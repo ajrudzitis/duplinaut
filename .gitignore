@@ -1,0 +1,8 @@
+/target/
+/.tools/
+/.duvet/reports/
+/.duvet/specifications/
+/.duvet/requirements/
+/.verus-log/
+__pycache__/
+*.pyc
