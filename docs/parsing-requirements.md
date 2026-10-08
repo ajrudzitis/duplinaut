@@ -19,6 +19,8 @@ Public documentation is the first reference:
 | DOC-DUP | [Duplicity manual, currently 3.2.1](https://duplicity.gitlab.io/stable/duplicity.1.html) | Backup model, signature-based listing, native metadata, encryption and prefix options |
 | DOC-NAME | [Official filename documentation](https://gitlab.com/duplicity/duplicity/-/raw/dev/docs/file_naming.rst) | Long/short object names, partial markers, suffixes |
 | DOC-RSYNC | [Librsync file formats](https://librsync.github.io/page_formats.html) | Integer byte order, signature and delta structures |
+| DOC-TAR | [Python 3.13 tar formats](https://docs.python.org/3.13/library/tarfile.html) | ustar/GNU/PAX interoperability and current PAX producer default |
+| DOC-GZIP | [RFC 1952](https://www.rfc-editor.org/rfc/rfc1952) | Gzip member structure, CRC32 and uncompressed-size checks |
 | DOC-VEST | [Vest project documentation](https://github.com/secure-foundations/vest) | DSL, combinators, verification guarantees and frontend trust |
 | DOC-DUVET | [Duvet specifications](https://awslabs.github.io/duvet/specifications.html), [annotations](https://awslabs.github.io/duvet/annotations.html), [reports](https://awslabs.github.io/duvet/reports.html) | Markdown requirement extraction and evidence links |
 
@@ -33,8 +35,13 @@ Official source fallback inspected on 2026-10-07: duplicity **3.0.7**, available
 | SRC-PATCH | [patchdir.py](https://gitlab.com/duplicity/duplicity/-/blob/rel.3.0.7/duplicity/patchdir.py): `get_index_from_tarinfo`, `Multivol_Filelike`, `patch_seq2ropath` | `9cd4bbb8f27c1a7508c73903a448a8018e7202b344880945b3111d75619f7439` |
 | SRC-HASH | [gpg.py](https://gitlab.com/duplicity/duplicity/-/blob/rel.3.0.7/duplicity/gpg.py): `get_hash` | `e39d6fbc645a08364fe9a9207f8e9bb3085f99ded8738a2c467630e7adaf9ddb` |
 | SRC-TAR | [dup_tarfile.py](https://gitlab.com/duplicity/duplicity/-/blob/rel.3.0.7/duplicity/dup_tarfile.py) | `b1e7c58f707bfb71a45fcf797cd6cf5729b5600ca1a9a7e70a0ec071b987e529` |
+| SRC-MAIN | [dup_main.py](https://gitlab.com/duplicity/duplicity/-/blob/rel.3.0.7/duplicity/dup_main.py): `write_multivol.get_indicies`, manifest publication | `6ae35084d2c705ae3c55bb100750ae50328c46c3090dcb3631d837ae1d96023e` |
 
 SRC-RSYNC references the official [opcode table](https://github.com/librsync/librsync/blob/271744de428c0177e993f95c045d70b8cf2558f2/src/prototab.c) and [magic numbers](https://github.com/librsync/librsync/blob/271744de428c0177e993f95c045d70b8cf2558f2/src/librsync.h), independently fetched and reviewed on 2026-10-07 at commit `271744de428c0177e993f95c045d70b8cf2558f2`. Their SHA-256 values are `2c7500cd1d485ef55720707607b7876fdc00a42677f53aab465b114f05eaa972` and `4974e6e51fabc0de94b03e7b640cdd21e4979a41bdf3e7bd975bc029aa655762`, respectively. The public format page omits the implicit literal opcodes, so source fallback is necessary.
+
+At the same immutable librsync commit, [sumset.h](https://github.com/librsync/librsync/blob/271744de428c0177e993f95c045d70b8cf2558f2/src/sumset.h) validates signature lengths (SHA-256 `5085b769fe4b67454ac0a099acc8af052d67f28bdcb18cfccf5c556f4738b831`); [checksum.c](https://github.com/librsync/librsync/blob/271744de428c0177e993f95c045d70b8cf2558f2/src/checksum.c) defines MD4 length 16 and BLAKE2 length 32 (SHA-256 `bea24c9e1ab77bb04a1d12e8233f0ac57f687d16603157234bb2230ec08e543c`).
+
+Observed official producer evidence is stored in `tests/fixtures/duplicity-3.0.7/`: deterministic source-tree oracles in `expected.json`, original archive digests and exact producer/restoration argv in `provenance.json`, and container/multipart observations in `format-observations.json`. The complete source recipe is `tests/producer/generate.py`. Successful official restoration establishes producer/oracle consistency, not native-reader completion.
 
 Target compatibility versions are duplicity 0.8.23, 2.1.3, 3.0.7, and 3.2.1. These are intended test targets, not currently supported or tested versions. Runtime parsing, decryption, decompression, indexing, and restoration are native Rust operations. Official duplicity, GnuPG, and rdiff are producers and reference implementations for tests.
 
@@ -70,7 +77,7 @@ Provenance: POLICY. Environmental I/O failures are errors; process exhaustion ou
 
 The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
 
-Provenance: POLICY. Limit failures are reported without publishing a partial restoration. Concrete defaults are unresolved in OPEN-LIMITS.
+Provenance: POLICY. Defaults: decoded object 8 GiB; reconstructed file 1 TiB; temporary storage 64 GiB; total retained metadata 256 MiB; entries/objects 10 million each; path bytes 1 MiB; path components 1024; nested envelope depth 8; gzip members 1024. All are configurable before opening a repository. Streaming operations enforce running totals before exceeding a bound. Larger historical repositories may require explicit larger limits; exceeding a default is a resource-limit error, not malformed input.
 
 ### PARSE-GEN-006
 
@@ -103,7 +110,7 @@ Informative grammar, where `G` is the configured global prefix, `K` the configur
 | Full signatures | `duplicity-full-signatures.T.sigtar` | `dfs.t.st` |
 | Incremental signatures | `duplicity-new-signatures.T.to.T.sigtar` | `dns.t.t.st` |
 
-`K` selects archive, manifest, or signature prefix by kind. Defaults for `G` and `K` are empty; `duplicity-` is part of the long stem. This follows SRC-NAME and DOC-DUP; DOC-NAME's description of a default global `duplicity-` prefix is imprecise relative to the inspected implementation. A long stem can have `.part` before the envelope suffix; a short stem can have `.p`. Envelope suffix is empty, `.gz`, `.gpg`, or recognized-but-unsupported `.p7m`. Statistics objects are recognized as auxiliary; their contents are outside the reader's restoration grammar. OPEN-NAMES records cases not yet resolved.
+`K` selects archive, manifest, or signature prefix by kind. Defaults for `G` and `K` are empty; `duplicity-` is part of the long stem. This follows SRC-NAME and DOC-DUP; DOC-NAME's description of a default global `duplicity-` prefix is imprecise relative to the inspected implementation. Every long stem can have `.part` before the envelope suffix; every short stem can have `.p`. SRC-NAME's producer emits partial incremental volume names while its reader regex does not consistently record their partial status; the project deliberately classifies those emitted names as partial rather than reproducing that inconsistency. Envelope suffix is exactly empty, `.gz`, `.gpg`, or recognized-but-unsupported `.p7m`; arbitrary additional suffixes are rejected for recognized stems. Statistics objects are auxiliary, outside the restoration grammar, and do not supply snapshot/volume completeness evidence.
 
 ### PARSE-NAME-001
 
@@ -127,7 +134,13 @@ Provenance: DOC-NAME, SRC-NAME. A short timestamp is seconds since the Unix epoc
 
 The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
 
-Provenance: DOC-NAME, SRC-TIME. Calendar validation and legacy/leap-second handling await OPEN-TIME; no locale-relative command-line time syntax is implied by this requirement.
+Provenance: DOC-NAME, SRC-TIME. The supported date profile uses real Gregorian calendar dates, years 1901..2099, hour 00..23, minute/second 00..59. The reader rejects normalization-only dates and leap-second fields 60/61 rather than reproducing Python's normalization. No locale-relative command-line time syntax is accepted.
+
+### PARSE-NAME-007
+
+The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+
+Provenance: SRC-TIME; valid-calendar bounds follow PARSE-NAME-004. Zone hours/minutes are 00..23/00..59, and UTC is local calendar time minus the signed offset. The separator defaults to `:` and is supplied explicitly by the caller for other archives. Its precise supported predicate is one byte in `0x21..0x7e` excluding `/`, `.`, `+`, `-`, ASCII digits, and `T`, `t`, `Z`, `z`; other values are configuration errors. This is POLICY rather than the upstream parser's unrestricted configuration. Accepted `T`/`Z` letters are case-insensitive. Short timestamps remain epoch seconds. Legacy-format producer testing is a pending compatibility claim, distinct from this explicit reader grammar.
 
 ### PARSE-NAME-005
 
@@ -147,7 +160,7 @@ Provenance: POLICY. Ambiguous or inconsistent identities do not authorize choosi
 
 The reader MUST decode unencrypted raw objects and gzip-enveloped objects according to their classified envelope.
 
-Provenance: DOC-DUP, SRC-NAME. Gzip member/trailing-byte policy awaits OPEN-ENVELOPE.
+Provenance: DOC-DUP, SRC-NAME, DOC-GZIP. Gzip accepts consecutive complete members up to the configured count, validates CRC32 and ISIZE for every member, and concatenates their decoded bytes. Any remaining byte that is not another valid gzip member is rejected; zero trailing bytes are not silently accepted. Official current archives contain one member. Header optional fields are bounded by decoded/input resource limits.
 
 ### PARSE-ENV-002
 
@@ -177,13 +190,13 @@ Provenance: SRC-HASH and manifest use in duplicity restoration. SHA1 and MD5 are
 
 An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
 
-Provenance: POLICY. Missing required digests, conflicting digests, and malformed digest values await OPEN-MANIFEST. No unchecked success is implied.
+Provenance: POLICY. Every selected volume needs at least one supported declared digest. SHA1 requires exactly 40 hexadecimal digits, MD5 exactly 32; hex case is immaterial. Conflicting declarations of the same algorithm are rejected. Every supported declared digest is checked; an unsupported declaration can be retained for display when supported declarations still validate the volume. No unchecked success is implied.
 
 ## Manifests
 
-Known emitted structure from SRC-MAN: optional `Hostname value` and `Localdir token` lines; `Filelist count` followed by indented `action token` records; volume sections beginning `Volume N:` with indented `StartingPath token [block]`, `EndingPath token [block]`, and `Hash algorithm hex` lines. Field names are accepted case-insensitively by the inspected reader. A block number is optional decimal metadata and differs from a volume number. Paths denote slash-separated byte components; `.` denotes the root.
+Known emitted structure from SRC-MAN and actual 3.0.7 fixtures: optional `Hostname value` and `Localdir token` lines; volume sections beginning `Volume N:` with indented `StartingPath token [block]`, `EndingPath token [block]`, and `Hash algorithm hex` lines; optional `Filelist count` followed by indented `action token` records. Streaming manifests append Filelist **after** volume records; the alternate `Manifest.to_string` serialization places it before them. Both positions are supported. Field names are case-insensitive. A block number is optional positive decimal metadata and differs from a volume number. Paths denote slash-separated byte components; `.` denotes the root. LF or CRLF terminates lines; a final line can omit its terminator. Whitespace separating fields is ASCII space or tab. Duplicate singleton fields within a volume, incomplete volume records, unknown structural fields, and inconsistent file-list counts are rejected under the project profile. Blank lines are permitted between records.
 
-Quoted tokens use surrounding double quotes and `\xHH` byte escapes. The producer escapes ASCII whitespace, backslash, double quote, and single quote. Unquoted tokens contain none of these bytes. Escape decoding is byte-preserving; it is not shell, JSON, or Unicode unescaping. Single-quote acceptance, unknown fields, optional headers, and historical file-list grammar remain in OPEN-MANIFEST.
+Quoted tokens use surrounding double quotes and `\xHH` byte escapes. Inside quotes literal bytes are permitted except backslash, double quote, NUL, LF, and CR. Raw tabs, spaces, and single quotes are permitted there as a reader POLICY; official producers instead escape ASCII whitespace, backslash, double quote, and single quote. Unquoted tokens contain no byte in ASCII whitespace `0x09..0x0d` or `0x20`, backslash, double quote, single quote, or NUL; they are nonempty. Escape decoding is byte-preserving; it is not shell, JSON, or Unicode unescaping. In particular `\x00` is syntactically valid and path validation subsequently rejects the decoded NUL. Single-quote wrappers are unsupported. The optional Hostname remainder is opaque metadata rather than a filesystem path. Missing headers and Filelist do not prevent data reconstruction; missing required volume integrity/range records do. Filelist actions in the observed profile are `new`, `changed`, and `deleted`; the list is change-summary metadata, not an authoritative restored directory listing.
 
 ### PARSE-MAN-001
 
@@ -195,7 +208,7 @@ Provenance: SRC-MAN. Required path fields, volume positivity, and numeric conver
 
 The manifest token parser MUST decode a valid double-quoted token's `\xHH` escape to exactly the represented byte.
 
-Provenance: SRC-MAN. Both hexadecimal letter cases are accepted. Plain permitted bytes between escapes remain unchanged.
+Provenance: SRC-MAN and the reviewed reader token grammar above. Both hexadecimal letter cases are accepted. Plain permitted bytes between escapes remain unchanged; an empty double-quoted token is syntactically valid and is validated for its field separately.
 
 ### PARSE-MAN-003
 
@@ -219,11 +232,21 @@ Provenance: SRC-MAN; conservative selection is POLICY. Compare byte-component se
 
 The reader MUST retain the distinction between absent block boundaries and explicit numeric block boundaries.
 
-Provenance: SRC-MAN. Exact block-boundary meaning awaits OPEN-MULTIPART; absence is not numeric zero.
+Provenance: SRC-MAN, SRC-MAIN, SRC-DIFF. A present EndingPath block `n` means multipart part `n` was emitted and the logical entry is still incomplete. A present StartingPath block gives the first continuing emitted part number. Absence means no continuing part is pending at that boundary; it can occur when a volume starts with a final short part and therefore does not imply part 1. Absence is not numeric zero.
+
+### PARSE-MAN-007
+
+The manifest parser MUST accept an optional counted Filelist section before or after volume records without interpreting its lines as volume fields.
+
+Provenance: SRC-MAN and official 3.0.7 fixtures. Parse action and token separately; preserve path bytes and reject malformed/count-inconsistent summaries. Filelist absence does not mean the snapshot is empty.
 
 ## Tar containers and duplicity entries
 
-Tar header blocks and payload alignment use 512-byte units. The inspected producer closes data volumes with zero padding to a 10240-byte record boundary; when already aligned it writes another zero record. Each stored data volume is decoded as its own tar container before records are combined. It is not valid to concatenate encrypted or compressed object bytes and treat them as one tar stream.
+Tar header blocks and payload alignment use 512-byte units. Actual 3.0.7 raw/gzip data volumes end at a complete entry boundary **without zero end blocks**: `GzipWriteFile` never writes `get_footer`, even on the final volume. In contrast, `GPGWriteFile` writes zero padding of `10240 - (entry_stream_bytes mod 10240)` bytes; this can be only 512 bytes. For a nonfinal encrypted volume it can then append a top-off consisting of the beginning of that stored ciphertext object. Each stored volume is decoded separately before entries are combined. An object boundary alone does not establish logical multipart completion.
+
+Header fields follow the common layout: name bytes 0..100, mode 100..108, uid 108..116, gid 116..124, size 124..136, mtime 136..148, checksum 148..156, type 156, linkname 157..257, magic/version 257..265, user/group names 265..329, and device numbers 329..345. Accepted magic/version bytes are POSIX `ustar\0` plus `00`, old GNU `ustar ` plus ` \0`, and eight zero bytes for V7. Only POSIX/ustar headers interpret bytes 345..500 as a path prefix and join a nonempty prefix with name using `/`; old GNU uses that region for other metadata and never treats it as a prefix. V7 has no prefix either. Interpret name/link bytes up to NUL. Numeric fields accept bounded ASCII octal surrounded by permitted spaces/NUL padding; GNU `0x80` positive or `0xff` negative base256 fields are decoded as in the inspected Python implementation. Negative sizes/modes/IDs are rejected; modification times use signed seconds but emitted negative original mtimes are clamped to zero by duplicity. Header checksum accepts the unsigned or historical signed-byte sum with its eight checksum bytes treated as spaces. Resource/platform bounds apply before use.
+
+Supported metadata entries are GNU `L`/`K` long name/link, PAX `x` per-entry headers, and PAX `g` global headers. PAX records are `decimal-length SPACE key=value LF`, length including the entire record; malformed lengths/terminators and duplicate keys within one header are rejected. Supported semantic keys are `path`, `linkpath`, `size`, `mtime`, `uid`, `gid`, `uname`, `gname`, `atime`, `ctime`, and `hdrcharset`; sparse/other keys affecting interpretation are unsupported. Global values apply until replaced; local values override global values for the next real entry, and empty values delete inherited entries. PAX path/link values normally encode UTF-8; `hdrcharset=BINARY` preserves their original bytes. PAX `size`, `uid`, and `gid` are nonnegative decimal; time values are signed decimal seconds with optional fractional nanoseconds, rejected if nonzero precision would be lost. User/group strings and atime/ctime are display-only metadata. Local/GNU metadata records need a following real entry; a dangling override is an error. The observed Python 3.13 producer uses PAX `path` and `hdrcharset=BINARY` for long/raw-byte names; it does not use GNU `L` for those cases.
 
 Data entry names: `snapshot/<path>`, `diff/<path>`, `deleted/<path>`, `multivol_snapshot/<path>/<part>`, and `multivol_diff/<path>/<part>`. Signature entry names: `signature/<path>`, `snapshot/<path>`, and `deleted/<path>`. A trailing separator in a directory/root entry is interpreted using the format-specific path rules. Multipart `part` numbers are positive decimal integers starting at 1; they are unrelated to stored volume numbers.
 
@@ -231,7 +254,7 @@ Data entry names: `snapshot/<path>`, `diff/<path>`, `deleted/<path>`, `multivol_
 
 The tar parser MUST validate each header checksum and payload extent before accepting the entry it describes.
 
-Provenance: SRC-TAR; exact numeric variants and checksum compatibility await OPEN-TAR.
+Provenance: SRC-TAR delegates to Python tarfile; DOC-TAR and the reviewed header profile above. Actual official fixtures confirm PAX path/BINARY headers and whole entry extents.
 
 ### PARSE-TAR-002
 
@@ -241,9 +264,9 @@ Provenance: SRC-TAR. Padding bytes are container bytes, not file content.
 
 ### PARSE-TAR-003
 
-The reader MUST support the reviewed GNU/ustar headers and GNU long-name/long-link records emitted by the supported producer profiles.
+The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
-Provenance: SRC-TAR, SRC-DIFF; full profile awaits OPEN-TAR. Review supported PAX records separately rather than silently ignoring path or size overrides.
+Provenance: SRC-TAR, SRC-DIFF, DOC-TAR; official 3.0.7 fixtures exercise PAX path and binary path encoding. Historical GNU and additional supported PAX variant tests remain pending; they do not authorize ignoring an override.
 
 ### PARSE-TAR-004
 
@@ -253,9 +276,9 @@ Provenance: POLICY. An unknown encoding cannot be skipped by guessing its size o
 
 ### PARSE-TAR-005
 
-The tar parser MUST validate archive termination and reject non-padding data after the accepted end marker.
+The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.
 
-Provenance: POLICY. Accepted zero-padding lengths and empty signature archives await OPEN-TAR; arbitrary trailing bytes are not padding.
+Provenance: SRC-HASH (`GzipWriteFile`, `GPGWriteFile`), SRC-DIFF, official 3.0.7 observations. Raw/gzip data volumes accept complete-entry EOF; zero-terminated tar inputs accept only integral zero blocks after their marker. Encrypted data volumes require the exact zero footer described above; optional nonfinal top-off is validated as an exact prefix of the original stored ciphertext bytes. Final encrypted volumes permit no top-off. Signature archives accept a standard zero-terminated tar (including empty) or an exactly zero-byte decoded signature stream. Unexpected trailing bytes and dangling extended headers are errors. Any missing required stored volume or incomplete multipart entry remains an error despite valid container EOF.
 
 ### PARSE-ENTRY-001
 
@@ -291,7 +314,7 @@ Provenance: POLICY. A zero-length last part is valid producer behavior when cont
 
 The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
 
-Provenance: POLICY; depends on OPEN-MULTIPART. There is no explicit final-part flag in the inspected emitted entry name.
+Provenance: SRC-DIFF, SRC-MAIN, official multipart fixtures. For the inspected 3.0.7 profile every nonfinal part has exactly 65536 payload bytes; the final part is shorter, including a zero-byte part after an exact multiple. Validate these lengths and sequential numbers against manifest boundary markers. The last normalized volume needs no pending EndingPath block, every required volume must exist and pass integrity, and complete container parsing must succeed. There is no explicit final-part flag in the emitted name; valid tar EOF alone never establishes completion.
 
 ## Librsync signatures
 
@@ -309,7 +332,7 @@ Provenance: DOC-RSYNC, SRC-RSYNC.
 
 The signature parser MUST validate nonzero block length, supported strong-checksum length for the selected magic, and complete checksum records.
 
-Provenance: DOC-RSYNC, SRC-RSYNC. Permitted checksum lengths require immutable upstream evidence before implementation; see OPEN-SIGNATURE.
+Provenance: DOC-RSYNC, pinned SRC-RSYNC `sumset.h` and `checksum.c`. MD4 variants permit strong-checksum length 1..16; BLAKE2 variants permit 1..32. Zero block length and zero checksum length are rejected rather than treated as producer default requests. The payload after the 12-byte header must be an exact multiple of `4 + strong-checksum length`; zero records are valid for an empty source file.
 
 ### PARSE-SIG-003
 
@@ -397,7 +420,7 @@ Provenance: POLICY. Metadata-only listings explicitly distinguish discovery from
 
 Snapshot interpretation MUST apply additions, replacement content, deltas, deletions, and file-type changes in chain order to the selected backup-relative path state.
 
-Provenance: SRC-DIFF, SRC-PATCH. Exact ancestor/subtree rules and metadata-only deltas require OPEN-STATE before implementation.
+Provenance: SRC-DIFF, SRC-PATCH and official 3.0.7 source/restore oracle. Snapshot records replace content/type/metadata at their path; replacement with a nondirectory also removes any descendant state. Directory snapshots preserve descendants unless explicitly deleted/replaced. Deletion removes the selected path and descendants; a later recreation is independent of former data. Diffs replace reconstructed regular content and update metadata from their own tar record. Unmentioned paths persist. Metadata-only regular changes can still encode a delta containing only copies; they are not absent changes. A resulting nonroot entry cannot have a missing/nondirectory ancestor. Apply all entries of a set before final ancestor consistency validation, because a nondirectory replacement can precede emitted descendant deletion records in component order.
 
 ### PARSE-STATE-002
 
@@ -567,8 +590,8 @@ This table is an initial mapping of obligations, not passing evidence. The verif
 | --- | --- | --- | --- |
 | VG-PARSE | PARSE-GEN, PARSE-PATH, PARSE-NAME, PARSE-MAN, PARSE-TAR, PARSE-SIG | Refines reviewed byte grammar; bounded consumption and arithmetic; finite-input termination/panic freedom | Planned |
 | VG-DELTA | PARSE-DELTA | Command decoder refinement and concatenation of literal/basis slices; source/output bounds | Planned |
-| VG-ASSEMBLY | PARSE-MULTI, PARSE-MAN-004..006 | Ordered concatenation, restart normalization, conservative volume selection, completion conditions | Planned; boundary question open |
-| VG-STATE | PARSE-CHAIN, PARSE-STATE | Unique contiguous chain and path-state transitions | Planned; transition question open |
+| VG-ASSEMBLY | PARSE-MULTI, PARSE-MAN-004..006 | Ordered concatenation, restart normalization, conservative volume selection, completion conditions | Reviewed 3.0.7 contract; native implementation/proofs pending |
+| VG-STATE | PARSE-CHAIN, PARSE-STATE | Unique contiguous chain and path-state transitions | Reviewed 3.0.7 contract; native implementation/proofs pending |
 | VG-RESTORE | PARSE-PATH, RESTORE | Valid selected paths and destination mapping; filesystem contract review and integration tests | Planned |
 | VG-INTEGRATION | PARSE-ENV, PARSE-SOURCE, PARSE-BROWSE | Trusted-adapter contract review, corruption/decryption/source-change tests | Planned; crypto profile open |
 
@@ -576,19 +599,28 @@ Official-producer scenarios: full and multiple incrementals; add/change/delete/r
 
 Adversarial scenarios: every opcode and width including implicit literals and zero-length commands; truncation at every field boundary; reserved commands, wrong magic, missing/trailing END, out-of-bounds copies, integer overflow, wrong passwords/keys/signers, mutated digests, malformed quoting, invalid tar checksums, malicious path components, symlink escapes, destination races, multipart loss/reordering, object replacement during reads, resource exhaustion, cancellation, and interrupted restoration. Official rdiff provides independent delta test data; it is not a runtime dependency. S3 tests include pagination and source conditions; TUI tests check that display escaping does not alter path identity.
 
-## Open questions and implementation holds
+## Profile decisions and remaining implementation holds
+
+The initial OPEN items below have reviewed reader decisions for the 3.0.7 profile. This releases specification holds for implementing that explicit profile; it does not confer native parser, proof, or historical-producer completion.
+
+| Former question | Reviewed decision and evidence |
+| --- | --- |
+| OPEN-TIME | Real Gregorian dates and bounded zones/years; exact separator predicate; reject leap-second and normalization-only inputs; SRC-TIME and explicit policy |
+| OPEN-NAMES | Exact six-kind long/short stem grammar, literal prefixes, optional partial marker on all stems, exact envelope suffix; correct the inconsistent upstream partial classification as a reader policy |
+| OPEN-MANIFEST | Byte token grammar; Filelist before/after volumes; explicit duplicates/fields/hash policy; restart normalization; source plus observed streaming manifests |
+| OPEN-TAR | Explicit POSIX/GNU/V7 interpretation, reviewed PAX subset, envelope-specific termination; source plus official gzip/raw-path/PAX observations |
+| OPEN-MULTIPART | 65536-byte nonfinal/short final chunks, inclusive ranges, manifest continuation markers, required integrity; source plus split snapshots/deltas and encrypted boundary probe |
+| OPEN-SIGNATURE | MD4 lengths 1..16/BLAKE2 lengths 1..32, nonzero blocks, complete records; immutable upstream assertions/constants |
+| OPEN-STATE | Ordered snapshot/diff/delete transitions and ancestor consistency; source plus source-tree/official-restoration comparisons for all three backup dates |
+| OPEN-ENVELOPE | Complete gzip members, per-member CRC/ISIZE, no trailing nonmember data; RFC 1952 and one-member official fixtures |
+| OPEN-LIMITS | Visible configurable byte/count/depth defaults and running-total enforcement; policy informed by actual fixture sizes |
+
+Remaining implementation/compatibility holds:
 
 | ID | Unresolved question | Evidence and required next action | Affected requirements |
 | --- | --- | --- | --- |
-| OPEN-TIME | Legacy `YYYY-MM-DDTHH:MM:SS±HH:MM`, configurable separators, leap seconds, calendar normalization, accepted year bounds and case | SRC-TIME has permissive/asserted normalization; pin expected semantics and test legacy official fixtures rather than inherit host time behavior | PARSE-NAME-004, chain date interpretation |
-| OPEN-NAMES | Partial incremental volume recognition and obsolete short-name production; exact auxiliary statistics grammar | SRC-NAME emits/recognizes partial markers inconsistently for incremental volumes; compare historical sources and fixtures before claiming all variants | PARSE-NAME-001,005 |
-| OPEN-MANIFEST | Historical/optional Filelist records, single quotes, duplicate fields, unknown fields, hash absence/algorithm conflict, newline variants and manifest completeness | SRC-MAN's permissive readers and producer syntax differ; select exact profile and rejection policy from producer fixtures and reviewed source | PARSE-MAN-001..003, PARSE-ENV-005..006 |
-| OPEN-TAR | Header numeric formats, signed checksums, GNU variants/PAX fields, timestamp precision, empty sigtars, exact end markers and padding | Inspect SRC-TAR and public tar standards; test actual producer containers and negative cases | PARSE-TAR-001..005, RESTORE-004 |
-| OPEN-MULTIPART | Last-part detection, incomplete final volumes, block-boundary semantics and duplicate metadata | SRC-DIFF emits no explicit final-part flag; SRC-PATCH groups by path; prove completion using manifests/container endpoints after producer testing | PARSE-MAN-006, PARSE-MULTI-003 |
-| OPEN-SIGNATURE | Accepted strong-checksum lengths for each magic and whether additional signature variants are required | DOC-RSYNC describes truncation; pin upstream length-validation source and producer variants | PARSE-SIG-002 |
-| OPEN-STATE | Metadata-only deltas, deletion of directories and ancestor replacement, ordering constraints within a set | Review SRC-DIFF/SRC-PATCH transition functions and compare official restoration for constructed trees | PARSE-STATE-001 |
 | OPEN-CRYPTO | Exact pgp library version/capabilities, legacy unauthenticated messages, OpenPGP packet variants/compression/signature policy | Establish native adapter profile with official GnuPG fixtures and RFC sources; unsupported legacy formats stay explicit | PARSE-ENV-002..004 |
-| OPEN-ENVELOPE | Gzip multiple members, trailing zeros, decoded-object termination | Consult gzip standards and producer outputs before fixing accepted envelope variants | PARSE-ENV-001 |
-| OPEN-LIMITS | Concrete defaults and stream/cache/staging contracts that make bounds enforceable | Measure official fixtures and design adapters before selecting defaults; all bounds remain visible/configurable | PARSE-GEN-005 |
+| OPEN-HISTORICAL | Confirm 0.8.23/2.1.3/3.2.1 archives, legacy timestamps, short names, historical tar/encrypted termination and chunk sizes | Run each pinned official producer and compare native results; do not generalize observed 3.0.7 constants across untested releases | Compatibility claims for every format subsystem |
+| OPEN-TAR-ADDITIONAL | Additional supported PAX fields/GNU variants and empty signature containers have no official fixture coverage yet | Generate targeted official or primary-format fixtures before accepting their implementation/testing milestones | PARSE-TAR-003,005 and metadata fidelity |
 
 Resolving a question updates the relevant normative text, provenance, proof obligations, and test scenarios. Broader compatibility claims require producer evidence for the claimed release. Duvet snapshots and README completion records are updated together after independent review.

@@ -1,0 +1,635 @@
+{
+  "producer": "duplicity 3.0.7 December 31, 2025",
+  "data_volumes": [
+    {
+      "path": "plain/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+      "entry_stream_bytes": 997888,
+      "raw_header_types_hex": {
+        "35": 5,
+        "30": 19,
+        "78": 1
+      },
+      "pax_fields": [
+        "path"
+      ],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": [
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f31",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f32",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f33",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f34",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f35",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f36",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f37",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f38",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f39",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3130",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3131",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3132",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3133",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3134",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3135",
+          "bytes": 65536
+        }
+      ]
+    },
+    {
+      "path": "plain/duplicity-full.20231114T221320Z.vol2.difftar.gz",
+      "entry_stream_bytes": 990720,
+      "raw_header_types_hex": {
+        "30": 15
+      },
+      "pax_fields": [],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": [
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3136",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3137",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3138",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3139",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3230",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3231",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3232",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3233",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3234",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3235",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3236",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3237",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3238",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3239",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3330",
+          "bytes": 65536
+        }
+      ]
+    },
+    {
+      "path": "plain/duplicity-full.20231114T221320Z.vol3.difftar.gz",
+      "entry_stream_bytes": 673792,
+      "raw_header_types_hex": {
+        "30": 19,
+        "32": 1,
+        "35": 2,
+        "78": 3
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": [
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3331",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3332",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3333",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3334",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3335",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3336",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3337",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3338",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3339",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3430",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f6c617267652e62696e2f3431",
+          "bytes": 0
+        }
+      ]
+    },
+    {
+      "path": "plain/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz",
+      "entry_stream_bytes": 999424,
+      "raw_header_types_hex": {
+        "35": 5,
+        "30": 20,
+        "78": 1
+      },
+      "pax_fields": [
+        "path"
+      ],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": [
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f31",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f32",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f33",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f34",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f35",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f36",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f37",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f38",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f39",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3130",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3131",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3132",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3133",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3134",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3135",
+          "bytes": 65536
+        }
+      ]
+    },
+    {
+      "path": "plain/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol2.difftar.gz",
+      "entry_stream_bytes": 502272,
+      "raw_header_types_hex": {
+        "30": 16,
+        "35": 3,
+        "78": 3
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": [
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3136",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3137",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3138",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3139",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3230",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3231",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3232",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f646966662f6c617267652e62696e2f3233",
+          "bytes": 26707
+        }
+      ]
+    },
+    {
+      "path": "plain/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz",
+      "entry_stream_bytes": 21504,
+      "raw_header_types_hex": {
+        "35": 7,
+        "30": 14,
+        "78": 4,
+        "32": 1
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": []
+    },
+    {
+      "path": "symmetric/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "entry_stream_bytes": 19968,
+      "raw_header_types_hex": {
+        "35": 7,
+        "30": 12,
+        "78": 4,
+        "32": 1
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 512,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": true,
+      "multipart": []
+    },
+    {
+      "path": "symmetric/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gpg",
+      "entry_stream_bytes": 20992,
+      "raw_header_types_hex": {
+        "35": 8,
+        "30": 13,
+        "78": 4
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 9728,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": true,
+      "multipart": []
+    },
+    {
+      "path": "symmetric/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gpg",
+      "entry_stream_bytes": 20480,
+      "raw_header_types_hex": {
+        "35": 7,
+        "30": 13,
+        "78": 4,
+        "32": 1
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 10240,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": true,
+      "multipart": []
+    },
+    {
+      "path": "public-key/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "entry_stream_bytes": 19968,
+      "raw_header_types_hex": {
+        "35": 7,
+        "30": 12,
+        "78": 4,
+        "32": 1
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 512,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": true,
+      "multipart": []
+    },
+    {
+      "path": "public-key/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gpg",
+      "entry_stream_bytes": 20992,
+      "raw_header_types_hex": {
+        "35": 8,
+        "30": 13,
+        "78": 4
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 9728,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": true,
+      "multipart": []
+    },
+    {
+      "path": "public-key/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gpg",
+      "entry_stream_bytes": 20480,
+      "raw_header_types_hex": {
+        "35": 7,
+        "30": 13,
+        "78": 4,
+        "32": 1
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 10240,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": true,
+      "multipart": []
+    },
+    {
+      "path": "signed/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "entry_stream_bytes": 19968,
+      "raw_header_types_hex": {
+        "35": 7,
+        "30": 12,
+        "78": 4,
+        "32": 1
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 512,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": true,
+      "multipart": []
+    },
+    {
+      "path": "signed/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gpg",
+      "entry_stream_bytes": 20992,
+      "raw_header_types_hex": {
+        "35": 8,
+        "30": 13,
+        "78": 4
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 9728,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": true,
+      "multipart": []
+    },
+    {
+      "path": "signed/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gpg",
+      "entry_stream_bytes": 20480,
+      "raw_header_types_hex": {
+        "35": 7,
+        "30": 13,
+        "78": 4,
+        "32": 1
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 10240,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": true,
+      "multipart": []
+    }
+  ],
+  "encrypted_boundary_probe": [
+    {
+      "basename": "duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "entry_stream_bytes": 1057280,
+      "raw_header_types_hex": {
+        "35": 1,
+        "30": 16
+      },
+      "pax_fields": [],
+      "zero_footer_bytes": 7680,
+      "topoff_bytes": 29599,
+      "topoff_equals_stored_prefix": true,
+      "multipart": [
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f31",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f32",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f33",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f34",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f35",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f36",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f37",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f38",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f39",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3130",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3131",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3132",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3133",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3134",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3135",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3136",
+          "bytes": 65536
+        }
+      ]
+    },
+    {
+      "basename": "duplicity-full.20231114T221320Z.vol2.difftar.gpg",
+      "entry_stream_bytes": 264704,
+      "raw_header_types_hex": {
+        "30": 5
+      },
+      "pax_fields": [],
+      "zero_footer_bytes": 1536,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": true,
+      "multipart": [
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3137",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3138",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3139",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3230",
+          "bytes": 65536
+        },
+        {
+          "name_hex": "6d756c7469766f6c5f736e617073686f742f70726f62652e62696e2f3231",
+          "bytes": 0
+        }
+      ]
+    }
+  ]
+}

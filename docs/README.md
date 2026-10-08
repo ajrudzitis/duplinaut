@@ -18,12 +18,12 @@
 
 ## Verification goals
 
-No implementation or proof is presently complete. An initial specification is available for every goal; goals with open questions cannot be accepted until those questions are resolved.
+Delta decoding and application, manifest token decoding, and byte-path validation now have native implementations and passing tests. Formal proofs and component acceptance are in progress. An initial specification is available for every goal; goals with open questions cannot be accepted until those questions are resolved.
 
 | Goal | Correctness claim | Implementation | Proof | Compatibility tests | Independent review |
 | --- | --- | --- | --- | --- | --- |
-| VG-PARSE | Input grammar refinement, bounds, arithmetic, termination, panic freedom | Pending | Pending | Pending | Pending |
-| VG-DELTA | Complete opcode decoding and exact literal/basis-slice reconstruction | Pending | Pending | Pending | Pending |
+| VG-PARSE | Input grammar refinement, bounds, arithmetic, termination, panic freedom | Delta/token/path implemented; remaining parsers pending | In progress | Delta official 3.0.7 payload tests pass; remaining pending | In progress |
+| VG-DELTA | Complete opcode decoding and exact literal/basis-slice reconstruction | Implemented | In progress | Official 3.0.7 incremental and metadata-only payloads pass | Adversarial tests pass; formal acceptance pending |
 | VG-ASSEMBLY | Restart records, conservative selection, complete ordered multipart content | Pending | Pending | Pending | Pending |
 | VG-STATE | Unique contiguous chains and correct path-state transitions | Pending | Pending | Pending | Pending |
 | VG-RESTORE | Valid selected paths, destination containment, supported metadata fidelity | Pending | Pending; trusted filesystem boundary | Pending | Pending |
