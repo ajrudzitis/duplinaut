@@ -1,50 +1,85 @@
-# Duplicity backup reader in Rust
+```text
+ ____  _   _ ____  _     ___ ____ ___ _____ __   __
+|  _ \| | | |  _ \| |   |_ _/ ___|_ _|_   _|\ \ / /
+| | | | | | | |_) | |    | | |    | |  | |   \ V /
+| |_| | |_| |  __/| |___ | | |___ | |  | |    | |
+|____/ \___/|_|   |_____|___\____|___| |_|    |_|
 
-A planned native Rust reader for browsing duplicity backup history and restoring selected entries from local archives and S3. Backup creation and bucket mutation are outside the project.
+             B A C K U P   R E A D E R
+```
 
-The first deliverable was the [parsing requirements](docs/parsing-requirements.md), written and independently reviewed before implementation using RFC requirement language. The repository now contains the Cargo workspace, assurance tooling, and initial native format components. Complete browsing, reconstruction, restoration, S3 access, and the TUI remain pending. Proofs and compatibility evidence are tracked separately from executable code.
+**Browse history. Recover files. Verify the reader.**
 
-## Development milestones
+A native Rust project for browsing duplicity backups and restoring selected files from local archives and S3. The reader runs without duplicity, GnuPG, or librsync executables; the official application supplies independent test fixtures.
 
-Tasks are checked only when the stated evidence passes. Specification, implementation, proof, compatibility testing, and review are separate completion states; a Duvet citation alone does not establish any of them.
+[Requirements](docs/parsing-requirements.md) | [Assurance progress](docs/README.md) | [Tool setup](tools/README.md) | [Official fixtures](tests/fixtures/README.md)
 
-- [x] Draft the parsing requirements before attempting implementation.
-- [x] Record primary-document and official-source provenance and unresolved format questions.
-- [x] Define verification goals and milestone completion rules.
-- [x] Independently review the initial specification while retaining unresolved format holds.
-- [x] Establish Duvet extraction and a reviewed snapshot baseline.
-- [x] Pin compatible Rust, Verus, Vest, Duvet, and solver versions and validate installed tools.
-- [ ] Complete the official-producer environment matrix.
-- [x] Establish and independently review xtask generation, traceability, verified-build, test, and CI gates.
-- [ ] Complete one small parser component with reviewed requirements, production implementation, proofs, official fixture tests, and independent acceptance.
-- [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers with the same evidence.
-- [ ] Complete snapshot indexing and native Linux restoration with verified reconstruction and filesystem integration tests.
-- [ ] Complete the read-only S3 adapter and its source consistency tests.
-- [ ] Complete the browsing/restoration TUI and progress/cancellation behavior.
-- [ ] Pass the supported official-producer compatibility matrix and publish the precise capability/trust profile.
+## Where things stand
 
-## Workspace and development commands
+**Under construction.** Initial reader kernels work; complete repository browsing, restoration, and the terminal interface are still being built. Passing tests, completed proofs, and independent acceptance are recorded separately.
 
-The product crates are `duplicity-core`, `duplicity-s3`, and `duplicity-tui`; an auxiliary `xtask` crate manages development checks. The core owns deterministic parsing and reconstruction. S3 and TUI crates currently expose scaffold status; AWS dependencies remain outside the core. Parsers are authored in Vest DSL with reviewed generated Rust used at runtime.
+| Component | Current evidence | Remaining work |
+| --- | --- | --- |
+| Delta decoding and application | Native and adversarial tests; official small and multipart payloads; focused Verus run passes | Dependency verification and final component acceptance |
+| Manifest tokens and byte paths | Native tests pass; exact grammar reviewed | Semantic proofs and complete manifest parsing |
+| Storage interface | Exact-size and cancellation tests pass | S3 adapter and source-consistency integration |
+| Assurance tooling | Pinned tools, Duvet baseline, executable failure tests, independent review | Expand gates as components are accepted |
+| Repository browser and restore | Requirements and official source-tree oracles | Implementation, proofs, and compatibility matrix |
+| Terminal interface | Workspace scaffold | Browsing, restore selection, progress, and cancellation |
 
-The commands below are implemented. [Tool setup](tools/README.md) documents bootstrapping and executable overrides. Twelve tooling failure tests and independent review passed. Default builds run verification and fail on incomplete proofs or unreviewed trust; parser milestone acceptance remains separate.
+The [parsing requirements](docs/parsing-requirements.md) were written in RFC 2119/8174 language and independently reviewed **before implementation**. Public documentation leads format research; immutable official-source references and producer evidence resolve ambiguities.
 
-| Command | Acceptance behavior |
+## Built around evidence
+
+Vest DSL definitions produce the parsing code used at runtime. Verus proofs connect that implementation to independently stated format and reconstruction semantics. A [documented direct-combinator fallback](crates/core/README.md#vest-dsl-and-fallback-record) handles a reviewed Vest frontend limitation.
+
+Duvet connects requirement headings to implementation and test evidence. A committed snapshot detects traceability regressions; coverage queries enforce accepted milestones. Formal obligations and successful verification runs are indexed separately in the [assurance ledger](docs/assurance.toml). Annotation counts and proof-function counts do not establish semantic coverage.
+
+Official duplicity 3.0.7 fixtures include full and incremental chains, multipart content, byte paths, metadata changes, deletions, symlinks, and encrypted/signed archives. Source-tree expectations were checked against official restoration. Native crypto and older-producer acceptance remain pending.
+
+Cryptography, compression, hashing, networking, and filesystem operations have explicit trusted adapter boundaries. Their integration tests and contract reviews are distinct from proofs of deterministic core algorithms. Specification, software, and verification agents work separately, with frozen executable handoffs for proof work.
+
+## Workspace
+
+| Crate | Responsibility |
 | --- | --- |
-| `cargo xtask build` | Generate/check parsers, run required verification, then compile the same production implementations |
-| `cargo xtask verify` | Run Verus obligations and audit trusted assumptions/exemptions |
-| `cargo xtask trace` | Run Duvet and produce requirement/evidence reports |
-| `cargo xtask trace-update` | Explicitly update the Duvet baseline for review and commit |
-| `cargo xtask test` | Run native tests and checked-in official-produced fixtures |
-| `cargo xtask producer` | Fail explicitly until official-fixture regeneration is established |
-| `cargo xtask ci` | Run the complete milestone acceptance gate |
+| [`duplicity-core`](crates/core) | Byte-preserving parsing, backup history, reconstruction, and restore contracts |
+| [`duplicity-s3`](crates/s3) | Read-only S3 access; AWS dependencies stay outside the core |
+| [`duplicity-tui`](crates/tui) | Terminal browsing and restoration |
+| [`xtask`](xtask) | Generation, verification, traceability, and acceptance checks |
 
-Ordinary Cargo builds are a development convenience once code exists; they do not establish verification evidence. Required tool absence, proof failure, timeout, stale generation, missing milestone evidence, and unreviewed assumptions fail the acceptance gate.
+## Development
 
-## Verification progress
+Start with the [pinned tool setup](tools/README.md), then use:
 
-The first delta component has executable tests and official-produced delta examples; its independent semantic proof remains pending. Tooling tests exercise actual Duvet coverage/snapshot failures, stale Vest generation, incomplete proof references, missing tools, unreviewed trust, and source identity. [Documentation progress](docs/README.md), per-crate READMEs, and the [machine ledger](docs/assurance.toml) distinguish those results from proved and independently accepted components. Structural declaration checks and Duvet links do not establish semantic correctness.
+```sh
+cargo xtask doctor       # Check tool and dependency identities
+cargo xtask build        # Verify, then build production code
+cargo xtask test         # Native tests and official-produced fixtures
+cargo xtask trace        # Duvet snapshot and accepted-milestone coverage
+cargo xtask ci           # Full acceptance checks
+```
 
-A dedicated specification agent owns requirements and provenance. A software agent implements reviewed contracts. A separate verification agent owns proof obligations, adversarial tests, and acceptance findings. The coordinator reviews handoffs, trusted boundaries, and requirement changes. Changes to contracts or assumptions return through specification review.
+`build` verifies by default. Missing tools, stale generated parsers, failed proofs, incomplete required evidence, or unreviewed assumptions fail the gate. The full core proof gate remains in progress; an ordinary Cargo build is a development check and carries no verification claim.
 
-[Duvet](https://github.com/awslabs/duvet) provides requirement traceability; [Verus](https://github.com/verus-lang/verus) and [Vest](https://github.com/secure-foundations/vest) provide the intended formal verification workflow. Cryptography, compression, hashing, networking, and filesystem adapters form explicitly documented trusted boundaries. A proof against the wrong specification is not considered completion.
+`cargo xtask generate` updates generated parsers for review. `cargo xtask trace-update` explicitly updates the Duvet baseline for review and commit. Official fixture regeneration is documented in [the producer guide](tests/producer/README.md); `cargo xtask producer` currently fails explicitly until that workflow is wired into xtask.
+
+## Backlog and milestones
+
+Tasks are checked only when their stated evidence passes. Each completed step gets a local Git commit, and useful working checkpoints record unfinished assurance work explicitly.
+
+- [x] Write and independently review parsing requirements before implementation.
+- [x] Record immutable format provenance and explicit implementation holds.
+- [x] Pin Rust, Verus, Vest, Duvet, and solver versions.
+- [x] Establish reviewed Duvet extraction, snapshots, and milestone coverage gates.
+- [x] Establish independently reviewed xtask generation and verification tooling.
+- [x] Produce official 3.0.7 fixtures with independent source/restore oracles.
+- [ ] Accept the first parser component with implementation, proofs, official tests, and independent review.
+- [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers.
+- [ ] Complete verified snapshot indexing and native Linux restoration.
+- [ ] Complete native OpenPGP adapters and their [capability profile](docs/openpgp-profile.md).
+- [ ] Complete the read-only S3 adapter and consistency/cancellation tests.
+- [ ] Complete the browsing/restoration TUI.
+- [ ] Pass the supported official-producer compatibility matrix.
+- [ ] **Create GitHub Actions for builds and formal methods:** install pinned tools, check generated parsers, run Verus, enforce Duvet coverage/snapshot gates, and run native/official-fixture tests on pull requests and pushes; retain reports and verification evidence as artifacts.
+- [ ] Publish the exact supported capabilities, verification claims, and trusted boundaries.
