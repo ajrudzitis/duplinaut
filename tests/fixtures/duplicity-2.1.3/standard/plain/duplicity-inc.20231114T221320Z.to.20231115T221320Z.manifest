@@ -1,0 +1,20 @@
+Hostname euler
+Localdir /tmp/duplicity-reader-producer-y6i200ll/plain-source
+Volume 1:
+    StartingPath   .  
+    EndingPath     switch/child.txt  
+    Hash SHA1 4dacf864817c6fc56c86652c3dd473f1154a1f70
+Filelist 13
+    changed  a/b/child.txt
+    changed  a!/sibling.txt
+    new      added.txt
+    changed  café-λ.txt
+    changed  empty.txt
+    changed  "line\x0abreak\x09tab"
+    changed  long/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+    changed  metadata.txt
+    changed  plain.txt
+    changed  raw-�.bin
+    deleted  revived.txt
+    changed  "space\x20quote\x27\x22\x20backslash\x5c.txt"
+    new      switch/child.txt

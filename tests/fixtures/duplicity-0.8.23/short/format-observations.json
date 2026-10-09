@@ -1,0 +1,59 @@
+{
+  "producer": "duplicity 0.8.23",
+  "data_volumes": [
+    {
+      "path": "plain/df.s44we8.1.dt.z",
+      "entry_stream_bytes": 19968,
+      "raw_header_types_hex": {
+        "35": 7,
+        "30": 12,
+        "78": 4,
+        "32": 1
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": []
+    },
+    {
+      "path": "plain/di.s44we8.s46r28.1.dt.z",
+      "entry_stream_bytes": 20992,
+      "raw_header_types_hex": {
+        "35": 8,
+        "30": 13,
+        "78": 4
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": []
+    },
+    {
+      "path": "plain/di.s46r28.s48lq8.1.dt.z",
+      "entry_stream_bytes": 20480,
+      "raw_header_types_hex": {
+        "35": 7,
+        "30": 13,
+        "78": 4,
+        "32": 1
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": []
+    }
+  ],
+  "encrypted_boundary_probe": []
+}

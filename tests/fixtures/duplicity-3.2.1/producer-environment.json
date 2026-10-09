@@ -1,0 +1,68 @@
+{
+  "nixpkgs_revision": "774debe7a0d1b496e35677ad955a1011c6ff74f3",
+  "python": "/nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/bin/python3",
+  "python_version": "3.12.14 (main, Aug 12 2026, 13:57:54) [GCC 15.3.0]",
+  "gpg": "/nix/store/krh2gxql1h8yx1h4l57vvphaw5wf1wqz-gnupg-2.4.9/bin/gpg",
+  "compiler": {
+    "argv": [
+      "/nix/store/79mr0jw3qccq7hhf1hh62knxd88dwazc-gcc-wrapper-15.3.0/bin/gcc",
+      "--version"
+    ],
+    "status": 0,
+    "output": "gcc (GCC) 15.3.0\nCopyright (C) 2025 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+  },
+  "librsync": {
+    "argv": [
+      "/nix/store/0skf1rj6ngdkpjjpmy86pf5y33kh6qaz-librsync-2.3.4/bin/rdiff",
+      "--version"
+    ],
+    "status": 0,
+    "output": "rdiff (librsync 2.3.4)\nCopyright (C) 1997-2016 by Martin Pool, Andrew Tridgell and others.\nhttp://librsync.sourcefrog.net/\nCapabilities: 64 bit files, trace disabled\n\nlibrsync comes with NO WARRANTY, to the extent permitted by law.\nYou may redistribute copies of librsync under the terms of the GNU\nLesser General Public License.  For more information about these\nmatters, see the files named COPYING.\n"
+  },
+  "nix_cflags_compile": " -frandom-seed=pyvs5vmns1 -isystem /nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/include -isystem /nix/store/k2h1g8ljqqqhxf1nhrwcdyixbm913jma-librsync-2.3.4-dev/include -isystem /nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/include -isystem /nix/store/k2h1g8ljqqqhxf1nhrwcdyixbm913jma-librsync-2.3.4-dev/include",
+  "nix_ldflags": "-rpath /nix/store/pyvs5vmns14331lwzdwvnvg2mzk9cm28-nix-shell/lib  -L/nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/lib -L/nix/store/8zfxg3r2wmvg7h6pgyf621gcrxmcch94-librsync-2.3.4-lib/lib -L/nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/lib -L/nix/store/8zfxg3r2wmvg7h6pgyf621gcrxmcch94-librsync-2.3.4-lib/lib",
+  "build_recipe_sha256": "75465e4200d2629605a1fe718b8cd61415d95c1af71f55a2e75d3626548756cd",
+  "record": {
+    "version": "3.2.1",
+    "source_url": "https://files.pythonhosted.org/packages/a8/31/94fac806c15bb2388f09c338f5f75a023c10eceffb496c18eec682976078/duplicity-3.2.1.tar.gz",
+    "source_sha256": "4284e3d8f0082a85d3dcfa634901532a1087463df7a33ead417670c0d63b9ef5",
+    "source_patches": [],
+    "build": {
+      "argv": [
+        "/nix/store/79mr0jw3qccq7hhf1hh62knxd88dwazc-gcc-wrapper-15.3.0/bin/gcc",
+        "-shared",
+        "-fPIC",
+        "-O2",
+        "-I/nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/include/python3.12",
+        "/tmp/duplicity-reader-historical-built/duplicity-3.2.1/duplicity/_librsyncmodule.c",
+        "-lrsync",
+        "-o",
+        "/tmp/duplicity-reader-historical-built/duplicity-3.2.1/duplicity/_librsync.cpython-312-x86_64-linux-gnu.so"
+      ],
+      "status": 0,
+      "output": ""
+    },
+    "wrapper_sha256": "60137d21964878ed56cb9c4a9b25a0534ad0387c6319aabc23a4e86f4f5278be",
+    "extension_sha256": "fb702ce2734699012f5f7b065d34625fb76385093af0ecfdfaf99ec99a32be12",
+    "linked_libraries": {
+      "argv": [
+        "/nix/store/chh967hh4lc8z39gvhsfc29l8if11gnz-glibc-2.42-84-bin/bin/ldd",
+        "/tmp/duplicity-reader-historical-built/duplicity-3.2.1/duplicity/_librsync.cpython-312-x86_64-linux-gnu.so"
+      ],
+      "status": 0,
+      "output": "\tlinux-vdso.so.1 (0x0000759d45274000)\n\tlibrsync.so.2 => /nix/store/8zfxg3r2wmvg7h6pgyf621gcrxmcch94-librsync-2.3.4-lib/lib/librsync.so.2 (0x0000759d45256000)\n\tlibc.so.6 => /nix/store/znb3q6g1ik34454j3vcjx824h1871asg-glibc-2.42-84/lib/libc.so.6 (0x0000759d45000000)\n\t/nix/store/znb3q6g1ik34454j3vcjx824h1871asg-glibc-2.42-84/lib64/ld-linux-x86-64.so.2 (0x0000759d45276000)\n"
+    },
+    "version_check": {
+      "argv": [
+        "/tmp/duplicity-reader-historical-built/producer-3.2.1",
+        "--version"
+      ],
+      "status": 0,
+      "output": "duplicity 3.2.1 September 28, 2026\n"
+    }
+  },
+  "python_dependencies": {
+    "future": "1.0.0",
+    "fasteners": "0.20"
+  }
+}

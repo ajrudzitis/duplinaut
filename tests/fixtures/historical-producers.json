@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "scope": "small plain full plus two incremental chains; native compatibility pending",
+  "producers": [
+    {
+      "version": "0.8.23",
+      "source_sha256": "35e0d218bc6569aa99e51795c5b521093af21283af8c4db4f20652e76c20fefd",
+      "source_patches": [],
+      "environment_path": "tests/fixtures/duplicity-0.8.23/producer-environment.json",
+      "environment_sha256": "bf27dfff7d699592889360126fd2eee32f5a51ecc2312560c80806e342842eb1",
+      "profiles": [
+        {
+          "profile": "standard",
+          "path": "tests/fixtures/duplicity-0.8.23/standard",
+          "snapshots": 3,
+          "official_restore_verified": true,
+          "native_reader_verified": false,
+          "artifact_count": 16,
+          "artifact_bytes": 36965
+        },
+        {
+          "profile": "short",
+          "path": "tests/fixtures/duplicity-0.8.23/short",
+          "snapshots": 3,
+          "official_restore_verified": true,
+          "native_reader_verified": false,
+          "artifact_count": 16,
+          "artifact_bytes": 36313
+        },
+        {
+          "profile": "legacy",
+          "path": "tests/fixtures/duplicity-0.8.23/legacy",
+          "snapshots": 3,
+          "official_restore_verified": true,
+          "native_reader_verified": false,
+          "artifact_count": 16,
+          "artifact_bytes": 37077
+        }
+      ]
+    },
+    {
+      "version": "2.1.3",
+      "source_sha256": "678b88c812cbab1a3a1fd34f7f18f86fd48ca9fa8b16bc4c74bbdce14b3a5a00",
+      "source_patches": [],
+      "environment_path": "tests/fixtures/duplicity-2.1.3/producer-environment.json",
+      "environment_sha256": "74a0fc37aeda1af6c8a8ad0d063a34817774e7da031b184497067f224247b7ef",
+      "profiles": [
+        {
+          "profile": "standard",
+          "path": "tests/fixtures/duplicity-2.1.3/standard",
+          "snapshots": 3,
+          "official_restore_verified": true,
+          "native_reader_verified": false,
+          "artifact_count": 16,
+          "artifact_bytes": 36963
+        }
+      ]
+    },
+    {
+      "version": "3.2.1",
+      "source_sha256": "4284e3d8f0082a85d3dcfa634901532a1087463df7a33ead417670c0d63b9ef5",
+      "source_patches": [],
+      "environment_path": "tests/fixtures/duplicity-3.2.1/producer-environment.json",
+      "environment_sha256": "0eec42ba6e765b553e9a5899ca77ccc22315a69c0366cd1afb033382a338fd29",
+      "profiles": [
+        {
+          "profile": "standard",
+          "path": "tests/fixtures/duplicity-3.2.1/standard",
+          "snapshots": 3,
+          "official_restore_verified": true,
+          "native_reader_verified": false,
+          "artifact_count": 16,
+          "artifact_bytes": 37063
+        }
+      ]
+    }
+  ],
+  "encountered_environment_errors": [
+    {
+      "attempt": "Python3.11 current pinned Nixpkgs",
+      "result": "dependency evaluation rejected sphinx9.1 for Python3.11; switched to Python3.12"
+    },
+    {
+      "attempt": "Python3.13 current pinned Nixpkgs",
+      "result": "future1.0.0 interpreter constraint rejected Python3.13; switched to Python3.12"
+    },
+    {
+      "attempt": "bare producer --version without GPG in PATH",
+      "result": "all three apps attempted GPG startup; fixed only isolated launcher PATH, no source patches"
+    },
+    {
+      "attempt": "3.2.1 sandboxed plain restore",
+      "result": "official restore startup GPG loopback probe could not create agent socket; rerun with isolated permitted agent"
+    },
+    {
+      "attempt": "3.2.1 legacy container observation assertion",
+      "result": "official source/restore succeeded but old no-footer observation failed; inspected current source and recorded actual integral zero footer"
+    }
+  ]
+}

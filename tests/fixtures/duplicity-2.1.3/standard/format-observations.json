@@ -1,0 +1,59 @@
+{
+  "producer": "duplicity 2.1.3",
+  "data_volumes": [
+    {
+      "path": "plain/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+      "entry_stream_bytes": 19968,
+      "raw_header_types_hex": {
+        "35": 7,
+        "30": 12,
+        "78": 4,
+        "32": 1
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": []
+    },
+    {
+      "path": "plain/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz",
+      "entry_stream_bytes": 20992,
+      "raw_header_types_hex": {
+        "35": 8,
+        "30": 13,
+        "78": 4
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": []
+    },
+    {
+      "path": "plain/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz",
+      "entry_stream_bytes": 20480,
+      "raw_header_types_hex": {
+        "35": 7,
+        "30": 13,
+        "78": 4,
+        "32": 1
+      },
+      "pax_fields": [
+        "hdrcharset",
+        "path"
+      ],
+      "zero_footer_bytes": 0,
+      "topoff_bytes": 0,
+      "topoff_equals_stored_prefix": false,
+      "multipart": []
+    }
+  ],
+  "encrypted_boundary_probe": []
+}

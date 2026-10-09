@@ -158,8 +158,8 @@ def observe_tar(data, stored, encrypted, final):
         assert not final or not opaque
         assert opaque == stored[:len(opaque)]
     else:
-        assert not tail, "Observed unencrypted profile unexpectedly gained a footer"
-        zero_count = 0
+        assert len(tail) % 512 == 0 and not any(tail), "Unexpected unencrypted tar trailing bytes"
+        zero_count = len(tail)
         opaque = b""
     members = list(tarfile.open(fileobj=io.BytesIO(data), mode="r:"))
     return {"entry_stream_bytes": offset, "raw_header_types_hex": types,
@@ -178,12 +178,19 @@ def decrypt(gpg, stored, environment):
     return result.stdout
 
 
-def extract_deltas(build):
+def is_data_volume(path):
+    return path.name.endswith((".difftar.gz", ".difftar.gpg", ".dt.z", ".dt.g"))
+
+
+def extract_deltas(build, snapshots):
     delta_directory = build / "deltas"
     delta_directory.mkdir(exist_ok=True)
     records = []
-    for index, dates in enumerate(["20231114T221320Z.to.20231115T221320Z", "20231115T221320Z.to.20231116T221320Z"], 1):
-        for volume in sorted((build / "plain").glob("duplicity-inc." + dates + ".vol*.difftar.gz")):
+    for snapshot in snapshots:
+        if snapshot["mode"] != "plain" or snapshot["index"] == 0:
+            continue
+        index = snapshot["index"]
+        for volume in sorted(build / name for name in snapshot["created_objects"] if is_data_volume(Path(name))):
             with tarfile.open(fileobj=io.BytesIO(gzip.decompress(volume.read_bytes())), mode="r:") as archive:
                 for member in archive:
                     if member.name not in ["diff/plain.txt", "diff/metadata.txt"]:
@@ -207,6 +214,9 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--plain-only", action="store_true")
     parser.add_argument("--expected-version", default="3.0.7")
+    parser.add_argument("--small", action="store_true", help="Omit incompressible multipart payloads")
+    parser.add_argument("--producer-option", action="append", default=[],
+                        help="Additional backup/restore option; pass as --producer-option=--option")
     arguments = parser.parse_args()
     if arguments.output.exists():
         raise SystemExit("Fixture output must not already exist")
@@ -243,7 +253,7 @@ def main():
         oracle = {"schema_version": 1, "producer": version, "snapshots": []}
         for mode in modes:
             root = os.fsencode(scratch / (mode + "-source"))
-            make_source(root, large=(mode == "plain"))
+            make_source(root, large=(mode == "plain" and not arguments.small))
             bucket = build / mode
             bucket.mkdir()
             cache = scratch / (mode + "-archive")
@@ -257,15 +267,22 @@ def main():
                     options += ["--encrypt-key", fingerprint]
                 if mode == "signed":
                     options += ["--sign-key", fingerprint]
+            options += arguments.producer_option
             for index, timestamp in enumerate(TIMES):
                 if index:
-                    mutate(root, index, large=(mode == "plain"))
+                    mutate(root, index, large=(mode == "plain" and not arguments.small))
                 expected = tree(root)
                 backup = [arguments.duplicity, "full" if index == 0 else "incremental"] + options
+                previous_objects = {path.name for path in bucket.iterdir()}
                 run(backup + ["--current-time", str(timestamp), os.fsdecode(root), bucket.as_uri()], environment, commands)
+                created_objects = [str(path.relative_to(build)) for path in sorted(bucket.iterdir())
+                                   if path.name not in previous_objects]
                 restore = scratch / (mode + "-restore-" + str(index))
                 restore_options = ["--archive-dir", str(cache), "--gpg-binary", arguments.gpg,
-                                   "--gpg-options=--pinentry-mode=loopback", "--time", str(timestamp)]
+                                   "--time", str(timestamp)]
+                if mode != "plain":
+                    restore_options += ["--gpg-options=--pinentry-mode=loopback"]
+                restore_options += arguments.producer_option
                 if mode == "signed":
                     restore_options += ["--sign-key", fingerprint]
                 run([arguments.duplicity, "restore"] + restore_options + [bucket.as_uri(), str(restore)], environment, commands)
@@ -278,13 +295,14 @@ def main():
                                                      "differences": [(left, right) for left, right in zip(official_comparison(expected), official_comparison(actual)) if left != right][:3]}, indent=2))
                 oracle["snapshots"].append({"mode": mode, "time": timestamp,
                                             "index": index, "entries": expected,
+                                            "created_objects": created_objects,
                                             "official_restore_verified": True,
                                             "official_comparison_exclusions": ["symlink_mtime_ns"]})
         observations = {"producer": version, "data_volumes": [], "encrypted_boundary_probe": []}
         for mode in modes:
-            for path in sorted((build / mode).glob("*.difftar.*")):
+            for path in sorted(path for path in (build / mode).iterdir() if is_data_volume(path)):
                 stored = path.read_bytes()
-                encrypted = path.suffix == ".gpg"
+                encrypted = path.suffix in [".gpg", ".g"]
                 decoded = decrypt(arguments.gpg, stored, environment) if encrypted else gzip.decompress(stored)
                 # All checked-in encrypted mode sets use one final volume.
                 observation = observe_tar(decoded, stored, encrypted, final=encrypted)
@@ -309,7 +327,7 @@ def main():
                 observations["encrypted_boundary_probe"].append({"basename": path.name, **observed})
             assert observations["encrypted_boundary_probe"][0]["topoff_bytes"] > 0
         (build / "format-observations.json").write_text(json.dumps(observations, indent=2) + "\n")
-        extract_deltas(build)
+        extract_deltas(build, oracle["snapshots"])
         (build / "expected.json").write_text(json.dumps(oracle, indent=2) + "\n")
         object_records = []
         for path in sorted(build.rglob("*")):
@@ -320,6 +338,8 @@ def main():
                       "duplicity_executable": arguments.duplicity, "gpg_executable": arguments.gpg,
                       "source_recipe": "tests/producer/generate.py",
                       "source_recipe_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), "times": TIMES,
+                      "profile": {"small": arguments.small, "plain_only": arguments.plain_only,
+                                  "producer_options": arguments.producer_option},
                       "source_deterministic": True, "archive_byte_reproducible": False,
                       "commands": [normalize_command(command, scratch) for command in commands],
                       "objects": object_records}

@@ -1,0 +1,37 @@
+{
+  "producer": "official duplicity",
+  "extractions": [
+    {
+      "path": "deltas/metadata-inc1.rdiff",
+      "source_object": "plain/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz",
+      "source_object_sha256": "e14e963688c66e07e2541a1d6aee79cf437d8adcd4542ea3838701de3454a4a9",
+      "source_member": "diff/metadata.txt",
+      "bytes": 8,
+      "sha256": "4aa9ea73edde39ef4c06a4058dd31c471b2bf98aeaa398e45b90503725db23d4"
+    },
+    {
+      "path": "deltas/plain-inc1.rdiff",
+      "source_object": "plain/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz",
+      "source_object_sha256": "e14e963688c66e07e2541a1d6aee79cf437d8adcd4542ea3838701de3454a4a9",
+      "source_member": "diff/plain.txt",
+      "bytes": 13,
+      "sha256": "0068b531f47e198700820eff51849369e64ae0c178cb4eec88fcfc475fa3c6db"
+    },
+    {
+      "path": "deltas/metadata-inc2.rdiff",
+      "source_object": "plain/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz",
+      "source_object_sha256": "5d84fe55f19b479cb2cfe87acc90b1b96922553e9e8cf9bef7bee6e8daba68fc",
+      "source_member": "diff/metadata.txt",
+      "bytes": 8,
+      "sha256": "4aa9ea73edde39ef4c06a4058dd31c471b2bf98aeaa398e45b90503725db23d4"
+    },
+    {
+      "path": "deltas/plain-inc2.rdiff",
+      "source_object": "plain/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz",
+      "source_object_sha256": "5d84fe55f19b479cb2cfe87acc90b1b96922553e9e8cf9bef7bee6e8daba68fc",
+      "source_member": "diff/plain.txt",
+      "bytes": 12,
+      "sha256": "a0f54eb7b46229ca62d79eff41b27919bd49af07be097573217a7a45688867e4"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "nixpkgs_revision": "774debe7a0d1b496e35677ad955a1011c6ff74f3",
+  "python": "/nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/bin/python3",
+  "python_version": "3.12.14 (main, Aug 12 2026, 13:57:54) [GCC 15.3.0]",
+  "gpg": "/nix/store/krh2gxql1h8yx1h4l57vvphaw5wf1wqz-gnupg-2.4.9/bin/gpg",
+  "compiler": {
+    "argv": [
+      "/nix/store/79mr0jw3qccq7hhf1hh62knxd88dwazc-gcc-wrapper-15.3.0/bin/gcc",
+      "--version"
+    ],
+    "status": 0,
+    "output": "gcc (GCC) 15.3.0\nCopyright (C) 2025 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+  },
+  "librsync": {
+    "argv": [
+      "/nix/store/0skf1rj6ngdkpjjpmy86pf5y33kh6qaz-librsync-2.3.4/bin/rdiff",
+      "--version"
+    ],
+    "status": 0,
+    "output": "rdiff (librsync 2.3.4)\nCopyright (C) 1997-2016 by Martin Pool, Andrew Tridgell and others.\nhttp://librsync.sourcefrog.net/\nCapabilities: 64 bit files, trace disabled\n\nlibrsync comes with NO WARRANTY, to the extent permitted by law.\nYou may redistribute copies of librsync under the terms of the GNU\nLesser General Public License.  For more information about these\nmatters, see the files named COPYING.\n"
+  },
+  "nix_cflags_compile": " -frandom-seed=pyvs5vmns1 -isystem /nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/include -isystem /nix/store/k2h1g8ljqqqhxf1nhrwcdyixbm913jma-librsync-2.3.4-dev/include -isystem /nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/include -isystem /nix/store/k2h1g8ljqqqhxf1nhrwcdyixbm913jma-librsync-2.3.4-dev/include",
+  "nix_ldflags": "-rpath /nix/store/pyvs5vmns14331lwzdwvnvg2mzk9cm28-nix-shell/lib  -L/nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/lib -L/nix/store/8zfxg3r2wmvg7h6pgyf621gcrxmcch94-librsync-2.3.4-lib/lib -L/nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/lib -L/nix/store/8zfxg3r2wmvg7h6pgyf621gcrxmcch94-librsync-2.3.4-lib/lib",
+  "build_recipe_sha256": "75465e4200d2629605a1fe718b8cd61415d95c1af71f55a2e75d3626548756cd",
+  "record": {
+    "version": "0.8.23",
+    "source_url": "https://files.pythonhosted.org/packages/fc/cf/4c492053398633154062759b1b8f7a4da77e029145c432ecfe3f76ca730c/duplicity-0.8.23.tar.gz",
+    "source_sha256": "35e0d218bc6569aa99e51795c5b521093af21283af8c4db4f20652e76c20fefd",
+    "source_patches": [],
+    "build": {
+      "argv": [
+        "/nix/store/79mr0jw3qccq7hhf1hh62knxd88dwazc-gcc-wrapper-15.3.0/bin/gcc",
+        "-shared",
+        "-fPIC",
+        "-O2",
+        "-I/nix/store/vvzzi00ycd7y8sf6qzdnpmvr45kjrqvw-python3-3.12.14-env/include/python3.12",
+        "/tmp/duplicity-reader-historical-built/duplicity-0.8.23/duplicity/_librsyncmodule.c",
+        "-lrsync",
+        "-o",
+        "/tmp/duplicity-reader-historical-built/duplicity-0.8.23/duplicity/_librsync.cpython-312-x86_64-linux-gnu.so"
+      ],
+      "status": 0,
+      "output": "/tmp/duplicity-reader-historical-built/duplicity-0.8.23/duplicity/_librsyncmodule.c: In function \u2018_librsync_new_patchmaker\u2019:\n/tmp/duplicity-reader-historical-built/duplicity-0.8.23/duplicity/_librsyncmodule.c:334:5: warning: ignoring return value of \u2018strerror_r\u2019 declared with attribute \u2018warn_unused_result\u2019 [-Wunused-result]\n  334 |     strerror_r(errno, buf, sizeof(buf));\n      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+    },
+    "wrapper_sha256": "6b69111274e3c23cea9d0ea9b03736781104e7614a7c496f70134736e0910ca1",
+    "extension_sha256": "5d3fa67ea5e504bc75ffb5ab2f96d99cb6dc95cec6456c83a1f714eb315ea325",
+    "linked_libraries": {
+      "argv": [
+        "/nix/store/chh967hh4lc8z39gvhsfc29l8if11gnz-glibc-2.42-84-bin/bin/ldd",
+        "/tmp/duplicity-reader-historical-built/duplicity-0.8.23/duplicity/_librsync.cpython-312-x86_64-linux-gnu.so"
+      ],
+      "status": 0,
+      "output": "\tlinux-vdso.so.1 (0x0000708b5a14f000)\n\tlibrsync.so.2 => /nix/store/8zfxg3r2wmvg7h6pgyf621gcrxmcch94-librsync-2.3.4-lib/lib/librsync.so.2 (0x0000708b5a131000)\n\tlibc.so.6 => /nix/store/znb3q6g1ik34454j3vcjx824h1871asg-glibc-2.42-84/lib/libc.so.6 (0x0000708b59e00000)\n\t/nix/store/znb3q6g1ik34454j3vcjx824h1871asg-glibc-2.42-84/lib64/ld-linux-x86-64.so.2 (0x0000708b5a151000)\n"
+    },
+    "version_check": {
+      "argv": [
+        "/tmp/duplicity-reader-historical-built/producer-0.8.23",
+        "--version"
+      ],
+      "status": 0,
+      "output": "duplicity 0.8.23\n"
+    }
+  },
+  "python_dependencies": {
+    "future": "1.0.0",
+    "fasteners": "0.20"
+  }
+}

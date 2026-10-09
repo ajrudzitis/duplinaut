@@ -1,0 +1,203 @@
+{
+  "producer": "duplicity 2.1.3",
+  "gpg": "gpg (GnuPG) 2.4.9",
+  "duplicity_executable": "/tmp/duplicity-reader-historical-built/producer-2.1.3",
+  "gpg_executable": "/nix/store/krh2gxql1h8yx1h4l57vvphaw5wf1wqz-gnupg-2.4.9/bin/gpg",
+  "source_recipe": "tests/producer/generate.py",
+  "source_recipe_sha256": "675b72926639c13abb6eb0c3a4a4733975cae49ce0d7e37990b32729ba606d5b",
+  "times": [
+    1700000000,
+    1700086400,
+    1700172800
+  ],
+  "profile": {
+    "small": true,
+    "plain_only": true,
+    "producer_options": []
+  },
+  "source_deterministic": true,
+  "archive_byte_reproducible": false,
+  "commands": [
+    [
+      "/tmp/duplicity-reader-historical-built/producer-2.1.3",
+      "--version"
+    ],
+    [
+      "/nix/store/krh2gxql1h8yx1h4l57vvphaw5wf1wqz-gnupg-2.4.9/bin/gpg",
+      "--version"
+    ],
+    [
+      "/tmp/duplicity-reader-historical-built/producer-2.1.3",
+      "full",
+      "--archive-dir",
+      "${WORK}/plain-archive",
+      "--name",
+      "reader-fixture-plain",
+      "--volsize",
+      "1",
+      "--gpg-binary",
+      "/nix/store/krh2gxql1h8yx1h4l57vvphaw5wf1wqz-gnupg-2.4.9/bin/gpg",
+      "--no-encryption",
+      "--current-time",
+      "1700000000",
+      "${WORK}/plain-source",
+      "file://${WORK}/fixture/plain"
+    ],
+    [
+      "/tmp/duplicity-reader-historical-built/producer-2.1.3",
+      "restore",
+      "--archive-dir",
+      "${WORK}/plain-archive",
+      "--gpg-binary",
+      "/nix/store/krh2gxql1h8yx1h4l57vvphaw5wf1wqz-gnupg-2.4.9/bin/gpg",
+      "--time",
+      "1700000000",
+      "file://${WORK}/fixture/plain",
+      "${WORK}/plain-restore-0"
+    ],
+    [
+      "/tmp/duplicity-reader-historical-built/producer-2.1.3",
+      "incremental",
+      "--archive-dir",
+      "${WORK}/plain-archive",
+      "--name",
+      "reader-fixture-plain",
+      "--volsize",
+      "1",
+      "--gpg-binary",
+      "/nix/store/krh2gxql1h8yx1h4l57vvphaw5wf1wqz-gnupg-2.4.9/bin/gpg",
+      "--no-encryption",
+      "--current-time",
+      "1700086400",
+      "${WORK}/plain-source",
+      "file://${WORK}/fixture/plain"
+    ],
+    [
+      "/tmp/duplicity-reader-historical-built/producer-2.1.3",
+      "restore",
+      "--archive-dir",
+      "${WORK}/plain-archive",
+      "--gpg-binary",
+      "/nix/store/krh2gxql1h8yx1h4l57vvphaw5wf1wqz-gnupg-2.4.9/bin/gpg",
+      "--time",
+      "1700086400",
+      "file://${WORK}/fixture/plain",
+      "${WORK}/plain-restore-1"
+    ],
+    [
+      "/tmp/duplicity-reader-historical-built/producer-2.1.3",
+      "incremental",
+      "--archive-dir",
+      "${WORK}/plain-archive",
+      "--name",
+      "reader-fixture-plain",
+      "--volsize",
+      "1",
+      "--gpg-binary",
+      "/nix/store/krh2gxql1h8yx1h4l57vvphaw5wf1wqz-gnupg-2.4.9/bin/gpg",
+      "--no-encryption",
+      "--current-time",
+      "1700172800",
+      "${WORK}/plain-source",
+      "file://${WORK}/fixture/plain"
+    ],
+    [
+      "/tmp/duplicity-reader-historical-built/producer-2.1.3",
+      "restore",
+      "--archive-dir",
+      "${WORK}/plain-archive",
+      "--gpg-binary",
+      "/nix/store/krh2gxql1h8yx1h4l57vvphaw5wf1wqz-gnupg-2.4.9/bin/gpg",
+      "--time",
+      "1700172800",
+      "file://${WORK}/fixture/plain",
+      "${WORK}/plain-restore-2"
+    ]
+  ],
+  "objects": [
+    {
+      "path": "deltas/metadata-inc1.rdiff",
+      "bytes": 8,
+      "sha256": "4aa9ea73edde39ef4c06a4058dd31c471b2bf98aeaa398e45b90503725db23d4"
+    },
+    {
+      "path": "deltas/metadata-inc2.rdiff",
+      "bytes": 8,
+      "sha256": "4aa9ea73edde39ef4c06a4058dd31c471b2bf98aeaa398e45b90503725db23d4"
+    },
+    {
+      "path": "deltas/plain-inc1.rdiff",
+      "bytes": 13,
+      "sha256": "0068b531f47e198700820eff51849369e64ae0c178cb4eec88fcfc475fa3c6db"
+    },
+    {
+      "path": "deltas/plain-inc2.rdiff",
+      "bytes": 12,
+      "sha256": "a0f54eb7b46229ca62d79eff41b27919bd49af07be097573217a7a45688867e4"
+    },
+    {
+      "path": "deltas/provenance.json",
+      "bytes": 1648,
+      "sha256": "9210eba9b5ffe2cb0e0761fd7d356f33b9f98d4b9b8570477bb3c257336ddc22"
+    },
+    {
+      "path": "expected.json",
+      "bytes": 25869,
+      "sha256": "fe134cad23369560f0441d2ddbf57f98c64f1e87216681f21d26412534a0bb26"
+    },
+    {
+      "path": "format-observations.json",
+      "bytes": 1366,
+      "sha256": "86c1a3df2369b620001f3800f4d3498defed19b7425ecc989135594e1bfc2259"
+    },
+    {
+      "path": "plain/duplicity-full-signatures.20231114T221320Z.sigtar.gz",
+      "bytes": 981,
+      "sha256": "d63403db8c0b081d663dd81faaefe680bad856b0a113e7f9c63d1c4fdc5c2f94"
+    },
+    {
+      "path": "plain/duplicity-full.20231114T221320Z.manifest",
+      "bytes": 841,
+      "sha256": "ae36e91e01f48a704c2243189c6c910eb00baa2a0f19a0abc08ae6dbd605e8d5"
+    },
+    {
+      "path": "plain/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+      "bytes": 806,
+      "sha256": "4ceda0afcb420dddd69500269bf7a867d7360168f9d1879731614526b49ca5c6"
+    },
+    {
+      "path": "plain/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest",
+      "bytes": 884,
+      "sha256": "61191f04349ffb5b2fa765bafd26032009b9a34659dcf70aff22b7fab109dc07"
+    },
+    {
+      "path": "plain/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz",
+      "bytes": 807,
+      "sha256": "07213723f5ddab2dc9b53bcf92840043bf52bc1f59f898c840cf9fe373b12e74"
+    },
+    {
+      "path": "plain/duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest",
+      "bytes": 884,
+      "sha256": "fa0f63bc02108aaecdd437069e8fd034c17a53897d21df946bd1a9d54ae7bf59"
+    },
+    {
+      "path": "plain/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz",
+      "bytes": 820,
+      "sha256": "11f57c472f540a02dddf0848e97cc0d46e6af66e488dcb28ccd7e5631bce3aaa"
+    },
+    {
+      "path": "plain/duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar.gz",
+      "bytes": 1014,
+      "sha256": "42866e9558375703de69f0bb5e957d7ebd913be01b3b81d7e0446aa15577f6fb"
+    },
+    {
+      "path": "plain/duplicity-new-signatures.20231115T221320Z.to.20231116T221320Z.sigtar.gz",
+      "bytes": 1002,
+      "sha256": "90586ca86e5d09e6866359ddbae1a49edad9b6b8cb158cb8d0573d3b72e64363"
+    }
+  ],
+  "producer_environment": {
+    "path": "../producer-environment.json",
+    "sha256": "74a0fc37aeda1af6c8a8ad0d063a34817774e7da031b184497067f224247b7ef"
+  }
+}

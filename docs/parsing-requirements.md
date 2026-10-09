@@ -1,6 +1,6 @@
 # Duplicity reader parsing requirements
 
-Status: initial specification reviewed by the coordinator and independent verification agent. Written before parser implementation. Unresolved formats remain held. No requirement currently has implementation, proof, or compatibility-test completion evidence.
+Status: initial specification reviewed by the coordinator and independent verification agent. Written before parser implementation. Unresolved formats remain held. Implementation, proof, and compatibility completion are recorded separately in the assurance ledger; this specification does not itself confer completion.
 
 This document defines the intended native Rust reader for browsing and restoring duplicity backups. It is a project specification, not a claim that duplicity implements every validation policy below. Requirements with unresolved dependencies are provisional and cannot authorize implementation of the affected behavior until those dependencies are resolved.
 
@@ -20,6 +20,8 @@ Public documentation is the first reference:
 | DOC-NAME | [Official filename documentation](https://gitlab.com/duplicity/duplicity/-/raw/dev/docs/file_naming.rst) | Long/short object names, partial markers, suffixes |
 | DOC-RSYNC | [Librsync file formats](https://librsync.github.io/page_formats.html) | Integer byte order, signature and delta structures |
 | DOC-TAR | [Python 3.13 tar formats](https://docs.python.org/3.13/library/tarfile.html) | ustar/GNU/PAX interoperability and current PAX producer default |
+| DOC-PGP | [RFC 9580](https://www.rfc-editor.org/rfc/rfc9580), historical [RFC 4880](https://www.rfc-editor.org/rfc/rfc4880), [RFC 6637](https://www.rfc-editor.org/rfc/rfc6637) | Packet integrity, composition, v4 keys and legacy Curve25519 ECDH |
+| DOC-RPGP | [rPGP 0.21.0 API](https://docs.rs/pgp/0.21.0/pgp/), [pinned implementation status](https://github.com/rpgp/rpgp/blob/c2b192e52b2e7f99777196539ea79b37f1f9ff30/docs/IMPL_STATUS.md), [security status](https://github.com/rpgp/rpgp/blob/c2b192e52b2e7f99777196539ea79b37f1f9ff30/docs/SECURITY_STATUS.md) | Native adapter capability and trusted upstream limitations |
 | DOC-GZIP | [RFC 1952](https://www.rfc-editor.org/rfc/rfc1952) | Gzip member structure, CRC32 and uncompressed-size checks |
 | DOC-VEST | [Vest project documentation](https://github.com/secure-foundations/vest) | DSL, combinators, verification guarantees and frontend trust |
 | DOC-DUVET | [Duvet specifications](https://awslabs.github.io/duvet/specifications.html), [annotations](https://awslabs.github.io/duvet/annotations.html), [reports](https://awslabs.github.io/duvet/reports.html) | Markdown requirement extraction and evidence links |
@@ -41,9 +43,13 @@ SRC-RSYNC references the official [opcode table](https://github.com/librsync/lib
 
 At the same immutable librsync commit, [sumset.h](https://github.com/librsync/librsync/blob/271744de428c0177e993f95c045d70b8cf2558f2/src/sumset.h) validates signature lengths (SHA-256 `5085b769fe4b67454ac0a099acc8af052d67f28bdcb18cfccf5c556f4738b831`); [checksum.c](https://github.com/librsync/librsync/blob/271744de428c0177e993f95c045d70b8cf2558f2/src/checksum.c) defines MD4 length 16 and BLAKE2 length 32 (SHA-256 `bea24c9e1ab77bb04a1d12e8233f0ac57f687d16603157234bb2230ec08e543c`).
 
-Observed official producer evidence is stored in `tests/fixtures/duplicity-3.0.7/`: deterministic source-tree oracles in `expected.json`, original archive digests and exact producer/restoration argv in `provenance.json`, and container/multipart observations in `format-observations.json`. The complete source recipe is `tests/producer/generate.py`. Successful official restoration establishes producer/oracle consistency, not native-reader completion.
+Observed official producer evidence is stored in `tests/fixtures/duplicity-3.0.7/`: deterministic source-tree oracles in `expected.json`, original archive digests and exact producer/restoration argv in `provenance.json`, and container/multipart observations in `format-observations.json`. The complete source recipe is `tests/producer/generate.py`. Additional historical producer evidence is indexed by `tests/fixtures/historical-producers.json`: 0.8.23 standard/short/legacy and 2.1.3/3.2.1 standard small plain chains, totaling 15 successfully source-compared official restores. Per-version producer environment records pin the verified source archives and original unmodified extension builds. Successful official restoration establishes producer/oracle consistency, not native-reader completion.
 
-Target compatibility versions are duplicity 0.8.23, 2.1.3, 3.0.7, and 3.2.1. These are intended test targets, not currently supported or tested versions. Runtime parsing, decryption, decompression, indexing, and restoration are native Rust operations. Official duplicity, GnuPG, and rdiff are producers and reference implementations for tests.
+SRC-HIST-321: official duplicity 3.2.1 source distribution SHA-256 `4284e3d8f0082a85d3dcfa634901532a1087463df7a33ead417670c0d63b9ef5`; inspected `gpg.py` SHA-256 `1d10c9a47f891bec30ee1b420c1c0ff448e65516590a5b061d13ab42fb0a3674` and `diffdir.py` SHA-256 `39cd139757729b0ef483883664935abde9ac81404fb89da7e35bc9a561873eef`. `GzipWriteFile` now calls `get_footer`; `TarBlockIter.get_footer` still pads to the next 10240-byte record, including a complete record when already aligned. Source fallback explains the independently observed change in actual official plain fixtures.
+
+Native crypto reference: published `pgp = "=0.21.0"`, released 2026-10-03, crate SHA-256 `ae70f4d9325a391db30d115d6191a7bb67cec856aa0bba131290f0c4e09a532a`, upstream commit `c2b192e52b2e7f99777196539ea79b37f1f9ff30`. Its Rust 1.88 minimum fits the pinned Rust 1.98 toolchain. Default BZip2 support is retained; malformed-artifact compatibility, experimental forwarding, PQC, and large-RSA extensions are excluded. The native dependency graph and adapter remain trusted boundaries, not Verus-proved cryptography. See [native adapter notes](openpgp-profile.md).
+
+Target compatibility versions are duplicity 0.8.23, 2.1.3, 3.0.7, and 3.2.1. These are native compatibility targets; original official-producer/reference evidence is recorded separately and does not establish native-reader support. Runtime parsing, decryption, decompression, indexing, and restoration are native Rust operations. Official duplicity, GnuPG, and rdiff are producers and reference implementations for tests.
 
 Initial scope includes Linux restoration of regular files, directories, symlinks, modification times, and ordinary permissions. Ownership, special-file creation, ACL/xattr fidelity, hard-link preservation, backup creation, bucket mutation, incomplete-chain repair, and CMS/GPGSM `.p7m` decoding are excluded. Unsupported entries and sets remain inspectable where enough metadata is available.
 
@@ -110,7 +116,7 @@ Informative grammar, where `G` is the configured global prefix, `K` the configur
 | Full signatures | `duplicity-full-signatures.T.sigtar` | `dfs.t.st` |
 | Incremental signatures | `duplicity-new-signatures.T.to.T.sigtar` | `dns.t.t.st` |
 
-`K` selects archive, manifest, or signature prefix by kind. Defaults for `G` and `K` are empty; `duplicity-` is part of the long stem. This follows SRC-NAME and DOC-DUP; DOC-NAME's description of a default global `duplicity-` prefix is imprecise relative to the inspected implementation. Every long stem can have `.part` before the envelope suffix; every short stem can have `.p`. SRC-NAME's producer emits partial incremental volume names while its reader regex does not consistently record their partial status; the project deliberately classifies those emitted names as partial rather than reproducing that inconsistency. Envelope suffix is exactly empty, `.gz`, `.gpg`, or recognized-but-unsupported `.p7m`; arbitrary additional suffixes are rejected for recognized stems. Statistics objects are auxiliary, outside the restoration grammar, and do not supply snapshot/volume completeness evidence.
+`K` selects archive, manifest, or signature prefix by kind. Defaults for `G` and `K` are empty; `duplicity-` is part of the long stem. This follows SRC-NAME and DOC-DUP; DOC-NAME's description of a default global `duplicity-` prefix is imprecise relative to the inspected implementation. Every long stem can have `.part` before the envelope suffix; every short stem can have `.p`. SRC-NAME's producer emits partial incremental volume names while its reader regex does not consistently record their partial status; the project deliberately classifies those emitted names as partial rather than reproducing that inconsistency. Long-stem envelope suffix is exactly empty, `.gz`, `.gpg`, or recognized-but-unsupported `.p7m`; short-stem suffix is exactly empty, `.z` (gzip), or `.g` (OpenPGP), as confirmed by the official 0.8.23 short-name corpus; arbitrary additional suffixes are rejected for recognized stems. Statistics objects are auxiliary, outside the restoration grammar, and do not supply snapshot/volume completeness evidence.
 
 ### PARSE-NAME-001
 
@@ -140,7 +146,7 @@ Provenance: DOC-NAME, SRC-TIME. The supported date profile uses real Gregorian c
 
 The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
 
-Provenance: SRC-TIME; valid-calendar bounds follow PARSE-NAME-004. Zone hours/minutes are 00..23/00..59, and UTC is local calendar time minus the signed offset. The separator defaults to `:` and is supplied explicitly by the caller for other archives. Its precise supported predicate is one byte in `0x21..0x7e` excluding `/`, `.`, `+`, `-`, ASCII digits, and `T`, `t`, `Z`, `z`; other values are configuration errors. This is POLICY rather than the upstream parser's unrestricted configuration. Accepted `T`/`Z` letters are case-insensitive. Short timestamps remain epoch seconds. Legacy-format producer testing is a pending compatibility claim, distinct from this explicit reader grammar.
+Provenance: SRC-TIME; valid-calendar bounds follow PARSE-NAME-004. Zone hours/minutes are 00..23/00..59, and UTC is local calendar time minus the signed offset. The separator defaults to `:` and is supplied explicitly by the caller for other archives. Its precise supported predicate is one byte in `0x21..0x7e` excluding `/`, `.`, `+`, `-`, ASCII digits, and `T`, `t`, `Z`, `z`; other values are configuration errors. This is POLICY rather than the upstream parser's unrestricted configuration. Accepted `T`/`Z` letters are case-insensitive. Short timestamps remain epoch seconds. Official 0.8.23 legacy UTC filenames with `_` separator have source/restore evidence; other separators/non-UTC legacy zones and native compatibility remain pending, distinct from this explicit reader grammar.
 
 ### PARSE-NAME-005
 
@@ -166,13 +172,13 @@ Provenance: DOC-DUP, SRC-NAME, DOC-GZIP. Gzip accepts consecutive complete membe
 
 The reader MUST support symmetric and public-key OpenPGP objects within the explicitly documented crypto capability profile.
 
-Provenance: DOC-DUP; capability bounds await OPEN-CRYPTO. Includes supported encrypted secret-key exports, compressed messages, and supplied passphrases; this does not promise arbitrary GnuPG options or every historical algorithm.
+Provenance: DOC-DUP, DOC-PGP, DOC-RPGP; the normative capability profile is PARSE-ENV-007..016. This does not promise arbitrary GnuPG options or every historical algorithm.
 
 ### PARSE-ENV-003
 
 The reader MUST finish the supported OpenPGP message integrity checks before accepting an object for successful restoration.
 
-Provenance: POLICY. Staging may hold decoded data pending validation; the requested destination cannot be published first. Legacy unauthenticated packets await OPEN-CRYPTO.
+Provenance: DOC-PGP, DOC-RPGP, POLICY. SEIPDv1 prefix and complete MDC are checked before plaintext is parsed as a duplicity object. Plaintext may remain in private staging until signer, container, manifest, and restoration validation finish; the requested destination cannot be published first. MDC integrity is not signer identity.
 
 ### PARSE-ENV-004
 
@@ -191,6 +197,66 @@ Provenance: SRC-HASH and manifest use in duplicity restoration. SHA1 and MD5 are
 An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
 
 Provenance: POLICY. Every selected volume needs at least one supported declared digest. SHA1 requires exactly 40 hexadecimal digits, MD5 exactly 32; hex case is immaterial. Conflicting declarations of the same algorithm are rejected. Every supported declared digest is checked; an unsupported declaration can be retained for display when supported declarations still validate the volume. No unchecked success is implied.
+
+### PARSE-ENV-007
+
+The native reader MUST accept only SEIPDv1 authenticated encrypted-data containers within its initial OpenPGP profile.
+
+Provenance: DOC-PGP sections 5.7 and 5.13; POLICY. Supported key wrappers are PKESK version 3 and SKESK version 4. SED/tag 9, proprietary GnuPG AEAD/tag 20, SEIPDv2, other wrapper versions, nested encrypted containers, and unknown critical packet variants are unsupported errors, never a weaker decryption fallback. SEIPDv2 is a follow-up requiring independent fixture and integrity evidence.
+
+### PARSE-ENV-008
+
+The adapter MUST restrict decryption and verification algorithms to the enumerated initial capability profile.
+
+Provenance: DOC-PGP, DOC-RPGP, POLICY. Payload encryption: AES-128/192/256. Recipient keys: v4 RSA with modulus 2048..8192 bits, or v4 legacy Curve25519 ECDH (algorithm 18 with its legacy OID and RFC 6637 SHA-256/384/512 and AES wrapping parameters). Binary document signatures: v4 RSA with SHA-224/256/384/512, or legacy Ed25519 (algorithm 22) with SHA-256/384/512. Key certification/binding signatures use these same per-algorithm hash restrictions. RFC 9580 section 5.2.3.3 requires Ed25519Legacy digests of at least 32 octets; SHA-224 is rejected for that algorithm. DSA, ElGamal, other curves, SHA1/MD5 document signatures, v2/v3/v5/v6 keys, hardware/key-agent stubs, and PQC are unsupported. SHA1 for v4 fingerprints, SEIPDv1 MDC, and the separately listed S2K is compatibility usage, not permission for SHA1 document signatures. Session-key cipher policy is checked after unwrapping; a PKESK algorithm alone does not identify the payload cipher.
+
+### PARSE-ENV-009
+
+The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
+
+Provenance: DOC-RPGP, POLICY. Binary and ASCII-armored v4 key exports may contain unencrypted private material or AES-protected usage-254 secret material with SHA1 integrity and simple, salted, or iterated-and-salted S2K (types 0, 1, 3), using SHA1 or SHA-224/256/384/512. The same S2K profile is supported for SKESKv4. Validate secret-material integrity before its use. Deprecated usage-255 additive-checksum protection and other S2K/protection forms are unsupported. Credentials remain separate from object identity, errors, logs, and public restoration metadata. No import modifies the user's keyring.
+
+### PARSE-ENV-010
+
+The adapter MUST enforce its configured ciphertext bound before materializing an encrypted object and authenticate the complete SEIPDv1 payload before releasing plaintext to message or duplicity parsers.
+
+Provenance: DOC-RPGP `Seipdv1ReadMode::CheckFirst`, POLICY. Default stored encrypted-object bound and CheckFirst bound are 256 MiB each; account for packet framing and the library's body limit separately. Read at most the limit plus a checked one-byte overflow probe; a limit hit without proven EOF is not success. Larger explicitly configured bounds require sufficient memory budget. No automatic Streaming fallback is permitted. The decoded-object default remains 8 GiB and independently limits decompression output.
+
+### PARSE-ENV-011
+
+The adapter MUST consume every accepted message and compression layer to its authenticated end and reject unexpected trailing packets or bytes.
+
+Provenance: DOC-PGP composition rules, DOC-RPGP full-read contract, POLICY. Exactly one literal-data body supplies the decoded duplicity object. Its packet filename and timestamp are untrusted and never select a restoration destination. Supported compression identifiers are 0 (uncompressed), 1 (ZIP/raw DEFLATE), 2 (ZLIB), and 3 (BZip2). Wrapping compression/signature layers are bounded by the configured nesting depth; literal bytes, decompression totals, keys, and packet counts are bounded separately. Hidden recursion inside a library wrapper cannot bypass the adapter depth contract. Partial-body packet lengths are accepted only when their complete terminal chunk is present. Container EOF, MDC success, and declared signature validation are separate checks.
+
+### PARSE-ENV-012
+
+Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
+
+Provenance: DOC-PGP, POLICY. For supported v4 certificates the fingerprint is exactly 20 bytes (40 hexadecimal digits, case-insensitive input). A matching primary key may sign directly; a signing subkey is authorized only by verified primary-to-subkey binding and verified embedded subkey-to-primary back signature with signing capability. Verify certificate self-signatures and accepted bindings before authorizing any component. The signature must cover the exact binary literal body, not decoded text. Missing or nonmatching signatures fail when signer verification is configured.
+
+### PARSE-ENV-013
+
+Historical signer verification MUST report its explicit offline fingerprint-authorization scope without claiming current certificate validity or Web-of-Trust validation.
+
+Provenance: DOC-RPGP mechanism/policy distinction, POLICY. Caller authorization is by pinned primary fingerprint for offline backup recovery. Cryptographic self/binding/document verification is mandatory; current wall-clock expiry, revocation policy, user-ID identity, trust databases, and online key lookup are outside this initial authorization policy. Available creation/expiry/revocation metadata is reported for caller assessment. Expired certificate dates do not silently invalidate otherwise authorized historical data, and an authorization result is not a claim of present-day certification validity.
+
+### PARSE-ENV-014
+
+The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
+
+Provenance: POLICY. Negative evidence includes wrong message/key passphrases, wrong recipients, wrong allowed fingerprints, tampered/truncated ciphertext, absent/invalid MDC, invalid signature, substituted unbound subkey, unsupported algorithms, trailing data, and every configured resource limit. Error classification never implies reliable differentiation between a wrong password and adversarial ciphertext when the cryptographic mechanism cannot provide it.
+
+### PARSE-ENV-015
+
+The crypto adapter's trusted contract and limitations MUST be recorded with the pinned dependency identities and independent positive and negative integration evidence.
+
+Provenance: ASSURE-PROOF-003, DOC-RPGP, POLICY. OpenPGP primitives, library packet parsing, buffering/EOF behavior, and certificate verification remain upstream trusted code. Tests use original official symmetric/public-key/signed objects and publicly labeled fixture credentials; no Verus proof is claimed for the crypto implementation. Upstream documents an unresolved RSA timing/Marvin concern; supporting RSA is not evidence of resistance to local or observable decryption timing attacks.
+
+### PARSE-ENV-016
+
+The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
+
+Provenance: POLICY. Defaults: exported key input 16 MiB; supplied certificates 64; subkeys/certificate 64; session-key packets/message 64; signatures/message 64; wrapping depth 8; iterated S2K encoded byte-count at most 65011712 per derivation; attempted derivations/message at most 64. Bound totals as well as per-item sizes. Resource rejection may precede authentication; it cannot become an accepted decoded object. The library's internal recursion limit or buffer size alone does not establish these project limits.
 
 ## Manifests
 
@@ -242,7 +308,7 @@ Provenance: SRC-MAN and official 3.0.7 fixtures. Parse action and token separate
 
 ## Tar containers and duplicity entries
 
-Tar header blocks and payload alignment use 512-byte units. Actual 3.0.7 raw/gzip data volumes end at a complete entry boundary **without zero end blocks**: `GzipWriteFile` never writes `get_footer`, even on the final volume. In contrast, `GPGWriteFile` writes zero padding of `10240 - (entry_stream_bytes mod 10240)` bytes; this can be only 512 bytes. For a nonfinal encrypted volume it can then append a top-off consisting of the beginning of that stored ciphertext object. Each stored volume is decoded separately before entries are combined. An object boundary alone does not establish logical multipart completion.
+Tar header blocks and payload alignment use 512-byte units. Official 0.8.23 and 2.1.3 plain volumes confirm complete-entry EOF without a zero footer. Actual 3.0.7 raw/gzip data volumes end at a complete entry boundary **without zero end blocks**: `GzipWriteFile` never writes `get_footer`, even on the final volume. In contrast, `GPGWriteFile` writes zero padding of `10240 - (entry_stream_bytes mod 10240)` bytes; this can be only 512 bytes. Official 3.2.1 `GzipWriteFile` also appends that exact zero footer to raw/gzip data volumes, including a 512-byte footer observed in the small full fixture. One zero header block is therefore valid for this producer profile; a universal two-zero-block requirement is incorrect. For a nonfinal encrypted volume it can then append a top-off consisting of the beginning of that stored ciphertext object. Each stored volume is decoded separately before entries are combined. An object boundary alone does not establish logical multipart completion.
 
 Header fields follow the common layout: name bytes 0..100, mode 100..108, uid 108..116, gid 116..124, size 124..136, mtime 136..148, checksum 148..156, type 156, linkname 157..257, magic/version 257..265, user/group names 265..329, and device numbers 329..345. Accepted magic/version bytes are POSIX `ustar\0` plus `00`, old GNU `ustar ` plus ` \0`, and eight zero bytes for V7. Only POSIX/ustar headers interpret bytes 345..500 as a path prefix and join a nonempty prefix with name using `/`; old GNU uses that region for other metadata and never treats it as a prefix. V7 has no prefix either. Interpret name/link bytes up to NUL. Numeric fields accept bounded ASCII octal surrounded by permitted spaces/NUL padding; GNU `0x80` positive or `0xff` negative base256 fields are decoded as in the inspected Python implementation. Negative sizes/modes/IDs are rejected; modification times use signed seconds but emitted negative original mtimes are clamped to zero by duplicity. Header checksum accepts the unsigned or historical signed-byte sum with its eight checksum bytes treated as spaces. Resource/platform bounds apply before use.
 
@@ -278,7 +344,7 @@ Provenance: POLICY. An unknown encoding cannot be skipped by guessing its size o
 
 The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.
 
-Provenance: SRC-HASH (`GzipWriteFile`, `GPGWriteFile`), SRC-DIFF, official 3.0.7 observations. Raw/gzip data volumes accept complete-entry EOF; zero-terminated tar inputs accept only integral zero blocks after their marker. Encrypted data volumes require the exact zero footer described above; optional nonfinal top-off is validated as an exact prefix of the original stored ciphertext bytes. Final encrypted volumes permit no top-off. Signature archives accept a standard zero-terminated tar (including empty) or an exactly zero-byte decoded signature stream. Unexpected trailing bytes and dangling extended headers are errors. Any missing required stored volume or incomplete multipart entry remains an error despite valid container EOF.
+Provenance: SRC-HASH (`GzipWriteFile`, `GPGWriteFile`), SRC-DIFF, SRC-HIST-321, official 0.8.23/2.1.3/3.0.7/3.2.1 observations. Raw/gzip data volumes accept complete-entry EOF for the inspected older profiles or the exact producer zero footer for 3.2.1. The general compatible zero-terminated input profile accepts one or more complete all-zero 512-byte blocks after complete entries; no nonzero trailing bytes are permitted. Encrypted data volumes require the exact zero footer described above; optional nonfinal top-off is validated as an exact prefix of the original stored ciphertext bytes. Final encrypted volumes permit no top-off. Signature archives accept a standard zero-terminated tar (including empty) or an exactly zero-byte decoded signature stream. Unexpected trailing bytes and dangling extended headers are errors. Any missing required stored volume or incomplete multipart entry remains an error despite valid container EOF.
 
 ### PARSE-ENTRY-001
 
@@ -593,7 +659,7 @@ This table is an initial mapping of obligations, not passing evidence. The verif
 | VG-ASSEMBLY | PARSE-MULTI, PARSE-MAN-004..006 | Ordered concatenation, restart normalization, conservative volume selection, completion conditions | Reviewed 3.0.7 contract; native implementation/proofs pending |
 | VG-STATE | PARSE-CHAIN, PARSE-STATE | Unique contiguous chain and path-state transitions | Reviewed 3.0.7 contract; native implementation/proofs pending |
 | VG-RESTORE | PARSE-PATH, RESTORE | Valid selected paths and destination mapping; filesystem contract review and integration tests | Planned |
-| VG-INTEGRATION | PARSE-ENV, PARSE-SOURCE, PARSE-BROWSE | Trusted-adapter contract review, corruption/decryption/source-change tests | Planned; crypto profile open |
+| VG-INTEGRATION | PARSE-ENV, PARSE-SOURCE, PARSE-BROWSE | Trusted-adapter contract review, corruption/decryption/source-change tests | Reviewed initial SEIPDv1 contract; native evidence pending |
 
 Official-producer scenarios: full and multiple incrementals; add/change/delete/recreate/type replacement; metadata-only changes; empty files/directories; symlinks; long and byte-valued paths; whitespace/quotes/backslashes; custom prefixes; short/legacy names where producers support them; gzip/raw/symmetric/public-key/signed objects; incompressible multipart data and deltas; restart manifests; missing signatures/volumes/chain links; all selected snapshot dates. Compare source trees and official restored trees for contents, paths, types, symlink targets, modes, and supported timestamps. Preserve producer version, exact command, environment, source-tree expectation, and archive digests.
 
@@ -613,14 +679,15 @@ The initial OPEN items below have reviewed reader decisions for the 3.0.7 profil
 | OPEN-SIGNATURE | MD4 lengths 1..16/BLAKE2 lengths 1..32, nonzero blocks, complete records; immutable upstream assertions/constants |
 | OPEN-STATE | Ordered snapshot/diff/delete transitions and ancestor consistency; source plus source-tree/official-restoration comparisons for all three backup dates |
 | OPEN-ENVELOPE | Complete gzip members, per-member CRC/ISIZE, no trailing nonmember data; RFC 1952 and one-member official fixtures |
+| OPEN-CRYPTO | Pinned pgp 0.21.0; authenticated SEIPDv1 only; explicit AES/key/S2K/compression/fingerprint policy; CheckFirst bounds and upstream trust recorded; RFC/API/source review plus original official GnuPG objects |
 | OPEN-LIMITS | Visible configurable byte/count/depth defaults and running-total enforcement; policy informed by actual fixture sizes |
 
 Remaining implementation/compatibility holds:
 
 | ID | Unresolved question | Evidence and required next action | Affected requirements |
 | --- | --- | --- | --- |
-| OPEN-CRYPTO | Exact pgp library version/capabilities, legacy unauthenticated messages, OpenPGP packet variants/compression/signature policy | Establish native adapter profile with official GnuPG fixtures and RFC sources; unsupported legacy formats stay explicit | PARSE-ENV-002..004 |
-| OPEN-HISTORICAL | Confirm 0.8.23/2.1.3/3.2.1 archives, legacy timestamps, short names, historical tar/encrypted termination and chunk sizes | Run each pinned official producer and compare native results; do not generalize observed 3.0.7 constants across untested releases | Compatibility claims for every format subsystem |
+| OPEN-CRYPTO-ADDITIONAL | SEIPDv2/v6, additional algorithms/key policies and full certificate-validity semantics | Acquire matching official-producer evidence and review stricter adapter contracts before expanding the supported profile | PARSE-ENV-007..016 |
+| OPEN-HISTORICAL | Native acceptance of original 0.8.23/2.1.3/3.2.1 small plain corpora; historical encrypted/multipart shapes, additional legacy zones/metadata | Official plain chains and 0.8.23 short/UTC-legacy names are now source/restore checked. Run native comparisons and acquire encrypted/multipart cases before broader claims; do not generalize 3.0.7 constants | Historical compatibility and untested variants of every format subsystem |
 | OPEN-TAR-ADDITIONAL | Additional supported PAX fields/GNU variants and empty signature containers have no official fixture coverage yet | Generate targeted official or primary-format fixtures before accepting their implementation/testing milestones | PARSE-TAR-003,005 and metadata fidelity |
 
 Resolving a question updates the relevant normative text, provenance, proof obligations, and test scenarios. Broader compatibility claims require producer evidence for the claimed release. Duvet snapshots and README completion records are updated together after independent review.
