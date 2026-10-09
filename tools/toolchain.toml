@@ -7,6 +7,10 @@ z3 = "4.16.0"
 vstd_sha256 = "9e5391d6f656ab9a485169f7e9fe87d3db1f0a6aa116fcb630dd0bef224170e7"
 vest_lib_sha256 = "f3f4d4698b6a56f5b23ae330d294a8d77fbb728fbf6d74946a18e0e46ba6e7a9"
 
+[vest_lib_vendor]
+path = "vendor/vest_lib"
+tree_sha256 = "425bf40c89a2d0a9cf17a3076522b6b34658e6987f288ecc4c75239a6509c020"
+
 [linux_x86_64]
 verus_url = "https://github.com/verus-lang/verus/releases/download/release/0.2026.09.06.8dea4a2/verus-0.2026.09.06.8dea4a2-x86-linux.zip"
 verus_sha256 = "13d01e134c0620c3b29770874707d16c33b3d227c843a489c8ceb744d43c0a16"

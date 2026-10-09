@@ -1,5 +1,6 @@
 [workspace]
 members = ["crates/core", "crates/s3", "crates/tui", "xtask"]
+exclude = ["vendor/vest_lib"]
 default-members = ["crates/core", "crates/s3", "crates/tui"]
 resolver = "2"
 
@@ -19,3 +20,5 @@ vest_lib = { version = "=0.2.1" }
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_only)", "cfg(verus_keep_ghost)", "cfg(verus_keep_ghost_body)"] }
 unsafe_code = "forbid"
 
+[patch.crates-io]
+vest_lib = { path = "vendor/vest_lib" }

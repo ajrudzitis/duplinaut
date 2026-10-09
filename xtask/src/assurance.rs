@@ -76,15 +76,24 @@ pub struct Trusted {
     pub requirements: Vec<String>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct VendorPin {
+    pub path: String,
+    pub tree_sha256: String,
+}
+
 pub fn load_ledger(root: &Path) -> Result<Ledger> {
     toml::from_str(&fs::read_to_string(root.join("docs/assurance.toml"))?)
         .context("invalid assurance ledger")
 }
 
 pub fn validate_dependencies(
+    root: &Path,
     metadata: &serde_json::Value,
     lock: &toml::Value,
     pins: &[(&str, &str, &str)],
+    vendor: Option<&VendorPin>,
 ) -> Result<()> {
     let packages = metadata["packages"]
         .as_array()
@@ -105,11 +114,41 @@ pub fn validate_dependencies(
             .iter()
             .filter(|item| item["name"] == name)
             .collect();
-        if matches.len() != 1
-            || matches[0]["version"] != version
-            || matches[0]["source"] != "registry+https://github.com/rust-lang/crates.io-index"
-        {
+        if matches.len() != 1 || matches[0]["version"] != version {
             bail!("unreviewed resolved dependency {name}; require crates.io {version} without path/git patches");
+        }
+        if name == "vest_lib" && matches[0]["source"].is_null() {
+            let approved = vendor
+                .context("local Vest library requires an independently reviewed vendor pin")?;
+            if approved.path != "vendor/vest_lib" {
+                bail!("Vest vendor path must be vendor/vest_lib");
+            }
+            let actual = Path::new(
+                matches[0]["manifest_path"]
+                    .as_str()
+                    .context("vendor manifest path missing")?,
+            )
+            .canonicalize()?;
+            if actual
+                != root
+                    .join(&approved.path)
+                    .join("Cargo.toml")
+                    .canonicalize()?
+            {
+                bail!("resolved Vest path does not match the reviewed vendor location");
+            }
+            if vendor_digest(&root.join(&approved.path))? != approved.tree_sha256 {
+                bail!("vendored Vest source differs from independently reviewed tree identity");
+            }
+            // Its crates.io archive identity remains independently pinned, even
+            // though Cargo.lock records a local source rather than an archive.
+            if checksum != "f3f4d4698b6a56f5b23ae330d294a8d77fbb728fbf6d74946a18e0e46ba6e7a9" {
+                bail!("vendor baseline archive identity differs from reviewed vest_lib 0.2.1");
+            }
+            continue;
+        }
+        if matches[0]["source"] != "registry+https://github.com/rust-lang/crates.io-index" {
+            bail!("unreviewed dependency source for {name}; only the pinned registry or reviewed Vest vendor is accepted");
         }
         let package = locked
             .iter()
@@ -123,6 +162,40 @@ pub fn validate_dependencies(
         }
     }
     Ok(())
+}
+
+pub fn vendor_digest(root: &Path) -> Result<String> {
+    fn collect(root: &Path, path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
+        let metadata = fs::symlink_metadata(path)?;
+        if metadata.file_type().is_symlink() {
+            bail!("vendor identity does not accept symlinks");
+        }
+        if metadata.is_dir() {
+            for entry in fs::read_dir(path)? {
+                collect(root, &entry?.path(), files)?;
+            }
+        } else if path.strip_prefix(root)? != Path::new("PROVENANCE.json") {
+            files.push(path.to_path_buf());
+        }
+        Ok(())
+    }
+    let mut files = Vec::new();
+    collect(root, root, &mut files)?;
+    files.sort();
+    let mut hash = Sha256::new();
+    for path in files {
+        let name = path
+            .strip_prefix(root)?
+            .to_str()
+            .context("non-UTF8 vendor source name")?
+            .as_bytes();
+        let contents = fs::read(&path)?;
+        hash.update((name.len() as u64).to_le_bytes());
+        hash.update(name);
+        hash.update((contents.len() as u64).to_le_bytes());
+        hash.update(contents);
+    }
+    Ok(format!("{:x}", hash.finalize()))
 }
 //= docs/parsing-requirements.md#assure-trace-001
 //# Every implemented requirement MUST have Duvet links from authored implementation and applicable test evidence to its specification heading and quoted normative text.

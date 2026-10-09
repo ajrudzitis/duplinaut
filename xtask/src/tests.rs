@@ -306,23 +306,76 @@ fn verification_opt_in_and_upstream_identity_required() {
     ]});
     let lock: toml::Value = toml::from_str("[[package]]\nname='vstd'\nversion='1'\nchecksum='a'\n[[package]]\nname='vest_lib'\nversion='2'\nchecksum='b'\n").unwrap();
     let pins = [("vstd", "1", "a"), ("vest_lib", "2", "b")];
-    assurance::validate_dependencies(&metadata, &lock, &pins).unwrap();
+    assurance::validate_dependencies(Path::new("."), &metadata, &lock, &pins, None).unwrap();
     metadata["packages"][0]["metadata"]["verus"]["verify"] = false.into();
-    assert!(assurance::validate_dependencies(&metadata, &lock, &pins).is_err());
+    assert!(
+        assurance::validate_dependencies(Path::new("."), &metadata, &lock, &pins, None).is_err()
+    );
     metadata["packages"][0]["metadata"]["verus"]["verify"] = true.into();
     metadata["packages"][1]["source"] = serde_json::Value::Null;
-    assert!(assurance::validate_dependencies(&metadata, &lock, &pins).is_err());
+    assert!(
+        assurance::validate_dependencies(Path::new("."), &metadata, &lock, &pins, None).is_err()
+    );
     metadata["packages"][1]["source"] =
         "registry+https://github.com/rust-lang/crates.io-index".into();
     metadata["packages"][1]["version"] = "unreviewed".into();
-    assert!(assurance::validate_dependencies(&metadata, &lock, &pins).is_err());
+    assert!(
+        assurance::validate_dependencies(Path::new("."), &metadata, &lock, &pins, None).is_err()
+    );
     metadata["packages"][1]["version"] = "1".into();
     assert!(assurance::validate_dependencies(
+        Path::new("."),
         &metadata,
         &lock,
-        &[("vstd", "1", "wrong"), ("vest_lib", "2", "b")]
+        &[("vstd", "1", "wrong"), ("vest_lib", "2", "b")],
+        None,
     )
     .is_err());
+}
+
+//= docs/parsing-requirements.md#assure-build-001
+//= type=test
+//# The acceptance build MUST fail on failed or incomplete required proofs, missing verification tools, stale generated parsers, or unreviewed verification exemptions.
+#[test]
+fn only_exact_reviewed_vendor_source_is_accepted() {
+    let temp = Temp::new();
+    let vendor = temp.0.join("vendor/vest_lib");
+    fs::create_dir_all(vendor.join("src")).unwrap();
+    fs::write(
+        vendor.join("Cargo.toml"),
+        "[package]\nname='vest_lib'\nversion='0.2.1'\n",
+    )
+    .unwrap();
+    fs::write(vendor.join("src/lib.rs"), "// reviewed fixture bytes\n").unwrap();
+    let mut metadata = serde_json::json!({"packages":[
+        {"name":"duplicity-core","metadata":{"verus":{"verify":true}}},
+        {"name":"vest_lib","version":"0.2.1","source":null,"manifest_path":vendor.join("Cargo.toml")}
+    ]});
+    let lock: toml::Value = toml::from_str("package=[]\n").unwrap();
+    let pins = [(
+        "vest_lib",
+        "0.2.1",
+        "f3f4d4698b6a56f5b23ae330d294a8d77fbb728fbf6d74946a18e0e46ba6e7a9",
+    )];
+    assert!(assurance::validate_dependencies(&temp.0, &metadata, &lock, &pins, None).is_err());
+    let approved = assurance::VendorPin {
+        path: "vendor/vest_lib".into(),
+        tree_sha256: assurance::vendor_digest(&vendor).unwrap(),
+    };
+    assurance::validate_dependencies(&temp.0, &metadata, &lock, &pins, Some(&approved)).unwrap();
+    fs::write(vendor.join("PROVENANCE.json"), "mutable self-attestation\n").unwrap();
+    assurance::validate_dependencies(&temp.0, &metadata, &lock, &pins, Some(&approved)).unwrap();
+    fs::write(vendor.join("src/lib.rs"), "// changed implementation\n").unwrap();
+    assert!(
+        assurance::validate_dependencies(&temp.0, &metadata, &lock, &pins, Some(&approved))
+            .is_err()
+    );
+    fs::write(vendor.join("src/lib.rs"), "// reviewed fixture bytes\n").unwrap();
+    metadata["packages"][1]["source"] = "git+https://example.invalid/unreviewed".into();
+    assert!(
+        assurance::validate_dependencies(&temp.0, &metadata, &lock, &pins, Some(&approved))
+            .is_err()
+    );
 }
 
 //= docs/parsing-requirements.md#assure-trace-002

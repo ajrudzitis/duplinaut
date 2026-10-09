@@ -20,6 +20,8 @@ struct Pins {
     z3: String,
     vstd_sha256: String,
     vest_lib_sha256: String,
+    #[serde(default)]
+    vest_lib_vendor: Option<assurance::VendorPin>,
 }
 #[derive(Debug, Serialize)]
 struct Tools {
@@ -252,12 +254,14 @@ fn doctor(root: &Path, tools: &Tools, pins: &Pins) -> Result<()> {
     )?;
     let lock: toml::Value = toml::from_str(&fs::read_to_string(root.join("Cargo.lock"))?)?;
     assurance::validate_dependencies(
+        root,
         &metadata,
         &lock,
         &[
             ("vstd", &pins.vstd, &pins.vstd_sha256),
             ("vest_lib", &pins.vest, &pins.vest_lib_sha256),
         ],
+        pins.vest_lib_vendor.as_ref(),
     )?;
     let json: serde_json::Value = serde_json::from_slice(
         &capture(root, &tools.verus, &["--version", "--output-json"])?.stdout,
