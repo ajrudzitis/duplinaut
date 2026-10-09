@@ -1,0 +1,82 @@
+schema = 1
+baseline_enabled = true
+specification = "docs/parsing-requirements.md"
+algorithm_sources = ["crates/core/src"]
+
+[[generation]]
+input = "crates/core/formats/delta.vest"
+output = "crates/core/src/generated/delta.rs"
+append = "\ninclude!(\"../verified/delta_refinement.rs\");\n"
+
+[[generation]]
+input = "crates/core/formats/manifest_token.vest"
+output = "crates/core/src/generated/manifest_token.rs"
+
+[[milestone]]
+id = "tooling"
+gate = true
+requirements = ["ASSURE-TRACE-001", "ASSURE-TRACE-002", "ASSURE-TRACE-003", "ASSURE-TRACE-004", "ASSURE-BUILD-001"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = false
+proof_rationale = "Build and traceability orchestration is a trusted development boundary, validated through executable failure tests and independent review. No parser proof claim follows from this milestone."
+implementations = [{ path = "xtask/src/main.rs", symbol = "trace" }, { path = "xtask/src/main.rs", symbol = "verify" }, { path = "xtask/src/main.rs", symbol = "evidence" }, { path = "xtask/src/assurance.rs", symbol = "validate_ledger" }]
+proofs = []
+tests = [{ package = "xtask", name = "tests::duvet_detects_changed_snapshot" }, { package = "xtask", name = "tests::duvet_requires_actual_implementation_and_test_annotations" }, { package = "xtask", name = "tests::missing_verification_tool_is_failure" }, { package = "xtask", name = "tests::stale_generated_parser_rejected" }, { package = "xtask", name = "tests::unreviewed_trust_and_project_proof_shortcuts_rejected" }, { package = "xtask", name = "tests::source_digest_changes_with_source_but_not_ignored_artifacts" }, { package = "xtask", name = "tests::proof_link_requires_declaration_not_a_comment_or_string" }, { package = "xtask", name = "tests::incomplete_or_nonexistent_required_proof_rejected" }, { package = "xtask", name = "tests::missing_milestones_empty_requirements_and_disabled_audit_rejected" }, { package = "xtask", name = "tests::unsuccessful_child_cannot_create_success" }]
+
+[[milestone]]
+id = "manifest-token"
+gate = false
+requirements = ["PARSE-MAN-002", "PARSE-MAN-003"]
+specified = true
+implemented = false
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+implementations = []
+proofs = []
+tests = []
+
+[[milestone]]
+id = "delta-wire"
+gate = false
+requirements = ["PARSE-DELTA-001", "PARSE-DELTA-002"]
+specified = true
+implemented = false
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+implementations = []
+proofs = []
+tests = []
+
+[[milestone]]
+id = "complete-reader"
+gate = false
+requirements = []
+specified = true
+implemented = false
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+implementations = []
+proofs = []
+tests = []
+
+[[trusted]]
+id = "upstream-verus-vest"
+reviewed = true
+rationale = "Pinned Verus/vstd/solver and Vest combinator primitives constitute upstream verification infrastructure. Vest's frontend is unverified; its generated semantics require independent review. Vest upstream trusted primitive external bodies do not permit project algorithm proof bypasses."
+requirements = ["ASSURE-PROOF-003", "ASSURE-VEST-003"]
+
+[[trusted]]
+id = "build-orchestration"
+reviewed = true
+rationale = "xtask process execution, source hashing and traceability parsing are trusted tooling; failure-mode tests and independent review required before acceptance."
+requirements = ["ASSURE-BUILD-001", "ASSURE-TRACE-002", "ASSURE-TRACE-003", "ASSURE-TRACE-004"]

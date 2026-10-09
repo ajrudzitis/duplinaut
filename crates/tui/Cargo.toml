@@ -1,0 +1,14 @@
+[package]
+name = "duplicity-tui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+duplicity-core.workspace = true
+duplicity-s3.workspace = true
+
+[lints]
+workspace = true
+

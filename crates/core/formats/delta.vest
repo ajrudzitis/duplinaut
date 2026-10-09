@@ -1,0 +1,63 @@
+!BIG_ENDIAN
+
+// librsync delta format. Source identity and complete opcode grammar:
+// docs/parsing-requirements.md, SRC-RSYNC. The stream controller handles END.
+
+//= docs/parsing-requirements.md#parse-delta-001
+//# The delta parser MUST require the reviewed delta magic before decoding commands.
+delta_magic = u32 | { 0x72730236 }
+
+literal1 = { @length: u8, data: [u8; @length], }
+literal2 = { @length: u16, data: [u8; @length], }
+literal4 = { @length: u32, data: [u8; @length], }
+literal8 = { @length: u64, data: [u8; @length], }
+
+copy1_1 = { offset: u8, length: u8, }
+copy1_2 = { offset: u8, length: u16, }
+copy1_4 = { offset: u8, length: u32, }
+copy1_8 = { offset: u8, length: u64, }
+copy2_1 = { offset: u16, length: u8, }
+copy2_2 = { offset: u16, length: u16, }
+copy2_4 = { offset: u16, length: u32, }
+copy2_8 = { offset: u16, length: u64, }
+copy4_1 = { offset: u32, length: u8, }
+copy4_2 = { offset: u32, length: u16, }
+copy4_4 = { offset: u32, length: u32, }
+copy4_8 = { offset: u32, length: u64, }
+copy8_1 = { offset: u64, length: u8, }
+copy8_2 = { offset: u64, length: u16, }
+copy8_4 = { offset: u64, length: u32, }
+copy8_8 = { offset: u64, length: u64, }
+
+//= docs/parsing-requirements.md#parse-delta-002
+//# The delta parser MUST decode every nonreserved opcode according to the complete delta grammar above.
+command = {
+    @opcode: u8,
+    body: choose(@opcode) {
+        0 => Nothing,
+        1..64 => [u8; @opcode],
+        0x41 => literal1,
+        0x42 => literal2,
+        0x43 => literal4,
+        0x44 => literal8,
+        0x45 => copy1_1,
+        0x46 => copy1_2,
+        0x47 => copy1_4,
+        0x48 => copy1_8,
+        0x49 => copy2_1,
+        0x4a => copy2_2,
+        0x4b => copy2_4,
+        0x4c => copy2_8,
+        0x4d => copy4_1,
+        0x4e => copy4_2,
+        0x4f => copy4_4,
+        0x50 => copy4_8,
+        0x51 => copy8_1,
+        0x52 => copy8_2,
+        0x53 => copy8_4,
+        0x54 => copy8_8,
+        //= docs/parsing-requirements.md#parse-delta-007
+        //# Reserved delta opcodes MUST produce an unsupported-command error.
+        _ => Never("reserved librsync delta opcode"),
+    },
+}

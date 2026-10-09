@@ -1,0 +1,49 @@
+'$schema' = "https://awslabs.github.io/duvet/config/v0.4.0.json"
+
+[[specification]]
+source = "docs/parsing-requirements.md"
+format = "markdown"
+
+[[source]]
+pattern = "crates/core/formats/*.vest"
+type = "implementation"
+
+[[source]]
+pattern = "crates/core/src/*.rs"
+type = "implementation"
+
+[[source]]
+pattern = "crates/core/src/verified/*.rs"
+type = "implementation"
+
+[[source]]
+pattern = "crates/core/tests/**/*.rs"
+type = "test"
+
+[[source]]
+pattern = "crates/s3/src/**/*.rs"
+type = "implementation"
+
+[[source]]
+pattern = "crates/tui/src/**/*.rs"
+type = "implementation"
+
+[[source]]
+pattern = "xtask/src/*.rs"
+type = "implementation"
+
+[[source]]
+pattern = "xtask/tests/*.rs"
+type = "test"
+
+[report.html]
+enabled = true
+path = ".duvet/reports/report.html"
+
+[report.json]
+enabled = true
+path = ".duvet/reports/report.json"
+
+[report.snapshot]
+enabled = true
+path = ".duvet/snapshot.txt"

@@ -1,0 +1,237 @@
+SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements.md)
+  SECTION: [PARSE-GEN-001](#parse-gen-001)
+    TEXT[!MUST,test]: A parser MUST return a structured error for malformed or truncated required input.
+
+  SECTION: [PARSE-GEN-002](#parse-gen-002)
+    TEXT[!MUST,test]: A successful parser MUST report a consumed input range wholly contained within the supplied input.
+
+  SECTION: [PARSE-GEN-003](#parse-gen-003)
+    TEXT[!MUST]: A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+
+  SECTION: [PARSE-GEN-004](#parse-gen-004)
+    TEXT[!MUST]: A parser MUST terminate without panicking on every finite input within its configured resource limits.
+
+  SECTION: [PARSE-GEN-005](#parse-gen-005)
+    TEXT[!MUST]: The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+
+  SECTION: [PARSE-GEN-006](#parse-gen-006)
+    TEXT[!MUST]: The core reader MUST perform its runtime operations without invoking duplicity, GnuPG, or librsync command-line tools.
+
+  SECTION: [PARSE-PATH-001](#parse-path-001)
+    TEXT[!MUST,implementation,test]: The reader MUST preserve backup path components as bytes without lossy UTF-8 conversion.
+
+  SECTION: [PARSE-PATH-002](#parse-path-002)
+    TEXT[!MUST,implementation,test]: A restore path MUST be relative to the backup root and contain no NUL, empty interior component, dot component, or parent component after format-specific root decoding.
+
+  SECTION: [PARSE-NAME-001](#parse-name-001)
+    TEXT[!MUST]: The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+
+  SECTION: [PARSE-NAME-002](#parse-name-002)
+    TEXT[!MUST]: Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+
+  SECTION: [PARSE-NAME-003](#parse-name-003)
+    TEXT[!MUST]: Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+
+  SECTION: [PARSE-NAME-004](#parse-name-004)
+    TEXT[!MUST]: The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+
+  SECTION: [PARSE-NAME-007](#parse-name-007)
+    TEXT[!MUST]: The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+
+  SECTION: [PARSE-NAME-005](#parse-name-005)
+    TEXT[!MUST]: Objects marked partial MUST be excluded from completed restore sets.
+
+  SECTION: [PARSE-NAME-006](#parse-name-006)
+    TEXT[!MUST]: An incremental set MUST have an end timestamp strictly later than its start timestamp.
+
+  SECTION: [PARSE-ENV-001](#parse-env-001)
+    TEXT[!MUST]: The reader MUST decode unencrypted raw objects and gzip-enveloped objects according to their classified envelope.
+
+  SECTION: [PARSE-ENV-002](#parse-env-002)
+    TEXT[!MUST]: The reader MUST support symmetric and public-key OpenPGP objects within the explicitly documented crypto capability profile.
+
+  SECTION: [PARSE-ENV-003](#parse-env-003)
+    TEXT[!MUST]: The reader MUST finish the supported OpenPGP message integrity checks before accepting an object for successful restoration.
+
+  SECTION: [PARSE-ENV-004](#parse-env-004)
+    TEXT[!MUST]: When signer verification is configured, the reader MUST require a valid signature from an explicitly permitted signer fingerprint.
+
+  SECTION: [PARSE-ENV-005](#parse-env-005)
+    TEXT[!MUST]: Manifest volume digests MUST be checked against the original stored object bytes before a restoration using those volumes is published.
+
+  SECTION: [PARSE-ENV-006](#parse-env-006)
+    TEXT[!MUST]: An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
+
+  SECTION: [PARSE-MAN-001](#parse-man-001)
+    TEXT[!MUST]: The manifest parser MUST recover ordered volume records containing volume number, starting path, ending path, optional block boundaries, and declared hashes.
+
+  SECTION: [PARSE-MAN-002](#parse-man-002)
+    TEXT[!MUST,implementation,test]: The manifest token parser MUST decode a valid double-quoted token's `\xHH` escape to exactly the represented byte.
+
+  SECTION: [PARSE-MAN-003](#parse-man-003)
+    TEXT[!MUST,implementation,test]: The manifest token parser MUST reject incomplete escapes, non-hexadecimal escape digits, unsupported escape forms, and unterminated quoted tokens.
+
+  SECTION: [PARSE-MAN-004](#parse-man-004)
+    TEXT[!MUST]: Manifest interpretation MUST replace earlier records of a repeated volume number with its last record and discard volume records above the last recorded volume number.
+
+  SECTION: [PARSE-MAN-005](#parse-man-005)
+    TEXT[!MUST]: Volume selection MUST include every volume whose declared inclusive path interval can contain a selected entry or descendant, including shared multipart boundary paths.
+
+  SECTION: [PARSE-MAN-006](#parse-man-006)
+    TEXT[!MUST]: The reader MUST retain the distinction between absent block boundaries and explicit numeric block boundaries.
+
+  SECTION: [PARSE-MAN-007](#parse-man-007)
+    TEXT[!MUST]: The manifest parser MUST accept an optional counted Filelist section before or after volume records without interpreting its lines as volume fields.
+
+  SECTION: [PARSE-TAR-001](#parse-tar-001)
+    TEXT[!MUST]: The tar parser MUST validate each header checksum and payload extent before accepting the entry it describes.
+
+  SECTION: [PARSE-TAR-002](#parse-tar-002)
+    TEXT[!MUST]: The tar parser MUST advance over each payload and its padding to the next 512-byte boundary without arithmetic overflow.
+
+  SECTION: [PARSE-TAR-003](#parse-tar-003)
+    TEXT[!MUST]: The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+  SECTION: [PARSE-TAR-004](#parse-tar-004)
+    TEXT[!MUST]: Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.
+
+  SECTION: [PARSE-TAR-005](#parse-tar-005)
+    TEXT[!MUST]: The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.
+
+  SECTION: [PARSE-ENTRY-001](#parse-entry-001)
+    TEXT[!MUST]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
+
+  SECTION: [PARSE-ENTRY-002](#parse-entry-002)
+    TEXT[!MUST]: The reader MUST classify signature entries using the three signature-entry prefixes defined above.
+
+  SECTION: [PARSE-ENTRY-003](#parse-entry-003)
+    TEXT[!MUST]: The reader MUST reject an unrecognized duplicity operation prefix in an otherwise recognized data or signature archive.
+
+  SECTION: [PARSE-MULTI-001](#parse-multi-001)
+    TEXT[!MUST]: Multipart assembly MUST concatenate payloads for one operation and path in consecutive part-number order starting at 1.
+
+  SECTION: [PARSE-MULTI-002](#parse-multi-002)
+    TEXT[!MUST]: Multipart assembly MUST reject missing, duplicate, reversed, mixed-operation, or interleaved parts of the same logical entry.
+
+  SECTION: [PARSE-MULTI-003](#parse-multi-003)
+    TEXT[!MUST]: The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+
+  SECTION: [PARSE-SIG-001](#parse-sig-001)
+    TEXT[!MUST]: The signature parser MUST recognize the four reviewed signature magic values and reject other magic values as unsupported.
+
+  SECTION: [PARSE-SIG-002](#parse-sig-002)
+    TEXT[!MUST]: The signature parser MUST validate nonzero block length, supported strong-checksum length for the selected magic, and complete checksum records.
+
+  SECTION: [PARSE-SIG-003](#parse-sig-003)
+    TEXT[!MUST]: The reader MUST represent original regular-file size as unknown when only a signature payload provides size information.
+
+  SECTION: [PARSE-DELTA-001](#parse-delta-001)
+    TEXT[!MUST,implementation,test]: The delta parser MUST require the reviewed delta magic before decoding commands.
+
+  SECTION: [PARSE-DELTA-002](#parse-delta-002)
+    TEXT[!MUST,implementation,test]: The delta parser MUST decode every nonreserved opcode according to the complete delta grammar above.
+
+  SECTION: [PARSE-DELTA-003](#parse-delta-003)
+    TEXT[!MUST,implementation,test]: A literal command MUST append exactly its indicated payload bytes to the reconstructed output.
+
+  SECTION: [PARSE-DELTA-004](#parse-delta-004)
+    TEXT[!MUST,implementation,test]: A copy command MUST append exactly the indicated byte range from the fixed basis file.
+
+  SECTION: [PARSE-DELTA-005](#parse-delta-005)
+    TEXT[!MUST,implementation,test]: A copy command MUST be rejected unless its offset and length describe a range wholly within the basis file.
+
+  SECTION: [PARSE-DELTA-006](#parse-delta-006)
+    TEXT[!MUST,implementation,test]: Zero-length explicit literal and valid zero-length copy commands MUST consume their encoded arguments and leave reconstructed output unchanged.
+
+  SECTION: [PARSE-DELTA-007](#parse-delta-007)
+    TEXT[!MUST,implementation,test]: Reserved delta opcodes MUST produce an unsupported-command error.
+
+  SECTION: [PARSE-DELTA-008](#parse-delta-008)
+    TEXT[!MUST,implementation,test]: A complete delta stream MUST contain END immediately after its last complete command and contain no bytes after END.
+
+  SECTION: [PARSE-CHAIN-001](#parse-chain-001)
+    TEXT[!MUST]: A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
+
+  SECTION: [PARSE-CHAIN-002](#parse-chain-002)
+    TEXT[!MUST]: The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+
+  SECTION: [PARSE-STATE-001](#parse-state-001)
+    TEXT[!MUST]: Snapshot interpretation MUST apply additions, replacement content, deltas, deletions, and file-type changes in chain order to the selected backup-relative path state.
+
+  SECTION: [PARSE-STATE-002](#parse-state-002)
+    TEXT[!MUST]: A delta entry MUST use the reconstructed regular-file content for that same path from the preceding state as its basis.
+
+  SECTION: [PARSE-BROWSE-001](#parse-browse-001)
+    TEXT[!MUST]: Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.
+
+  SECTION: [PARSE-BROWSE-002](#parse-browse-002)
+    TEXT[!MUST]: When signature metadata cannot provide a requested listing, the reader MUST expose that a volume scan is required before starting that scan.
+
+  SECTION: [PARSE-SOURCE-001](#parse-source-001)
+    TEXT[!MUST]: The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
+
+  SECTION: [RESTORE-001](#restore-001)
+    TEXT[!MUST]: A restoration MUST preserve each selected entry's backup-relative path beneath a destination that did not exist when publication began.
+
+  SECTION: [RESTORE-002](#restore-002)
+    TEXT[!MUST]: A restoration MUST write into private staging on the destination filesystem and publish the completed tree without replacing an existing destination.
+
+  SECTION: [RESTORE-003](#restore-003)
+    TEXT[!MUST]: Restoration filesystem operations MUST prevent traversal through symlinks outside the private staging tree.
+
+  SECTION: [RESTORE-004](#restore-004)
+    TEXT[!MUST]: The reader MUST restore supported regular files, directories, and symlinks with ordinary permissions and supported modification times.
+
+  SECTION: [RESTORE-005](#restore-005)
+    TEXT[!MUST]: A restore selection requiring unsupported filesystem entry types MUST fail before publication with an entry-specific diagnostic.
+
+  SECTION: [RESTORE-006](#restore-006)
+    TEXT[!MUST]: Cancellation or a handled restoration failure MUST leave the requested destination unpublished and attempt removal of temporary plaintext.
+
+  SECTION: [ASSURE-SPEC-001](#assure-spec-001)
+    TEXT[!MUST]: Each parser component MUST have reviewed requirements and resolved blocking questions before its implementation begins.
+
+  SECTION: [ASSURE-VEST-001](#assure-vest-001)
+    TEXT[!SHOULD]: Parsers using Vest SHOULD be authored in the Vest DSL.
+
+  SECTION: [ASSURE-VEST-002](#assure-vest-002)
+    TEXT[!MUST,implementation]: Every direct-combinator fallback MUST document the DSL limitation or suitability reason and its affected requirement IDs.
+
+  SECTION: [ASSURE-VEST-003](#assure-vest-003)
+    TEXT[!MUST]: The reviewed generated parser specifications MUST express the applicable normative requirements before their proofs are accepted as evidence of those requirements.
+
+  SECTION: [ASSURE-PROOF-001](#assure-proof-001)
+    TEXT[!MUST]: Production parsing and reconstruction MUST execute the same verified implementations used to establish accepted correctness claims.
+
+  SECTION: [ASSURE-PROOF-002](#assure-proof-002)
+    TEXT[!MUST]: The proof plan MUST cover parser refinement, consumption bounds, arithmetic safety, termination, panic freedom, delta output semantics, multipart order, chain continuity, state transitions, and restore-plan path validity for the supported profile.
+
+  SECTION: [ASSURE-PROOF-003](#assure-proof-003)
+    TEXT[!MUST]: Each trusted adapter or upstream trusted computing base assumption MUST have a reviewed rationale and identified affected correctness claims.
+
+  SECTION: [ASSURE-PROOF-004](#assure-proof-004)
+    TEXT[!MUST]: Project parsing and reconstruction algorithms MUST contain no assumption or admission of unproved facts, unchecked axioms, assumed specifications, external-body proof bypasses, or termination exemptions.
+
+  SECTION: [ASSURE-TRACE-001](#assure-trace-001)
+    TEXT[!MUST,implementation,test]: Every implemented requirement MUST have Duvet links from authored implementation and applicable test evidence to its specification heading and quoted normative text.
+
+  SECTION: [ASSURE-TRACE-002](#assure-trace-002)
+    TEXT[!MUST,implementation,test]: Formal proof obligations and successful verification results MUST be recorded separately by requirement ID with the verified source identity and tool configuration.
+
+  SECTION: [ASSURE-TRACE-003](#assure-trace-003)
+    TEXT[!MUST,implementation,test]: The acceptance gate MUST compare Duvet's derived requirement snapshot with a reviewed snapshot committed to the repository.
+
+  SECTION: [ASSURE-TRACE-004](#assure-trace-004)
+    TEXT[!MUST,implementation,test]: Each completed milestone MUST pass Duvet implementation and test coverage checks for its declared requirement sections.
+
+  SECTION: [ASSURE-BUILD-001](#assure-build-001)
+    TEXT[!MUST,implementation,test]: The acceptance build MUST fail on failed or incomplete required proofs, missing verification tools, stale generated parsers, or unreviewed verification exemptions.
+
+  SECTION: [ASSURE-TEST-001](#assure-test-001)
+    TEXT[!MUST]: Compatibility tests MUST restore supported snapshots produced by official duplicity and compare contents and supported metadata with both their source tree and official restoration.
+
+  SECTION: [ASSURE-PROGRESS-001](#assure-progress-001)
+    TEXT[!MUST]: README completion records MUST distinguish specification review, implementation, successful proofs, successful compatibility tests, and independent review for each completed component.
+
+  SECTION: [ASSURE-COMMIT-001](#assure-commit-001)
+    TEXT[!MUST]: Development MUST record meaningful validated checkpoint commits with the corresponding README task status and assurance evidence.

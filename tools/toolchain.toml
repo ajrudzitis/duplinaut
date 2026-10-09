@@ -1,0 +1,16 @@
+rust = "1.98.0"
+verus = "0.2026.09.06.8dea4a2"
+vstd = "0.0.0-2026-09-06-0133"
+vest = "0.2.1"
+duvet = "0.4.3"
+z3 = "4.16.0"
+vstd_sha256 = "9e5391d6f656ab9a485169f7e9fe87d3db1f0a6aa116fcb630dd0bef224170e7"
+vest_lib_sha256 = "f3f4d4698b6a56f5b23ae330d294a8d77fbb728fbf6d74946a18e0e46ba6e7a9"
+
+[linux_x86_64]
+verus_url = "https://github.com/verus-lang/verus/releases/download/release/0.2026.09.06.8dea4a2/verus-0.2026.09.06.8dea4a2-x86-linux.zip"
+verus_sha256 = "13d01e134c0620c3b29770874707d16c33b3d227c843a489c8ceb744d43c0a16"
+verus_directory = "verus-x86-linux"
+z3_url = "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-glibc-2.39.zip"
+z3_sha256 = "7288c49a5bd6dbafd7b0b0d1f65956b91672da24b08f09242919af159be3418e"
+z3_directory = "z3-4.16.0-x64-glibc-2.39"

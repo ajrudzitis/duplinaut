@@ -1,0 +1,7 @@
+//! Native duplicity archive parsing and reconstruction.
+//!
+//! Parsing and reconstruction run natively; upstream tools are test producers.
+pub mod generated;
+pub mod delta;
+pub mod manifest_token;
+pub mod path;

@@ -1,0 +1,15 @@
+// Byte predicates are the reviewed manifest token profile, not Unicode classes.
+hex_digit = u8 | {48,49,50,51,52,53,54,55,56,57,65,66,67,68,69,70,97,98,99,100,101,102}
+
+//= docs/parsing-requirements.md#parse-man-002
+//# The manifest token parser MUST decode a valid double-quoted token's `\xHH` escape to exactly the represented byte.
+escape = wrap(u8 = 92, u8 = 120, { high: hex_digit, low: hex_digit, })
+
+quoted_byte = u8 | !{0,10,13,34,92}
+quoted_atom = choose { Plain => quoted_byte, Escaped => escape, }
+quoted_token = { const opening: u8 = 34, atoms: Vec<quoted_atom>, const closing: u8 = 34, }
+unquoted_byte = u8 | !{0,9,10,11,12,13,32,34,39,92}
+
+//= docs/parsing-requirements.md#parse-man-003
+//# The manifest token parser MUST reject incomplete escapes, non-hexadecimal escape digits, unsupported escape forms, and unterminated quoted tokens.
+manifest_token = quoted_token

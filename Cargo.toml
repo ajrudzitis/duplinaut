@@ -1,0 +1,21 @@
+[workspace]
+members = ["crates/core", "crates/s3", "crates/tui", "xtask"]
+default-members = ["crates/core", "crates/s3", "crates/tui"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.98"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+duplicity-core = { path = "crates/core" }
+duplicity-s3 = { path = "crates/s3" }
+vstd = { version = "=0.0.0-2026-09-06-0133" }
+vest_lib = { version = "=0.2.1" }
+
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_only)", "cfg(verus_keep_ghost)", "cfg(verus_keep_ghost_body)"] }
+unsafe_code = "forbid"
+
