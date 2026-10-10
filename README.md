@@ -62,7 +62,7 @@ cargo xtask ci           # Full acceptance checks
 
 `build` verifies by default. Missing tools, stale generated parsers, failed proofs, incomplete required evidence, or unreviewed assumptions fail the gate. The full core proof gate remains in progress; an ordinary Cargo build is a development check and carries no verification claim.
 
-`cargo xtask generate` updates generated parsers for review. `cargo xtask trace-update` explicitly updates the Duvet baseline for review and commit. Official fixture regeneration is documented in [the producer guide](tests/producer/README.md); `cargo xtask producer` currently fails explicitly until that workflow is wired into xtask.
+`cargo xtask generate` updates generated parsers for review. `cargo xtask trace-update` explicitly updates the Duvet baseline for review and commit. `cargo xtask producer` regenerates official fixtures with explicit tools and a new output directory, as documented in [the producer guide](tests/producer/README.md).
 
 ## Backlog and milestones
 

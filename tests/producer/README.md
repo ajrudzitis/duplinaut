@@ -14,6 +14,8 @@ python3 tests/producer/generate.py \
 
 Output must not exist. Source trees, caches, private test-agent state, official restored trees, and an encrypted multipart probe use isolated temporary directories. `--plain-only` omits encrypted chains and test-key generation. `--small` also omits the large incompressible plain payloads. Repeat `--producer-option=--option` to pass options to backup and restore; the official executable must actually support them. New-object tracking extracts deltas independently of long/short/legacy object names. Missing tools, wrong producer version, failed backup/restoration, wrong source comparison, or failed container observations fail the command. A GnuPG agent needs permission to create a local socket.
 
+`cargo xtask producer` runs this same recipe. Set `PRODUCER_PYTHON`, `PRODUCER_DUPLICITY`, `PRODUCER_GPG` and `PRODUCER_OUTPUT` explicitly. `PRODUCER_VERSION` defaults to `3.0.7`; `PRODUCER_PROFILE` accepts `full` (default), `plain`, or `small-plain`. The wrapper preserves argument boundaries and never overwrites an existing output. Use the direct Python invocation above for historical producer options.
+
 The checked-in 3.0.7 corpus was produced with:
 
 - Duplicity: `/nix/store/5j4mk0k17j37nh8a7s2pcr5z0vblx73r-duplicity-3.0.7/bin/duplicity`
