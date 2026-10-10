@@ -8,7 +8,8 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Manifest token decoding | Reviewed exact byte predicates | Implemented; three tests pass | Focused strict verification: 155 obligations, zero errors | Official manifests pass through this decoder | Independent semantic review complete; complete-core gate pending |
 | Byte-path validation and comparison | Reviewed root/component grammar | Implemented; three tests pass | Exact component comparison and loop safety checked; normalization contract pending | Archive fixture integration pending | Comparison source review complete |
 | Manifest framing and normalization | Reviewed fields, counts, hashes and restart semantics | Implemented; eight tests pass | Pending | Plain manifests from all four producer versions pass | Software checkpoint reviewed; formal acceptance pending |
-| Names, tar, signatures | Requirements written; open questions remain | Pending | Pending | Pending | Pending |
+| Object names and timestamps | Reviewed canonical, legacy and short-name grammar | Implemented; six tests pass; canonical framing uses Vest DSL | Calendar and classification refinement pending | All 84 recorded official object basenames pass | Native source reviewed; formal acceptance pending |
+| Tar and signatures | Requirements written; open questions remain | Pending | Pending | Pending | Pending |
 | Reconstruction and restoration | Requirements written; open questions remain | Pending | Pending | Pending | Pending |
 
 - [x] Create the library and verification-enabled Cargo configuration.
@@ -22,6 +23,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Implement bounded manifest records, restart normalization, digest declarations and counted file lists; test official manifests.
 - [x] Prove byte-component comparison against an independent lexicographic model.
 - [x] Prove exact manifest token consumption, decoded bytes, malformed-input rejection and encoded-size limits against an independent model.
+- [x] Parse object names with literal prefixes, bounded numerals and Gregorian timestamps; test every supported calendar day and original producer basename.
 - [ ] Prove path normalization and manifest contextual semantics.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
