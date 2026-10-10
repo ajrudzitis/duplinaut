@@ -20,6 +20,7 @@ output = "crates/core/src/generated/names.rs"
 [[generation]]
 input = "crates/core/formats/signature.vest"
 output = "crates/core/src/generated/signature.rs"
+append = "\ninclude!(\"../verified/signature_refinement.rs\");\n"
 
 [[generation]]
 input = "crates/core/formats/tar.vest"
