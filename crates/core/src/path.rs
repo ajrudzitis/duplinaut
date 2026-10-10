@@ -2,6 +2,19 @@
 use vstd::prelude::*;
 
 verus! {
+/// Lexicographic byte order, including the shorter-prefix rule.
+pub open spec fn bytes_less(left: Seq<u8>, right: Seq<u8>) -> bool {
+    (left.len() < right.len() && left == right.take(left.len() as int))
+    || exists|i: int| 0 <= i < left.len() && i < right.len()
+        && left.take(i) == right.take(i) && left[i] < right[i]
+}
+
+/// Lexicographic order on components, rather than on slash-joined rendering.
+pub open spec fn components_less(left: Seq<Seq<u8>>, right: Seq<Seq<u8>>) -> bool {
+    (left.len() < right.len() && left == right.take(left.len() as int))
+    || exists|i: int| 0 <= i < left.len() && i < right.len()
+        && left.take(i) == right.take(i) && bytes_less(left[i], right[i])
+}
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BackupPath { components: Vec<Vec<u8>> }
 
@@ -9,6 +22,9 @@ pub struct BackupPath { components: Vec<Vec<u8>> }
 pub enum PathError { Absolute, EmptyComponent, DotComponent, ParentComponent, Nul, ByteLimit, ComponentLimit }
 
 impl BackupPath {
+    pub closed spec fn view(&self) -> Seq<Seq<u8>> {
+        self.components@.map_values(|component: Vec<u8>| component@)
+    }
     /// Root markers are decoded here; one trailing separator is allowed only
     /// when the container explicitly identifies a directory.
     //= docs/parsing-requirements.md#parse-path-001
@@ -27,7 +43,13 @@ impl BackupPath {
         let mut start = 0;
         let mut cursor = 0;
         let mut components: Vec<Vec<u8>> = Vec::new();
-        loop {
+        loop
+            invariant
+                0 < end <= bytes.len(),
+                start <= cursor <= end,
+                components.len() <= max_components,
+            decreases end - cursor,
+        {
             if cursor == end || bytes[cursor] == b'/' {
                 let count = cursor - start;
                 if count == 0 { return Err(PathError::EmptyComponent); }
@@ -38,7 +60,10 @@ impl BackupPath {
                 if components.len() == max_components { return Err(PathError::ComponentLimit); }
                 let mut component: Vec<u8> = Vec::new();
                 let mut index = start;
-                while index < cursor {
+                while index < cursor
+                    invariant start <= index <= cursor <= end <= bytes.len(),
+                    decreases cursor - index,
+                {
                     component.push(bytes[index]);
                     index += 1;
                 }
@@ -51,7 +76,86 @@ impl BackupPath {
         Ok(Self { components })
     }
 
-    pub fn components(&self) -> &Vec<Vec<u8>> { &self.components }
+    pub fn components(&self) -> (result: &Vec<Vec<u8>>)
+        ensures result@.map_values(|component: Vec<u8>| component@) == self@,
+    { &self.components }
+
+    /// Compare byte-component sequences, independently of terminal rendering.
+    /// Returns -1, 0, or 1. This kernel supplies manifest range comparisons.
+    pub fn compare(&self, other: &Self) -> (result: i8)
+        ensures
+            result == -1 || result == 0 || result == 1,
+            result == -1 ==> components_less(self@, other@),
+            result == 0 ==> self@ == other@,
+            result == 1 ==> components_less(other@, self@),
+    {
+        reveal(BackupPath::view);
+        let mut component_index = 0;
+        while component_index < self.components.len() && component_index < other.components.len()
+            invariant
+                component_index <= self.components.len(),
+                component_index <= other.components.len(),
+                self@.take(component_index as int) == other@.take(component_index as int),
+            decreases self.components.len() - component_index,
+        {
+            let left = &self.components[component_index];
+            let right = &other.components[component_index];
+            let mut byte_index = 0;
+            while byte_index < left.len() && byte_index < right.len()
+                invariant
+                    component_index < self.components.len(),
+                    component_index < other.components.len(),
+                    self@.take(component_index as int) == other@.take(component_index as int),
+                    left@ == self@[component_index as int],
+                    right@ == other@[component_index as int],
+                    byte_index <= left.len(),
+                    byte_index <= right.len(),
+                    left@.take(byte_index as int) == right@.take(byte_index as int),
+                decreases left.len() - byte_index,
+            {
+                if left[byte_index] < right[byte_index] { return -1; }
+                if left[byte_index] > right[byte_index] { return 1; }
+                proof {
+                    assert(left@.take(byte_index as int + 1) =~= right@.take(byte_index as int + 1));
+                }
+                byte_index += 1;
+            }
+            if left.len() < right.len() {
+                proof {
+                    assert(left@.take(left@.len() as int) =~= left@);
+                    assert(bytes_less(left@, right@));
+                    assert(components_less(self@, other@)) by {
+                        assert(self@.take(component_index as int) == other@.take(component_index as int));
+                    }
+                }
+                return -1;
+            }
+            if left.len() > right.len() {
+                proof {
+                    assert(right@.take(right@.len() as int) =~= right@);
+                    assert(bytes_less(right@, left@));
+                    assert(components_less(other@, self@));
+                }
+                return 1;
+            }
+            proof {
+                assert(left@ =~= right@);
+                assert(self@.take(component_index as int + 1) =~= other@.take(component_index as int + 1));
+            }
+            component_index += 1;
+        }
+        proof {
+            if component_index == self.components.len() {
+                assert(self@.take(component_index as int) =~= self@);
+            }
+            if component_index == other.components.len() {
+                assert(other@.take(component_index as int) =~= other@);
+            }
+        }
+        if self.components.len() < other.components.len() { -1 }
+        else if self.components.len() > other.components.len() { 1 }
+        else { 0 }
+    }
 }
 }
 

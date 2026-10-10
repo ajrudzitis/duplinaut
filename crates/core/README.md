@@ -6,8 +6,9 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | --- | --- | --- | --- | --- | --- |
 | Delta decoder and application | Reviewed grammar and bounds | Implemented; 16 native tests pass | Focused verification: 535 obligations, zero errors | Official 0.8.23, 2.1.3, 3.0.7 and 3.2.1 payloads pass, including multipart | Independent semantic review complete; whole-workspace gate pending |
 | Manifest token decoding | Reviewed exact byte predicates | Implemented; three tests pass | Pending | Remaining manifest fixture integration pending | Pending |
-| Byte-path validation | Reviewed root/component grammar | Implemented; two tests pass | Pending | Remaining archive fixture integration pending | Pending |
-| Names, manifests, tar, signatures | Requirements written; open questions remain | Pending | Pending | Pending | Pending |
+| Byte-path validation and comparison | Reviewed root/component grammar | Implemented; three tests pass | Exact component comparison and loop safety checked; normalization contract pending | Archive fixture integration pending | Comparison source review complete |
+| Manifest framing and normalization | Reviewed fields, counts, hashes and restart semantics | Implemented; eight tests pass | Pending | Plain manifests from all four producer versions pass | Software checkpoint reviewed; formal acceptance pending |
+| Names, tar, signatures | Requirements written; open questions remain | Pending | Pending | Pending | Pending |
 | Reconstruction and restoration | Requirements written; open questions remain | Pending | Pending | Pending | Pending |
 
 - [x] Create the library and verification-enabled Cargo configuration.
@@ -18,6 +19,9 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Apply a large delta assembled from two official volumes and compare its result with the independent source-tree hash oracle.
 - [x] Prove delta decoding and fixed-basis application against an independent wire model, including rejection and output bounds.
 - [x] Test extracted deltas from five historical producer profiles against independent source contents.
+- [x] Implement bounded manifest records, restart normalization, digest declarations and counted file lists; test official manifests.
+- [x] Prove byte-component comparison against an independent lexicographic model.
+- [ ] Prove path normalization and manifest contextual semantics.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 

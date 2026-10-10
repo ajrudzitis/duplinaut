@@ -1,5 +1,7 @@
 use duplicity_core::path::{BackupPath, PathError};
-fn parse(bytes: &[u8]) -> Result<BackupPath, PathError> { BackupPath::parse(bytes, false, 1024, 32) }
+fn parse(bytes: &[u8]) -> Result<BackupPath, PathError> {
+    BackupPath::parse(bytes, false, 1024, 32)
+}
 
 //= docs/parsing-requirements.md#parse-path-001
 //# The reader MUST preserve backup path components as bytes without lossy UTF-8 conversion.
@@ -17,14 +19,74 @@ fn identity_and_order_use_byte_components() {
 //# A restore path MUST be relative to the backup root and contain no NUL, empty interior component, dot component, or parent component after format-specific root decoding.
 #[test]
 fn reject_escape_and_ambiguous_components() {
-    for bytes in [b"/a".as_slice(), b"a//b", b"a/", b"a/./b", b"a/../b", b"..", b"a\0b"] {
+    for bytes in [
+        b"/a".as_slice(),
+        b"a//b",
+        b"a/",
+        b"a/./b",
+        b"a/../b",
+        b"..",
+        b"a\0b",
+    ] {
         assert!(parse(bytes).is_err(), "{bytes:?}");
     }
     assert!(parse(b"").unwrap().components().is_empty());
     assert!(parse(b".").unwrap().components().is_empty());
-    assert!(BackupPath::parse(b"./", true, 2, 1).unwrap().components().is_empty());
-    assert_eq!(BackupPath::parse(b"a/", true, 2, 1).unwrap(), parse(b"a").unwrap());
+    assert!(BackupPath::parse(b"./", true, 2, 1)
+        .unwrap()
+        .components()
+        .is_empty());
+    assert_eq!(
+        BackupPath::parse(b"a/", true, 2, 1).unwrap(),
+        parse(b"a").unwrap()
+    );
     assert!(BackupPath::parse(b"a//", true, 3, 2).is_err());
-    assert_eq!(BackupPath::parse(b"ab", false, 1, 1), Err(PathError::ByteLimit));
-    assert_eq!(BackupPath::parse(b"a/b", false, 3, 1), Err(PathError::ComponentLimit));
+    assert_eq!(
+        BackupPath::parse(b"ab", false, 1, 1),
+        Err(PathError::ByteLimit)
+    );
+    assert_eq!(
+        BackupPath::parse(b"a/b", false, 3, 1),
+        Err(PathError::ComponentLimit)
+    );
+}
+
+#[test]
+fn comparison_covers_component_and_byte_prefix_boundaries() {
+    let paths = [
+        b"".as_slice(),
+        b"a",
+        b"a/b",
+        b"a/b/child",
+        b"a/b!",
+        b"a/bc",
+        b"a/c",
+        b"a!",
+        b"a!/b",
+        b"ab",
+        b"raw-\xff",
+        b"raw-\xff/a",
+    ];
+    for (left_index, left) in paths.iter().enumerate() {
+        for (right_index, right) in paths.iter().enumerate() {
+            let left = parse(left).unwrap();
+            let right = parse(right).unwrap();
+            let expected = if left_index < right_index {
+                -1
+            } else if left_index > right_index {
+                1
+            } else {
+                0
+            };
+            assert_eq!(left.compare(&right), expected, "{left} / {right}");
+            assert_eq!(
+                left.compare(&right),
+                match left.cmp(&right) {
+                    std::cmp::Ordering::Less => -1,
+                    std::cmp::Ordering::Equal => 0,
+                    std::cmp::Ordering::Greater => 1,
+                }
+            );
+        }
+    }
 }
