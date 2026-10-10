@@ -663,7 +663,8 @@ impl Manifest {
         let mut cursor = 0;
         let mut metadata_reserved = 0;
         while cursor < bytes.len()
-            invariant cursor <= bytes.len(),
+            invariant cursor <= bytes.len(), entry_count <= limits.entries,
+                metadata_reserved <= limits.metadata_bytes,
             decreases bytes.len() - cursor,
         {
             let start = cursor;
