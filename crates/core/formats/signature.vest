@@ -1,0 +1,9 @@
+!BIG_ENDIAN
+
+// Published format: https://librsync.github.io/page_formats.html .
+// Semantic algorithm limits and complete-record framing are controller checks.
+//= docs/parsing-requirements.md#parse-sig-001
+//# The signature parser MUST recognize the four reviewed signature magic values and reject other magic values as unsupported.
+
+signature_magic = u32 | {0x72730136,0x72730137,0x72730146,0x72730147}
+signature_header = { magic: signature_magic, block_length: u32, strong_length: u32, }

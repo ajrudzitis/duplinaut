@@ -5,3 +5,5 @@ pub mod delta;
 pub mod manifest_token;
 #[rustfmt::skip]
 pub mod names;
+#[rustfmt::skip]
+pub mod signature;

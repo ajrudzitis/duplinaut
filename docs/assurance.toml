@@ -17,6 +17,10 @@ proof_profile = "manifest-token-facts-v1"
 input = "crates/core/formats/names.vest"
 output = "crates/core/src/generated/names.rs"
 
+[[generation]]
+input = "crates/core/formats/signature.vest"
+output = "crates/core/src/generated/signature.rs"
+
 [[milestone]]
 id = "tooling"
 gate = true
