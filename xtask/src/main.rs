@@ -20,6 +20,8 @@ struct Pins {
     z3: String,
     vstd_sha256: String,
     vest_lib_sha256: String,
+    verus_syn: String,
+    verus_syn_sha256: String,
     #[serde(default)]
     vest_lib_vendor: Option<assurance::VendorPin>,
 }
@@ -260,6 +262,7 @@ fn doctor(root: &Path, tools: &Tools, pins: &Pins) -> Result<()> {
         &[
             ("vstd", &pins.vstd, &pins.vstd_sha256),
             ("vest_lib", &pins.vest, &pins.vest_lib_sha256),
+            ("verus_syn", &pins.verus_syn, &pins.verus_syn_sha256),
         ],
         pins.vest_lib_vendor.as_ref(),
     )?;
@@ -312,8 +315,7 @@ fn generate(root: &Path, ledger: &Ledger, tools: &Tools, update: bool) -> Result
             ],
         )?;
         let expected = root.join(&item.output);
-        let mut bytes = fs::read(&produced)?;
-        bytes.extend(item.append.as_bytes());
+        let bytes = assurance::augment_generation(&fs::read(&produced)?, item)?;
         if update {
             fs::create_dir_all(expected.parent().context("output parent missing")?)?;
             fs::write(expected, bytes)?;
