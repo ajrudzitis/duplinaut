@@ -66,53 +66,183 @@ struct PendingVolume {
     number: u64, start: Option<Boundary>, end: Option<Boundary>, hashes: Vec<DeclaredDigest>,
 }
 
-fn space(byte: u8) -> bool { byte == b' ' || byte == b'\t' }
-fn lower(byte: u8) -> u8 {
+pub open spec fn spacing(byte: u8) -> bool { byte == 32 || byte == 9 }
+pub open spec fn lowercase(byte: u8) -> u8 {
+    if 65 <= byte <= 90 { (byte as int + 32) as u8 } else { byte }
+}
+pub open spec fn start_nonspace(bytes: Seq<u8>, index: int) -> int
+    decreases bytes.len() - index,
+{
+    if 0 <= index < bytes.len() && spacing(bytes[index]) {
+        start_nonspace(bytes, index + 1)
+    } else { index }
+}
+pub open spec fn end_nonspace(bytes: Seq<u8>, start: int, end: int) -> int
+    decreases end - start,
+{
+    if 0 <= start < end <= bytes.len() && spacing(bytes[end - 1]) {
+        end_nonspace(bytes, start, end - 1)
+    } else { end }
+}
+pub open spec fn trimmed(bytes: Seq<u8>) -> Seq<u8> {
+    let start = start_nonspace(bytes, 0);
+    bytes.subrange(start, end_nonspace(bytes, start, bytes.len() as int))
+}
+pub open spec fn word_end(bytes: Seq<u8>, index: int) -> int
+    decreases bytes.len() - index,
+{
+    if 0 <= index < bytes.len() && !spacing(bytes[index]) { word_end(bytes, index + 1) }
+    else { index }
+}
+pub open spec fn word_model(bytes: Seq<u8>) -> (Seq<u8>, Seq<u8>) {
+    let line = trimmed(bytes);
+    let end = word_end(line, 0);
+    (line.take(end), trimmed(line.skip(end)))
+}
+/// Decimal grammar uses mathematical integers; overflow is an explicit
+/// representability check, independently of the executable division guard.
+pub open spec fn decimal_scan(bytes: Seq<u8>, index: int, value: int, positive: bool) -> Result<u64, ManifestError>
+    decreases bytes.len() - index,
+{
+    if !(0 <= index <= bytes.len() && 0 <= value <= u64::MAX) { Err(ManifestError::Malformed) }
+    else if index == bytes.len() {
+        if positive && value == 0 { Err(ManifestError::Malformed) } else { Ok(value as u64) }
+    } else if bytes[index] < 48 || bytes[index] > 57 { Err(ManifestError::Malformed) }
+    else {
+        let next = value * 10 + bytes[index] as int - 48;
+        if next > u64::MAX { Err(ManifestError::Malformed) }
+        else { decimal_scan(bytes, index + 1, next, positive) }
+    }
+}
+pub open spec fn decimal_model(bytes: Seq<u8>, positive: bool) -> Result<u64, ManifestError> {
+    if bytes.len() == 0 { Err(ManifestError::Malformed) } else { decimal_scan(bytes, 0, 0, positive) }
+}
+pub open spec fn manifest_token_model(bytes: Seq<u8>, max_encoded: int)
+    -> Result<(Seq<u8>, Seq<u8>), ManifestError> {
+    if bytes.len() > max_encoded { Err(ManifestError::Limit) }
+    else {
+        match crate::verified::token_refinement::wire_token(bytes) {
+            None => Err(ManifestError::Malformed),
+            Some((n, decoded)) => {
+                if n < bytes.len() && !spacing(bytes[n]) { Err(ManifestError::Malformed) }
+                else { Ok((decoded, trimmed(bytes.skip(n)))) }
+            },
+        }
+    }
+}
+
+fn space(byte: u8) -> (result: bool)
+    ensures result == spacing(byte),
+{ byte == b' ' || byte == b'\t' }
+fn lower(byte: u8) -> (result: u8)
+    ensures result == lowercase(byte),
+{
     if byte >= b'A' && byte <= b'Z' { byte + 32 } else { byte }
 }
-fn equal_word(left: &[u8], right: &[u8]) -> bool {
+fn equal_word(left: &[u8], right: &[u8]) -> (result: bool)
+    ensures result == (left.len() == right.len()
+        && forall|i: int| 0 <= i < left.len() ==> lowercase(left@[i]) == lowercase(right@[i])),
+{
     if left.len() != right.len() { return false; }
     let mut i = 0;
-    while i < left.len() {
+    while i < left.len()
+        invariant
+            left.len() == right.len(),
+            i <= left.len(),
+            forall|j: int| 0 <= j < i ==> lowercase(left@[j]) == lowercase(right@[j]),
+        decreases left.len() - i,
+    {
         if lower(left[i]) != lower(right[i]) { return false; }
         i += 1;
     }
     true
 }
-fn owned(bytes: &[u8]) -> Vec<u8> {
+fn owned(bytes: &[u8]) -> (result: Vec<u8>)
+    ensures result@ == bytes@,
+{
     let mut result = Vec::new();
     let mut i = 0;
-    while i < bytes.len() { result.push(bytes[i]); i += 1; }
+    while i < bytes.len()
+        invariant i <= bytes.len(), result@ == bytes@.take(i as int),
+        decreases bytes.len() - i,
+    {
+        result.push(bytes[i]);
+        assert(result@ =~= bytes@.take(i as int + 1));
+        i += 1;
+    }
     result
 }
-fn trim(bytes: &[u8]) -> &[u8] {
+fn trim(bytes: &[u8]) -> (result: &[u8])
+    ensures result@ == trimmed(bytes@),
+{
     let mut start = 0;
     let mut end = bytes.len();
-    while start < end && space(bytes[start]) { start += 1; }
-    while start < end && space(bytes[end - 1]) { end -= 1; }
+    while start < end && space(bytes[start])
+        invariant start <= end == bytes.len(),
+            start_nonspace(bytes@, 0) == start_nonspace(bytes@, start as int),
+        decreases end - start,
+    {
+        reveal_with_fuel(start_nonspace, 1);
+        start += 1;
+    }
+    proof { reveal_with_fuel(start_nonspace, 1); }
+    while start < end && space(bytes[end - 1])
+        invariant start <= end <= bytes.len(),
+            start == start_nonspace(bytes@, 0),
+            end_nonspace(bytes@, start as int, bytes.len() as int) == end_nonspace(bytes@, start as int, end as int),
+        decreases end - start,
+    {
+        reveal_with_fuel(end_nonspace, 1);
+        end -= 1;
+    }
+    proof { reveal_with_fuel(end_nonspace, 1); }
     vstd::slice::slice_subrange(bytes, start, end)
 }
-fn word(bytes: &[u8]) -> (&[u8], &[u8]) {
+fn word(bytes: &[u8]) -> (result: (&[u8], &[u8]))
+    ensures (result.0@, result.1@) == word_model(bytes@),
+{
+    let ghost original = bytes@;
     let bytes = trim(bytes);
     let mut end = 0;
-    while end < bytes.len() && !space(bytes[end]) { end += 1; }
+    while end < bytes.len() && !space(bytes[end])
+        invariant end <= bytes.len(), bytes@ == trimmed(original),
+            word_end(bytes@, 0) == word_end(bytes@, end as int),
+        decreases bytes.len() - end,
+    {
+        reveal_with_fuel(word_end, 1);
+        end += 1;
+    }
+    proof { reveal_with_fuel(word_end, 1); }
     (vstd::slice::slice_subrange(bytes, 0, end), trim(vstd::slice::slice_subrange(bytes, end, bytes.len())))
 }
-fn decimal(bytes: &[u8], positive: bool) -> Result<u64, ManifestError> {
+fn decimal(bytes: &[u8], positive: bool) -> (result: Result<u64, ManifestError>)
+    ensures result == decimal_model(bytes@, positive),
+{
     if bytes.len() == 0 { return Err(ManifestError::Malformed); }
     let mut number: u64 = 0;
     let mut i = 0;
-    while i < bytes.len() {
+    while i < bytes.len()
+        invariant i <= bytes.len(),
+            decimal_model(bytes@, positive) == decimal_scan(bytes@, i as int, number as int, positive),
+        decreases bytes.len() - i,
+    {
+        proof { reveal_with_fuel(decimal_scan, 1); }
         if bytes[i] < b'0' || bytes[i] > b'9' { return Err(ManifestError::Malformed); }
         let digit = (bytes[i] - b'0') as u64;
         if number > (u64::MAX - digit) / 10 { return Err(ManifestError::Malformed); }
         number = number * 10 + digit;
         i += 1;
     }
+    proof { reveal_with_fuel(decimal_scan, 1); }
     if positive && number == 0 { return Err(ManifestError::Malformed); }
     Ok(number)
 }
-fn token<'a>(bytes: &'a [u8], limits: &ManifestLimits) -> Result<(Vec<u8>, &'a [u8]), ManifestError> {
+fn token<'a>(bytes: &'a [u8], limits: &ManifestLimits) -> (result: Result<(Vec<u8>, &'a [u8]), ManifestError>)
+    ensures match result {
+        Ok((decoded, rest)) => manifest_token_model(bytes@, limits.line_bytes as int) == Ok((decoded@, rest@)),
+        Err(error) => manifest_token_model(bytes@, limits.line_bytes as int) == Err(error),
+    },
+{
     let (consumed, decoded) = match decode_token(bytes, limits.line_bytes) {
         Ok(value) => value,
         Err(TokenError::Limit) => return Err(ManifestError::Limit),
@@ -145,10 +275,16 @@ fn digest(bytes: &[u8]) -> Result<DeclaredDigest, ManifestError> {
         || (algorithm == DigestAlgorithm::Md5 && hex.len() != 32) { return Err(ManifestError::Malformed); }
     let mut normalized_name = Vec::new();
     let mut i = 0;
-    while i < name.len() { normalized_name.push(lower(name[i])); i += 1; }
+    while i < name.len()
+        invariant i <= name.len(),
+        decreases name.len() - i,
+    { normalized_name.push(lower(name[i])); i += 1; }
     let mut normalized_hex = Vec::new();
     i = 0;
-    while i < hex.len() {
+    while i < hex.len()
+        invariant i <= hex.len(),
+        decreases hex.len() - i,
+    {
         let byte = lower(hex[i]);
         if !((byte >= b'0' && byte <= b'9') || (byte >= b'a' && byte <= b'f')) {
             return Err(ManifestError::Malformed);
@@ -164,7 +300,10 @@ fn finish(pending: PendingVolume) -> Result<VolumeRecord, ManifestError> {
     if pending.hashes.len() == 0 { return Err(ManifestError::Malformed); }
     let mut supported = false;
     let mut i = 0;
-    while i < pending.hashes.len() {
+    while i < pending.hashes.len()
+        invariant i <= pending.hashes.len(),
+        decreases pending.hashes.len() - i,
+    {
         if pending.hashes[i].algorithm != DigestAlgorithm::Unsupported { supported = true; }
         i += 1;
     }
@@ -190,9 +329,15 @@ impl Manifest {
         let mut entry_count = 0;
         let mut cursor = 0;
         let mut metadata_reserved = 0;
-        while cursor < bytes.len() {
+        while cursor < bytes.len()
+            invariant cursor <= bytes.len(),
+            decreases bytes.len() - cursor,
+        {
             let start = cursor;
-            while cursor < bytes.len() && bytes[cursor] != b'\n' {
+            while cursor < bytes.len() && bytes[cursor] != b'\n'
+                invariant start <= cursor <= bytes.len(),
+                decreases bytes.len() - cursor,
+            {
                 if cursor - start >= limits.line_bytes { return Err(ManifestError::Limit); }
                 cursor += 1;
             }
@@ -277,7 +422,10 @@ impl Manifest {
                     let hash = match digest(value) { Ok(value) => value, Err(error) => return Err(error) };
                     let mut i = 0;
                     let mut duplicate = false;
-                    while i < record.hashes.len() {
+                    while i < record.hashes.len()
+                        invariant i <= record.hashes.len(),
+                        decreases record.hashes.len() - i,
+                    {
                         if equal_word(&record.hashes[i].name, &hash.name) {
                             if record.hashes[i].hex != hash.hex { return Err(ManifestError::Malformed); }
                             duplicate = true;
@@ -309,11 +457,17 @@ impl Manifest {
         if self.records.len() == 0 { return result; }
         let last = self.records[self.records.len() - 1].number;
         let mut i = 0;
-        while i < self.records.len() {
+        while i < self.records.len()
+            invariant i <= self.records.len(),
+            decreases self.records.len() - i,
+        {
             let record = &self.records[i];
             if record.number <= last {
                 let mut j = 0;
-                while j < result.len() && result[j].number < record.number { j += 1; }
+                while j < result.len() && result[j].number < record.number
+                    invariant j <= result.len(),
+                    decreases result.len() - j,
+                { j += 1; }
                 if j < result.len() && result[j].number == record.number { result[j] = record; }
                 else { result.insert(j, record); }
             }
@@ -326,7 +480,10 @@ impl Manifest {
 fn descendant(path: &BackupPath, root: &BackupPath) -> bool {
     if path.components().len() < root.components().len() { return false; }
     let mut i = 0;
-    while i < root.components().len() {
+    while i < root.components().len()
+        invariant i <= root@.len(),
+        decreases root@.len() - i,
+    {
         if path.components()[i] != root.components()[i] { return false; }
         i += 1;
     }
