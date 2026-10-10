@@ -367,6 +367,223 @@ fn finish(pending: PendingVolume) -> Result<VolumeRecord, ManifestError> {
     Ok(VolumeRecord { number: pending.number, start, end, hashes: pending.hashes })
 }
 
+pub open spec fn record_values(records: Seq<&VolumeRecord>) -> Seq<VolumeRecord> {
+    records.map_values(|record: &VolumeRecord| *record)
+}
+pub closed spec fn insertion_index(records: Seq<VolumeRecord>, number: u64, index: int) -> int
+    decreases records.len() - index,
+{
+    if 0 <= index < records.len() && records[index].number < number {
+        insertion_index(records, number, index + 1)
+    } else { index }
+}
+pub open spec fn insert_record(records: Seq<VolumeRecord>, record: VolumeRecord) -> Seq<VolumeRecord> {
+    let index = insertion_index(records, record.number, 0);
+    if index < records.len() && records[index].number == record.number {
+        records.update(index, record)
+    } else { records.insert(index, record) }
+}
+pub open spec fn normalized_prefix(records: Seq<VolumeRecord>, end: int, cap: u64) -> Seq<VolumeRecord>
+    decreases end,
+{
+    if end <= 0 || end > records.len() { Seq::empty() }
+    else {
+        let previous = normalized_prefix(records, end - 1, cap);
+        if records[end - 1].number <= cap { insert_record(previous, records[end - 1]) }
+        else { previous }
+    }
+}
+pub open spec fn normalized_records(records: Seq<VolumeRecord>) -> Seq<VolumeRecord> {
+    if records.len() == 0 { Seq::empty() }
+    else { normalized_prefix(records, records.len() as int, records.last().number) }
+}
+pub open spec fn ordered_records(records: Seq<VolumeRecord>) -> bool {
+    forall|i: int, j: int| 0 <= i < j < records.len() ==> records[i].number < records[j].number
+}
+proof fn lemma_insertion_index(records: Seq<VolumeRecord>, number: u64, start: int)
+    requires 0 <= start <= records.len(),
+    ensures
+        start <= insertion_index(records, number, start) <= records.len(),
+        forall|i: int| start <= i < insertion_index(records, number, start)
+            ==> records[i].number < number,
+        insertion_index(records, number, start) < records.len()
+            ==> records[insertion_index(records, number, start)].number >= number,
+    decreases records.len() - start,
+{
+    reveal_with_fuel(insertion_index, 1);
+    if start < records.len() && records[start].number < number {
+        lemma_insertion_index(records, number, start + 1);
+    }
+}
+proof fn lemma_insert_ordered(records: Seq<VolumeRecord>, record: VolumeRecord)
+    requires ordered_records(records),
+    ensures ordered_records(insert_record(records, record)),
+{
+    lemma_insertion_index(records, record.number, 0);
+    let index = insertion_index(records, record.number, 0);
+    let output = insert_record(records, record);
+    assert forall|i: int, j: int| 0 <= i < j < output.len()
+        implies output[i].number < output[j].number by {
+        if index < records.len() && records[index].number == record.number {
+            assert(output[i].number == records[i].number);
+            assert(output[j].number == records[j].number);
+        } else {
+            if i < index && j < index {
+                assert(output[i] == records[i]);
+                assert(output[j] == records[j]);
+            } else if i < index && j == index {
+                assert(output[i] == records[i]);
+            } else if i < index && j > index {
+                assert(output[i] == records[i]);
+                assert(output[j] == records[j - 1]);
+            } else if i == index {
+                assert(output[j] == records[j - 1]);
+                if j - 1 > index { assert(records[index].number < records[j - 1].number); }
+            } else {
+                assert(output[i] == records[i - 1]);
+                assert(output[j] == records[j - 1]);
+            }
+        }
+    }
+}
+proof fn lemma_normalized_ordered(records: Seq<VolumeRecord>, end: int, cap: u64)
+    requires 0 <= end <= records.len(),
+    ensures ordered_records(normalized_prefix(records, end, cap)),
+    decreases end,
+{
+    reveal_with_fuel(normalized_prefix, 1);
+    if end > 0 {
+        lemma_normalized_ordered(records, end - 1, cap);
+        if records[end - 1].number <= cap {
+            lemma_insert_ordered(normalized_prefix(records, end - 1, cap), records[end - 1]);
+        }
+    }
+}
+#[verifier::rlimit(20)]
+proof fn lemma_insert_members(records: Seq<VolumeRecord>, record: VolumeRecord)
+    requires ordered_records(records),
+    ensures
+        exists|i: int| 0 <= i < insert_record(records, record).len()
+            && insert_record(records, record)[i] == record,
+        forall|i: int| 0 <= i < insert_record(records, record).len() ==>
+            (if insert_record(records, record)[i].number == record.number {
+                insert_record(records, record)[i] == record
+            } else {
+                exists|j: int| 0 <= j < records.len() && records[j] == insert_record(records, record)[i]
+            }),
+        forall|j: int| 0 <= j < records.len() && records[j].number != record.number ==>
+            exists|i: int| 0 <= i < insert_record(records, record).len()
+                && insert_record(records, record)[i] == records[j],
+{
+    lemma_insertion_index(records, record.number, 0);
+    let index = insertion_index(records, record.number, 0);
+    let output = insert_record(records, record);
+    let replacement = index < records.len() && records[index].number == record.number;
+    assert(0 <= index < output.len() && output[index] == record);
+    assert forall|i: int| 0 <= i < output.len() implies
+        (if output[i].number == record.number { output[i] == record }
+        else { exists|j: int| 0 <= j < records.len() && records[j] == output[i] }) by {
+        if i != index {
+            let old_index = if replacement || i < index { i } else { i - 1 };
+            assert(0 <= old_index < records.len());
+            assert(output[i] == records[old_index]);
+            if old_index < index { assert(records[old_index].number < record.number); }
+            else if replacement { assert(record.number < records[old_index].number); }
+            else {
+                if old_index == index { assert(records[index].number != record.number); }
+                else { assert(records[index].number < records[old_index].number); }
+            }
+            assert(output[i].number != record.number);
+        }
+    }
+    assert forall|j: int| 0 <= j < records.len() && records[j].number != record.number
+        implies exists|i: int| 0 <= i < output.len() && output[i] == records[j] by {
+        let new_index = if replacement || j < index { j } else { j + 1 };
+        assert(0 <= new_index < output.len() && output[new_index] == records[j]);
+    }
+}
+pub closed spec fn latest_record(records: Seq<VolumeRecord>, end: int, record: VolumeRecord) -> bool {
+    exists|j: int| 0 <= j < end && record == records[j]
+        && forall|k: int| j < k < end ==> records[k].number != record.number
+}
+proof fn lemma_latest_new(records: Seq<VolumeRecord>, end: int)
+    requires 0 < end <= records.len(),
+    ensures latest_record(records, end, records[end - 1]),
+{
+    reveal(latest_record);
+    assert(0 <= end - 1 < end);
+}
+proof fn lemma_latest_preserved(records: Seq<VolumeRecord>, end: int, record: VolumeRecord)
+    requires 0 < end <= records.len(), latest_record(records, end - 1, record),
+        record.number != records[end - 1].number,
+    ensures latest_record(records, end, record),
+{
+    reveal(latest_record);
+    let j = choose|j: int| 0 <= j < end - 1 && record == records[j]
+        && forall|k: int| j < k < end - 1 ==> records[k].number != record.number;
+    assert(forall|k: int| j < k < end ==> records[k].number != record.number);
+}
+pub open spec fn normalization_semantics(records: Seq<VolumeRecord>, end: int, cap: u64,
+    output: Seq<VolumeRecord>) -> bool {
+    &&& ordered_records(output)
+    &&& forall|i: int| 0 <= i < output.len() ==> output[i].number <= cap
+    &&& forall|i: int| 0 <= i < output.len() ==> #[trigger] latest_record(records, end, output[i])
+    &&& forall|j: int| 0 <= j < end && records[j].number <= cap ==>
+        exists|i: int| 0 <= i < output.len() && output[i].number == records[j].number
+}
+#[verifier::rlimit(20)]
+proof fn lemma_advance_semantics(records: Seq<VolumeRecord>, end: int, cap: u64,
+    previous: Seq<VolumeRecord>)
+    requires 0 < end <= records.len(),
+        normalization_semantics(records, end - 1, cap, previous),
+    ensures normalization_semantics(records, end, cap,
+        if records[end - 1].number <= cap { insert_record(previous, records[end - 1]) }
+        else { previous }),
+{
+    let record = records[end - 1];
+    if record.number <= cap {
+        lemma_insert_ordered(previous, record);
+        lemma_insert_members(previous, record);
+        lemma_latest_new(records, end);
+        let output = insert_record(previous, record);
+        assert forall|i: int| 0 <= i < output.len() implies output[i].number <= cap by {
+            if output[i].number != record.number {
+                let j = choose|j: int| 0 <= j < previous.len() && previous[j] == output[i];
+            }
+        }
+        assert forall|i: int| 0 <= i < output.len() implies
+            #[trigger] latest_record(records, end, output[i]) by {
+            if output[i].number != record.number {
+                let p = choose|p: int| 0 <= p < previous.len() && previous[p] == output[i];
+                lemma_latest_preserved(records, end, previous[p]);
+            }
+        }
+        assert forall|j: int| 0 <= j < end && records[j].number <= cap implies
+            exists|i: int| 0 <= i < output.len() && output[i].number == records[j].number by {
+            if records[j].number != record.number {
+                let p = choose|p: int| 0 <= p < previous.len() && previous[p].number == records[j].number;
+            }
+        }
+    } else {
+        assert forall|i: int| 0 <= i < previous.len() implies
+            #[trigger] latest_record(records, end, previous[i]) by {
+            lemma_latest_preserved(records, end, previous[i]);
+        }
+    }
+}
+
+proof fn lemma_normalized_semantics(records: Seq<VolumeRecord>, end: int, cap: u64)
+    requires 0 <= end <= records.len(),
+    ensures normalization_semantics(records, end, cap, normalized_prefix(records, end, cap)),
+    decreases end,
+{
+    reveal_with_fuel(normalized_prefix, 1);
+    if end > 0 {
+        lemma_normalized_semantics(records, end - 1, cap);
+        lemma_advance_semantics(records, end, cap, normalized_prefix(records, end - 1, cap));
+    }
+}
+
 impl Manifest {
     //= docs/parsing-requirements.md#parse-man-001
     //# The manifest parser MUST recover ordered volume records containing volume number, starting path, ending path, optional block boundaries, and declared hashes.
@@ -508,51 +725,228 @@ impl Manifest {
     /// Ordered by volume number, last declaration wins, capped by final number.
     //= docs/parsing-requirements.md#parse-man-004
     //# Manifest interpretation MUST replace earlier records of a repeated volume number with its last record and discard volume records above the last recorded volume number.
-    pub fn volumes(&self) -> Vec<&VolumeRecord> {
+    pub fn volumes(&self) -> (result: Vec<&VolumeRecord>)
+        ensures
+            record_values(result@) == normalized_records(self.records@),
+            self.records.len() > 0 ==> normalization_semantics(self.records@,
+                self.records.len() as int, self.records@.last().number, record_values(result@)),
+    {
         let mut result: Vec<&VolumeRecord> = Vec::new();
         if self.records.len() == 0 { return result; }
         let last = self.records[self.records.len() - 1].number;
         let mut i = 0;
         while i < self.records.len()
-            invariant i <= self.records.len(),
+            invariant i <= self.records.len(), self.records.len() > 0,
+                last == self.records@[self.records.len() - 1].number,
+                record_values(result@) == normalized_prefix(self.records@, i as int, last),
             decreases self.records.len() - i,
         {
+            proof { reveal_with_fuel(normalized_prefix, 1); }
             let record = &self.records[i];
             if record.number <= last {
                 let mut j = 0;
                 while j < result.len() && result[j].number < record.number
                     invariant j <= result.len(),
+                        insertion_index(record_values(result@), record.number, 0)
+                            == insertion_index(record_values(result@), record.number, j as int),
                     decreases result.len() - j,
-                { j += 1; }
+                {
+                    reveal_with_fuel(insertion_index, 1);
+                    j += 1;
+                }
+                proof { reveal_with_fuel(insertion_index, 1); }
+                let ghost previous = record_values(result@);
                 if j < result.len() && result[j].number == record.number { result[j] = record; }
                 else { result.insert(j, record); }
+                assert(record_values(result@) =~= insert_record(previous, *record));
             }
             i += 1;
         }
+        proof { lemma_normalized_semantics(self.records@, self.records.len() as int, last); }
         result
     }
 }
 
-fn descendant(path: &BackupPath, root: &BackupPath) -> bool {
+pub open spec fn is_descendant(path: Seq<Seq<u8>>, root: Seq<Seq<u8>>) -> bool {
+    path.len() >= root.len() && forall|i: int| 0 <= i < root.len() ==> path[i] == root[i]
+}
+proof fn lemma_byte_order_asymmetric(left: Seq<u8>, right: Seq<u8>)
+    requires crate::path::bytes_less(left, right),
+    ensures !crate::path::bytes_less(right, left),
+{
+    broadcast use vstd::seq::group_seq_lemmas;
+    if left.len() < right.len() && left == right.take(left.len() as int) {
+        assert forall|j: int| 0 <= j < left.len() && j < right.len()
+            implies !(right.take(j) == left.take(j) && right[j] < left[j]) by {
+            assert(left[j] == right[j]);
+        }
+    } else {
+        let i = choose|i: int| 0 <= i < left.len() && i < right.len()
+            && left.take(i) == right.take(i) && left[i] < right[i];
+        assert(0 <= i < left.len() && i < right.len()
+            && left.take(i) == right.take(i) && left[i] < right[i]);
+        if right.len() < left.len() && right == left.take(right.len() as int) {
+            assert(left[i] == right[i]);
+        }
+        assert forall|j: int| 0 <= j < left.len() && j < right.len()
+            implies !(right.take(j) == left.take(j) && right[j] < left[j]) by {
+            if j < i {
+                assert(left.take(i)[j] == left[j]);
+                assert(right.take(i)[j] == right[j]);
+                assert(left[j] == right[j]);
+            } else if j > i && right.take(j) == left.take(j) {
+                assert(left.take(j)[i] == left[i]);
+                assert(right.take(j)[i] == right[i]);
+                assert(left[i] == right[i]);
+            }
+        }
+    }
+}
+proof fn lemma_component_order_asymmetric(left: Seq<Seq<u8>>, right: Seq<Seq<u8>>)
+    requires crate::path::components_less(left, right),
+    ensures !crate::path::components_less(right, left),
+{
+    broadcast use vstd::seq::group_seq_lemmas;
+    if left.len() < right.len() && left == right.take(left.len() as int) {
+        assert forall|j: int| 0 <= j < left.len() && j < right.len()
+            implies !(right.take(j) == left.take(j) && crate::path::bytes_less(right[j], left[j])) by {
+            assert(left[j] == right[j]);
+            if crate::path::bytes_less(right[j], left[j]) {
+                lemma_byte_order_asymmetric(right[j], left[j]);
+            }
+        }
+    } else {
+        let i = choose|i: int| 0 <= i < left.len() && i < right.len()
+            && left.take(i) == right.take(i) && crate::path::bytes_less(left[i], right[i]);
+        assert(0 <= i < left.len() && i < right.len()
+            && left.take(i) == right.take(i) && crate::path::bytes_less(left[i], right[i]));
+        lemma_byte_order_asymmetric(left[i], right[i]);
+        if right.len() < left.len() && right == left.take(right.len() as int) {
+            assert(left[i] == right[i]);
+        }
+        assert forall|j: int| 0 <= j < left.len() && j < right.len()
+            implies !(right.take(j) == left.take(j) && crate::path::bytes_less(right[j], left[j])) by {
+            if j < i {
+                assert(left.take(i)[j] == left[j]);
+                assert(right.take(i)[j] == right[j]);
+                assert(left[j] == right[j]);
+                if crate::path::bytes_less(right[j], left[j]) {
+                    lemma_byte_order_asymmetric(right[j], left[j]);
+                }
+            } else if j > i && right.take(j) == left.take(j) {
+                assert(left.take(j)[i] == left[i]);
+                assert(right.take(j)[i] == right[i]);
+                assert(left[i] == right[i]);
+            }
+        }
+    }
+}
+fn descendant(path: &BackupPath, root: &BackupPath) -> (result: bool)
+    ensures result == is_descendant(path@, root@),
+{
     if path.components().len() < root.components().len() { return false; }
     let mut i = 0;
     while i < root.components().len()
-        invariant i <= root@.len(),
+        invariant i <= root@.len(), path@.len() >= root@.len(),
+            forall|j: int| 0 <= j < i ==> path@[j] == root@[j],
         decreases root@.len() - i,
     {
-        if path.components()[i] != root.components()[i] { return false; }
+        if path.components()[i] != root.components()[i] {
+            assert(path@[i as int] != root@[i as int]);
+            return false;
+        }
         i += 1;
     }
     true
 }
 
+fn path_before_or_equal(left: &BackupPath, right: &BackupPath) -> (result: bool)
+    ensures result == !crate::path::components_less(right@, left@),
+{
+    let order = left.compare(right);
+    proof {
+        if order < 0 { lemma_component_order_asymmetric(left@, right@); }
+        else if order == 0 && crate::path::components_less(right@, left@) {
+            lemma_component_order_asymmetric(right@, left@);
+        }
+    }
+    order <= 0
+}
+pub open spec fn volume_selection(start: Seq<Seq<u8>>, end: Seq<Seq<u8>>,
+    selected: Seq<Seq<u8>>) -> bool {
+    crate::path::components_less(end, start)
+        || (!crate::path::components_less(selected, start)
+            && !crate::path::components_less(end, selected))
+        || is_descendant(start, selected) || is_descendant(end, selected)
+}
+proof fn lemma_descendant_prefix(path: Seq<Seq<u8>>, root: Seq<Seq<u8>>)
+    requires is_descendant(path, root),
+    ensures root == path.take(root.len() as int),
+{
+    assert(root =~= path.take(root.len() as int));
+}
+proof fn lemma_less_descendant_right(left: Seq<Seq<u8>>, root: Seq<Seq<u8>>, path: Seq<Seq<u8>>)
+    requires crate::path::components_less(left, root), is_descendant(path, root),
+    ensures crate::path::components_less(left, path),
+{
+    broadcast use vstd::seq::group_seq_lemmas;
+    lemma_descendant_prefix(path, root);
+    if left.len() < root.len() && left == root.take(left.len() as int) {
+        assert(left =~= path.take(left.len() as int));
+    } else {
+        let i = choose|i: int| 0 <= i < left.len() && i < root.len()
+            && left.take(i) == root.take(i) && crate::path::bytes_less(left[i], root[i]);
+        assert(0 <= i < left.len() && i < root.len()
+            && left.take(i) == root.take(i) && crate::path::bytes_less(left[i], root[i]));
+        assert(root[i] == path[i]);
+        assert(root.take(i) =~= path.take(i));
+        assert(left.take(i) == path.take(i) && crate::path::bytes_less(left[i], path[i]));
+    }
+}
+proof fn lemma_less_descendant_left(root: Seq<Seq<u8>>, right: Seq<Seq<u8>>, path: Seq<Seq<u8>>)
+    requires crate::path::components_less(root, right), !is_descendant(right, root),
+        is_descendant(path, root),
+    ensures crate::path::components_less(path, right),
+{
+    broadcast use vstd::seq::group_seq_lemmas;
+    lemma_descendant_prefix(path, root);
+    if root.len() < right.len() && root == right.take(root.len() as int) {
+        assert(is_descendant(right, root));
+    }
+    let i = choose|i: int| 0 <= i < root.len() && i < right.len()
+        && root.take(i) == right.take(i) && crate::path::bytes_less(root[i], right[i]);
+    assert(0 <= i < root.len() && i < right.len()
+        && root.take(i) == right.take(i) && crate::path::bytes_less(root[i], right[i]));
+    assert(root[i] == path[i]);
+    assert(root.take(i) =~= path.take(i));
+    assert(path.take(i) == right.take(i) && crate::path::bytes_less(path[i], right[i]));
+}
+/// Every entry in the inclusive interval whose components extend the selected
+/// path causes selection, including entries shared by multipart boundaries.
+pub proof fn lemma_selection_covers_descendant(start: Seq<Seq<u8>>, end: Seq<Seq<u8>>,
+    selected: Seq<Seq<u8>>, entry: Seq<Seq<u8>>)
+    requires is_descendant(entry, selected),
+        !crate::path::components_less(entry, start),
+        !crate::path::components_less(end, entry),
+    ensures volume_selection(start, end, selected),
+{
+    if !volume_selection(start, end, selected) {
+        if crate::path::components_less(selected, start) {
+            lemma_less_descendant_left(selected, start, entry);
+        } else if crate::path::components_less(end, selected) {
+            lemma_less_descendant_right(end, selected, entry);
+        }
+    }
+}
 impl VolumeRecord {
     //= docs/parsing-requirements.md#parse-man-005
     //# Volume selection MUST include every volume whose declared inclusive path interval can contain a selected entry or descendant, including shared multipart boundary paths.
-    pub fn may_contain(&self, selected: &BackupPath) -> bool {
+    pub fn may_contain(&self, selected: &BackupPath) -> (result: bool)
+        ensures result == volume_selection(self.start.path@, self.end.path@, selected@),
+    {
         // Public records can be caller-constructed. Invalid ranges select all.
-        if self.start.path.compare(&self.end.path) > 0 { return true; }
-        (self.start.path.compare(selected) <= 0 && self.end.path.compare(selected) >= 0)
+        if !path_before_or_equal(&self.start.path, &self.end.path) { return true; }
+        (path_before_or_equal(&self.start.path, selected) && path_before_or_equal(selected, &self.end.path))
             || descendant(&self.start.path, selected) || descendant(&self.end.path, selected)
     }
 }

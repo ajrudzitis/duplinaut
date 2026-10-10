@@ -175,7 +175,13 @@ reviewed = true
 proof_required = true
 # Native source review complete; formal acceptance remains pending.
 implementations = [{ path = "crates/core/src/manifest.rs", symbol = "parse" }, { path = "crates/core/src/manifest.rs", symbol = "volumes" }, { path = "crates/core/src/manifest.rs", symbol = "may_contain" }]
-proofs = []
+# Individual fresh strict checks: 21 obligations across restart/selection helpers.
+# Complete manifest parser state semantics and same-source core gate pending.
+proofs = [
+  { id = "manifest-restart", requirement = "PARSE-MAN-004", path = "crates/core/src/manifest.rs", symbol = "volumes", kind = "contract" },
+  { id = "manifest-selection", requirement = "PARSE-MAN-005", path = "crates/core/src/manifest.rs", symbol = "may_contain", kind = "contract" },
+  { id = "manifest-selection-coverage", requirement = "PARSE-MAN-005", path = "crates/core/src/manifest.rs", symbol = "lemma_selection_covers_descendant", kind = "lemma" },
+]
 tests = [{ package = "duplicity-core", name = "official_plain_manifests_all_producers" }, { package = "duplicity-core", name = "restart_normalization_replaces_and_discards" }, { package = "duplicity-core", name = "inclusive_componentwise_selection_includes_descendants_and_shared_boundaries" }, { package = "duplicity-core", name = "filelist_positions_case_crlf_and_byte_tokens" }, { package = "duplicity-core", name = "digest_shapes_conflicts_and_unsupported_integrity" }, { package = "duplicity-core", name = "malformed_fields_paths_counts_and_boundaries_fail" }, { package = "duplicity-core", name = "explicit_limits_are_enforced_without_arithmetic_wrap" }, { package = "duplicity-core", name = "official_multipart_boundaries_and_byte_path_values_are_independent_expectations" }]
 
 [[milestone]]

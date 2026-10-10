@@ -7,7 +7,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Delta decoder and application | Reviewed grammar and bounds | Implemented; 16 native tests pass | Focused verification: 535 obligations, zero errors | Official 0.8.23, 2.1.3, 3.0.7 and 3.2.1 payloads pass, including multipart | Independent semantic review complete; whole-workspace gate pending |
 | Manifest token decoding | Reviewed exact byte predicates | Implemented; three tests pass | Focused strict verification: 155 obligations, zero errors | Official manifests pass through this decoder | Independent semantic review complete; complete-core gate pending |
 | Byte-path validation and comparison | Reviewed root/component grammar | Implemented; three tests pass | Exact normalization, rejection diagnostics and comparison: 10 focused strict obligations pass | Archive fixture integration pending | Independent semantic review complete; complete-core gate pending |
-| Manifest framing and normalization | Reviewed fields, counts, hashes and restart semantics | Implemented; eight tests pass | Exact framing, decimal and token helper contracts checked; state semantics pending | Plain manifests from all four producer versions pass | Software and helper contracts reviewed; complete formal acceptance pending |
+| Manifest framing and normalization | Reviewed fields, counts, hashes and restart semantics | Implemented; eight tests pass | Exact framing/digest helpers, last-declaration restart normalization and conservative selection checked; complete parser state pending | Plain manifests from all four producer versions pass | Software and helper contracts reviewed; complete formal acceptance pending |
 | Object names and timestamps | Reviewed canonical, legacy and short-name grammar | Implemented; six tests pass; canonical framing uses Vest DSL | Calendar and classification refinement pending | All 84 recorded official object basenames pass | Native source reviewed; formal acceptance pending |
 | Librsync signatures | Reviewed four magics and checksum widths | Implemented; four tests pass; header uses Vest DSL | Header/controller/cursor refinement: 54 focused strict obligations pass | Payloads from 18 official signature archives pass | Independent semantic review complete; complete-core gate pending |
 | Tar containers and operations | Reviewed header, GNU/PAX and footer profiles | Implemented; twelve tests pass; header uses Vest DSL | Exact header, numeric, checksum, extent and footer refinements: 37 focused strict obligations pass; controller pending | All 39 recorded plain gzip archives scan and classify | Native source reviewed; formal acceptance pending |
@@ -34,7 +34,9 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Integrate independently checked exact tar header, numeric, checksum, extent and envelope-footer kernels into runtime parsing.
 - [x] Prove exact path normalization and rejection diagnostics against a functional byte grammar.
 - [x] Validate supported manifest digests against stored volume bytes before decoding; enforce plain/gzip size and member limits.
-- [ ] Prove manifest contextual semantics.
+- [x] Prove restart normalization preserves exactly the final-number-capped last declarations in sorted unique order.
+- [x] Prove exact volume selection and inclusion of every selected descendant in a declared inclusive interval.
+- [ ] Prove complete manifest parser contextual semantics.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 
