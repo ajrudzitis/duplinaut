@@ -22,12 +22,12 @@ Delta decoding and application, manifest token decoding, and byte-path validatio
 
 | Goal | Correctness claim | Implementation | Proof | Compatibility tests | Independent review |
 | --- | --- | --- | --- | --- | --- |
-| VG-PARSE | Input grammar refinement, bounds, arithmetic, termination, panic freedom | Delta/token/path implemented; remaining parsers pending | In progress | Delta official 3.0.7 payload tests pass; remaining pending | In progress |
+| VG-PARSE | Input grammar refinement, bounds, arithmetic, termination, panic freedom | Delta/token/path, names, manifests, signatures and tar implemented; whole-controller refinement pending | In progress | Delta official 3.0.7 payload tests pass; remaining pending | In progress |
 | VG-DELTA | Complete opcode decoding and exact literal/basis-slice reconstruction | Implemented | Focused strict verification: 535 obligations pass; complete-core gate pending | Official 0.8.23, 2.1.3, 3.0.7 and 3.2.1 payloads pass | Independent semantic review complete |
 | VG-ASSEMBLY | Restart records, conservative selection, complete ordered multipart content | Pending | Pending | Pending | Pending |
 | VG-STATE | Unique contiguous chains and correct path-state transitions | Pending | Pending | Pending | Pending |
 | VG-RESTORE | Valid selected paths, destination containment, supported metadata fidelity | Pending | Pending; trusted filesystem boundary | Pending | Pending |
-| VG-INTEGRATION | Integrity/decryption/source consistency adapter contracts | Bounded source API and S3 implemented; crypto pending | Contract review; primitives trusted | Three source and eleven S3 tests pass | Source and S3 source review complete; complete-reader integration pending |
+| VG-INTEGRATION | Integrity/decryption/source consistency adapter contracts | Bounded source API, S3 and stored-byte digest/plain/gzip adapters implemented; crypto pending | Contract review; primitives trusted | Three source and eleven S3 tests pass | Source and S3 source review complete; complete-reader integration pending |
 
 Requirement mappings and scenarios appear in the specification. Completion records include exact source identity, tool versions, target/features, proved contracts, trusted assumptions, official fixture provenance, and successful check results. Neither annotation counts nor proof-function counts measure semantic coverage.
 

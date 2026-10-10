@@ -99,54 +99,13 @@ fn text(bytes: &[u8]) -> &[u8] {
     &bytes[..bytes.iter().position(|b| *b == 0).unwrap_or(bytes.len())]
 }
 fn number(bytes: &[u8]) -> Result<i128, TarError> {
-    if matches!(bytes.first(), Some(0x80 | 0xff)) {
-        let mut value = if bytes[0] == 0xff { -1i128 } else { 0 };
-        for &byte in &bytes[1..] {
-            value = value
-                .checked_mul(256)
-                .and_then(|v| v.checked_add(i128::from(byte)))
-                .ok_or(TarError::Numeric)?;
-        }
-        return Ok(value);
-    }
-    let begin = bytes
-        .iter()
-        .position(|b| !matches!(b, 0 | b' '))
-        .unwrap_or(bytes.len());
-    let end = bytes
-        .iter()
-        .rposition(|b| !matches!(b, 0 | b' '))
-        .map_or(begin, |i| i + 1);
-    let mut value = 0i128;
-    for &byte in &bytes[begin..end] {
-        if !(b'0'..=b'7').contains(&byte) {
-            return Err(TarError::Numeric);
-        }
-        value = value
-            .checked_mul(8)
-            .and_then(|v| v.checked_add(i128::from(byte - b'0')))
-            .ok_or(TarError::Numeric)?;
-    }
-    Ok(value)
+    crate::verified::tar_number::number(bytes).ok_or(TarError::Numeric)
 }
 fn unsigned(bytes: &[u8]) -> Result<u64, TarError> {
-    u64::try_from(number(bytes)?).map_err(|_| TarError::Numeric)
+    crate::verified::tar_number::unsigned(bytes).ok_or(TarError::Numeric)
 }
 fn decimal(bytes: &[u8]) -> Result<u64, TarError> {
-    if bytes.is_empty() {
-        return Err(TarError::Numeric);
-    }
-    let mut value = 0u64;
-    for &byte in bytes {
-        if !byte.is_ascii_digit() {
-            return Err(TarError::Numeric);
-        }
-        value = value
-            .checked_mul(10)
-            .and_then(|v| v.checked_add(u64::from(byte - b'0')))
-            .ok_or(TarError::Numeric)?;
-    }
-    Ok(value)
+    crate::verified::tar_helpers::decimal(bytes).ok_or(TarError::Numeric)
 }
 fn time(bytes: &[u8]) -> Result<TarTime, TarError> {
     let (negative, bytes) = match bytes.first() {
@@ -277,36 +236,19 @@ fn long(bytes: &[u8], limit: usize) -> Result<&[u8], TarError> {
 // Explicit remainders are retained for the forthcoming wire proof.
 #[allow(clippy::manual_is_multiple_of)]
 fn footer(bytes: &[u8], cursor: usize, profile: Termination<'_>) -> Result<(), TarError> {
-    let tail = &bytes[cursor..];
-    match profile {
-        Termination::Data => {
-            if tail.len() % 512 != 0 || tail.iter().any(|b| *b != 0) {
-                return Err(TarError::Termination);
-            }
-        }
-        Termination::Signatures => {
-            if (tail.is_empty() && !bytes.is_empty())
-                || tail.len() % 512 != 0
-                || tail.iter().any(|b| *b != 0)
-            {
-                return Err(TarError::Termination);
-            }
-        }
+    let (mode, stored, nonfinal) = match profile {
+        Termination::Data => (0, &[][..], false),
+        Termination::Signatures => (1, &[][..], false),
         Termination::Encrypted {
             stored_ciphertext,
             nonfinal,
-        } => {
-            let zeros = 10240 - cursor % 10240;
-            if tail.len() < zeros || tail[..zeros].iter().any(|b| *b != 0) {
-                return Err(TarError::Termination);
-            }
-            let topoff = &tail[zeros..];
-            if !topoff.is_empty() && (!nonfinal || !stored_ciphertext.starts_with(topoff)) {
-                return Err(TarError::Termination);
-            }
-        }
+        } => (2, stored_ciphertext, nonfinal),
+    };
+    if crate::verified::tar_footer::footer_valid(bytes, cursor, mode, stored, nonfinal) {
+        Ok(())
+    } else {
+        Err(TarError::Termination)
     }
-    Ok(())
 }
 
 impl<'a> TarVolume<'a> {
@@ -357,17 +299,7 @@ impl<'a> TarVolume<'a> {
                 return Err(TarError::Truncated);
             }
             let expected = unsigned(h.checksum)?;
-            let mut unsigned_sum = 0u64;
-            let mut signed_sum = 0i64;
-            for (index, &byte) in block.iter().enumerate() {
-                let byte = if (148..156).contains(&index) {
-                    b' '
-                } else {
-                    byte
-                };
-                unsigned_sum += u64::from(byte);
-                signed_sum += i64::from(byte as i8);
-            }
+            let (unsigned_sum, signed_sum) = crate::verified::tar_helpers::checksums(block);
             if expected != unsigned_sum && i128::from(expected) != i128::from(signed_sum) {
                 return Err(TarError::Checksum);
             }
@@ -396,13 +328,13 @@ impl<'a> TarVolume<'a> {
             if size > limits.max_entry_bytes {
                 return Err(TarError::Limit);
             }
-            let data_start = cursor.checked_add(512).ok_or(TarError::Limit)?;
-            let data_end = data_start.checked_add(size).ok_or(TarError::Limit)?;
-            let padding = (512 - size % 512) % 512;
-            let next = data_end.checked_add(padding).ok_or(TarError::Limit)?;
-            if next > bytes.len() {
-                return Err(TarError::Truncated);
-            }
+            let (data_start, data_end, next) =
+                crate::verified::tar_helpers::extent(cursor, size, bytes.len()).map_err(
+                    |error| match error {
+                        crate::verified::tar_helpers::ExtentError::Overflow => TarError::Limit,
+                        crate::verified::tar_helpers::ExtentError::Truncated => TarError::Truncated,
+                    },
+                )?;
             let payload = &bytes[data_start..data_end];
             cursor = next;
             if extension {

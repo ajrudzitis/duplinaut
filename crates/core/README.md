@@ -10,7 +10,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Manifest framing and normalization | Reviewed fields, counts, hashes and restart semantics | Implemented; eight tests pass | Exact framing, decimal and token helper contracts checked; state semantics pending | Plain manifests from all four producer versions pass | Software and helper contracts reviewed; complete formal acceptance pending |
 | Object names and timestamps | Reviewed canonical, legacy and short-name grammar | Implemented; six tests pass; canonical framing uses Vest DSL | Calendar and classification refinement pending | All 84 recorded official object basenames pass | Native source reviewed; formal acceptance pending |
 | Librsync signatures | Reviewed four magics and checksum widths | Implemented; four tests pass; header uses Vest DSL | Header/controller/cursor refinement: 54 focused strict obligations pass | Payloads from 18 official signature archives pass | Independent semantic review complete; complete-core gate pending |
-| Tar containers and operations | Reviewed header, GNU/PAX and footer profiles | Implemented; twelve tests pass; header uses Vest DSL | Controller refinement pending | All 39 recorded plain gzip archives scan and classify | Native source reviewed; formal acceptance pending |
+| Tar containers and operations | Reviewed header, GNU/PAX and footer profiles | Implemented; twelve tests pass; header uses Vest DSL | Exact header, numeric, checksum, extent and footer refinements: 37 focused strict obligations pass; controller pending | All 39 recorded plain gzip archives scan and classify | Native source reviewed; formal acceptance pending |
 | Stored-object integrity and plain/gzip envelopes | Reviewed stored-byte hash and envelope requirements | Implemented; three tests pass | Digest and decompression libraries are trusted adapters; controller proof pending | Recorded official manifest hashes and gzip objects pass | Native source reviewed; complete formal acceptance pending |
 | Reconstruction and restoration | Requirements written; open questions remain | Pending | Pending | Pending | Pending |
 
@@ -31,6 +31,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Prove exact manifest trimming, word/token boundaries, ASCII matching and decimal overflow rejection.
 - [x] Prove exact manifest digest recognition, supported widths, hexadecimal validation and normalized output.
 - [x] Scan native tar containers and classify duplicity operations; test GNU/PAX metadata and explicit footer profiles against official archives.
+- [x] Integrate independently checked exact tar header, numeric, checksum, extent and envelope-footer kernels into runtime parsing.
 - [x] Prove exact path normalization and rejection diagnostics against a functional byte grammar.
 - [x] Validate supported manifest digests against stored volume bytes before decoding; enforce plain/gzip size and member limits.
 - [ ] Prove manifest contextual semantics.

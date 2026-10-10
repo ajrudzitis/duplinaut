@@ -25,6 +25,7 @@ append = "\ninclude!(\"../verified/signature_refinement.rs\");\n"
 [[generation]]
 input = "crates/core/formats/tar.vest"
 output = "crates/core/src/generated/tar.rs"
+append = "\ninclude!(\"../verified/tar_header_refinement.rs\");\n"
 
 [[milestone]]
 id = "tooling"
@@ -173,6 +174,28 @@ proofs = []
 tests = [{ package = "duplicity-core", name = "official_plain_manifests_all_producers" }, { package = "duplicity-core", name = "restart_normalization_replaces_and_discards" }, { package = "duplicity-core", name = "inclusive_componentwise_selection_includes_descendants_and_shared_boundaries" }, { package = "duplicity-core", name = "filelist_positions_case_crlf_and_byte_tokens" }, { package = "duplicity-core", name = "digest_shapes_conflicts_and_unsupported_integrity" }, { package = "duplicity-core", name = "malformed_fields_paths_counts_and_boundaries_fail" }, { package = "duplicity-core", name = "explicit_limits_are_enforced_without_arithmetic_wrap" }, { package = "duplicity-core", name = "official_multipart_boundaries_and_byte_path_values_are_independent_expectations" }]
 
 [[milestone]]
+id = "tar-containers"
+gate = false
+requirements = ["PARSE-TAR-001", "PARSE-TAR-002", "PARSE-TAR-003", "PARSE-TAR-004", "PARSE-TAR-005"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = true
+# Current-source focused --no-cheating: 37 obligations, zero errors.
+# Exact helper and header refinement checkpoints; complete controller proof pending.
+implementations = [{ path = "crates/core/src/tar.rs", symbol = "parse" }]
+proofs = [
+  { id = "tar-header-wire", requirement = "PARSE-TAR-001", path = "crates/core/src/verified/tar_header_refinement.rs", symbol = "lemma_tar_header_refinement", kind = "lemma" },
+  { id = "tar-checksum", requirement = "PARSE-TAR-001", path = "crates/core/src/verified/tar_helpers.rs", symbol = "checksums", kind = "contract" },
+  { id = "tar-extent", requirement = "PARSE-TAR-002", path = "crates/core/src/verified/tar_helpers.rs", symbol = "extent", kind = "contract" },
+  { id = "tar-number", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_number.rs", symbol = "number", kind = "contract" },
+  { id = "tar-footer", requirement = "PARSE-TAR-005", path = "crates/core/src/verified/tar_footer.rs", symbol = "footer_valid", kind = "contract" },
+]
+tests = [{ package = "duplicity-core", name = "all_official_plain_gzip_archives_scan_and_classify" }, { package = "duplicity-core", name = "complete_entry_extents_padding_and_checksum" }, { package = "duplicity-core", name = "numeric_conversion_boundaries_and_interior_padding" }, { package = "duplicity-core", name = "footer_profiles_are_explicit" }, { package = "duplicity-core", name = "malformed_and_unsupported_pax_are_not_skipped" }]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
@@ -197,3 +220,9 @@ id = "build-orchestration"
 reviewed = true
 rationale = "xtask process execution, source hashing and traceability parsing are trusted tooling; failure-mode tests and independent review required before acceptance."
 requirements = ["ASSURE-BUILD-001", "ASSURE-TRACE-002", "ASSURE-TRACE-003", "ASSURE-TRACE-004"]
+
+[[trusted]]
+id = "native-digest-and-gzip"
+reviewed = true
+rationale = "RustCrypto SHA1/MD5 and flate2 gzip/DEFLATE primitives, allocation and runtime are trusted native adapters. Bounded stored/decoded/member controller tests and official-object compatibility do not establish a formal controller proof or authenticity."
+requirements = ["PARSE-ENV-001", "PARSE-ENV-005", "PARSE-ENV-006"]
