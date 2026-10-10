@@ -1,4 +1,6 @@
 //! Byte-preserving token decoding for the reviewed manifest grammar.
+// Explicit length and byte-range predicates match the checked arithmetic model.
+#![allow(clippy::len_zero, clippy::manual_range_contains)]
 use crate::generated::manifest_token::{ManifestTokenFmt, QuotedAtom, UnquotedByteFmt};
 use vest_lib::combinators::Star;
 use vest_lib::core::exec::parser::Parser;
