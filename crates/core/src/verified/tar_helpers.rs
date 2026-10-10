@@ -1,7 +1,11 @@
 //! Checked tar arithmetic kernels. These contracts do not yet establish
 //! refinement of the whole tar/PAX controller or the generated header parser.
 // Explicit scalar operations preserve the Verus contracts and solver-visible bounds.
-#![allow(clippy::len_zero, clippy::manual_range_contains, clippy::assign_op_pattern)]
+#![allow(
+    clippy::len_zero,
+    clippy::manual_range_contains,
+    clippy::assign_op_pattern
+)]
 use vstd::prelude::*;
 
 verus! {

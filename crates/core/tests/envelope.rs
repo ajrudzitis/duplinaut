@@ -245,3 +245,65 @@ fn official_volumes_match_recorded_manifest_digests_before_decode() {
     );
     assert!(checked >= 20, "only {checked} official volumes checked");
 }
+
+//= docs/parsing-requirements.md#parse-env-001
+//= type=test
+//# The reader MUST decode unencrypted raw objects and gzip-enveloped objects according to their classified envelope.
+#[test]
+fn gzip_optional_header_fields_are_bounded_and_validated() {
+    let plain = gzip(b"abc");
+    let limits = EnvelopeLimits {
+        stored_bytes: 200_000,
+        decoded_bytes: 3,
+        gzip_members: 1,
+    };
+    for flag in [0x20, 0x40, 0x80] {
+        let mut malformed = plain.clone();
+        malformed[3] |= flag;
+        assert_eq!(
+            decode_metadata(&malformed, Envelope::Gzip, limits),
+            Err(EnvelopeError::InvalidGzip)
+        );
+    }
+    for flag in [0x08, 0x10] {
+        let mut header = plain[..10].to_vec();
+        header[3] = flag;
+        header.extend(std::iter::repeat_n(b'a', 65_535));
+        let mut valid = header.clone();
+        valid.push(0);
+        valid.extend_from_slice(&plain[10..]);
+        assert_eq!(
+            decode_metadata(&valid, Envelope::Gzip, limits).unwrap(),
+            b"abc"
+        );
+        header.push(b'a');
+        header.push(0);
+        header.extend_from_slice(&plain[10..]);
+        assert_eq!(
+            decode_metadata(&header, Envelope::Gzip, limits),
+            Err(EnvelopeError::InvalidGzip)
+        );
+    }
+    let mut extra = plain[..10].to_vec();
+    extra[3] = 0x04;
+    extra.extend_from_slice(&u16::MAX.to_le_bytes());
+    extra.extend(std::iter::repeat_n(0x55, usize::from(u16::MAX)));
+    extra.extend_from_slice(&plain[10..]);
+    assert_eq!(
+        decode_metadata(&extra, Envelope::Gzip, limits).unwrap(),
+        b"abc"
+    );
+    assert_eq!(
+        decode_metadata(&extra[..12], Envelope::Gzip, limits),
+        Err(EnvelopeError::InvalidGzip)
+    );
+    // A present FHCRC cannot be ignored. Zero is incorrect for this header.
+    let mut bad_crc = plain[..10].to_vec();
+    bad_crc[3] = 0x02;
+    bad_crc.extend_from_slice(&[0, 0]);
+    bad_crc.extend_from_slice(&plain[10..]);
+    assert_eq!(
+        decode_metadata(&bad_crc, Envelope::Gzip, limits),
+        Err(EnvelopeError::InvalidGzip)
+    );
+}
