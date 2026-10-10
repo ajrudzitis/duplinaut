@@ -214,6 +214,21 @@ proofs = [
 tests = [{ package = "duplicity-core", name = "all_official_plain_gzip_archives_scan_and_classify" }, { package = "duplicity-core", name = "complete_entry_extents_padding_and_checksum" }, { package = "duplicity-core", name = "numeric_conversion_boundaries_and_interior_padding" }, { package = "duplicity-core", name = "footer_profiles_are_explicit" }, { package = "duplicity-core", name = "malformed_and_unsupported_pax_are_not_skipped" }]
 
 [[milestone]]
+id = "multipart-assembly"
+gate = false
+requirements = ["PARSE-MULTI-001", "PARSE-MULTI-002", "PARSE-MULTI-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = true
+# Native 3.0.7 plain/gzip checkpoint; queued-restart and formal refinement pending.
+implementations = [{ path = "crates/core/src/multipart.rs", symbol = "push_stored_volume" }, { path = "crates/core/src/multipart.rs", symbol = "finish" }]
+proofs = []
+tests = [{ package = "duplicity-core", name = "continuation_markers_zero_final_and_empty_volumes" }, { package = "duplicity-core", name = "malformed_parts_lengths_markers_and_interleaving_rejected" }, { package = "duplicity-core", name = "component_metadata_growth_is_bounded_before_classification" }, { package = "duplicity-core", name = "all_volumes_integrity_container_limits_and_poisoning" }, { package = "duplicity-core", name = "official_multipart_snapshot_and_delta_match_source_tree_oracles" }, { package = "duplicity-core", name = "every_failure_class_latches_poison_before_publication" }]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

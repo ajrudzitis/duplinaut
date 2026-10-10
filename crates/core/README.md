@@ -12,6 +12,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Librsync signatures | Reviewed four magics and checksum widths | Implemented; four tests pass; header uses Vest DSL | Header/controller/cursor refinement: 54 focused strict obligations pass | Payloads from 18 official signature archives pass | Independent semantic review complete; complete-core gate pending |
 | Tar containers and operations | Reviewed header, GNU/PAX and footer profiles | Implemented; thirteen tests pass; header uses Vest DSL | Exact header/arithmetic/footer: 37 focused strict obligations pass; PAX framing/keys and fractional time: 21 pass; controller pending | All 39 recorded plain gzip archives scan and classify | Native source reviewed; formal acceptance pending |
 | Stored-object integrity and plain/gzip envelopes | Reviewed stored-byte hash and envelope requirements | Implemented; four tests pass | Digest and decompression libraries are trusted adapters; controller proof pending | Recorded official manifest hashes and gzip objects pass | Native source reviewed; complete formal acceptance pending |
+| Multipart assembly | Reviewed ordinary 3.0.7 profile; queued-restart evidence pending | Implemented; six tests pass; all stored volumes checked before publication | Controller refinement pending | Official three-volume snapshot and two-volume delta match independent source hashes | Independent native review complete; restart and formal acceptance pending |
 | Reconstruction and restoration | Requirements written; open questions remain | Pending | Pending | Pending | Pending |
 
 - [x] Create the library and verification-enabled Cargo configuration.
@@ -38,7 +39,11 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Prove restart normalization preserves exactly the final-number-capped last declarations in sorted unique order.
 - [x] Prove exact volume selection and inclusion of every selected descendant in a declared inclusive interval.
 - [x] Prove exact path/error adaptation, optional positive block boundaries and volume record completion diagnostics.
+- [x] Assemble ordinary 3.0.7 plain/gzip multipart operations with verified stored digests, complete containers, explicit bounds and sticky failure.
+- [x] Independently test multipart snapshot/delta source oracles and rejection after provisional output.
+- [ ] Acquire and accept queued-restart boundary behavior before claiming full restart assembly compatibility.
 - [ ] Prove complete manifest parser contextual semantics.
+- [ ] Prove complete multipart controller refinement.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 

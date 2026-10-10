@@ -14,3 +14,5 @@ mod verified;
 
 pub mod envelope;
 pub mod tar;
+
+pub mod multipart;

@@ -138,13 +138,13 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The reader MUST reject an unrecognized duplicity operation prefix in an otherwise recognized data or signature archive.
 
   SECTION: [PARSE-MULTI-001](#parse-multi-001)
-    TEXT[!MUST]: Multipart assembly MUST concatenate payloads for one operation and path in consecutive part-number order starting at 1.
+    TEXT[!MUST,implementation,test]: Multipart assembly MUST concatenate payloads for one operation and path in consecutive part-number order starting at 1.
 
   SECTION: [PARSE-MULTI-002](#parse-multi-002)
-    TEXT[!MUST]: Multipart assembly MUST reject missing, duplicate, reversed, mixed-operation, or interleaved parts of the same logical entry.
+    TEXT[!MUST,implementation,test]: Multipart assembly MUST reject missing, duplicate, reversed, mixed-operation, or interleaved parts of the same logical entry.
 
   SECTION: [PARSE-MULTI-003](#parse-multi-003)
-    TEXT[!MUST]: The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+    TEXT[!MUST,implementation,test]: The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
 
   SECTION: [PARSE-SIG-001](#parse-sig-001)
     TEXT[!MUST,implementation,test]: The signature parser MUST recognize the four reviewed signature magic values and reject other magic values as unsupported.
