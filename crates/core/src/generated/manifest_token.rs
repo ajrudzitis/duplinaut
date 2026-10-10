@@ -826,6 +826,7 @@ mod derived_specs {
 mod derived_proofs {
     use super::*;
     broadcast use {
+        crate::verified::token_refinement::group_token_facts,
         vest_lib::combinators::disjoint::disjointness_lemmas,
         QuotedAtomSpec::lemma_from_into,
         QuotedAtomSpec::lemma_into_from,
@@ -1804,6 +1805,8 @@ mod derived_proofs {
 // Executable Implementations
 // ============================================================
 mod exec_impls {
+broadcast use crate::verified::token_refinement::group_token_facts;
+
     use super::*;
 
     impl<'i> Parser<&'i [u8]> for HexDigitFmt {

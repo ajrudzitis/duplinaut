@@ -5,7 +5,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Component | Specification review | Implementation | Proof | Official compatibility tests | Independent acceptance |
 | --- | --- | --- | --- | --- | --- |
 | Delta decoder and application | Reviewed grammar and bounds | Implemented; 16 native tests pass | Focused verification: 535 obligations, zero errors | Official 0.8.23, 2.1.3, 3.0.7 and 3.2.1 payloads pass, including multipart | Independent semantic review complete; whole-workspace gate pending |
-| Manifest token decoding | Reviewed exact byte predicates | Implemented; three tests pass | Pending | Remaining manifest fixture integration pending | Pending |
+| Manifest token decoding | Reviewed exact byte predicates | Implemented; three tests pass | Focused strict verification: 155 obligations, zero errors | Official manifests pass through this decoder | Independent semantic review complete; complete-core gate pending |
 | Byte-path validation and comparison | Reviewed root/component grammar | Implemented; three tests pass | Exact component comparison and loop safety checked; normalization contract pending | Archive fixture integration pending | Comparison source review complete |
 | Manifest framing and normalization | Reviewed fields, counts, hashes and restart semantics | Implemented; eight tests pass | Pending | Plain manifests from all four producer versions pass | Software checkpoint reviewed; formal acceptance pending |
 | Names, tar, signatures | Requirements written; open questions remain | Pending | Pending | Pending | Pending |
@@ -21,6 +21,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Test extracted deltas from five historical producer profiles against independent source contents.
 - [x] Implement bounded manifest records, restart normalization, digest declarations and counted file lists; test official manifests.
 - [x] Prove byte-component comparison against an independent lexicographic model.
+- [x] Prove exact manifest token consumption, decoded bytes, malformed-input rejection and encoded-size limits against an independent model.
 - [ ] Prove path normalization and manifest contextual semantics.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.

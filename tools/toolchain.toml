@@ -6,6 +6,8 @@ duvet = "0.4.3"
 z3 = "4.16.0"
 vstd_sha256 = "9e5391d6f656ab9a485169f7e9fe87d3db1f0a6aa116fcb630dd0bef224170e7"
 vest_lib_sha256 = "f3f4d4698b6a56f5b23ae330d294a8d77fbb728fbf6d74946a18e0e46ba6e7a9"
+verus_syn = "0.0.0-2026-09-06-0133"
+verus_syn_sha256 = "7d8b53574934e1f608dfccd809ce17f3733d6eb99c14ce8220326121929e1637"
 
 [vest_lib_vendor]
 path = "vendor/vest_lib"

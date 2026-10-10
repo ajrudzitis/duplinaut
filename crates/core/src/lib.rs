@@ -7,3 +7,4 @@ pub mod manifest_token;
 pub mod path;
 pub mod source;
 pub mod manifest;
+mod verified;

@@ -232,6 +232,7 @@ fn incomplete_or_nonexistent_required_proof_rejected() {
         requirement: "REQ-001".into(),
         path: "crates/core/src/algorithm.rs".into(),
         symbol: "missing".into(),
+        kind: assurance::ProofKind::Lemma,
     });
     assert!(validate_ledger(&temp.0, &ledger).is_err());
     ledger.milestone[0].proofs[0].symbol = "valid".into();
@@ -398,4 +399,162 @@ fn source_digest_changes_with_source_but_not_ignored_artifacts() {
     assert_eq!(before, source_digest(&temp.0).unwrap());
     fs::write(temp.0.join("source.rs"), "fn read() { panic!(); }\n").unwrap();
     assert_ne!(before, source_digest(&temp.0).unwrap());
+}
+
+//= docs/parsing-requirements.md#assure-trace-002
+//= type=test
+//# Formal proof obligations and successful verification results MUST be recorded separately by requirement ID with the verified source identity and tool configuration.
+#[test]
+fn executable_contract_evidence_requires_verified_mode_and_real_postcondition() {
+    use assurance::{check_proof_symbol, ProofKind};
+    let temp = Temp::new();
+    for source in [
+        "verus! { pub fn goal(x: u8) -> (result: u8) ensures result == x, { x } }",
+        "verus! { pub exec fn goal(x: u8) -> (result: u8) ensures match result { 0 => x == 0, _ => result == x }, { x } }",
+        "verus! { struct Reader; impl Reader { fn goal(x: u8) -> (result: u8) ensures result == x, { x } } }",
+        "mod checked { verus! { fn goal(x: u8) -> (result: u8) ensures result == x, { x } } }",
+        "#[verus_verify] #[verus_spec(result => ensures result == x)] fn goal(x: u8) -> u8 { x }",
+    ] {
+        fs::write(temp.0.join("contract.rs"), source).unwrap();
+        check_proof_symbol(&temp.0, "contract.rs", "goal", ProofKind::Contract).unwrap();
+        assert!(check_proof_symbol(&temp.0, "contract.rs", "goal", ProofKind::Lemma).is_err());
+    }
+    for source in [
+        "fn goal(x: u8) -> u8 { x }",
+        "fn goal(x: u8) -> (result: u8) ensures result == x, { x }",
+        "verus! { fn goal(x: u8) -> u8 { let ensures = x; ensures } }",
+        "verus! { fn goal(x: u8) -> u8 ensures true, { x } }",
+        "verus! { fn goal(x: u8) -> u8 ensures (true), true, { x } }",
+        "verus! { proof fn goal(x: u8) ensures x == x, {} }",
+        "verus! { spec fn goal(x: u8) -> u8 { x } }",
+        "verus! { fn goal(x: u8) -> (result: u8) ensures result == x,; }",
+        "#[verus_verify] fn goal(x: u8) -> u8 { x }",
+        "#[verus_spec(result => ensures result == x)] fn goal(x: u8) -> u8 { x }",
+        "#[verus_verify] #[verus_spec(result => ensures true)] fn goal(x: u8) -> u8 { x }",
+        "// verus! { fn goal() ensures false {} }\nconst EXAMPLE: &str = \"verus! { fn goal() ensures false {} }\";",
+        "quote! { verus! { fn goal(x: u8) -> (result: u8) ensures result == x, { x } } }",
+        "macro_rules! template { () => { verus! { fn goal(x: u8) -> (result: u8) ensures result == x, { x } } }; }",
+        "fn other() { verus! { fn goal(x: u8) -> (result: u8) ensures result == x, { x } } }",
+        "#[cfg(any())] verus! { fn goal(x: u8) -> (result: u8) ensures result == x, { x } }",
+    ] {
+        fs::write(temp.0.join("contract.rs"), source).unwrap();
+        assert!(check_proof_symbol(&temp.0, "contract.rs", "goal", ProofKind::Contract).is_err(), "accepted invalid contract: {source}");
+    }
+    // The production contract syntax is accepted without treating this check
+    // as a substitute for the complete verifier or independent semantic review.
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    check_proof_symbol(
+        root,
+        "crates/core/src/delta.rs",
+        "apply_delta",
+        ProofKind::Contract,
+    )
+    .unwrap();
+}
+
+//= docs/parsing-requirements.md#assure-build-001
+//= type=test
+//# The acceptance build MUST fail on failed or incomplete required proofs, missing verification tools, stale generated parsers, or unreviewed verification exemptions.
+#[test]
+fn executable_contract_evidence_requires_core_inclusion_and_explicit_kind() {
+    let temp = Temp::new();
+    let mut ledger = ledger_fixture(&temp.0);
+    fs::write(
+        temp.0.join("crates/core/src/algorithm.rs"),
+        "verus! { fn decode(x: u8) -> (result: u8) ensures result == x, { x } }",
+    )
+    .unwrap();
+    ledger.milestone[0] = toml::from_str("id='tooling'\ngate=true\nrequirements=['REQ-001']\nspecified=true\nimplemented=true\nproved=true\ntested=true\nreviewed=true\nproof_required=true\nimplementations=[{path='crates/core/src/algorithm.rs',symbol='decode'}]\nproofs=[{id='wire',requirement='REQ-001',path='crates/core/src/algorithm.rs',symbol='decode',kind='contract'}]\ntests=[{package='xtask',name='fixture'}]\n").unwrap();
+    validate_ledger(&temp.0, &ledger).unwrap();
+    ledger.milestone[0].proofs[0].kind = assurance::ProofKind::Lemma;
+    assert!(validate_ledger(&temp.0, &ledger).is_err());
+    ledger.milestone[0].proofs[0].kind = assurance::ProofKind::Contract;
+    fs::write(
+        temp.0.join("crates/core/src/lib.rs"),
+        "// source excluded\n",
+    )
+    .unwrap();
+    assert!(validate_ledger(&temp.0, &ledger).is_err());
+    fs::write(
+        temp.0.join("crates/core/src/lib.rs"),
+        "#[cfg(any())] mod algorithm;\n",
+    )
+    .unwrap();
+    assert!(validate_ledger(&temp.0, &ledger).is_err());
+    fs::write(temp.0.join("crates/core/src/lib.rs"), "mod algorithm;\n").unwrap();
+    fs::write(
+        temp.0.join("crates/core/src/algorithm.rs"),
+        "verus! { #[cfg(any())] fn decode(x: u8) -> (result: u8) ensures result == x, { x } }",
+    )
+    .unwrap();
+    assert!(validate_ledger(&temp.0, &ledger).is_err());
+    let default: assurance::ProofReference =
+        toml::from_str("id='lemma'\nrequirement='REQ-001'\npath='proof.rs'\nsymbol='valid'\n")
+            .unwrap();
+    assert_eq!(default.kind, assurance::ProofKind::Lemma);
+    assert!(toml::from_str::<assurance::ProofReference>(
+        "id='bad'\nrequirement='REQ-001'\npath='proof.rs'\nsymbol='valid'\nkind='unknown'\n"
+    )
+    .is_err());
+}
+
+//= docs/parsing-requirements.md#assure-build-001
+//= type=test
+//# The acceptance build MUST fail on failed or incomplete required proofs, missing verification tools, stale generated parsers, or unreviewed verification exemptions.
+#[test]
+fn generation_fact_activation_preserves_every_original_byte() {
+    let item: assurance::Generation = toml::from_str("input='crates/core/formats/manifest_token.vest'\noutput='crates/core/src/generated/manifest_token.rs'\nproof_profile='manifest-token-facts-v1'\n").unwrap();
+    let raw = b"// mod exec_impls { fake }\nverus! { mod derived_proofs { broadcast use { original::facts, }; proof fn lemma() {} } mod exec_impls { fn parse() -> u8 { 7 } } }\n";
+    let generated = assurance::augment_generation(raw, &item).unwrap();
+    let generated = String::from_utf8(generated).unwrap();
+    let activation = "\nbroadcast use crate::verified::token_refinement::group_token_facts;\n";
+    assert_eq!(generated.matches(activation).count(), 1);
+    let list_activation = "\n        crate::verified::token_refinement::group_token_facts,";
+    assert_eq!(generated.matches(list_activation).count(), 1);
+    assert_eq!(
+        generated
+            .replace(activation, "")
+            .replace(list_activation, "")
+            .as_bytes(),
+        raw
+    );
+    for bad in [
+        "verus! { mod derived_proofs {} }",
+        "verus! { mod derived_proofs {} mod exec_impls {} mod exec_impls {} }",
+        "verus! { mod derived_proofs {} #[cfg(any())] mod exec_impls {} }",
+        "quote! { verus! { mod derived_proofs {} mod exec_impls {} } }",
+        "mod derived_proofs {} mod exec_impls {}",
+        "verus! { mod derived_proofs {} mod exec_impls; }",
+        "verus! { mod derived_proofs { broadcast use one; } mod exec_impls {} }",
+        "verus! { mod derived_proofs { broadcast use {}; } mod exec_impls {} }",
+        "verus! { mod derived_proofs { broadcast use { one }; broadcast use { two }; } mod exec_impls {} }",
+        "verus! { mod derived_proofs { broadcast use { one }; } mod exec_impls { broadcast use { two }; } }",
+    ] {
+        assert!(assurance::augment_generation(bad.as_bytes(), &item).is_err());
+    }
+    let mut wrong = item;
+    wrong.output = "other.rs".into();
+    assert!(assurance::augment_generation(raw, &wrong).is_err());
+    assert!(toml::from_str::<assurance::Generation>(
+        "input='a'\noutput='b'\nproof_profile='arbitrary-edit'\n"
+    )
+    .is_err());
+}
+
+#[test]
+fn lemma_evidence_rejects_unexpanded_macros_and_ordinary_functions() {
+    let temp = Temp::new();
+    for source in [
+        "proof fn goal() {}",
+        "quote! { verus! { proof fn goal() {} } }",
+        "fn ordinary() { verus! { proof fn goal() {} } }",
+        "verus! { fn goal() {} }",
+        "verus! { #[cfg(any())] proof fn goal() {} }",
+    ] {
+        fs::write(temp.0.join("proof.rs"), source).unwrap();
+        assert!(
+            assurance::check_symbol(&temp.0, "proof.rs", "goal", true).is_err(),
+            "accepted invalid lemma: {source}"
+        );
+    }
 }

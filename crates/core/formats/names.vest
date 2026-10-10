@@ -1,0 +1,17 @@
+// Canonical timestamp framing is authored in the Vest DSL. Calendar ranges and
+// conversion to exact Unix seconds are checked by the scalar controller.
+date_digit = u8 | {48,49,50,51,52,53,54,55,56,57}
+date_t = u8 | {84,116}
+date_z = u8 | {90,122}
+
+//= docs/parsing-requirements.md#parse-name-004
+canonical_timestamp = {
+    year: [date_digit; 4],
+    month: [date_digit; 2],
+    day: [date_digit; 2],
+    separator: date_t,
+    hour: [date_digit; 2],
+    minute: [date_digit; 2],
+    second: [date_digit; 2],
+    zone: date_z,
+}

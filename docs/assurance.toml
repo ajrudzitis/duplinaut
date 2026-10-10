@@ -11,6 +11,11 @@ append = "\ninclude!(\"../verified/delta_refinement.rs\");\n"
 [[generation]]
 input = "crates/core/formats/manifest_token.vest"
 output = "crates/core/src/generated/manifest_token.rs"
+proof_profile = "manifest-token-facts-v1"
+
+[[generation]]
+input = "crates/core/formats/names.vest"
+output = "crates/core/src/generated/names.rs"
 
 [[milestone]]
 id = "tooling"
@@ -32,28 +37,65 @@ id = "manifest-token"
 gate = false
 requirements = ["PARSE-MAN-002", "PARSE-MAN-003"]
 specified = true
-implemented = false
+# Focused --no-cheating verification: 155 obligations, zero errors.
+# Complete same-source core verification remains pending.
+implemented = true
 proved = false
-tested = false
-reviewed = false
+tested = true
+reviewed = true
 proof_required = true
-implementations = []
-proofs = []
-tests = []
+implementations = [{ path = "crates/core/src/manifest_token.rs", symbol = "decode_token" }]
+proofs = [
+  { id = "token-002", requirement = "PARSE-MAN-002", path = "crates/core/src/manifest_token.rs", symbol = "decode_token", kind = "contract" },
+  { id = "token-003", requirement = "PARSE-MAN-003", path = "crates/core/src/manifest_token.rs", symbol = "decode_token", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "quoted_and_unquoted_tokens_leave_delimiters_for_the_caller" },
+  { package = "duplicity-core", name = "malformed_quotes_and_escapes_are_rejected" },
+  { package = "duplicity-core", name = "escapes_preserve_every_byte_and_both_hex_cases" }
+]
 
 [[milestone]]
 id = "delta-wire"
 gate = false
-requirements = ["PARSE-DELTA-001", "PARSE-DELTA-002"]
+# Focused --no-cheating verification: 535 obligations, zero errors.
+# proved remains false until the complete same-source core gate passes.
+requirements = ["PARSE-DELTA-001", "PARSE-DELTA-002", "PARSE-DELTA-003", "PARSE-DELTA-004", "PARSE-DELTA-005", "PARSE-DELTA-006", "PARSE-DELTA-007", "PARSE-DELTA-008"]
 specified = true
-implemented = false
+implemented = true
 proved = false
-tested = false
-reviewed = false
+tested = true
+reviewed = true
 proof_required = true
-implementations = []
-proofs = []
-tests = []
+implementations = [{ path = "crates/core/src/delta.rs", symbol = "decode_command" }, { path = "crates/core/src/delta.rs", symbol = "apply_delta" }]
+proofs = [
+  { id = "delta-001", requirement = "PARSE-DELTA-001", path = "crates/core/src/delta.rs", symbol = "apply_delta", kind = "contract" },
+  { id = "delta-002", requirement = "PARSE-DELTA-002", path = "crates/core/src/delta.rs", symbol = "decode_command", kind = "contract" },
+  { id = "delta-003", requirement = "PARSE-DELTA-003", path = "crates/core/src/delta.rs", symbol = "apply_delta", kind = "contract" },
+  { id = "delta-004", requirement = "PARSE-DELTA-004", path = "crates/core/src/delta.rs", symbol = "apply_delta", kind = "contract" },
+  { id = "delta-005", requirement = "PARSE-DELTA-005", path = "crates/core/src/delta.rs", symbol = "apply_delta", kind = "contract" },
+  { id = "delta-006", requirement = "PARSE-DELTA-006", path = "crates/core/src/delta.rs", symbol = "apply_delta", kind = "contract" },
+  { id = "delta-007", requirement = "PARSE-DELTA-007", path = "crates/core/src/delta.rs", symbol = "decode_command", kind = "contract" },
+  { id = "delta-008", requirement = "PARSE-DELTA-008", path = "crates/core/src/delta.rs", symbol = "apply_delta", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "every_literal_opcode_decodes_exact_payload" },
+  { package = "duplicity-core", name = "all_copy_widths_use_the_fixed_basis" },
+  { package = "duplicity-core", name = "magic_and_exact_stream_termination_are_required" },
+  { package = "duplicity-core", name = "out_of_bounds_copies_and_output_exhaustion_fail" },
+  { package = "duplicity-core", name = "zero_length_commands_consume_arguments_without_ending" },
+  { package = "duplicity-core", name = "reserved_and_truncated_commands_fail" },
+  { package = "duplicity-core", name = "every_copy_width_preserves_high_bits_and_byte_order" },
+  { package = "duplicity-core", name = "every_command_rejects_every_proper_truncated_prefix" },
+  { package = "duplicity-core", name = "oversized_u64_fields_cannot_wrap_into_small_valid_ranges" },
+  { package = "duplicity-core", name = "literals_do_not_change_the_basis_for_later_copies" },
+  { package = "duplicity-core", name = "all_copy_widths_accept_zero_length_at_the_end_of_the_basis" },
+  { package = "duplicity-core", name = "command_consumption_leaves_the_following_command_untouched" },
+  { package = "duplicity-core", name = "official_incremental_payloads_match_independent_source_contents" },
+  { package = "duplicity-core", name = "official_metadata_only_deltas_preserve_contents" },
+  { package = "duplicity-core", name = "official_large_delta_matches_source_tree_oracle" },
+  { package = "duplicity-core", name = "historical_official_delta_payloads_restore_independent_source_contents" }
+]
 
 [[milestone]]
 id = "complete-reader"
