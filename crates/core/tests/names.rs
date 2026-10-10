@@ -1,9 +1,15 @@
 use duplicity_core::names::{
-    Envelope, NameConfig, NameError, ObjectKind, Timestamp, parse_long_timestamp, parse_name,
+    parse_long_timestamp, parse_name, Envelope, NameConfig, NameError, ObjectKind, Timestamp,
 };
 
 //= docs/parsing-requirements.md#parse-name-004
+//= type=test
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+
 //= docs/parsing-requirements.md#parse-name-007
+//= type=test
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+
 #[test]
 fn gregorian_dates_and_zones_are_exact() {
     let parse = |s: &[u8]| parse_long_timestamp(s, b':');
@@ -46,7 +52,13 @@ fn gregorian_dates_and_zones_are_exact() {
 }
 
 //= docs/parsing-requirements.md#parse-name-002
+//= type=test
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+
 //= docs/parsing-requirements.md#parse-name-005
+//= type=test
+//# Objects marked partial MUST be excluded from completed restore sets.
+
 #[test]
 fn exact_names_suffixes_prefixes_and_limits() {
     let config = NameConfig::default();
@@ -77,11 +89,9 @@ fn exact_names_suffixes_prefixes_and_limits() {
         archive_prefix: b"a+",
         ..config
     };
-    assert!(
-        parse_name(&[b"[g]a+" as &[u8], base].concat(), custom)
-            .unwrap()
-            .is_some()
-    );
+    assert!(parse_name(&[b"[g]a+" as &[u8], base].concat(), custom)
+        .unwrap()
+        .is_some());
     assert_eq!(
         parse_name(&[b"ga+" as &[u8], base].concat(), custom),
         Ok(None)
@@ -96,16 +106,14 @@ fn exact_names_suffixes_prefixes_and_limits() {
         ),
         Err(NameError::Limit)
     );
-    assert!(
-        parse_name(
-            base,
-            NameConfig {
-                max_name_bytes: base.len(),
-                ..config
-            }
-        )
-        .is_ok()
-    );
+    assert!(parse_name(
+        base,
+        NameConfig {
+            max_name_bytes: base.len(),
+            ..config
+        }
+    )
+    .is_ok());
     assert_eq!(parse_name(b"random-object", config), Ok(None));
     assert_eq!(
         parse_name(b"prefix/file", config),
@@ -124,7 +132,13 @@ fn exact_names_suffixes_prefixes_and_limits() {
 }
 
 //= docs/parsing-requirements.md#parse-name-003
+//= type=test
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+
 //= docs/parsing-requirements.md#parse-name-006
+//= type=test
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+
 #[test]
 fn base36_overflow_and_increment_order() {
     let config = NameConfig::default();
@@ -159,6 +173,9 @@ fn base36_overflow_and_increment_order() {
 }
 
 //= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+
 #[test]
 fn every_official_archive_basename_is_classified() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");

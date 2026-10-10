@@ -110,7 +110,11 @@ fn numeral(input: &[u8], radix: u64) -> Result<u64, NameError> {
 }
 
 //= docs/parsing-requirements.md#parse-name-004
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+
 //= docs/parsing-requirements.md#parse-name-007
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+
 /// Parse an exact canonical or legacy explicitly zoned Gregorian timestamp.
 pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, NameError> {
     if !separator_valid(separator) {
@@ -321,10 +325,20 @@ fn body(
 }
 
 //= docs/parsing-requirements.md#parse-name-001
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+
 //= docs/parsing-requirements.md#parse-name-002
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+
 //= docs/parsing-requirements.md#parse-name-003
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+
 //= docs/parsing-requirements.md#parse-name-005
+//# Objects marked partial MUST be excluded from completed restore sets.
+
 //= docs/parsing-requirements.md#parse-name-006
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+
 /// Parse a basename, not an S3 key. Unrelated names return `Ok(None)`.
 /// Conflicting prefix configurations producing distinct successful classifications
 /// return `Ambiguous`; malformed recognized stems are errors rather than ignored.

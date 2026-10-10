@@ -25,6 +25,10 @@ pattern = "crates/s3/src/**/*.rs"
 type = "implementation"
 
 [[source]]
+pattern = "crates/s3/tests/**/*.rs"
+type = "test"
+
+[[source]]
 pattern = "crates/tui/src/**/*.rs"
 type = "implementation"
 

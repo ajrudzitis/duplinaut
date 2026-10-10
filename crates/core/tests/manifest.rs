@@ -19,8 +19,8 @@ fn path(text: &[u8]) -> BackupPath {
 //= docs/parsing-requirements.md#parse-man-006
 //# The reader MUST retain the distinction between absent block boundaries and explicit numeric block boundaries.
 //= docs/parsing-requirements.md#parse-man-007
-//# The manifest parser MUST accept an optional counted Filelist section before or after volume records without interpreting its lines as volume fields.
 //= type=test
+//# The manifest parser MUST accept an optional counted Filelist section before or after volume records without interpreting its lines as volume fields.
 #[test]
 fn official_plain_manifests_all_producers() {
     let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
@@ -61,8 +61,8 @@ fn official_plain_manifests_all_producers() {
 }
 
 //= docs/parsing-requirements.md#parse-man-004
-//# Manifest interpretation MUST replace earlier records of a repeated volume number with its last record and discard volume records above the last recorded volume number.
 //= type=test
+//# Manifest interpretation MUST replace earlier records of a repeated volume number with its last record and discard volume records above the last recorded volume number.
 #[test]
 fn restart_normalization_replaces_and_discards() {
     let text = volume(1, ".", "a")
@@ -84,8 +84,8 @@ fn restart_normalization_replaces_and_discards() {
 }
 
 //= docs/parsing-requirements.md#parse-man-005
-//# Volume selection MUST include every volume whose declared inclusive path interval can contain a selected entry or descendant, including shared multipart boundary paths.
 //= type=test
+//# Volume selection MUST include every volume whose declared inclusive path interval can contain a selected entry or descendant, including shared multipart boundary paths.
 #[test]
 fn inclusive_componentwise_selection_includes_descendants_and_shared_boundaries() {
     let manifest = parse(&(volume(1, ".", "a/b 2") + &volume(2, "a/b 3", "z"))).unwrap();
@@ -122,8 +122,8 @@ fn filelist_positions_case_crlf_and_byte_tokens() {
 }
 
 //= docs/parsing-requirements.md#parse-env-006
-//# An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
 //= type=test
+//# An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
 #[test]
 fn digest_shapes_conflicts_and_unsupported_integrity() {
     let valid = volume(1, ".", "z");

@@ -5,6 +5,8 @@ date_t = u8 | {84,116}
 date_z = u8 | {90,122}
 
 //= docs/parsing-requirements.md#parse-name-004
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+
 canonical_timestamp = {
     year: [date_digit; 4],
     month: [date_digit; 2],

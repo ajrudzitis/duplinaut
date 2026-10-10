@@ -24,25 +24,25 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: A restore path MUST be relative to the backup root and contain no NUL, empty interior component, dot component, or parent component after format-specific root decoding.
 
   SECTION: [PARSE-NAME-001](#parse-name-001)
-    TEXT[!MUST]: The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    TEXT[!MUST,implementation,test]: The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 
   SECTION: [PARSE-NAME-002](#parse-name-002)
-    TEXT[!MUST]: Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+    TEXT[!MUST,implementation,test]: Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
 
   SECTION: [PARSE-NAME-003](#parse-name-003)
-    TEXT[!MUST]: Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    TEXT[!MUST,implementation,test]: Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
 
   SECTION: [PARSE-NAME-004](#parse-name-004)
-    TEXT[!MUST]: The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    TEXT[!MUST,implementation,test]: The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
 
   SECTION: [PARSE-NAME-007](#parse-name-007)
-    TEXT[!MUST]: The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    TEXT[!MUST,implementation,test]: The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
 
   SECTION: [PARSE-NAME-005](#parse-name-005)
-    TEXT[!MUST]: Objects marked partial MUST be excluded from completed restore sets.
+    TEXT[!MUST,implementation,test]: Objects marked partial MUST be excluded from completed restore sets.
 
   SECTION: [PARSE-NAME-006](#parse-name-006)
-    TEXT[!MUST]: An incremental set MUST have an end timestamp strictly later than its start timestamp.
+    TEXT[!MUST,implementation,test]: An incremental set MUST have an end timestamp strictly later than its start timestamp.
 
   SECTION: [PARSE-ENV-001](#parse-env-001)
     TEXT[!MUST]: The reader MUST decode unencrypted raw objects and gzip-enveloped objects according to their classified envelope.
@@ -60,10 +60,40 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: Manifest volume digests MUST be checked against the original stored object bytes before a restoration using those volumes is published.
 
   SECTION: [PARSE-ENV-006](#parse-env-006)
-    TEXT[!MUST]: An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
+    TEXT[!MUST,implementation,test]: An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
+
+  SECTION: [PARSE-ENV-007](#parse-env-007)
+    TEXT[!MUST]: The native reader MUST accept only SEIPDv1 authenticated encrypted-data containers within its initial OpenPGP profile.
+
+  SECTION: [PARSE-ENV-008](#parse-env-008)
+    TEXT[!MUST]: The adapter MUST restrict decryption and verification algorithms to the enumerated initial capability profile.
+
+  SECTION: [PARSE-ENV-009](#parse-env-009)
+    TEXT[!MUST]: The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
+
+  SECTION: [PARSE-ENV-010](#parse-env-010)
+    TEXT[!MUST]: The adapter MUST enforce its configured ciphertext bound before materializing an encrypted object and authenticate the complete SEIPDv1 payload before releasing plaintext to message or duplicity parsers.
+
+  SECTION: [PARSE-ENV-011](#parse-env-011)
+    TEXT[!MUST]: The adapter MUST consume every accepted message and compression layer to its authenticated end and reject unexpected trailing packets or bytes.
+
+  SECTION: [PARSE-ENV-012](#parse-env-012)
+    TEXT[!MUST]: Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
+
+  SECTION: [PARSE-ENV-013](#parse-env-013)
+    TEXT[!MUST]: Historical signer verification MUST report its explicit offline fingerprint-authorization scope without claiming current certificate validity or Web-of-Trust validation.
+
+  SECTION: [PARSE-ENV-014](#parse-env-014)
+    TEXT[!MUST]: The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
+
+  SECTION: [PARSE-ENV-015](#parse-env-015)
+    TEXT[!MUST]: The crypto adapter's trusted contract and limitations MUST be recorded with the pinned dependency identities and independent positive and negative integration evidence.
+
+  SECTION: [PARSE-ENV-016](#parse-env-016)
+    TEXT[!MUST]: The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
 
   SECTION: [PARSE-MAN-001](#parse-man-001)
-    TEXT[!MUST]: The manifest parser MUST recover ordered volume records containing volume number, starting path, ending path, optional block boundaries, and declared hashes.
+    TEXT[!MUST,implementation,test]: The manifest parser MUST recover ordered volume records containing volume number, starting path, ending path, optional block boundaries, and declared hashes.
 
   SECTION: [PARSE-MAN-002](#parse-man-002)
     TEXT[!MUST,implementation,test]: The manifest token parser MUST decode a valid double-quoted token's `\xHH` escape to exactly the represented byte.
@@ -72,16 +102,16 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The manifest token parser MUST reject incomplete escapes, non-hexadecimal escape digits, unsupported escape forms, and unterminated quoted tokens.
 
   SECTION: [PARSE-MAN-004](#parse-man-004)
-    TEXT[!MUST]: Manifest interpretation MUST replace earlier records of a repeated volume number with its last record and discard volume records above the last recorded volume number.
+    TEXT[!MUST,implementation,test]: Manifest interpretation MUST replace earlier records of a repeated volume number with its last record and discard volume records above the last recorded volume number.
 
   SECTION: [PARSE-MAN-005](#parse-man-005)
-    TEXT[!MUST]: Volume selection MUST include every volume whose declared inclusive path interval can contain a selected entry or descendant, including shared multipart boundary paths.
+    TEXT[!MUST,implementation,test]: Volume selection MUST include every volume whose declared inclusive path interval can contain a selected entry or descendant, including shared multipart boundary paths.
 
   SECTION: [PARSE-MAN-006](#parse-man-006)
-    TEXT[!MUST]: The reader MUST retain the distinction between absent block boundaries and explicit numeric block boundaries.
+    TEXT[!MUST,implementation,test]: The reader MUST retain the distinction between absent block boundaries and explicit numeric block boundaries.
 
   SECTION: [PARSE-MAN-007](#parse-man-007)
-    TEXT[!MUST]: The manifest parser MUST accept an optional counted Filelist section before or after volume records without interpreting its lines as volume fields.
+    TEXT[!MUST,implementation,test]: The manifest parser MUST accept an optional counted Filelist section before or after volume records without interpreting its lines as volume fields.
 
   SECTION: [PARSE-TAR-001](#parse-tar-001)
     TEXT[!MUST]: The tar parser MUST validate each header checksum and payload extent before accepting the entry it describes.
@@ -117,13 +147,13 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
 
   SECTION: [PARSE-SIG-001](#parse-sig-001)
-    TEXT[!MUST]: The signature parser MUST recognize the four reviewed signature magic values and reject other magic values as unsupported.
+    TEXT[!MUST,implementation,test]: The signature parser MUST recognize the four reviewed signature magic values and reject other magic values as unsupported.
 
   SECTION: [PARSE-SIG-002](#parse-sig-002)
-    TEXT[!MUST]: The signature parser MUST validate nonzero block length, supported strong-checksum length for the selected magic, and complete checksum records.
+    TEXT[!MUST,implementation,test]: The signature parser MUST validate nonzero block length, supported strong-checksum length for the selected magic, and complete checksum records.
 
   SECTION: [PARSE-SIG-003](#parse-sig-003)
-    TEXT[!MUST]: The reader MUST represent original regular-file size as unknown when only a signature payload provides size information.
+    TEXT[!MUST,implementation,test]: The reader MUST represent original regular-file size as unknown when only a signature payload provides size information.
 
   SECTION: [PARSE-DELTA-001](#parse-delta-001)
     TEXT[!MUST,implementation,test]: The delta parser MUST require the reviewed delta magic before decoding commands.
@@ -168,7 +198,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: When signature metadata cannot provide a requested listing, the reader MUST expose that a volume scan is required before starting that scan.
 
   SECTION: [PARSE-SOURCE-001](#parse-source-001)
-    TEXT[!MUST]: The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
+    TEXT[!MUST,implementation,test]: The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
 
   SECTION: [RESTORE-001](#restore-001)
     TEXT[!MUST]: A restoration MUST preserve each selected entry's backup-relative path beneath a destination that did not exist when publication began.
