@@ -10,7 +10,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Manifest framing and normalization | Reviewed fields, counts, hashes and restart semantics | Implemented; eight tests pass | Exact framing, decimal and token helper contracts checked; state semantics pending | Plain manifests from all four producer versions pass | Software and helper contracts reviewed; complete formal acceptance pending |
 | Object names and timestamps | Reviewed canonical, legacy and short-name grammar | Implemented; six tests pass; canonical framing uses Vest DSL | Calendar and classification refinement pending | All 84 recorded official object basenames pass | Native source reviewed; formal acceptance pending |
 | Librsync signatures | Reviewed four magics and checksum widths | Implemented; four tests pass; header uses Vest DSL | Header/controller/cursor refinement: 54 focused strict obligations pass | Payloads from 18 official signature archives pass | Independent semantic review complete; complete-core gate pending |
-| Tar containers and operations | Reviewed header, GNU/PAX and footer profiles | Implemented; ten tests pass; header uses Vest DSL | Controller refinement pending | All 39 recorded plain gzip archives scan and classify | Native source reviewed; formal acceptance pending |
+| Tar containers and operations | Reviewed header, GNU/PAX and footer profiles | Implemented; twelve tests pass; header uses Vest DSL | Controller refinement pending | All 39 recorded plain gzip archives scan and classify | Native source reviewed; formal acceptance pending |
 | Reconstruction and restoration | Requirements written; open questions remain | Pending | Pending | Pending | Pending |
 
 - [x] Create the library and verification-enabled Cargo configuration.
@@ -28,6 +28,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Read signature headers and borrowed checksum records; validate all algorithms and official signature payloads without inferring original file size.
 - [x] Prove signature header/controller semantics, exact checksum exposure and cursor progression; review the thin native iterator adapter separately.
 - [x] Prove exact manifest trimming, word/token boundaries, ASCII matching and decimal overflow rejection.
+- [x] Prove exact manifest digest recognition, supported widths, hexadecimal validation and normalized output.
 - [x] Scan native tar containers and classify duplicity operations; test GNU/PAX metadata and explicit footer profiles against official archives.
 - [x] Prove exact path normalization and rejection diagnostics against a functional byte grammar.
 - [ ] Prove manifest contextual semantics.

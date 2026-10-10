@@ -266,30 +266,86 @@ fn boundary(bytes: &[u8], limits: &ManifestLimits) -> Result<Boundary, ManifestE
     };
     Ok(Boundary { path, block })
 }
-fn digest(bytes: &[u8]) -> Result<DeclaredDigest, ManifestError> {
+pub open spec fn normalized(bytes: Seq<u8>) -> Seq<u8> {
+    bytes.map_values(|byte: u8| lowercase(byte))
+}
+pub open spec fn ascii_equal(left: Seq<u8>, right: Seq<u8>) -> bool {
+    left.len() == right.len() && forall|i: int| 0 <= i < left.len()
+        ==> lowercase(left[i]) == lowercase(right[i])
+}
+pub open spec fn digest_algorithm(name: Seq<u8>) -> DigestAlgorithm {
+    if ascii_equal(name, seq![83u8, 72u8, 65u8, 49u8]) { DigestAlgorithm::Sha1 }
+    else if ascii_equal(name, seq![77u8, 68u8, 53u8]) { DigestAlgorithm::Md5 }
+    else { DigestAlgorithm::Unsupported }
+}
+pub open spec fn hexadecimal(byte: u8) -> bool {
+    48 <= lowercase(byte) <= 57 || 97 <= lowercase(byte) <= 102
+}
+pub open spec fn digest_valid(bytes: Seq<u8>) -> bool {
+    let (name, hex) = word_model(bytes);
+    name.len() > 0 && hex.len() > 0
+        && (digest_algorithm(name) != DigestAlgorithm::Sha1 || hex.len() == 40)
+        && (digest_algorithm(name) != DigestAlgorithm::Md5 || hex.len() == 32)
+        && forall|i: int| 0 <= i < hex.len() ==> hexadecimal(hex[i])
+}
+// Explicit arrays expose each grammar byte to the checked equality contract.
+#[allow(clippy::byte_char_slices)]
+fn digest(bytes: &[u8]) -> (result: Result<DeclaredDigest, ManifestError>)
+    ensures match result {
+        Ok(value) => digest_valid(bytes@)
+            && value.algorithm == digest_algorithm(word_model(bytes@).0)
+            && value.name@ == normalized(word_model(bytes@).0)
+            && value.hex@ == normalized(word_model(bytes@).1),
+        Err(error) => error == ManifestError::Malformed && !digest_valid(bytes@),
+    },
+{
     let (name, hex) = word(bytes);
     if name.len() == 0 || hex.len() == 0 { return Err(ManifestError::Malformed); }
-    let algorithm = if equal_word(name, b"SHA1") { DigestAlgorithm::Sha1 }
-        else if equal_word(name, b"MD5") { DigestAlgorithm::Md5 } else { DigestAlgorithm::Unsupported };
-    if (algorithm == DigestAlgorithm::Sha1 && hex.len() != 40)
-        || (algorithm == DigestAlgorithm::Md5 && hex.len() != 32) { return Err(ManifestError::Malformed); }
+    let algorithm = if equal_word(name, &[b'S', b'H', b'A', b'1']) { DigestAlgorithm::Sha1 }
+        else if equal_word(name, &[b'M', b'D', b'5']) { DigestAlgorithm::Md5 } else { DigestAlgorithm::Unsupported };
+    assert(algorithm == digest_algorithm(name@));
+    let wrong_length = match algorithm {
+        DigestAlgorithm::Sha1 => hex.len() != 40,
+        DigestAlgorithm::Md5 => hex.len() != 32,
+        DigestAlgorithm::Unsupported => false,
+    };
+    if wrong_length { return Err(ManifestError::Malformed); }
     let mut normalized_name = Vec::new();
     let mut i = 0;
     while i < name.len()
-        invariant i <= name.len(),
+        invariant i <= name.len(), normalized_name@ == normalized(name@.take(i as int)),
+            (name@, hex@) == word_model(bytes@),
+            name.len() > 0, hex.len() > 0,
+            algorithm == digest_algorithm(name@),
+            algorithm == DigestAlgorithm::Sha1 ==> hex.len() == 40,
+            algorithm == DigestAlgorithm::Md5 ==> hex.len() == 32,
         decreases name.len() - i,
-    { normalized_name.push(lower(name[i])); i += 1; }
+    {
+        normalized_name.push(lower(name[i]));
+        assert(normalized_name@ =~= normalized(name@.take(i as int + 1)));
+        i += 1;
+    }
     let mut normalized_hex = Vec::new();
     i = 0;
     while i < hex.len()
         invariant i <= hex.len(),
+            (name@, hex@) == word_model(bytes@),
+            name.len() > 0, hex.len() > 0,
+            algorithm == digest_algorithm(name@),
+            algorithm == DigestAlgorithm::Sha1 ==> hex.len() == 40,
+            algorithm == DigestAlgorithm::Md5 ==> hex.len() == 32,
+            normalized_name@ == normalized(name@),
+            normalized_hex@ == normalized(hex@.take(i as int)),
+            forall|j: int| 0 <= j < i ==> hexadecimal(hex@[j]),
         decreases hex.len() - i,
     {
         let byte = lower(hex[i]);
         if !((byte >= b'0' && byte <= b'9') || (byte >= b'a' && byte <= b'f')) {
             return Err(ManifestError::Malformed);
         }
-        normalized_hex.push(byte); i += 1;
+        normalized_hex.push(byte);
+        assert(normalized_hex@ =~= normalized(hex@.take(i as int + 1)));
+        i += 1;
     }
     Ok(DeclaredDigest { algorithm, name: normalized_name, hex: normalized_hex })
 }
@@ -304,7 +360,7 @@ fn finish(pending: PendingVolume) -> Result<VolumeRecord, ManifestError> {
         invariant i <= pending.hashes.len(),
         decreases pending.hashes.len() - i,
     {
-        if pending.hashes[i].algorithm != DigestAlgorithm::Unsupported { supported = true; }
+        if !matches!(pending.hashes[i].algorithm, DigestAlgorithm::Unsupported) { supported = true; }
         i += 1;
     }
     if !supported { return Err(ManifestError::UnsupportedIntegrity); }
