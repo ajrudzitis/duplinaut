@@ -5,3 +5,4 @@ pub mod generated;
 pub mod delta;
 pub mod manifest_token;
 pub mod path;
+pub mod source;
