@@ -21,6 +21,10 @@ output = "crates/core/src/generated/names.rs"
 input = "crates/core/formats/signature.vest"
 output = "crates/core/src/generated/signature.rs"
 
+[[generation]]
+input = "crates/core/formats/tar.vest"
+output = "crates/core/src/generated/tar.rs"
+
 [[milestone]]
 id = "tooling"
 gate = true
@@ -100,6 +104,72 @@ tests = [
   { package = "duplicity-core", name = "official_large_delta_matches_source_tree_oracle" },
   { package = "duplicity-core", name = "historical_official_delta_payloads_restore_independent_source_contents" }
 ]
+
+[[milestone]]
+id = "names"
+gate = false
+requirements = ["PARSE-NAME-001", "PARSE-NAME-002", "PARSE-NAME-003", "PARSE-NAME-004", "PARSE-NAME-005", "PARSE-NAME-006", "PARSE-NAME-007"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = true
+# Native source review complete; formal acceptance remains pending.
+implementations = [{ path = "crates/core/src/names.rs", symbol = "parse_name" }, { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }]
+proofs = []
+tests = [{ package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" }, { package = "duplicity-core", name = "exact_names_suffixes_prefixes_and_limits" }, { package = "duplicity-core", name = "base36_overflow_and_increment_order" }, { package = "duplicity-core", name = "every_official_archive_basename_is_classified" }, { package = "duplicity-core", name = "every_supported_calendar_day_is_contiguous" }, { package = "duplicity-core", name = "truncated_and_byte_invalid_framing_is_rejected" }]
+
+[[milestone]]
+id = "signatures"
+gate = false
+requirements = ["PARSE-SIG-001", "PARSE-SIG-002", "PARSE-SIG-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = true
+# Native source review complete; formal acceptance remains pending.
+implementations = [{ path = "crates/core/src/signature.rs", symbol = "parse" }, { path = "crates/core/src/signature.rs", symbol = "original_size" }]
+proofs = []
+tests = [{ package = "duplicity-core", name = "all_algorithms_and_strong_length_boundaries" }, { package = "duplicity-core", name = "malformed_records_and_resource_limits" }, { package = "duplicity-core", name = "empty_and_partial_source_blocks_never_infer_exact_size" }, { package = "duplicity-core", name = "signatures_from_all_plain_official_producer_corpora" }]
+
+[[milestone]]
+id = "byte-path"
+gate = false
+requirements = ["PARSE-PATH-001", "PARSE-PATH-002"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = true
+# Native source review complete; formal acceptance remains pending.
+implementations = [{ path = "crates/core/src/path.rs", symbol = "parse" }, { path = "crates/core/src/path.rs", symbol = "compare" }]
+# Focused --no-cheating verification: 10 obligations, zero errors.
+# proved remains false until the complete same-source core gate passes.
+proofs = [
+  { id = "path-byte-preservation", requirement = "PARSE-PATH-001", path = "crates/core/src/path.rs", symbol = "parse", kind = "contract" },
+  { id = "path-validation", requirement = "PARSE-PATH-002", path = "crates/core/src/path.rs", symbol = "parse", kind = "contract" },
+  { id = "path-byte-comparison", requirement = "PARSE-PATH-001", path = "crates/core/src/path.rs", symbol = "compare", kind = "contract" },
+]
+tests = [{ package = "duplicity-core", name = "identity_and_order_use_byte_components" }, { package = "duplicity-core", name = "reject_escape_and_ambiguous_components" }, { package = "duplicity-core", name = "comparison_covers_component_and_byte_prefix_boundaries" }]
+
+[[milestone]]
+id = "manifest-records"
+gate = false
+requirements = ["PARSE-MAN-001", "PARSE-MAN-004", "PARSE-MAN-005", "PARSE-MAN-006", "PARSE-MAN-007"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = true
+# Native source review complete; formal acceptance remains pending.
+implementations = [{ path = "crates/core/src/manifest.rs", symbol = "parse" }, { path = "crates/core/src/manifest.rs", symbol = "volumes" }, { path = "crates/core/src/manifest.rs", symbol = "may_contain" }]
+proofs = []
+tests = [{ package = "duplicity-core", name = "official_plain_manifests_all_producers" }, { package = "duplicity-core", name = "restart_normalization_replaces_and_discards" }, { package = "duplicity-core", name = "inclusive_componentwise_selection_includes_descendants_and_shared_boundaries" }, { package = "duplicity-core", name = "filelist_positions_case_crlf_and_byte_tokens" }, { package = "duplicity-core", name = "digest_shapes_conflicts_and_unsupported_integrity" }, { package = "duplicity-core", name = "malformed_fields_paths_counts_and_boundaries_fail" }, { package = "duplicity-core", name = "explicit_limits_are_enforced_without_arithmetic_wrap" }, { package = "duplicity-core", name = "official_multipart_boundaries_and_byte_path_values_are_independent_expectations" }]
 
 [[milestone]]
 id = "complete-reader"
