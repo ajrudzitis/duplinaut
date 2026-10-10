@@ -37,6 +37,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Validate supported manifest digests against stored volume bytes before decoding; enforce plain/gzip size and member limits.
 - [x] Prove restart normalization preserves exactly the final-number-capped last declarations in sorted unique order.
 - [x] Prove exact volume selection and inclusion of every selected descendant in a declared inclusive interval.
+- [x] Prove exact path/error adaptation, optional positive block boundaries and volume record completion diagnostics.
 - [ ] Prove complete manifest parser contextual semantics.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.

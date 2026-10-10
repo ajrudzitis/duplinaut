@@ -217,6 +217,7 @@ fn word(bytes: &[u8]) -> (result: (&[u8], &[u8]))
 }
 fn decimal(bytes: &[u8], positive: bool) -> (result: Result<u64, ManifestError>)
     ensures result == decimal_model(bytes@, positive),
+        match result { Ok(number) => !positive || number > 0, Err(_) => true },
 {
     if bytes.len() == 0 { return Err(ManifestError::Malformed); }
     let mut number: u64 = 0;
@@ -251,14 +252,52 @@ fn token<'a>(bytes: &'a [u8], limits: &ManifestLimits) -> (result: Result<(Vec<u
     if consumed < bytes.len() && !space(bytes[consumed]) { return Err(ManifestError::Malformed); }
     Ok((decoded, trim(vstd::slice::slice_subrange(bytes, consumed, bytes.len()))))
 }
-fn path(bytes: &[u8], limits: &ManifestLimits) -> Result<BackupPath, ManifestError> {
+pub open spec fn manifest_path_model(bytes: Seq<u8>, limits: ManifestLimits)
+    -> Result<Seq<Seq<u8>>, ManifestError> {
+    match crate::path::path_model(bytes, false, limits.path_bytes as int, limits.path_components as int) {
+        Ok(value) => Ok(value),
+        Err(crate::path::PathError::ByteLimit) | Err(crate::path::PathError::ComponentLimit)
+            => Err(ManifestError::Limit),
+        Err(_) => Err(ManifestError::Malformed),
+    }
+}
+fn path(bytes: &[u8], limits: &ManifestLimits) -> (result: Result<BackupPath, ManifestError>)
+    ensures match result {
+        Ok(value) => manifest_path_model(bytes@, *limits) == Ok(value@),
+        Err(error) => manifest_path_model(bytes@, *limits) == Err(error),
+    },
+{
     match BackupPath::parse(bytes, false, limits.path_bytes, limits.path_components) {
         Ok(value) => Ok(value),
         Err(crate::path::PathError::ByteLimit) | Err(crate::path::PathError::ComponentLimit) => Err(ManifestError::Limit),
         Err(_) => Err(ManifestError::Malformed),
     }
 }
-fn boundary(bytes: &[u8], limits: &ManifestLimits) -> Result<Boundary, ManifestError> {
+pub open spec fn boundary_model(bytes: Seq<u8>, limits: ManifestLimits)
+    -> Result<(Seq<Seq<u8>>, Option<u64>), ManifestError> {
+    match manifest_token_model(bytes, limits.line_bytes as int) {
+        Err(error) => Err(error),
+        Ok((decoded, rest)) => match manifest_path_model(decoded, limits) {
+            Err(error) => Err(error),
+            Ok(path) => {
+                if rest.len() == 0 { Ok((path, None)) }
+                else {
+                    match decimal_model(rest, true) {
+                        Ok(block) => Ok((path, Some(block))),
+                        Err(error) => Err(error),
+                    }
+                }
+            },
+        },
+    }
+}
+fn boundary(bytes: &[u8], limits: &ManifestLimits) -> (result: Result<Boundary, ManifestError>)
+    ensures match result {
+        Ok(value) => boundary_model(bytes@, *limits) == Ok((value.path@, value.block))
+            && (match value.block { None => true, Some(number) => number > 0 }),
+        Err(error) => boundary_model(bytes@, *limits) == Err(error),
+    },
+{
     let (decoded, rest) = match token(bytes, limits) { Ok(value) => value, Err(error) => return Err(error) };
     let path = match path(&decoded, limits) { Ok(value) => value, Err(error) => return Err(error) };
     let block = if rest.len() == 0 { None } else {
@@ -349,15 +388,34 @@ fn digest(bytes: &[u8]) -> (result: Result<DeclaredDigest, ManifestError>)
     }
     Ok(DeclaredDigest { algorithm, name: normalized_name, hex: normalized_hex })
 }
-fn finish(pending: PendingVolume) -> Result<VolumeRecord, ManifestError> {
+spec fn finish_model(pending: PendingVolume) -> Result<VolumeRecord, ManifestError> {
+    match (pending.start, pending.end) {
+        (Some(start), Some(end)) => {
+            if crate::path::components_less(end.path@, start.path@) || pending.hashes@.len() == 0 {
+                Err(ManifestError::Malformed)
+            } else if !(exists|i: int| 0 <= i < pending.hashes@.len()
+                && pending.hashes@[i].algorithm != DigestAlgorithm::Unsupported) {
+                Err(ManifestError::UnsupportedIntegrity)
+            } else { Ok(VolumeRecord { number: pending.number, start, end, hashes: pending.hashes }) }
+        },
+        _ => Err(ManifestError::Malformed),
+    }
+}
+fn finish(pending: PendingVolume) -> (result: Result<VolumeRecord, ManifestError>)
+    ensures result == finish_model(pending),
+{
     let start = match pending.start { Some(value) => value, None => return Err(ManifestError::Malformed) };
     let end = match pending.end { Some(value) => value, None => return Err(ManifestError::Malformed) };
-    if start.path.compare(&end.path) > 0 { return Err(ManifestError::Malformed); }
+    if !path_before_or_equal(&start.path, &end.path) { return Err(ManifestError::Malformed); }
     if pending.hashes.len() == 0 { return Err(ManifestError::Malformed); }
     let mut supported = false;
     let mut i = 0;
     while i < pending.hashes.len()
         invariant i <= pending.hashes.len(),
+            pending.start == Some(start), pending.end == Some(end),
+            !crate::path::components_less(end.path@, start.path@), pending.hashes.len() > 0,
+            supported == (exists|j: int| 0 <= j < i
+                && pending.hashes@[j].algorithm != DigestAlgorithm::Unsupported),
         decreases pending.hashes.len() - i,
     {
         if !matches!(pending.hashes[i].algorithm, DigestAlgorithm::Unsupported) { supported = true; }
@@ -593,6 +651,8 @@ impl Manifest {
     //# The manifest parser MUST accept an optional counted Filelist section before or after volume records without interpreting its lines as volume fields.
     //= docs/parsing-requirements.md#parse-env-006
     //# An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
+    // Explicit grammar bytes remain visible to the checked equality contract.
+    #[allow(clippy::byte_char_slices)]
     pub fn parse(bytes: &[u8], limits: ManifestLimits) -> Result<Self, ManifestError> {
         if bytes.len() > limits.metadata_bytes { return Err(ManifestError::Limit); }
         let mut manifest = Self { hostname: None, localdir: None, records: Vec::new(), filelist: None };
@@ -633,9 +693,9 @@ impl Manifest {
             let (field, value) = word(line);
             if remaining > 0 {
                 if !indented { return Err(ManifestError::Malformed); }
-                let action = if equal_word(field, b"new") { FileAction::New }
-                    else if equal_word(field, b"changed") { FileAction::Changed }
-                    else if equal_word(field, b"deleted") { FileAction::Deleted }
+                let action = if equal_word(field, &[b'n', b'e', b'w']) { FileAction::New }
+                    else if equal_word(field, &[b'c', b'h', b'a', b'n', b'g', b'e', b'd']) { FileAction::Changed }
+                    else if equal_word(field, &[b'd', b'e', b'l', b'e', b't', b'e', b'd']) { FileAction::Deleted }
                     else { return Err(ManifestError::Malformed); };
                 let (decoded, rest) = match token(value, &limits) { Ok(value) => value, Err(error) => return Err(error) };
                 if rest.len() != 0 { return Err(ManifestError::Malformed); }
@@ -648,13 +708,13 @@ impl Manifest {
                 continue;
             }
             if !indented {
-                if equal_word(field, b"Volume") || equal_word(field, b"Filelist") {
+                if equal_word(field, &[b'V', b'o', b'l', b'u', b'm', b'e']) || equal_word(field, &[b'F', b'i', b'l', b'e', b'l', b'i', b's', b't']) {
                     if let Some(record) = pending {
                         let record = match finish(record) { Ok(value) => value, Err(error) => return Err(error) };
                         manifest.records.push(record);
                     }
                     pending = None;
-                    if equal_word(field, b"Volume") {
+                    if equal_word(field, &[b'V', b'o', b'l', b'u', b'm', b'e']) {
                         if filelist_closed { return Err(ManifestError::Malformed); }
                         if entry_count == limits.entries { return Err(ManifestError::Limit); }
                         entry_count += 1;
@@ -671,10 +731,10 @@ impl Manifest {
                         filelist_closed = manifest.records.len() > 0;
                         manifest.filelist = Some(Vec::new());
                     }
-                } else if equal_word(field, b"Hostname") {
+                } else if equal_word(field, &[b'H', b'o', b's', b't', b'n', b'a', b'm', b'e']) {
                     if pending.is_some() || manifest.hostname.is_some() || value.len() == 0 { return Err(ManifestError::Malformed); }
                     manifest.hostname = Some(owned(value));
-                } else if equal_word(field, b"Localdir") {
+                } else if equal_word(field, &[b'L', b'o', b'c', b'a', b'l', b'd', b'i', b'r']) {
                     if pending.is_some() || manifest.localdir.is_some() { return Err(ManifestError::Malformed); }
                     let (decoded, rest) = match token(value, &limits) { Ok(value) => value, Err(error) => return Err(error) };
                     if rest.len() != 0 { return Err(ManifestError::Malformed); }
@@ -682,16 +742,16 @@ impl Manifest {
                 } else { return Err(ManifestError::Malformed); }
             } else {
                 let record = match &mut pending { Some(value) => value, None => return Err(ManifestError::Malformed) };
-                if equal_word(field, b"StartingPath") || equal_word(field, b"EndingPath") {
+                if equal_word(field, &[b'S', b't', b'a', b'r', b't', b'i', b'n', b'g', b'P', b'a', b't', b'h']) || equal_word(field, &[b'E', b'n', b'd', b'i', b'n', b'g', b'P', b'a', b't', b'h']) {
                     let boundary = match boundary(value, &limits) { Ok(value) => value, Err(error) => return Err(error) };
-                    if equal_word(field, b"StartingPath") {
+                    if equal_word(field, &[b'S', b't', b'a', b'r', b't', b'i', b'n', b'g', b'P', b'a', b't', b'h']) {
                         if record.start.is_some() { return Err(ManifestError::Malformed); }
                         record.start = Some(boundary);
                     } else {
                         if record.end.is_some() { return Err(ManifestError::Malformed); }
                         record.end = Some(boundary);
                     }
-                } else if equal_word(field, b"Hash") {
+                } else if equal_word(field, &[b'H', b'a', b's', b'h']) {
                     let hash = match digest(value) { Ok(value) => value, Err(error) => return Err(error) };
                     let mut i = 0;
                     let mut duplicate = false;

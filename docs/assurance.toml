@@ -175,9 +175,13 @@ reviewed = true
 proof_required = true
 # Native source review complete; formal acceptance remains pending.
 implementations = [{ path = "crates/core/src/manifest.rs", symbol = "parse" }, { path = "crates/core/src/manifest.rs", symbol = "volumes" }, { path = "crates/core/src/manifest.rs", symbol = "may_contain" }]
-# Individual fresh strict checks: 21 obligations across restart/selection helpers.
+# Individual fresh strict checks: 21 obligations across restart/selection helpers,
+# plus six exact path/boundary/positive-decimal/record-completion obligations.
 # Complete manifest parser state semantics and same-source core gate pending.
 proofs = [
+  { id = "manifest-path-adapter", requirement = "PARSE-MAN-001", path = "crates/core/src/manifest.rs", symbol = "path", kind = "contract" },
+  { id = "manifest-boundary", requirement = "PARSE-MAN-001", path = "crates/core/src/manifest.rs", symbol = "boundary", kind = "contract" },
+  { id = "manifest-finish", requirement = "PARSE-MAN-001", path = "crates/core/src/manifest.rs", symbol = "finish", kind = "contract" },
   { id = "manifest-restart", requirement = "PARSE-MAN-004", path = "crates/core/src/manifest.rs", symbol = "volumes", kind = "contract" },
   { id = "manifest-selection", requirement = "PARSE-MAN-005", path = "crates/core/src/manifest.rs", symbol = "may_contain", kind = "contract" },
   { id = "manifest-selection-coverage", requirement = "PARSE-MAN-005", path = "crates/core/src/manifest.rs", symbol = "lemma_selection_covers_descendant", kind = "lemma" },
