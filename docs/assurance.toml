@@ -132,9 +132,14 @@ proved = false
 tested = true
 reviewed = true
 proof_required = true
-# Native source review complete; formal acceptance remains pending.
+# Focused --no-cheating: 54 obligations, zero errors; complete-core acceptance pending.
 implementations = [{ path = "crates/core/src/signature.rs", symbol = "parse" }, { path = "crates/core/src/signature.rs", symbol = "original_size" }]
-proofs = []
+proofs = [
+  { id = "signature-magic", requirement = "PARSE-SIG-001", path = "crates/core/src/signature.rs", symbol = "parse", kind = "contract" },
+  { id = "signature-layout", requirement = "PARSE-SIG-002", path = "crates/core/src/signature.rs", symbol = "parse", kind = "contract" },
+  { id = "signature-cursor", requirement = "PARSE-SIG-002", path = "crates/core/src/signature.rs", symbol = "next_record", kind = "contract" },
+  { id = "signature-size-unknown", requirement = "PARSE-SIG-003", path = "crates/core/src/signature.rs", symbol = "original_size", kind = "contract" },
+]
 tests = [{ package = "duplicity-core", name = "all_algorithms_and_strong_length_boundaries" }, { package = "duplicity-core", name = "malformed_records_and_resource_limits" }, { package = "duplicity-core", name = "empty_and_partial_source_blocks_never_infer_exact_size" }, { package = "duplicity-core", name = "signatures_from_all_plain_official_producer_corpora" }]
 
 [[milestone]]
