@@ -195,6 +195,7 @@ tested = true
 reviewed = true
 proof_required = true
 # Current-source focused --no-cheating: 37 obligations, zero errors.
+# PAX framing/key and fractional-time focus: another 21 obligations, zero errors.
 # Exact helper and header refinement checkpoints; complete controller proof pending.
 implementations = [{ path = "crates/core/src/tar.rs", symbol = "parse" }]
 proofs = [
@@ -202,6 +203,8 @@ proofs = [
   { id = "tar-checksum", requirement = "PARSE-TAR-001", path = "crates/core/src/verified/tar_helpers.rs", symbol = "checksums", kind = "contract" },
   { id = "tar-extent", requirement = "PARSE-TAR-002", path = "crates/core/src/verified/tar_helpers.rs", symbol = "extent", kind = "contract" },
   { id = "tar-number", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_number.rs", symbol = "number", kind = "contract" },
+  { id = "tar-pax-record", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_pax.rs", symbol = "record", kind = "contract" },
+  { id = "tar-pax-time", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_time.rs", symbol = "time", kind = "contract" },
   { id = "tar-footer", requirement = "PARSE-TAR-005", path = "crates/core/src/verified/tar_footer.rs", symbol = "footer_valid", kind = "contract" },
 ]
 tests = [{ package = "duplicity-core", name = "all_official_plain_gzip_archives_scan_and_classify" }, { package = "duplicity-core", name = "complete_entry_extents_padding_and_checksum" }, { package = "duplicity-core", name = "numeric_conversion_boundaries_and_interior_padding" }, { package = "duplicity-core", name = "footer_profiles_are_explicit" }, { package = "duplicity-core", name = "malformed_and_unsupported_pax_are_not_skipped" }]

@@ -660,3 +660,53 @@ fn trailing_global_state_is_valid_but_local_overrides_are_dangling() {
         assert_eq!(parse(&with_footer).unwrap_err(), TarError::DanglingOverride);
     }
 }
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+#[test]
+fn pax_timestamp_precision_and_signed_extremes() {
+    for (text, seconds, nanoseconds) in [
+        (
+            b"9223372036854775807.999999999" as &[u8],
+            i64::MAX,
+            999_999_999,
+        ),
+        (b"-9223372036854775808.000000000000", i64::MIN, 0),
+        (b"-9223372036854775807.999999999", i64::MIN, 1),
+        (b"-0.000000001", -1, 999_999_999),
+        (b"+0.100000000000", 0, 100_000_000),
+    ] {
+        let bytes = [
+            member(b"pax", b'x', &record(b"mtime", text)),
+            member(b"snapshot/f", b'0', b""),
+        ]
+        .concat();
+        assert_eq!(
+            parse(&bytes).unwrap().entries[0].mtime,
+            TarTime {
+                seconds,
+                nanoseconds
+            }
+        );
+    }
+    for text in [
+        b"9223372036854775808" as &[u8],
+        b"-9223372036854775808.000000001",
+        b"18446744073709551616",
+        b"1.1234567891",
+        b"1.",
+        b".1",
+        b"1.2.3",
+        b"--1",
+        b"+",
+        b"1.000000000x",
+    ] {
+        let bytes = [
+            member(b"pax", b'x', &record(b"mtime", text)),
+            member(b"snapshot/f", b'0', b""),
+        ]
+        .concat();
+        assert_eq!(parse(&bytes).unwrap_err(), TarError::Numeric, "{text:?}");
+    }
+}

@@ -7,3 +7,6 @@ pub(crate) mod tar_footer;
 pub(crate) mod tar_number;
 
 pub(crate) mod tar_helpers;
+
+pub(crate) mod tar_pax;
+pub(crate) mod tar_time;

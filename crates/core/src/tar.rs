@@ -108,80 +108,21 @@ fn decimal(bytes: &[u8]) -> Result<u64, TarError> {
     crate::verified::tar_helpers::decimal(bytes).ok_or(TarError::Numeric)
 }
 fn time(bytes: &[u8]) -> Result<TarTime, TarError> {
-    let (negative, bytes) = match bytes.first() {
-        Some(b'-') => (true, &bytes[1..]),
-        Some(b'+') => (false, &bytes[1..]),
-        _ => (false, bytes),
-    };
-    let mut fields = bytes.split(|b| *b == b'.');
-    let seconds = i128::from(decimal(fields.next().ok_or(TarError::Numeric)?)?);
-    let fraction = fields.next();
-    if fields.next().is_some() {
-        return Err(TarError::Numeric);
-    }
-    let mut nanos = 0i128;
-    if let Some(fraction) = fraction {
-        if fraction.is_empty() {
-            return Err(TarError::Numeric);
-        }
-        for (i, &byte) in fraction.iter().enumerate() {
-            if !byte.is_ascii_digit() || (i >= 9 && byte != b'0') {
-                return Err(TarError::Numeric);
-            }
-            if i < 9 {
-                nanos = nanos * 10 + i128::from(byte - b'0');
-            }
-        }
-        for _ in fraction.len()..9 {
-            nanos *= 10;
-        }
-    }
-    let total = (seconds * 1_000_000_000 + nanos) * if negative { -1 } else { 1 };
-    Ok(TarTime {
-        seconds: i64::try_from(total.div_euclid(1_000_000_000)).map_err(|_| TarError::Numeric)?,
-        nanoseconds: total.rem_euclid(1_000_000_000) as u32,
-    })
+    crate::verified::tar_time::time(bytes)
+        .map(|(seconds, nanoseconds)| TarTime {
+            seconds,
+            nanoseconds,
+        })
+        .ok_or(TarError::Numeric)
 }
-const KEYS: [&[u8]; 11] = [
-    b"path",
-    b"linkpath",
-    b"size",
-    b"mtime",
-    b"uid",
-    b"gid",
-    b"uname",
-    b"gname",
-    b"atime",
-    b"ctime",
-    b"hdrcharset",
-];
 type Pax<'a> = [Option<&'a [u8]>; 11];
 fn pax(bytes: &[u8]) -> Result<Pax<'_>, TarError> {
     let mut result = [None; 11];
     let mut cursor = 0;
     while cursor < bytes.len() {
-        let space = bytes[cursor..]
-            .iter()
-            .position(|b| *b == b' ')
-            .ok_or(TarError::Pax)?
-            + cursor;
-        let size = usize::try_from(decimal(&bytes[cursor..space]).map_err(|_| TarError::Pax)?)
-            .map_err(|_| TarError::Pax)?;
-        let end = cursor.checked_add(size).ok_or(TarError::Pax)?;
-        if end > bytes.len() || end <= space + 1 || bytes[end - 1] != b'\n' {
-            return Err(TarError::Pax);
-        }
-        let record = &bytes[space + 1..end - 1];
-        let equal = record
-            .iter()
-            .position(|b| *b == b'=')
-            .ok_or(TarError::Pax)?;
-        let key = &record[..equal];
-        let value = &record[equal + 1..];
-        let index = KEYS
-            .iter()
-            .position(|k| *k == key)
-            .ok_or(TarError::UnsupportedPax)?;
+        let (end, key, value) =
+            crate::verified::tar_pax::record(bytes, cursor).ok_or(TarError::Pax)?;
+        let index = crate::verified::tar_pax::key_index(key).ok_or(TarError::UnsupportedPax)?;
         if result[index].is_some() || value.contains(&0) {
             return Err(TarError::Pax);
         }
