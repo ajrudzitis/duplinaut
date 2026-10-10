@@ -359,6 +359,37 @@ fn trace(root: &Path, ledger: &Ledger, tools: &Tools) -> Result<()> {
 //= docs/parsing-requirements.md#assure-build-001
 //# The acceptance build MUST fail on failed or incomplete required proofs, missing verification tools, stale generated parsers, or unreviewed verification exemptions.
 fn verify(root: &Path, tools: &Tools, action: &str, release: bool) -> Result<()> {
+    // Cargo does not reliably fingerprint forwarded module-selection flags.
+    // An empty, atomically allocated target prevents cached focus results from
+    // becoming acceptance evidence, regardless of the caller's target setting.
+    let target = fresh_verification_target(root)?;
+    verify_in_target(root, tools, action, release, &target)
+}
+
+fn fresh_verification_target(root: &Path) -> Result<PathBuf> {
+    let parent = root.join("target/assurance");
+    fs::create_dir_all(&parent)?;
+    for index in 0..10_000 {
+        let path = parent.join(format!("verification-{}-{index}", std::process::id()));
+        match fs::create_dir(&path) {
+            Ok(()) => return Ok(path.canonicalize()?),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error.into()),
+        }
+    }
+    bail!("cannot allocate a fresh verification target directory")
+}
+
+fn verify_in_target(
+    root: &Path,
+    tools: &Tools,
+    action: &str,
+    release: bool,
+    target: &Path,
+) -> Result<()> {
+    if fs::read_dir(target)?.next().is_some() {
+        bail!("verification target must be empty before the acceptance process starts");
+    }
     let subcommand = if action == "verify" {
         "verify"
     } else {
@@ -369,6 +400,8 @@ fn verify(root: &Path, tools: &Tools, action: &str, release: bool) -> Result<()>
         "--workspace",
         "--locked",
         "--check-toolchain",
+        "--target-dir",
+        target.to_str().context("non-UTF8 verification target")?,
         "--fwd-verus-args-to",
         "roots",
     ];
@@ -384,10 +417,62 @@ fn verify(root: &Path, tools: &Tools, action: &str, release: bool) -> Result<()>
     cmd.env("PATH", env::join_paths(paths)?);
     cmd.env_remove("VERUSFLAGS")
         .env_remove("RUSTFLAGS")
-        .env_remove("CARGO_ENCODED_RUSTFLAGS");
-    let status = cmd.status().context("cannot run pinned cargo-verus")?;
-    if !status.success() {
-        bail!("verified {subcommand} failed ({status}); no successful evidence recorded");
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+        .env_remove("CARGO_BUILD_RUSTFLAGS")
+        .env_remove("RUSTC_WRAPPER")
+        .env_remove("RUSTC_WORKSPACE_WRAPPER")
+        .env_remove("CARGO_BUILD_RUSTC_WRAPPER")
+        .env_remove("CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER")
+        .env_remove("CARGO_TARGET_DIR");
+    for (key, _) in env::vars_os() {
+        if key.to_string_lossy().starts_with("__VERUS_DRIVER") {
+            cmd.env_remove(key);
+        }
+    }
+    println!(
+        "Fresh full-workspace verification target: {}",
+        target.display()
+    );
+    let output = cmd.output().context("cannot run pinned cargo-verus")?;
+    fs::write(target.join("verification.stdout.log"), &output.stdout)?;
+    fs::write(target.join("verification.stderr.log"), &output.stderr)?;
+    use std::io::Write;
+    std::io::stdout().write_all(&output.stdout)?;
+    std::io::stderr().write_all(&output.stderr)?;
+    if !output.status.success() {
+        bail!(
+            "verified {subcommand} failed ({}); no successful evidence recorded",
+            output.status
+        );
+    }
+    require_fresh_verification_summary(&output.stdout, &output.stderr)?;
+    Ok(())
+}
+
+fn require_fresh_verification_summary(stdout: &[u8], stderr: &[u8]) -> Result<()> {
+    let mut found = false;
+    for bytes in [stdout, stderr] {
+        for line in std::str::from_utf8(bytes)
+            .context("non-UTF8 verification output")?
+            .lines()
+        {
+            if let Some(result) = line.trim().strip_prefix("verification results:: ") {
+                let (verified, errors) = result
+                    .split_once(" verified, ")
+                    .context("unrecognized verification summary")?;
+                let errors = errors
+                    .strip_suffix(" errors")
+                    .context("unrecognized verification error count")?
+                    .parse::<usize>()?;
+                if errors != 0 {
+                    bail!("verification reported nonzero errors");
+                }
+                found |= verified.parse::<usize>()? > 0;
+            }
+        }
+    }
+    if !found {
+        bail!("no fresh nonempty verification summary; cached or skipped proofs cannot provide acceptance evidence");
     }
     Ok(())
 }
@@ -468,7 +553,7 @@ fn evidence(
     }
     let evidence = serde_json::json!({"schema":1,"command":action,"source_sha256":digest,"tools":pins,"executables":tools,"executable_sha256":hashes,
         "target":format!("{}-{}", env::consts::ARCH, env::consts::OS),"configuration":{"release":release,"features":"default","locked":true,"project_no_cheating":true},
-        "verification":"passed","tests":if tests {"passed"} else {"not-run"},
+        "verification":"passed","verification_freshness":"isolated-empty-target/full-summary-required","tests":if tests {"passed"} else {"not-run"},
         "milestones":ledger.milestone.iter().filter(|item|item.gate).map(|item|&item.id).collect::<Vec<_>>(),
         "proof_obligations":ledger.milestone.iter().filter(|item|item.gate).flat_map(|item|item.proofs.iter()).collect::<Vec<_>>()});
     let path = root.join(format!("target/assurance/{action}.json"));

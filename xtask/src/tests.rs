@@ -541,6 +541,87 @@ fn generation_fact_activation_preserves_every_original_byte() {
     .is_err());
 }
 
+//= docs/parsing-requirements.md#assure-build-001
+//= type=test
+//# The acceptance build MUST fail on failed or incomplete required proofs, missing verification tools, stale generated parsers, or unreviewed verification exemptions.
+#[test]
+fn cached_partial_verification_and_success_without_fresh_proofs_are_rejected() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = Temp::new();
+    fs::create_dir_all(temp.0.join("target/shared")).unwrap();
+    fs::write(
+        temp.0.join("target/shared/partial-cache"),
+        "previous focused success",
+    )
+    .unwrap();
+    let driver = temp.0.join("fake-cargo-verus");
+    fs::write(
+        &driver,
+        r#"#!/bin/sh
+printf '%s\n' "$@" > requested-arguments
+while [ "$#" -gt 0 ]; do
+    if [ "$1" = '--target-dir' ]; then shift; selected_target=$1; fi
+    shift
+done
+[ -n "$selected_target" ] || exit 19
+if [ -f "$selected_target/partial-cache" ]; then
+    echo 'verification results:: 1 verified, 0 errors'
+    exit 0
+fi
+# Model Cargo's successful no-op when nothing was actually verified.
+if [ -f emit-fresh ]; then
+    echo 'verification results:: 32 verified, 0 errors'
+fi
+exit 0
+"#,
+    )
+    .unwrap();
+    fs::set_permissions(&driver, fs::Permissions::from_mode(0o755)).unwrap();
+    let tools = Tools {
+        cargo_verus: driver.clone(),
+        verus: driver.clone(),
+        vest: driver.clone(),
+        duvet: driver,
+    };
+    assert!(verify(&temp.0, &tools, "verify", false).is_err());
+    fs::write(temp.0.join("emit-fresh"), "").unwrap();
+    verify(&temp.0, &tools, "verify", false).unwrap();
+    let arguments = fs::read_to_string(temp.0.join("requested-arguments")).unwrap();
+    assert!(
+        arguments.starts_with("verify\n--workspace\n--locked\n--check-toolchain\n--target-dir\n")
+    );
+    assert!(arguments.ends_with("--fwd-verus-args-to\nroots\n--\n--no-cheating\n"));
+    assert!(!arguments.contains("--verify-module"));
+    assert!(!arguments.contains("--verify-only-module"));
+    let targets: Vec<_> = fs::read_dir(temp.0.join("target/assurance"))
+        .unwrap()
+        .collect();
+    assert_eq!(targets.len(), 2);
+    assert!(temp.0.join("target/shared/partial-cache").exists());
+    assert!(verify_in_target(
+        &temp.0,
+        &tools,
+        "verify",
+        false,
+        &temp.0.join("target/shared")
+    )
+    .is_err());
+    assert!(require_fresh_verification_summary(
+        b"verification results:: 0 verified, 0 errors\n",
+        b""
+    )
+    .is_err());
+    assert!(require_fresh_verification_summary(
+        b"verification results:: 32 verified, 1 errors\n",
+        b""
+    )
+    .is_err());
+    assert!(require_fresh_verification_summary(
+        b"verification results:: 3183 verified, 0 errors\nverification results:: 535 verified, 0 errors (partial verification with `--verify-*`)\n",
+        b""
+    ).is_err());
+}
+
 #[test]
 fn lemma_evidence_rejects_unexpanded_macros_and_ordinary_functions() {
     let temp = Temp::new();

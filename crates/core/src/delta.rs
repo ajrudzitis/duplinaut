@@ -1,4 +1,7 @@
 //! Native librsync delta decoding using the Vest DSL-generated parser.
+// Retain explicit arithmetic and error branches in the checked kernel rather
+// than introducing trait-dispatched helpers into the verification surface.
+#![allow(clippy::len_zero, clippy::question_mark, clippy::assign_op_pattern)]
 use crate::generated::delta::{CommandBody, CommandFmt, DeltaMagicFmt};
 #[cfg(verus_keep_ghost)]
 use crate::generated::delta::{CommandMeaning, generated_meaning, wire_command, lemma_command_refinement,
@@ -6,9 +9,6 @@ use crate::generated::delta::{CommandMeaning, generated_meaning, wire_command, l
 use vest_lib::core::exec::parser::Parser;
 #[cfg(verus_keep_ghost)]
 use vest_lib::core::{proof::*, spec::*};
-// Retain explicit arithmetic and error branches in the checked kernel rather
-// than introducing trait-dispatched helpers into the verification surface.
-#![allow(clippy::len_zero, clippy::question_mark, clippy::assign_op_pattern)]
 use vstd::prelude::*;
 
 verus! {
