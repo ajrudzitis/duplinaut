@@ -11,3 +11,5 @@ pub mod manifest;
 pub mod names;
 pub mod signature;
 mod verified;
+
+pub mod tar;
