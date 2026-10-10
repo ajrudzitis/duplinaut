@@ -6,13 +6,23 @@ use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, io::Read};
 
 const FULL: &[&[u8]] = &[
-    include_bytes!("../../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.vol1.difftar.gz"),
-    include_bytes!("../../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.vol2.difftar.gz"),
-    include_bytes!("../../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.vol3.difftar.gz"),
+    include_bytes!(
+        "../../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.vol1.difftar.gz"
+    ),
+    include_bytes!(
+        "../../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.vol2.difftar.gz"
+    ),
+    include_bytes!(
+        "../../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.vol3.difftar.gz"
+    ),
 ];
 const INCREMENTAL: &[&[u8]] = &[
-    include_bytes!("../../../tests/fixtures/duplicity-3.0.7/plain/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz"),
-    include_bytes!("../../../tests/fixtures/duplicity-3.0.7/plain/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol2.difftar.gz"),
+    include_bytes!(
+        "../../../tests/fixtures/duplicity-3.0.7/plain/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz"
+    ),
+    include_bytes!(
+        "../../../tests/fixtures/duplicity-3.0.7/plain/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol2.difftar.gz"
+    ),
 ];
 
 fn extract_parts(volumes: &[&[u8]], prefix: &[u8]) -> Vec<u8> {
@@ -35,8 +45,11 @@ fn extract_parts(volumes: &[&[u8]], prefix: &[u8]) -> Vec<u8> {
     let mut output = Vec::new();
     for (index, (number, bytes)) in parts.into_iter().enumerate() {
         assert_eq!(number, index + 1);
-        if index + 1 < count { assert_eq!(bytes.len(), 65536); }
-        else { assert!(bytes.len() < 65536); }
+        if index + 1 < count {
+            assert_eq!(bytes.len(), 65536);
+        } else {
+            assert!(bytes.len() < 65536);
+        }
         output.extend(bytes);
     }
     output
@@ -45,12 +58,23 @@ fn extract_parts(volumes: &[&[u8]], prefix: &[u8]) -> Vec<u8> {
 fn source_hash(snapshot_index: u64) -> String {
     let oracle: serde_json::Value = serde_json::from_str(include_str!(
         "../../../tests/fixtures/duplicity-3.0.7/expected.json"
-    )).unwrap();
-    let snapshot = oracle["snapshots"].as_array().unwrap().iter()
-        .find(|item| item["mode"] == "plain" && item["index"] == snapshot_index).unwrap();
-    snapshot["entries"].as_array().unwrap().iter()
-        .find(|item| item["path_hex"] == "6c617267652e62696e").unwrap()["sha256"]
-        .as_str().unwrap().to_owned()
+    ))
+    .unwrap();
+    let snapshot = oracle["snapshots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["mode"] == "plain" && item["index"] == snapshot_index)
+        .unwrap();
+    snapshot["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["path_hex"] == "6c617267652e62696e")
+        .unwrap()["sha256"]
+        .as_str()
+        .unwrap()
+        .to_owned()
 }
 
 //= docs/parsing-requirements.md#parse-delta-003

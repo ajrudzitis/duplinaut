@@ -25,15 +25,27 @@ fn every_literal_opcode_decodes_exact_payload() {
         let data: Vec<u8> = (0..length).map(|index| index ^ 0xa5).collect();
         let mut command = vec![length];
         command.extend_from_slice(&data);
-        assert_eq!(decode_command(&command), Ok((command.len(), DecodedCommand::Literal(&data))));
-        assert_eq!(apply_delta(&stream(&command), b"unused basis", 64), Ok(data));
+        assert_eq!(
+            decode_command(&command),
+            Ok((command.len(), DecodedCommand::Literal(&data)))
+        );
+        assert_eq!(
+            apply_delta(&stream(&command), b"unused basis", 64),
+            Ok(data)
+        );
     }
     for (opcode, width) in [(0x41, 1), (0x42, 2), (0x43, 4), (0x44, 8)] {
         let mut command = vec![opcode];
         command.extend(number(3, width));
         command.extend_from_slice(b"new");
-        assert_eq!(decode_command(&command), Ok((command.len(), DecodedCommand::Literal(b"new"))));
-        assert_eq!(apply_delta(&stream(&command), b"old", 3), Ok(b"new".to_vec()));
+        assert_eq!(
+            decode_command(&command),
+            Ok((command.len(), DecodedCommand::Literal(b"new")))
+        );
+        assert_eq!(
+            apply_delta(&stream(&command), b"old", 3),
+            Ok(b"new".to_vec())
+        );
     }
     assert_eq!(decode_command(&[0]), Ok((1, DecodedCommand::End)));
 }
@@ -49,10 +61,22 @@ fn all_copy_widths_use_the_fixed_basis() {
             let mut command = vec![0x45 + offset_width * 4 + length_width];
             command.extend(number(5, [1, 2, 4, 8][offset_width as usize]));
             command.extend(number(7, [1, 2, 4, 8][length_width as usize]));
-            assert_eq!(decode_command(&command), Ok((command.len(), DecodedCommand::Copy { offset: 5, length: 7 })));
+            assert_eq!(
+                decode_command(&command),
+                Ok((
+                    command.len(),
+                    DecodedCommand::Copy {
+                        offset: 5,
+                        length: 7
+                    }
+                ))
+            );
             let mut repeated = command.clone();
             repeated.extend_from_slice(&command);
-            assert_eq!(apply_delta(&stream(&repeated), basis, 14), Ok(b"56789AB56789AB".to_vec()));
+            assert_eq!(
+                apply_delta(&stream(&repeated), basis, 14),
+                Ok(b"56789AB56789AB".to_vec())
+            );
         }
     }
 }
@@ -65,15 +89,25 @@ fn all_copy_widths_use_the_fixed_basis() {
 //# A complete delta stream MUST contain END immediately after its last complete command and contain no bytes after END.
 #[test]
 fn magic_and_exact_stream_termination_are_required() {
-    assert_eq!(apply_delta(&[0x72, 0x73, 0x02, 0x36, 0], b"", 0), Ok(vec![]));
+    assert_eq!(
+        apply_delta(&[0x72, 0x73, 0x02, 0x36, 0], b"", 0),
+        Ok(vec![])
+    );
     for bytes in [vec![], vec![0x72, 0x73, 0x02]] {
         assert_eq!(apply_delta(&bytes, b"", 16), Err(DeltaError::Truncated));
     }
-    for bytes in [vec![0, 0, 0, 0, 0]] {
-        assert_eq!(apply_delta(&bytes, b"", 16), Err(DeltaError::BadMagic));
-    }
-    assert_eq!(apply_delta(&[0x72, 0x73, 0x02, 0x36], b"", 0), Err(DeltaError::Truncated));
-    assert_eq!(apply_delta(&[0x72, 0x73, 0x02, 0x36, 0, 0], b"", 0), Err(DeltaError::TrailingData));
+    assert_eq!(
+        apply_delta(&[0, 0, 0, 0, 0], b"", 16),
+        Err(DeltaError::BadMagic)
+    );
+    assert_eq!(
+        apply_delta(&[0x72, 0x73, 0x02, 0x36], b"", 0),
+        Err(DeltaError::Truncated)
+    );
+    assert_eq!(
+        apply_delta(&[0x72, 0x73, 0x02, 0x36, 0, 0], b"", 0),
+        Err(DeltaError::TrailingData)
+    );
 }
 
 //= docs/parsing-requirements.md#parse-delta-005
@@ -81,14 +115,29 @@ fn magic_and_exact_stream_termination_are_required() {
 //# A copy command MUST be rejected unless its offset and length describe a range wholly within the basis file.
 #[test]
 fn out_of_bounds_copies_and_output_exhaustion_fail() {
-    assert_eq!(apply_delta(&stream(&[0x45, 0, 4]), b"abc", 10), Err(DeltaError::CopyOutOfBounds));
-    assert_eq!(apply_delta(&stream(&[0x45, 4, 0]), b"abc", 10), Err(DeltaError::CopyOutOfBounds));
-    assert_eq!(apply_delta(&stream(&[0x45, 0, 3]), b"abc", 2), Err(DeltaError::OutputLimit));
-    assert_eq!(apply_delta(&stream(&[3, b'a', b'b', b'c']), b"", 2), Err(DeltaError::OutputLimit));
+    assert_eq!(
+        apply_delta(&stream(&[0x45, 0, 4]), b"abc", 10),
+        Err(DeltaError::CopyOutOfBounds)
+    );
+    assert_eq!(
+        apply_delta(&stream(&[0x45, 4, 0]), b"abc", 10),
+        Err(DeltaError::CopyOutOfBounds)
+    );
+    assert_eq!(
+        apply_delta(&stream(&[0x45, 0, 3]), b"abc", 2),
+        Err(DeltaError::OutputLimit)
+    );
+    assert_eq!(
+        apply_delta(&stream(&[3, b'a', b'b', b'c']), b"", 2),
+        Err(DeltaError::OutputLimit)
+    );
     let mut huge = vec![0x54];
     huge.extend(number(u64::MAX, 8));
     huge.extend(number(1, 8));
-    assert_eq!(apply_delta(&stream(&huge), b"abc", 10), Err(DeltaError::CopyOutOfBounds));
+    assert_eq!(
+        apply_delta(&stream(&huge), b"abc", 10),
+        Err(DeltaError::CopyOutOfBounds)
+    );
 }
 
 //= docs/parsing-requirements.md#parse-delta-006
@@ -99,11 +148,17 @@ fn zero_length_commands_consume_arguments_without_ending() {
     for (opcode, width) in [(0x41, 1), (0x42, 2), (0x43, 4), (0x44, 8)] {
         let mut command = vec![opcode];
         command.extend(number(0, width));
-        assert_eq!(decode_command(&command), Ok((1 + width, DecodedCommand::Literal(b""))));
+        assert_eq!(
+            decode_command(&command),
+            Ok((1 + width, DecodedCommand::Literal(b"")))
+        );
         command.extend_from_slice(&[1, b'x']);
         assert_eq!(apply_delta(&stream(&command), b"", 1), Ok(b"x".to_vec()));
     }
-    assert_eq!(apply_delta(&stream(&[0x45, 3, 0, 1, b'x']), b"abc", 1), Ok(b"x".to_vec()));
+    assert_eq!(
+        apply_delta(&stream(&[0x45, 3, 0, 1, b'x']), b"abc", 1),
+        Ok(b"x".to_vec())
+    );
 }
 
 //= docs/parsing-requirements.md#parse-delta-007
@@ -112,12 +167,22 @@ fn zero_length_commands_consume_arguments_without_ending() {
 #[test]
 fn reserved_and_truncated_commands_fail() {
     for opcode in 0x55..=0xff {
-        assert_eq!(decode_command(&[opcode]), Err(DeltaError::UnsupportedOpcode));
+        assert_eq!(
+            decode_command(&[opcode]),
+            Err(DeltaError::UnsupportedOpcode)
+        );
     }
-    let commands = [vec![3, b'a', b'b', b'c'], vec![0x44, 0, 0, 0, 0, 0, 0, 0, 3, b'a', b'b', b'c'], vec![0x54, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2]];
+    let commands = [
+        vec![3, b'a', b'b', b'c'],
+        vec![0x44, 0, 0, 0, 0, 0, 0, 0, 3, b'a', b'b', b'c'],
+        vec![0x54, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2],
+    ];
     for command in commands {
         for length in 0..command.len() {
-            assert_eq!(decode_command(&command[..length]), Err(DeltaError::Truncated));
+            assert_eq!(
+                decode_command(&command[..length]),
+                Err(DeltaError::Truncated)
+            );
         }
     }
     let mut huge_literal = vec![0x44];

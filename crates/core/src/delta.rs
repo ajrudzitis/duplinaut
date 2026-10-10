@@ -2,10 +2,12 @@
 // Retain explicit arithmetic and error branches in the checked kernel rather
 // than introducing trait-dispatched helpers into the verification surface.
 #![allow(clippy::len_zero, clippy::question_mark, clippy::assign_op_pattern)]
-use crate::generated::delta::{CommandBody, CommandFmt, DeltaMagicFmt};
 #[cfg(verus_keep_ghost)]
-use crate::generated::delta::{CommandMeaning, generated_meaning, wire_command, lemma_command_refinement,
-    apply_from, apply_model, delta_has_magic, lemma_magic_refinement};
+use crate::generated::delta::{
+    apply_from, apply_model, delta_has_magic, generated_meaning, lemma_command_refinement,
+    lemma_magic_refinement, wire_command, CommandMeaning,
+};
+use crate::generated::delta::{CommandBody, CommandFmt, DeltaMagicFmt};
 use vest_lib::core::exec::parser::Parser;
 #[cfg(verus_keep_ghost)]
 use vest_lib::core::{proof::*, spec::*};

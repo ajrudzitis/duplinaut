@@ -2,10 +2,14 @@
 //! contents and original object/member hashes recorded beside the fixtures.
 use duplicity_core::delta::apply_delta;
 
-const FIRST: &[u8] = include_bytes!("../../../tests/fixtures/duplicity-3.0.7/deltas/plain-inc1.rdiff");
-const SECOND: &[u8] = include_bytes!("../../../tests/fixtures/duplicity-3.0.7/deltas/plain-inc2.rdiff");
-const META_FIRST: &[u8] = include_bytes!("../../../tests/fixtures/duplicity-3.0.7/deltas/metadata-inc1.rdiff");
-const META_SECOND: &[u8] = include_bytes!("../../../tests/fixtures/duplicity-3.0.7/deltas/metadata-inc2.rdiff");
+const FIRST: &[u8] =
+    include_bytes!("../../../tests/fixtures/duplicity-3.0.7/deltas/plain-inc1.rdiff");
+const SECOND: &[u8] =
+    include_bytes!("../../../tests/fixtures/duplicity-3.0.7/deltas/plain-inc2.rdiff");
+const META_FIRST: &[u8] =
+    include_bytes!("../../../tests/fixtures/duplicity-3.0.7/deltas/metadata-inc1.rdiff");
+const META_SECOND: &[u8] =
+    include_bytes!("../../../tests/fixtures/duplicity-3.0.7/deltas/metadata-inc2.rdiff");
 
 //= docs/parsing-requirements.md#parse-delta-001
 //# The delta parser MUST require the reviewed delta magic before decoding commands.

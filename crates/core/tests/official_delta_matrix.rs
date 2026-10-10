@@ -4,18 +4,43 @@
 use duplicity_core::delta::apply_delta;
 
 macro_rules! payloads {
-    ($base:literal) => {[
-        include_bytes!(concat!("../../../tests/fixtures/", $base, "/deltas/plain-inc1.rdiff")).as_slice(),
-        include_bytes!(concat!("../../../tests/fixtures/", $base, "/deltas/plain-inc2.rdiff")).as_slice(),
-        include_bytes!(concat!("../../../tests/fixtures/", $base, "/deltas/metadata-inc1.rdiff")).as_slice(),
-        include_bytes!(concat!("../../../tests/fixtures/", $base, "/deltas/metadata-inc2.rdiff")).as_slice(),
-    ]};
+    ($base:literal) => {
+        [
+            include_bytes!(concat!(
+                "../../../tests/fixtures/",
+                $base,
+                "/deltas/plain-inc1.rdiff"
+            ))
+            .as_slice(),
+            include_bytes!(concat!(
+                "../../../tests/fixtures/",
+                $base,
+                "/deltas/plain-inc2.rdiff"
+            ))
+            .as_slice(),
+            include_bytes!(concat!(
+                "../../../tests/fixtures/",
+                $base,
+                "/deltas/metadata-inc1.rdiff"
+            ))
+            .as_slice(),
+            include_bytes!(concat!(
+                "../../../tests/fixtures/",
+                $base,
+                "/deltas/metadata-inc2.rdiff"
+            ))
+            .as_slice(),
+        ]
+    };
 }
 
 const CASES: &[(&str, [&[u8]; 4])] = &[
     ("0.8.23 standard", payloads!("duplicity-0.8.23/standard")),
     ("0.8.23 short names", payloads!("duplicity-0.8.23/short")),
-    ("0.8.23 legacy timestamps", payloads!("duplicity-0.8.23/legacy")),
+    (
+        "0.8.23 legacy timestamps",
+        payloads!("duplicity-0.8.23/legacy"),
+    ),
     ("2.1.3 standard", payloads!("duplicity-2.1.3/standard")),
     ("3.2.1 standard", payloads!("duplicity-3.2.1/standard")),
 ];
@@ -29,9 +54,17 @@ fn historical_official_delta_payloads_restore_independent_source_contents() {
     for (name, payloads) in CASES {
         let second = apply_delta(payloads[0], b"original\n", 1024).unwrap();
         assert_eq!(second, b"second\n", "{name}");
-        assert_eq!(apply_delta(payloads[1], &second, 1024).unwrap(), b"third\n", "{name}");
+        assert_eq!(
+            apply_delta(payloads[1], &second, 1024).unwrap(),
+            b"third\n",
+            "{name}"
+        );
         let metadata = apply_delta(payloads[2], b"unchanged-content\n", 1024).unwrap();
         assert_eq!(metadata, b"unchanged-content\n", "{name}");
-        assert_eq!(apply_delta(payloads[3], &metadata, 1024).unwrap(), metadata, "{name}");
+        assert_eq!(
+            apply_delta(payloads[3], &metadata, 1024).unwrap(),
+            metadata,
+            "{name}"
+        );
     }
 }

@@ -4,10 +4,22 @@ use duplicity_core::delta::{apply_delta, decode_command, DecodedCommand, DeltaEr
 // Widths are transcribed from the reviewed upstream table, rather than inferred
 // by calling the implementation under test.
 const COPY_WIDTHS: [(u8, usize, usize); 16] = [
-    (0x45, 1, 1), (0x46, 1, 2), (0x47, 1, 4), (0x48, 1, 8),
-    (0x49, 2, 1), (0x4a, 2, 2), (0x4b, 2, 4), (0x4c, 2, 8),
-    (0x4d, 4, 1), (0x4e, 4, 2), (0x4f, 4, 4), (0x50, 4, 8),
-    (0x51, 8, 1), (0x52, 8, 2), (0x53, 8, 4), (0x54, 8, 8),
+    (0x45, 1, 1),
+    (0x46, 1, 2),
+    (0x47, 1, 4),
+    (0x48, 1, 8),
+    (0x49, 2, 1),
+    (0x4a, 2, 2),
+    (0x4b, 2, 4),
+    (0x4c, 2, 8),
+    (0x4d, 4, 1),
+    (0x4e, 4, 2),
+    (0x4f, 4, 4),
+    (0x50, 4, 8),
+    (0x51, 8, 1),
+    (0x52, 8, 2),
+    (0x53, 8, 4),
+    (0x54, 8, 8),
 ];
 
 fn append_number(bytes: &mut Vec<u8>, value: u64, width: usize) {
@@ -78,7 +90,8 @@ fn every_command_rejects_every_proper_truncated_prefix() {
             assert_eq!(
                 decode_command(&command[..end]),
                 Err(DeltaError::Truncated),
-                "opcode {:#x}, prefix {end}", command[0],
+                "opcode {:#x}, prefix {end}",
+                command[0],
             );
         }
     }
@@ -92,12 +105,18 @@ fn oversized_u64_fields_cannot_wrap_into_small_valid_ranges() {
     let mut command = vec![0x54];
     append_number(&mut command, 0x1_0000_0002, 8);
     append_number(&mut command, 1, 8);
-    assert_eq!(apply_delta(&delta(&command), b"abcd", 4), Err(DeltaError::CopyOutOfBounds));
+    assert_eq!(
+        apply_delta(&delta(&command), b"abcd", 4),
+        Err(DeltaError::CopyOutOfBounds)
+    );
 
     let mut command = vec![0x54];
     append_number(&mut command, 0, 8);
     append_number(&mut command, 0x1_0000_0002, 8);
-    assert_eq!(apply_delta(&delta(&command), b"abcd", 4), Err(DeltaError::CopyOutOfBounds));
+    assert_eq!(
+        apply_delta(&delta(&command), b"abcd", 4),
+        Err(DeltaError::CopyOutOfBounds)
+    );
 
     let mut command = vec![0x44];
     append_number(&mut command, 0x1_0000_0002, 8);
@@ -128,8 +147,14 @@ fn all_copy_widths_accept_zero_length_at_the_end_of_the_basis() {
         assert_eq!(apply_delta(&delta(&command), b"abcd", 0), Ok(vec![]));
     }
     // Reaching the budget does not prevent parsing subsequent no-op commands.
-    assert_eq!(apply_delta(&delta(&[1, b'x', 0x41, 0, 0x45, 0, 0]), b"", 1), Ok(vec![b'x']));
-    assert_eq!(apply_delta(&delta(&[1, b'x', 1, b'y']), b"", 1), Err(DeltaError::OutputLimit));
+    assert_eq!(
+        apply_delta(&delta(&[1, b'x', 0x41, 0, 0x45, 0, 0]), b"", 1),
+        Ok(vec![b'x'])
+    );
+    assert_eq!(
+        apply_delta(&delta(&[1, b'x', 1, b'y']), b"", 1),
+        Err(DeltaError::OutputLimit)
+    );
 }
 
 //= docs/parsing-requirements.md#parse-gen-002
@@ -137,6 +162,9 @@ fn all_copy_widths_accept_zero_length_at_the_end_of_the_basis() {
 //# A successful parser MUST report a consumed input range wholly contained within the supplied input.
 #[test]
 fn command_consumption_leaves_the_following_command_untouched() {
-    assert_eq!(decode_command(&[1, b'x', 0x55]), Ok((2, DecodedCommand::Literal(b"x"))));
+    assert_eq!(
+        decode_command(&[1, b'x', 0x55]),
+        Ok((2, DecodedCommand::Literal(b"x")))
+    );
     assert_eq!(decode_command(&[0, 0x55]), Ok((1, DecodedCommand::End)));
 }

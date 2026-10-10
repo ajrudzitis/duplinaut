@@ -1,9 +1,12 @@
 //! Independent byte grammar and refinement facts for manifest tokens.
-use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
 use crate::generated::manifest_token::*;
 #[cfg(verus_keep_ghost)]
-use vest_lib::{combinators::{Star, Const, U8}, core::{spec::*, proof::*}};
+use vest_lib::{
+    combinators::{Const, Star, U8},
+    core::{proof::*, spec::*},
+};
+use vstd::prelude::*;
 
 verus! {
 pub open spec fn is_hex(b: u8) -> bool {

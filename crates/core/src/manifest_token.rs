@@ -2,12 +2,12 @@
 // Explicit length and byte-range predicates match the checked arithmetic model.
 #![allow(clippy::len_zero, clippy::manual_range_contains)]
 use crate::generated::manifest_token::{ManifestTokenFmt, QuotedAtom, UnquotedByteFmt};
+#[cfg(verus_keep_ghost)]
+use crate::verified::token_refinement::*;
 use vest_lib::combinators::Star;
 use vest_lib::core::exec::parser::Parser;
 #[cfg(verus_keep_ghost)]
-use vest_lib::core::{spec::*, proof::*};
-#[cfg(verus_keep_ghost)]
-use crate::verified::token_refinement::*;
+use vest_lib::core::{proof::*, spec::*};
 use vstd::prelude::*;
 
 verus! {

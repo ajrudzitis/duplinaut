@@ -18,18 +18,41 @@ fn escapes_preserve_every_byte_and_both_hex_cases() {
 #[test]
 fn malformed_quotes_and_escapes_are_rejected() {
     for invalid in [
-        b"\"".as_slice(), b"\"abc", b"\"\\", b"\"\\x", b"\"\\x0", b"\"\\x00",
-        b"\"\\xgg\"", b"\"\\x0g\"", b"\"\\n\"", b"\"\\X00\"", b"\"raw\0\"",
-        b"\"raw\n\"", b"\"raw\r\"", b"'single'", b"", b"\\x00",
+        b"\"".as_slice(),
+        b"\"abc",
+        b"\"\\",
+        b"\"\\x",
+        b"\"\\x0",
+        b"\"\\x00",
+        b"\"\\xgg\"",
+        b"\"\\x0g\"",
+        b"\"\\n\"",
+        b"\"\\X00\"",
+        b"\"raw\0\"",
+        b"\"raw\n\"",
+        b"\"raw\r\"",
+        b"'single'",
+        b"",
+        b"\\x00",
     ] {
-        assert_eq!(decode_token(invalid, 1024), Err(TokenError::Invalid), "{invalid:?}");
+        assert_eq!(
+            decode_token(invalid, 1024),
+            Err(TokenError::Invalid),
+            "{invalid:?}"
+        );
     }
 }
 
 #[test]
 fn quoted_and_unquoted_tokens_leave_delimiters_for_the_caller() {
-    assert_eq!(decode_token(b"\"a b\t'\xff\" 17", 1024).unwrap(), (8, b"a b\t'\xff".to_vec()));
-    assert_eq!(decode_token(b"raw-\xff/path\t12", 1024).unwrap(), (10, b"raw-\xff/path".to_vec()));
+    assert_eq!(
+        decode_token(b"\"a b\t'\xff\" 17", 1024).unwrap(),
+        (8, b"a b\t'\xff".to_vec())
+    );
+    assert_eq!(
+        decode_token(b"raw-\xff/path\t12", 1024).unwrap(),
+        (10, b"raw-\xff/path".to_vec())
+    );
     assert_eq!(decode_token(b"\"\"", 2).unwrap(), (2, Vec::new()));
     assert_eq!(decode_token(b"abc", 2), Err(TokenError::Limit));
 }
