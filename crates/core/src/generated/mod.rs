@@ -7,3 +7,5 @@ pub mod manifest_token;
 pub mod names;
 #[rustfmt::skip]
 pub mod signature;
+#[rustfmt::skip]
+pub mod tar;

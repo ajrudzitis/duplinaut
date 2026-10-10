@@ -1,0 +1,8 @@
+// Reviewed 512-byte tar header layout. Numeric, checksum, magic, extension and
+// termination semantics are explicit controller checks, pending refinement.
+tar_header = {
+ name: [u8; 100], mode: [u8; 8], uid: [u8; 8], gid: [u8; 8],
+ size: [u8; 12], mtime: [u8; 12], checksum: [u8; 8], entry_type: u8,
+ linkname: [u8; 100], magic_version: [u8; 8], uname: [u8; 32], gname: [u8; 32],
+ device_major: [u8; 8], device_minor: [u8; 8], prefix: [u8; 155], unused: [u8; 12],
+}
