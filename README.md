@@ -22,6 +22,7 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | --- | --- | --- |
 | Delta decoding and application | 16 tests; official historical and multipart payloads; 535 focused Verus obligations pass; independent semantic review complete | Complete-core acceptance gate |
 | Manifest tokens, manifests and byte paths | Official manifest tests pass; component comparison formally checked | Token, normalization and manifest proofs |
+| Stored-object envelopes | Stored-byte SHA1/MD5 validation; bounded plain/gzip decoding; official-object integration tests | Native OpenPGP and controller verification |
 | Storage and S3 | Exact-size and cancellation tests; 11 S3 tests using actual SDK HTTP handling; source review complete | Live-service and complete-reader consistency integration |
 | Assurance tooling | Pinned tools, Duvet baseline, executable failure tests, independent review | Expand gates as components are accepted |
 | Repository browser and restore | Requirements and official source-tree oracles | Implementation, proofs, and compatibility matrix |

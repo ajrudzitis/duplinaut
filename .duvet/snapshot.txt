@@ -45,7 +45,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: An incremental set MUST have an end timestamp strictly later than its start timestamp.
 
   SECTION: [PARSE-ENV-001](#parse-env-001)
-    TEXT[!MUST]: The reader MUST decode unencrypted raw objects and gzip-enveloped objects according to their classified envelope.
+    TEXT[!MUST,implementation,test]: The reader MUST decode unencrypted raw objects and gzip-enveloped objects according to their classified envelope.
 
   SECTION: [PARSE-ENV-002](#parse-env-002)
     TEXT[!MUST]: The reader MUST support symmetric and public-key OpenPGP objects within the explicitly documented crypto capability profile.
@@ -57,7 +57,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: When signer verification is configured, the reader MUST require a valid signature from an explicitly permitted signer fingerprint.
 
   SECTION: [PARSE-ENV-005](#parse-env-005)
-    TEXT[!MUST]: Manifest volume digests MUST be checked against the original stored object bytes before a restoration using those volumes is published.
+    TEXT[!MUST,implementation,test]: Manifest volume digests MUST be checked against the original stored object bytes before a restoration using those volumes is published.
 
   SECTION: [PARSE-ENV-006](#parse-env-006)
     TEXT[!MUST,implementation,test]: An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.

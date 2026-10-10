@@ -12,4 +12,5 @@ pub mod names;
 pub mod signature;
 mod verified;
 
+pub mod envelope;
 pub mod tar;

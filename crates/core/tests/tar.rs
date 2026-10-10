@@ -93,64 +93,54 @@ fn footer_profiles_are_explicit() {
     assert!(parse(&bad).is_err());
     let encrypted = [entry.clone(), vec![0; 10240 - entry.len() % 10240]].concat();
     let stored = b"ciphertext bytes";
-    assert!(
-        TarVolume::parse(
-            &encrypted,
-            Termination::Encrypted {
-                stored_ciphertext: stored,
-                nonfinal: false
-            },
-            TarLimits::default()
-        )
-        .is_ok()
-    );
+    assert!(TarVolume::parse(
+        &encrypted,
+        Termination::Encrypted {
+            stored_ciphertext: stored,
+            nonfinal: false
+        },
+        TarLimits::default()
+    )
+    .is_ok());
     let topped = [encrypted.clone(), stored[..6].to_vec()].concat();
-    assert!(
-        TarVolume::parse(
-            &topped,
-            Termination::Encrypted {
-                stored_ciphertext: stored,
-                nonfinal: true
-            },
-            TarLimits::default()
-        )
-        .is_ok()
-    );
-    assert!(
-        TarVolume::parse(
-            &topped,
-            Termination::Encrypted {
-                stored_ciphertext: stored,
-                nonfinal: false
-            },
-            TarLimits::default()
-        )
-        .is_err()
-    );
+    assert!(TarVolume::parse(
+        &topped,
+        Termination::Encrypted {
+            stored_ciphertext: stored,
+            nonfinal: true
+        },
+        TarLimits::default()
+    )
+    .is_ok());
+    assert!(TarVolume::parse(
+        &topped,
+        Termination::Encrypted {
+            stored_ciphertext: stored,
+            nonfinal: false
+        },
+        TarLimits::default()
+    )
+    .is_err());
     let wrong = [encrypted, b"cipherX".to_vec()].concat();
-    assert!(
-        TarVolume::parse(
-            &wrong,
-            Termination::Encrypted {
-                stored_ciphertext: stored,
-                nonfinal: true
-            },
-            TarLimits::default()
-        )
-        .is_err()
-    );
+    assert!(TarVolume::parse(
+        &wrong,
+        Termination::Encrypted {
+            stored_ciphertext: stored,
+            nonfinal: true
+        },
+        TarLimits::default()
+    )
+    .is_err());
     let short_footer = [entry, vec![0; 512]].concat();
-    assert!(
-        TarVolume::parse(
-            &short_footer,
-            Termination::Encrypted {
-                stored_ciphertext: stored,
-                nonfinal: true
-            },
-            TarLimits::default()
-        )
-        .is_err()
-    );
+    assert!(TarVolume::parse(
+        &short_footer,
+        Termination::Encrypted {
+            stored_ciphertext: stored,
+            nonfinal: true
+        },
+        TarLimits::default()
+    )
+    .is_err());
 }
 
 //= docs/parsing-requirements.md#parse-tar-001
@@ -243,16 +233,14 @@ fn gnu_long_name_and_link_require_real_entries() {
         parse(&member(b"././@LongLink", b'L', name)).unwrap_err(),
         TarError::DanglingOverride
     );
-    assert!(
-        parse(
-            &[
-                member(b"././@LongLink", b'L', b"bad\0x"),
-                member(b"snapshot/f", b'0', b"")
-            ]
-            .concat()
-        )
-        .is_err()
-    );
+    assert!(parse(
+        &[
+            member(b"././@LongLink", b'L', b"bad\0x"),
+            member(b"snapshot/f", b'0', b"")
+        ]
+        .concat()
+    )
+    .is_err());
 }
 
 //= docs/parsing-requirements.md#parse-tar-003
@@ -423,11 +411,9 @@ fn entry_classification_and_limits() {
         b"snapshot//file",
     ] {
         let bytes = member(name, b'0', b"");
-        assert!(
-            parse(&bytes).unwrap().entries[0]
-                .classify(ArchiveKind::Data, 1024, 16)
-                .is_err()
-        );
+        assert!(parse(&bytes).unwrap().entries[0]
+            .classify(ArchiveKind::Data, 1024, 16)
+            .is_err());
     }
     let bytes = member(b"snapshot/file", b'0', b"hello");
     for limits in [
@@ -585,17 +571,15 @@ fn encrypted_record_footer_handles_one_block_and_full_record() {
         .unwrap();
         assert_eq!(parsed.entry_stream_bytes, entry.len());
         assert_eq!(parsed.entries[0].payload.len(), payload_length);
-        assert!(
-            TarVolume::parse(
-                &bytes[..bytes.len() - 512],
-                Termination::Encrypted {
-                    stored_ciphertext: b"stored",
-                    nonfinal: false
-                },
-                TarLimits::default()
-            )
-            .is_err()
-        );
+        assert!(TarVolume::parse(
+            &bytes[..bytes.len() - 512],
+            Termination::Encrypted {
+                stored_ciphertext: b"stored",
+                nonfinal: false
+            },
+            TarLimits::default()
+        )
+        .is_err());
     }
 }
 
@@ -651,7 +635,7 @@ fn numeric_conversion_boundaries_and_interior_padding() {
             assert_eq!(parse(&bytes).unwrap_err(), TarError::Numeric);
         }
     }
-    for field in [b"001\00001" as &[u8], b"001 0001"] {
+    for field in [b"001\x000001" as &[u8], b"001 0001"] {
         let mut bytes = member(b"snapshot/file", b'0', b"");
         bytes[108..116].copy_from_slice(field);
         checksum(&mut bytes);
