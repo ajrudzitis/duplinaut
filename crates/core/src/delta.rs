@@ -42,7 +42,12 @@ pub fn decode_command<'a>(bytes: &'a [u8]) -> (result: Result<(usize, DecodedCom
                 &&& 1 <= consumed <= bytes.len()
                 &&& wire_command(bytes@) == Some((consumed as int, decoded_meaning(command)))
             },
-            Err(_) => wire_command(bytes@) is None,
+            Err(error) => {
+                &&& wire_command(bytes@) is None
+                &&& if bytes.len() > 0 && bytes[0] > 0x54 {
+                    error == DeltaError::UnsupportedOpcode
+                } else { error == DeltaError::Truncated }
+            },
         },
 {
     proof {

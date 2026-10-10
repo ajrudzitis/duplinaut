@@ -1,10 +1,10 @@
 # duplicity-core
 
-Native deterministic format parsing and reconstruction. Delta decoding/application, manifest tokens, and byte-path validation have native implementations; 20 tests pass. Independent semantic proofs are in progress; no completed parser assurance claim is made yet.
+Native deterministic format parsing and reconstruction. Delta decoding/application has independently reviewed semantic contracts checked by Verus with `--no-cheating`: 535 obligations pass in focused verification. The whole reader verification gate remains incomplete.
 
 | Component | Specification review | Implementation | Proof | Official compatibility tests | Independent acceptance |
 | --- | --- | --- | --- | --- | --- |
-| Delta decoder and application | Reviewed grammar and bounds | Implemented; 15 native tests pass | In progress | Official 3.0.7 small and multipart payloads pass | Pending |
+| Delta decoder and application | Reviewed grammar and bounds | Implemented; 16 native tests pass | Focused verification: 535 obligations, zero errors | Official 0.8.23, 2.1.3, 3.0.7 and 3.2.1 payloads pass, including multipart | Independent semantic review complete; whole-workspace gate pending |
 | Manifest token decoding | Reviewed exact byte predicates | Implemented; three tests pass | Pending | Remaining manifest fixture integration pending | Pending |
 | Byte-path validation | Reviewed root/component grammar | Implemented; two tests pass | Pending | Remaining archive fixture integration pending | Pending |
 | Names, manifests, tar, signatures | Requirements written; open questions remain | Pending | Pending | Pending | Pending |
@@ -16,6 +16,8 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Independently test byte order, all command truncation prefixes, overflow traps, and immutable basis semantics.
 - [x] Restore official 3.0.7 extracted incremental and metadata-only delta payloads against independently known source contents.
 - [x] Apply a large delta assembled from two official volumes and compare its result with the independent source-tree hash oracle.
+- [x] Prove delta decoding and fixed-basis application against an independent wire model, including rejection and output bounds.
+- [x] Test extracted deltas from five historical producer profiles against independent source contents.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 

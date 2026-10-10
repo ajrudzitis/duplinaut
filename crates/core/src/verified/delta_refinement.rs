@@ -27,6 +27,33 @@ pub open spec fn literal_width(opcode: u8) -> int {
     match opcode { 0x41 => 1, 0x42 => 2, 0x43 => 4, 0x44 => 8, _ => 0 }
 }
 
+pub proof fn lemma_wire16(input: Seq<u8>, start: int)
+    requires 0 <= start, start + 2 <= input.len(),
+    ensures
+        vest_lib::combinators::uints::spec::u16_be_from_bytes([input[start], input[start + 1]]) as u64
+            == wire_number(input, start, 2),
+{
+    let a = input[start];
+    let b = input[start + 1];
+    assert((((a as u16) << 8 | b as u16) as u64)
+        == ((a as u64) << 8 | b as u64)) by (bit_vector);
+}
+
+pub proof fn lemma_wire32(input: Seq<u8>, start: int)
+    requires 0 <= start, start + 4 <= input.len(),
+    ensures
+        vest_lib::combinators::uints::spec::u32_be_from_bytes(
+            [input[start], input[start + 1], input[start + 2], input[start + 3]]) as u64
+            == wire_number(input, start, 4),
+{
+    let a = input[start];
+    let b = input[start + 1];
+    let c = input[start + 2];
+    let d = input[start + 3];
+    assert((((a as u32) << 24 | (b as u32) << 16 | (c as u32) << 8 | d as u32) as u64)
+        == ((a as u64) << 24 | (b as u64) << 16 | (c as u64) << 8 | d as u64)) by (bit_vector);
+}
+
 pub open spec fn copy_widths(opcode: u8) -> (int, int) {
     match opcode {
         0x45 => (1, 1),
@@ -129,6 +156,65 @@ pub proof fn lemma_command_refinement(input: Seq<u8>)
         CommandFmt.spec_parse(input) is Some ==>
             !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
 {
+    if input.len() == 0 {
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
+    } else {
+        match input[0] {
+            0 ..= 64 => lemma_simple_command(input),
+            65 => lemma_literal1_refinement(input),
+            66 => lemma_literal2_refinement(input),
+            67 => lemma_literal4_refinement(input),
+            68 => lemma_literal8_refinement(input),
+            69 => lemma_copy11_refinement(input),
+            70 => lemma_copy12_refinement(input),
+            71 => lemma_copy14_refinement(input),
+            72 => lemma_copy18_refinement(input),
+            73 => lemma_copy21_refinement(input),
+            74 => lemma_copy22_refinement(input),
+            75 => lemma_copy24_refinement(input),
+            76 => lemma_copy28_refinement(input),
+            77 => lemma_copy41_refinement(input),
+            78 => lemma_copy42_refinement(input),
+            79 => lemma_copy44_refinement(input),
+            80 => lemma_copy48_refinement(input),
+            81 => lemma_copy81_refinement(input),
+            82 => lemma_copy82_refinement(input),
+            83 => lemma_copy84_refinement(input),
+            84 => lemma_copy88_refinement(input),
+            _ => lemma_simple_command(input),
+        }
+    }
+}
+
+pub proof fn lemma_simple_command(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0,
+        input[0] <= 64 || input[0] > 84,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
+    match input[0] { 0 => {}, 1 ..= 64 => {}, _ => {} }
+}
+
+pub proof fn lemma_literal1_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 65,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
     reveal(<CommandFmt as SpecParser>::spec_parse);
     reveal(<CommandBodyFmt as SpecParser>::spec_parse);
     reveal(CommandBodyFmt::spec);
@@ -137,134 +223,371 @@ pub proof fn lemma_command_refinement(input: Seq<u8>)
     reveal(CommandBodySpec::from_structural);
     reveal(<Literal1Fmt as SpecParser>::spec_parse);
     reveal(Literal1Spec::from_structural);
+}
+
+pub proof fn lemma_literal2_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 66,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Literal2Fmt as SpecParser>::spec_parse);
     reveal(Literal2Spec::from_structural);
+    if input.len() >= 3 { lemma_wire16(input, 1); }
+}
+
+pub proof fn lemma_literal4_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 67,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Literal4Fmt as SpecParser>::spec_parse);
     reveal(Literal4Spec::from_structural);
+    if input.len() >= 5 { lemma_wire32(input, 1); }
+}
+
+pub proof fn lemma_literal8_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 68,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Literal8Fmt as SpecParser>::spec_parse);
     reveal(Literal8Spec::from_structural);
+}
+
+pub proof fn lemma_copy11_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 69,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy11Fmt as SpecParser>::spec_parse);
     reveal(Copy11Spec::from_structural);
+}
+
+pub proof fn lemma_copy12_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 70,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy12Fmt as SpecParser>::spec_parse);
     reveal(Copy12Spec::from_structural);
+    if input.len() >= 4 {
+        lemma_wire16(input, 2);
+    }
+}
+
+pub proof fn lemma_copy14_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 71,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy14Fmt as SpecParser>::spec_parse);
     reveal(Copy14Spec::from_structural);
+    if input.len() >= 6 {
+        lemma_wire32(input, 2);
+    }
+}
+
+pub proof fn lemma_copy18_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 72,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy18Fmt as SpecParser>::spec_parse);
     reveal(Copy18Spec::from_structural);
+}
+
+pub proof fn lemma_copy21_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 73,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy21Fmt as SpecParser>::spec_parse);
     reveal(Copy21Spec::from_structural);
+    if input.len() >= 4 {
+        lemma_wire16(input, 1);
+    }
+}
+
+pub proof fn lemma_copy22_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 74,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy22Fmt as SpecParser>::spec_parse);
     reveal(Copy22Spec::from_structural);
+    if input.len() >= 5 {
+        lemma_wire16(input, 1);
+        lemma_wire16(input, 3);
+    }
+}
+
+pub proof fn lemma_copy24_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 75,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy24Fmt as SpecParser>::spec_parse);
     reveal(Copy24Spec::from_structural);
+    if input.len() >= 7 {
+        lemma_wire16(input, 1);
+        lemma_wire32(input, 3);
+    }
+}
+
+pub proof fn lemma_copy28_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 76,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy28Fmt as SpecParser>::spec_parse);
     reveal(Copy28Spec::from_structural);
+    if input.len() >= 11 {
+        lemma_wire16(input, 1);
+    }
+}
+
+pub proof fn lemma_copy41_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 77,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy41Fmt as SpecParser>::spec_parse);
     reveal(Copy41Spec::from_structural);
+    if input.len() >= 6 {
+        lemma_wire32(input, 1);
+    }
+}
+
+pub proof fn lemma_copy42_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 78,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy42Fmt as SpecParser>::spec_parse);
     reveal(Copy42Spec::from_structural);
+    if input.len() >= 7 {
+        lemma_wire32(input, 1);
+        lemma_wire16(input, 5);
+    }
+}
+
+pub proof fn lemma_copy44_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 79,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy44Fmt as SpecParser>::spec_parse);
     reveal(Copy44Spec::from_structural);
+    if input.len() >= 9 {
+        lemma_wire32(input, 1);
+        lemma_wire32(input, 5);
+    }
+}
+
+pub proof fn lemma_copy48_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 80,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy48Fmt as SpecParser>::spec_parse);
     reveal(Copy48Spec::from_structural);
+    if input.len() >= 13 {
+        lemma_wire32(input, 1);
+    }
+}
+
+pub proof fn lemma_copy81_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 81,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy81Fmt as SpecParser>::spec_parse);
     reveal(Copy81Spec::from_structural);
+}
+
+pub proof fn lemma_copy82_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 82,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy82Fmt as SpecParser>::spec_parse);
     reveal(Copy82Spec::from_structural);
+    if input.len() >= 11 {
+        lemma_wire16(input, 9);
+    }
+}
+
+pub proof fn lemma_copy84_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 83,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy84Fmt as SpecParser>::spec_parse);
     reveal(Copy84Spec::from_structural);
+    if input.len() >= 13 {
+        lemma_wire32(input, 9);
+    }
+}
+
+pub proof fn lemma_copy88_refinement(input: Seq<u8>)
+    requires input.len() <= usize::MAX as int, input.len() > 0, input[0] == 84,
+    ensures
+        normalized_generated_parse(input) == wire_command(input),
+        CommandFmt.spec_parse(input) is Some ==>
+            !(CommandFmt.spec_parse(input).unwrap().1.body is Default),
+{
+    reveal(<CommandFmt as SpecParser>::spec_parse);
+    reveal(<CommandBodyFmt as SpecParser>::spec_parse);
+    reveal(CommandBodyFmt::spec);
+    reveal(CommandBodyFmt::opcode_spec);
+    reveal(CommandSpec::from_structural);
+    reveal(CommandBodySpec::from_structural);
     reveal(<Copy88Fmt as SpecParser>::spec_parse);
     reveal(Copy88Spec::from_structural);
-    if input.len() > 0 {
-        match input[0] {
-            0 => { assert(normalized_generated_parse(input) == wire_command(input)); },
-            1 => { },
-            2 => { },
-            3 => { },
-            4 => { },
-            5 => { },
-            6 => { },
-            7 => { },
-            8 => { },
-            9 => { },
-            10 => { },
-            11 => { },
-            12 => { },
-            13 => { },
-            14 => { },
-            15 => { },
-            16 => { },
-            17 => { },
-            18 => { },
-            19 => { },
-            20 => { },
-            21 => { },
-            22 => { },
-            23 => { },
-            24 => { },
-            25 => { },
-            26 => { },
-            27 => { },
-            28 => { },
-            29 => { },
-            30 => { },
-            31 => { },
-            32 => { },
-            33 => { },
-            34 => { },
-            35 => { },
-            36 => { },
-            37 => { },
-            38 => { },
-            39 => { },
-            40 => { },
-            41 => { },
-            42 => { },
-            43 => { },
-            44 => { },
-            45 => { },
-            46 => { },
-            47 => { },
-            48 => { },
-            49 => { },
-            50 => { },
-            51 => { },
-            52 => { },
-            53 => { },
-            54 => { },
-            55 => { },
-            56 => { },
-            57 => { },
-            58 => { },
-            59 => { },
-            60 => { },
-            61 => { },
-            62 => { },
-            63 => { },
-            64 => { },
-            65 => { },
-            66 => { },
-            67 => { },
-            68 => { },
-            69 => { },
-            70 => { },
-            71 => { },
-            72 => { },
-            73 => { },
-            74 => { },
-            75 => { },
-            76 => { },
-            77 => { },
-            78 => { },
-            79 => { },
-            80 => { },
-            81 => { },
-            82 => { },
-            83 => { },
-            84 => { },
-            _ => { },
-        }
-    }
 }
 
 /// Complete stream interpretation against the immutable original basis.
@@ -322,5 +645,13 @@ pub proof fn lemma_magic_refinement(bytes: Seq<u8>)
         DeltaMagicFmt.spec_parse(bytes) is Some ==> DeltaMagicFmt.spec_parse(bytes).unwrap().0 == 4,
 {
     reveal(<DeltaMagicFmt as SpecParser>::spec_parse);
+    if bytes.len() >= 4 {
+        let a = bytes[0];
+        let b = bytes[1];
+        let c = bytes[2];
+        let d = bytes[3];
+        assert((((a as u32) << 24 | (b as u32) << 16 | (c as u32) << 8 | d as u32) == 0x72730236)
+            == (a == 0x72 && b == 0x73 && c == 0x02 && d == 0x36)) by (bit_vector);
+    }
 }
 }
