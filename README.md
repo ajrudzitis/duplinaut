@@ -20,9 +20,9 @@ A native Rust project for browsing duplicity backups and restoring selected file
 
 | Component | Current evidence | Remaining work |
 | --- | --- | --- |
-| Delta decoding and application | Native and adversarial tests; official small and multipart payloads; focused Verus run passes | Dependency verification and final component acceptance |
-| Manifest tokens and byte paths | Native tests pass; exact grammar reviewed | Semantic proofs and complete manifest parsing |
-| Storage interface | Exact-size and cancellation tests pass | S3 adapter and source-consistency integration |
+| Delta decoding and application | 16 tests; official historical and multipart payloads; 535 focused Verus obligations pass; independent semantic review complete | Complete-core acceptance gate |
+| Manifest tokens, manifests and byte paths | Official manifest tests pass; component comparison formally checked | Token, normalization and manifest proofs |
+| Storage and S3 | Exact-size and cancellation tests; 11 S3 tests using actual SDK HTTP handling; source review complete | Live-service and complete-reader consistency integration |
 | Assurance tooling | Pinned tools, Duvet baseline, executable failure tests, independent review | Expand gates as components are accepted |
 | Repository browser and restore | Requirements and official source-tree oracles | Implementation, proofs, and compatibility matrix |
 | Terminal interface | Workspace scaffold | Browsing, restore selection, progress, and cancellation |
@@ -74,6 +74,10 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Establish reviewed Duvet extraction, snapshots, and milestone coverage gates.
 - [x] Establish independently reviewed xtask generation and verification tooling.
 - [x] Produce official 3.0.7 fixtures with independent source/restore oracles.
+- [x] Produce historical official fixtures for 0.8.23, 2.1.3 and 3.2.1, including short and legacy names.
+- [x] Implement and independently review delta semantic contracts; pass focused strict verification and official payload tests.
+- [x] Implement bounded manifests and test official producer records.
+- [x] Implement and review the read-only S3 adapter; test conditional reads, bounds, cancellation and persistent stream failures.
 - [ ] Accept the first parser component with implementation, proofs, official tests, and independent review.
 - [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers.
 - [ ] Complete verified snapshot indexing and native Linux restoration.
