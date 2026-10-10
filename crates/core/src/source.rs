@@ -2,7 +2,10 @@
 //! integration boundaries; parser correctness does not prove backend behavior.
 use std::{
     io::{self, Read},
-    sync::{atomic::{AtomicBool, Ordering}, Arc},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,15 +32,23 @@ pub struct SourceLimits {
 
 impl Default for SourceLimits {
     fn default() -> Self {
-        Self { max_objects: 10_000_000, max_metadata_bytes: 256 * 1024 * 1024, max_stored_bytes: 8 * 1024 * 1024 * 1024 }
+        Self {
+            max_objects: 10_000_000,
+            max_metadata_bytes: 256 * 1024 * 1024,
+            max_stored_bytes: 8 * 1024 * 1024 * 1024,
+        }
     }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Cancellation(Arc<AtomicBool>);
 impl Cancellation {
-    pub fn cancel(&self) { self.0.store(true, Ordering::Release); }
-    pub fn is_cancelled(&self) -> bool { self.0.load(Ordering::Acquire) }
+    pub fn cancel(&self) {
+        self.0.store(true, Ordering::Release);
+    }
+    pub fn is_cancelled(&self) -> bool {
+        self.0.load(Ordering::Acquire)
+    }
 }
 
 #[derive(Debug)]
@@ -63,11 +74,16 @@ impl std::fmt::Display for SourceError {
 }
 impl std::error::Error for SourceError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self { Self::Io(error) => Some(error), _ => None }
+        match self {
+            Self::Io(error) => Some(error),
+            _ => None,
+        }
     }
 }
 impl From<io::Error> for SourceError {
-    fn from(error: io::Error) -> Self { Self::Io(error) }
+    fn from(error: io::Error) -> Self {
+        Self::Io(error)
+    }
 }
 
 /// Implementations list only and open read-only streams. They must enforce
@@ -76,8 +92,18 @@ impl From<io::Error> for SourceError {
 /// Returned streams must fail on a short/long body relative to `object.size`.
 /// Callers still validate manifest digests over the original stored bytes.
 pub trait ObjectSource: Send + Sync {
-    fn list(&self, prefix: &str, limits: SourceLimits, cancel: &Cancellation) -> Result<Vec<StoredObject>, SourceError>;
-    fn open(&self, object: &StoredObject, limits: SourceLimits, cancel: &Cancellation) -> Result<Box<dyn Read + Send>, SourceError>;
+    fn list(
+        &self,
+        prefix: &str,
+        limits: SourceLimits,
+        cancel: &Cancellation,
+    ) -> Result<Vec<StoredObject>, SourceError>;
+    fn open(
+        &self,
+        object: &StoredObject,
+        limits: SourceLimits,
+        cancel: &Cancellation,
+    ) -> Result<Box<dyn Read + Send>, SourceError>;
 }
 
 /// Trusted I/O wrapper enforcing exact discovered size and cancellation.
@@ -90,10 +116,24 @@ pub struct CheckedReader<R> {
     failure: Option<(io::ErrorKind, String)>,
 }
 impl<R: Read> CheckedReader<R> {
-    pub fn new(inner: R, expected: u64, maximum: u64, cancel: Cancellation) -> Result<Self, SourceError> {
-        if expected > maximum { return Err(SourceError::Limit); }
-        if cancel.is_cancelled() { return Err(SourceError::Cancelled); }
-        Ok(Self { inner, remaining: expected, cancel, failure: None })
+    pub fn new(
+        inner: R,
+        expected: u64,
+        maximum: u64,
+        cancel: Cancellation,
+    ) -> Result<Self, SourceError> {
+        if expected > maximum {
+            return Err(SourceError::Limit);
+        }
+        if cancel.is_cancelled() {
+            return Err(SourceError::Cancelled);
+        }
+        Ok(Self {
+            inner,
+            remaining: expected,
+            cancel,
+            failure: None,
+        })
     }
     fn latch(&mut self, error: io::Error) -> io::Error {
         // Interrupted is the standard retryable Read error. All other failures
@@ -106,27 +146,46 @@ impl<R: Read> CheckedReader<R> {
 }
 impl<R: Read> Read for CheckedReader<R> {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        if buffer.is_empty() { return Ok(0); }
+        if buffer.is_empty() {
+            return Ok(0);
+        }
         if let Some((kind, message)) = &self.failure {
             return Err(io::Error::new(*kind, message.clone()));
         }
-        if self.cancel.is_cancelled() { return Err(io::Error::other("source operation cancelled")); }
+        if self.cancel.is_cancelled() {
+            return Err(io::Error::other("source operation cancelled"));
+        }
         if self.remaining == 0 {
             let mut probe = [0u8; 1];
             let count = match self.inner.read(&mut probe) {
                 Ok(count) => count,
                 Err(error) => return Err(self.latch(error)),
             };
-            if count == 0 { return Ok(0); }
-            return Err(self.latch(io::Error::new(io::ErrorKind::InvalidData, "object body exceeds discovered size")));
+            if count == 0 {
+                return Ok(0);
+            }
+            return Err(self.latch(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "object body exceeds discovered size",
+            )));
         }
         let requested = self.remaining.min(buffer.len() as u64) as usize;
         let count = match self.inner.read(&mut buffer[..requested]) {
             Ok(count) => count,
             Err(error) => return Err(self.latch(error)),
         };
-        if count == 0 { return Err(self.latch(io::Error::new(io::ErrorKind::UnexpectedEof, "object body is shorter than discovered size"))); }
-        if count > requested { return Err(self.latch(io::Error::new(io::ErrorKind::InvalidData, "source returned an invalid byte count"))); }
+        if count == 0 {
+            return Err(self.latch(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "object body is shorter than discovered size",
+            )));
+        }
+        if count > requested {
+            return Err(self.latch(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "source returned an invalid byte count",
+            )));
+        }
         self.remaining -= count as u64;
         Ok(count)
     }
