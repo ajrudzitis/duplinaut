@@ -21,7 +21,8 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | Component | Current evidence | Remaining work |
 | --- | --- | --- |
 | Delta decoding and application | 16 tests; official historical and multipart payloads; 535 focused Verus obligations pass; independent semantic review complete | Complete-core acceptance gate |
-| Manifest tokens, manifests and byte paths | Official manifest tests pass; component comparison formally checked | Token, normalization and manifest proofs |
+| Manifest tokens, manifests and byte paths | Official manifests pass; exact token and path refinements checked; digest and framing helper proofs checked | Complete manifest state and selection proofs |
+| Signatures and tar containers | Official archives pass; 54 signature and 37 tar-header/helper focused obligations pass | Complete tar/PAX controller refinement |
 | Stored-object envelopes | Stored-byte SHA1/MD5 validation; bounded plain/gzip decoding; official-object integration tests | Native OpenPGP and controller verification |
 | Storage and S3 | Exact-size and cancellation tests; 11 S3 tests using actual SDK HTTP handling; source review complete | Live-service and complete-reader consistency integration |
 | Assurance tooling | Pinned tools, Duvet baseline, executable failure tests, independent review | Expand gates as components are accepted |
@@ -78,12 +79,14 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Produce historical official fixtures for 0.8.23, 2.1.3 and 3.2.1, including short and legacy names.
 - [x] Implement and independently review delta semantic contracts; pass focused strict verification and official payload tests.
 - [x] Implement bounded manifests and test official producer records.
+- [x] Integrate exact token, path, signature and tar helper refinement checkpoints.
+- [x] Validate stored-byte volume digests and decode bounded plain/gzip envelopes against official objects.
 - [x] Implement and review the read-only S3 adapter; test conditional reads, bounds, cancellation and persistent stream failures.
 - [ ] Accept the first parser component with implementation, proofs, official tests, and independent review.
 - [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers.
 - [ ] Complete verified snapshot indexing and native Linux restoration.
 - [ ] Complete native OpenPGP adapters and their [capability profile](docs/openpgp-profile.md).
-- [ ] Complete the read-only S3 adapter and consistency/cancellation tests.
+- [ ] Validate S3 with a live service and complete-reader consistency integration.
 - [ ] Complete the browsing/restoration TUI.
 - [ ] Pass the supported official-producer compatibility matrix.
 - [ ] **Create GitHub Actions for builds and formal methods:** install pinned tools, check generated parsers, run Verus, enforce Duvet coverage/snapshot gates, and run native/official-fixture tests on pull requests and pushes; retain reports and verification evidence as artifacts.
