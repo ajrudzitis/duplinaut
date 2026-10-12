@@ -90,3 +90,5 @@ Infrastructure references used for this capacity/ownership review:
 and [pinned BTree node layout](https://raw.githubusercontent.com/rust-lang/rust/1.98.0/library/alloc/src/collections/btree/node.rs).
 A zero-output delta needs no content buffer; the minimum eight-byte growth
 allowance applies to nonempty output.
+
+The complete local `cargo xtask ci` gate passed after this scalar proof was adopted at commit `474ffd4`, source SHA-256 `4b7b0f11d3fda0f7494c3a269bd57963ccfc07e399e19b5817918dd4c07ac4a0`. Fresh full-workspace verification checked 998 core obligations with zero errors; all existing generation, traceability, lint and test gates passed. The accepted milestone remains tooling-only, and full state/controller proofs remain pending.
