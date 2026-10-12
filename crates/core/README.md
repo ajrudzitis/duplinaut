@@ -13,6 +13,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Tar containers and operations | Reviewed header, GNU/PAX and footer profiles | Implemented; thirteen tests pass; header uses Vest DSL | Exact header/arithmetic/footer: 37 focused strict obligations pass; PAX framing/keys and fractional time: 21 pass; controller pending | All 48 recorded plain gzip archives scan and classify | Native source reviewed; formal acceptance pending |
 | Stored-object integrity and plain/gzip envelopes | Reviewed stored-byte hash and envelope requirements | Implemented; four tests pass | Digest and decompression libraries are trusted adapters; controller proof pending | Recorded official manifest hashes and gzip objects pass | Native source reviewed; complete formal acceptance pending |
 | Multipart assembly | Reviewed ordinary 3.0.7 profile; queued-restart requirements and fixtures reviewed | Implemented; six tests pass; all stored volumes checked before publication | Controller refinement pending | Official three-volume snapshot and two-volume delta match independent source hashes | Independent native review complete; footer-bearing restart and formal acceptance pending |
+| Chain planning | Reviewed explicit anchor, exact target and conservative local uniqueness | Implemented; five tests pass | Controller refinement pending | Eighteen dates across six official plain naming profiles | Independent native review complete; no restorability claim |
 | Snapshot reconstruction | Reviewed ordered state and preceding-set basis | Implemented; eight test groups pass | State/resource refinement pending | Three official 3.0.7 backup dates match byte paths, contents and metadata | Independent native review complete; formal acceptance pending |
 | Filesystem restoration | Requirements written | Pending | Pending | Pending | Pending |
 
@@ -69,3 +70,6 @@ Stored-volume decoding checks SHA1 and MD5 declarations before decompression, re
 - [x] Independently review state semantics; test deleted delta bases, near-prefix subtree isolation and final-validation atomicity.
 - [x] Test exact successful payload, file, entry and live payload limits, including empty states and one-unit rejection boundaries.
 - [ ] Add exact success/rejection threshold tests for state metadata and live metadata budgets.
+
+- [x] Plan metadata-only contiguous chains with explicit anchors and exact dates; reject missing links and ambiguous branches.
+- [ ] Prove chain-controller refinement and integrate original object identities, manifest/volume validation and snapshot states.

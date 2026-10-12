@@ -198,10 +198,10 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: A complete delta stream MUST contain END immediately after its last complete command and contain no bytes after END.
 
   SECTION: [PARSE-CHAIN-001](#parse-chain-001)
-    TEXT[!MUST]: A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
+    TEXT[!MUST,implementation,test]: A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
 
   SECTION: [PARSE-CHAIN-002](#parse-chain-002)
-    TEXT[!MUST]: The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+    TEXT[!MUST,implementation,test]: The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
 
   SECTION: [PARSE-STATE-001](#parse-state-001)
     TEXT[!MUST,implementation,test]: Snapshot interpretation MUST apply additions, replacement content, deltas, deletions, and file-type changes in chain order to the selected backup-relative path state.
