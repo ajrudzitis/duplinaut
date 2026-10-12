@@ -547,7 +547,7 @@ fn all_official_plain_gzip_archives_scan_and_classify() {
             archives += 1;
         }
     }
-    assert_eq!(archives, 39);
+    assert_eq!(archives, 48);
     assert!(entries > 600);
 }
 

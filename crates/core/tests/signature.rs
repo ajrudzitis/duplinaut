@@ -264,7 +264,7 @@ fn signatures_from_all_plain_official_producer_corpora() {
             archives += 1;
         }
     }
-    assert_eq!(archives, 18);
+    assert_eq!(archives, 21);
     assert!(signatures >= 200, "only {signatures} signatures");
     assert!(short_sources > 100);
 }
