@@ -204,10 +204,10 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
 
   SECTION: [PARSE-STATE-001](#parse-state-001)
-    TEXT[!MUST]: Snapshot interpretation MUST apply additions, replacement content, deltas, deletions, and file-type changes in chain order to the selected backup-relative path state.
+    TEXT[!MUST,implementation,test]: Snapshot interpretation MUST apply additions, replacement content, deltas, deletions, and file-type changes in chain order to the selected backup-relative path state.
 
   SECTION: [PARSE-STATE-002](#parse-state-002)
-    TEXT[!MUST]: A delta entry MUST use the reconstructed regular-file content for that same path from the preceding state as its basis.
+    TEXT[!MUST,implementation,test]: A delta entry MUST use the reconstructed regular-file content for that same path from the preceding state as its basis.
 
   SECTION: [PARSE-BROWSE-001](#parse-browse-001)
     TEXT[!MUST]: Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.
