@@ -260,7 +260,7 @@ proof_required = true
 # Native controller tests pass; formal state/resource refinement pending.
 implementations = [{ path = "crates/core/src/state.rs", symbol = "apply" }]
 proofs = []
-tests = [{ package = "duplicity-core", name = "immutable_preceding_set_basis_and_transactional_failure" }, { package = "duplicity-core", name = "directory_preservation_type_replacement_deletion_and_recreation" }, { package = "duplicity-core", name = "missing_ancestors_root_types_empty_state_and_unsupported_metadata" }, { package = "duplicity-core", name = "resulting_and_live_limits_prevent_partial_state_success" }, { package = "duplicity-core", name = "official_three_snapshot_dates_match_contents_types_and_metadata" }, { package = "duplicity-core", name = "exact_payload_entry_and_live_limits_accept_without_spare_budget" }, { package = "duplicity-core", name = "deleted_bases_remain_available_from_preceding_set" }, { package = "duplicity-core", name = "subtree_removal_preserves_near_prefixes_and_final_errors_are_atomic" }]
+tests = [{ package = "duplicity-core", name = "immutable_preceding_set_basis_and_transactional_failure" }, { package = "duplicity-core", name = "directory_preservation_type_replacement_deletion_and_recreation" }, { package = "duplicity-core", name = "missing_ancestors_root_types_empty_state_and_unsupported_metadata" }, { package = "duplicity-core", name = "resulting_and_live_limits_prevent_partial_state_success" }, { package = "duplicity-core", name = "official_three_snapshot_dates_match_contents_types_and_metadata" }, { package = "duplicity-core", name = "exact_payload_entry_and_live_limits_accept_without_spare_budget" }, { package = "duplicity-core", name = "exact_metadata_and_live_metadata_limits_include_transition_scratch" }, { package = "duplicity-core", name = "deleted_bases_remain_available_from_preceding_set" }, { package = "duplicity-core", name = "subtree_removal_preserves_near_prefixes_and_final_errors_are_atomic" }]
 
 [[milestone]]
 id = "chain-planning"
@@ -323,6 +323,35 @@ proof_required = true
 implementations = [{ path = "crates/core/src/local.rs", symbol = "open" }]
 proofs = []
 tests = [{ package = "duplicity-core", name = "flat_regular_listing_and_anchored_repeated_reads" }, { package = "duplicity-core", name = "changes_replacements_and_eof_are_terminal" }, { package = "duplicity-core", name = "cancellation_limits_and_untrusted_descriptors" }, { package = "duplicity-core", name = "original_official_directory_reconstructs_three_dates" }, { package = "duplicity-core", name = "interrupted_post_read_validation_retries_without_losing_bytes" }]
+
+[[milestone]]
+id = "linux-restoration"
+gate = false
+requirements = ["RESTORE-001", "RESTORE-002", "RESTORE-003", "RESTORE-004", "RESTORE-005", "RESTORE-006", "RESTORE-007", "RESTORE-008", "RESTORE-009", "RESTORE-010", "RESTORE-011", "RESTORE-012", "RESTORE-013", "RESTORE-014", "RESTORE-015", "RESTORE-016", "RESTORE-017", "RESTORE-018", "RESTORE-019", "RESTORE-020", "RESTORE-021", "RESTORE-022", "RESTORE-023", "RESTORE-024", "RESTORE-025", "RESTORE-026", "RESTORE-027"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = true
+# Native acceptance only; exact controller/kernel refinement remains pending.
+implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }]
+proofs = []
+tests = [
+  { package = "duplicity-core", name = "restore_linux::tests::attempted_descendant_side_effect_errors_cleanup_but_outer_uncertainty_is_untouched" },
+  { package = "duplicity-core", name = "restore_linux::tests::publication_side_effect_errors_never_run_modifying_cleanup" },
+  { package = "duplicity-core", name = "restore_linux::tests::cancellation_rename_race_success_wins_and_wrapper_cleanup_warns" },
+  { package = "duplicity-core", name = "restore_linux::tests::short_interrupted_zero_writes_and_forward_faults_keep_cleanup_reserved" },
+  { package = "duplicity-core", name = "restore_linux::tests::root_profiles_restrictive_descendants_and_preflight_mode_checks" },
+  { package = "duplicity-core", name = "restore_linux::tests::inherited_acl_is_removed_before_widened_final_permissions" },
+  { package = "duplicity-core", name = "restore_linux::tests::fractional_negative_time_is_exact_or_fails_before_publication" },
+  { package = "duplicity-core", name = "restore_linux::tests::exact_creation_fd_payload_cleanup_and_metadata_edges" },
+  { package = "duplicity-core", name = "restore_linux::tests::cleanup_failures_count_and_continue_without_hiding_original_error" },
+  { package = "duplicity-core", name = "restore_linux::tests::genuinely_empty_tree_has_explicit_policy_root_without_invented_mtime" },
+  { package = "duplicity-core", name = "restore_linux::tests::concurrent_destination_and_parent_path_changes_preserve_anchored_semantics" },
+  { package = "duplicity-core", name = "official_three_dates_publish_both_profiles_exact_supported_metadata" },
+  { package = "duplicity-core", name = "existing_destinations_never_replaced_and_preflight_limits_do_not_stage" },
+]
 
 [[milestone]]
 id = "complete-reader"
