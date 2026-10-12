@@ -1,0 +1,111 @@
+# Native Linux restoration checkpoint
+
+This software follows the independently adopted [Linux specification](restore-linux.md)
+and RFC requirements RESTORE-001 through RESTORE-027. It consumes a borrowed,
+immutable `RestorePlan`; it neither downloads objects nor launches subprocesses.
+It forbids unsafe project code. Complete filesystem/controller formal verification
+remains pending, distinct from existing parser/state/plan refinement evidence.
+
+The public API is `restore(&RestorePlan, &Path, &[u8], &Cancellation, RestoreLimits)`.
+The byte-valued destination is one new leaf under the caller-selected parent.
+`RestoreOutcome` distinguishes `Published(Receipt)`, `Unpublished(Unpublished)` and
+`PublicationIndeterminate(Indeterminate)`. Receipts retain parent/root device and
+inode identities, destination/staging bytes, chosen profile and actual filesystem
+magic. The parent pathname may initially resolve through caller-selected symlinks;
+subsequent work stays anchored to its opened directory object. The threat model,
+UID/filesystem policy and held guarantees are exactly those of the specification.
+
+The owned parent must permit owner write/search, deny group/other write and have
+an allowlisted filesystem type. Default profile selection uses same-parent private
+staging when parent ordinary group/other bits are zero, otherwise a private 0700
+wrapper. An explicitly requested private-parent profile fails on a searchable
+parent. Wrapper publication requires root owner-write; private-parent publication
+preserves read-only root modes. Neither strategy changes parent permissions.
+Every backup lookup uses one original byte-valued component and cached directory
+FDs. Symlink target bytes are never lookup paths. Access/default ACLs are removed
+and checked absent before widening final ordinary modes; directory default ACLs
+are removed before descendants exist. Metadata/readback finish bottom-up, root
+last, before one NOREPLACE rename. Empty plans without root metadata publish
+policy 0700 and mark their root mtime unspecified.
+
+Creation journals distinguish Unattempted, PossiblyCreated and Created. A slot is
+armed before a creation boundary; native success marks Created before any postcall
+hook. Child late errors remain removable inside the exclusively owned namespace,
+including entries whose FDs could not be acquired. Outer creation errors other
+than definite EEXIST leave an uncertain candidate untouched. Any publication
+error returns uncertainty without chmod/unlink/rollback of root, descendants or
+wrapper. Successful publication wins racing cancellation; only an empty wrapper
+can receive post-success removal, with faults recorded as success warnings.
+Prepublication cleanup repairs cached directory modes parent-first, then unlinks
+attempted entries child-first through original cached parents. It continues after
+faults. Fixed-size reports count all failures, retain the first errno and flag
+truncated per-failure detail. Crash/fatal-signal cleanup, secure erasure, source
+ownership/ACL/xattr fidelity and crash durability are not claimed.
+
+## Exact independent budgets
+
+These are operational charge units, not a global heap or wall-time proof. Borrowed
+snapshot content and paths, allocations elsewhere in the caller, standard allocator
+overhead, syscall/kernel storage and trusted rustix/getrandom internals are excluded.
+Parent-path C-string conversion is explicitly charged before allocation/open;
+backup lookups use pre-owned CStrings and avoid joined-path conversion. Fixed stack
+buffers include a 65536-byte write slice bound (borrowed payload) and 4096-byte link
+readback buffer. No payload copy is allocated by the restorer.
+
+Let E be plan-entry count, R be one when source-root metadata exists, H be 1 for
+private-parent staging or 2 for wrapper staging, D be source-directory count plus
+one for a root synthesized only for an empty plan, and F be one when any regular
+entry exists. C = E - R + H is the maximum created-entry count.
+
+| Limit | Default | Exact unit / charging policy |
+| --- | ---: | --- |
+| entries | 1000000 | C, including root and applicable wrapper |
+| directory_fds | 100000 | D + H + F: cached source/root directories, parent/wrapper and at most one active regular FD; minimum parent slot checked before opening |
+| metadata_bytes | 268435456 | sizeof Prepared + Receipt + CString + OwnedFd, all charged name bytes below, E * (sizeof Node + sizeof Option OwnedFd), and one extra Option OwnedFd root slot; capacities reserved before staging |
+| name_bytes | 67108864 | parent byte-path length+1, destination length+1,128 staging-byte overlap allowance,5 inner-root bytes including NUL, every nonroot leaf length+1 and symlink target length+1 |
+| payload_bytes | 8589934592 | checked sum of complete borrowed regular payload lengths |
+| forward_work | 32000000 | one unit per initial parent/stat syscall, preflight entry/component/candidate comparison, plan-node construction, staging random-name attempt, entry/finalization visit, forward syscall boundary and write attempt; partial writes and Interrupted retries consume units |
+| staging_attempts | 16 | unpredictable 128-bit candidate selections; EEXIST only permits another candidate |
+| cleanup_work | 4000000 | pre-reserves 2*C syscall attempts before staging, sufficient for cached-directory mode repair and attempted-entry removal; reserved independently from forward work; successful wrapper removal consumes one reserved attempt |
+| profile | automatic | stricter explicit PrivateParentSameParent or ProtectedParentWrapper available |
+
+Full borrowed component paths are validated component-by-component and ancestor
+closure supplies corresponding planned directory entries; name charging counts
+the owned leaf strings once, never repeatedly materialized joined paths. Component
+and candidate comparisons count one work unit each, not one CPU instruction per
+byte. Ordinary OS blocking has no cancellation latency bound. Cancellation is
+observed before forward actions/chunks and the final publication decision; cleanup
+ignores cancellation to attempt removal. Source staging metadata and fixed reports
+are prepared before creation, and receipt strings move without allocation at the
+publication decision. Allocator exhaustion abort behavior/process termination
+remains outside handled-failure recovery.
+
+## Native evidence and pending proof work
+
+Eleven fault/controller tests and two integration tests cover both profiles on the
+observed ext-family filesystem magic 0xef53. Original official full plus two
+incrementals publish all raw paths and match source-oracle modes, regular content
+hashes and file/directory mtimes. Link mtimes match exact emitted snapshot metadata;
+source-only symlink mtime changes excluded by the recorded official oracle remain
+excluded. Tests include outward targets, restrictive directories/root modes,
+empty trees, inherited named-user/default ACL clearing before final mode 0777,
+negative/fractional/extreme times (exact success or prepublication fidelity failure),
+existing destination types, concurrent destination creation, parent pathname
+replacement, wrapper privacy, exact entry/FD/payload/cleanup/name/metadata budget
+edges, short/Interrupted/zero writes, cancellation/rename race, cleanup diagnostics,
+create-error-after-side-effect and rename-error-after-side-effect.
+
+Fault injection is a private generic syscall boundary compiled with Native no-op
+hooks for the public API. Test after-hooks simulate a backend returning a late
+error after a native effect; they do not claim to reproduce each kernel error path.
+Publication after-hook errors are part of the abstract injected syscall result,
+not a production post-success callback. Native runtime has no exported hooks.
+Pinned safe wrappers are rustix 1.1.5 fs/process/time and
+[getrandom 0.3.4 fill](https://docs.rs/getrandom/0.3.4/getrandom/fn.fill.html).
+The native tests do not establish behavior on untested Btrfs/XFS/tmpfs, hostile
+same-UID/privileged writers or compromised kernels/filesystems. Required future
+proofs include budget-before-action, exact parent mapping, journal coverage, write
+offsets and publication/cancellation/uncertainty transitions. No such complete
+proof is claimed by implementation annotations or passing native tests.
+
+Independent source review and independent execution accepted this native checkpoint. The named-user ACL inheritance test requires both the effective UID and UID 1001 to be mapped in the test process user namespace. A sandbox mapping only UID 1000 cannot install that ACL and fails test setup; the exact test passed outside that sandbox, without a skip. Complete filesystem-controller formal acceptance remains pending.

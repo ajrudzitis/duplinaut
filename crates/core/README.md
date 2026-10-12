@@ -16,7 +16,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Chain planning | Reviewed explicit anchor, exact target and conservative local uniqueness | Implemented; five tests pass | Controller refinement pending | Eighteen dates across six official plain naming profiles | Independent native review complete; no restorability claim |
 | Snapshot reconstruction | Reviewed ordered state and preceding-set basis | Implemented; nine test groups pass | State/resource refinement pending | Three official 3.0.7 backup dates match byte paths, contents and metadata | Independent native review complete; formal acceptance pending |
 | Restore selection | Reviewed byte paths, ancestors and supported types | Implemented; three regression groups pass | Controller refinement pending | Native byte-path and near-prefix tests pass | Independent native review complete; no filesystem publication |
-| Filesystem restoration | Requirements written | Pending | Pending | Pending | Pending |
+| Filesystem restoration | Independently reviewed Linux staging/publication profile | Native Linux implementation | Controller refinement pending; kernel/syscall boundary trusted | Eleven fault tests and two official integration groups pass on ext-family filesystem | Independent native review complete |
 
 - [x] Create the library and verification-enabled Cargo configuration.
 - [x] Implement a reviewed Vest DSL delta component and bounded fixed-basis application.
@@ -78,4 +78,5 @@ Stored-volume decoding checks SHA1 and MD5 declarations before decompression, re
 - [ ] Prove repository-reader refinement and thin chain iterator adaptation; complete same-source core acceptance.
 
 - [x] Select immutable restore entries, required source ancestors and exact byte paths; reject selected unsupported types.
-- [ ] Prove restore-selection refinement and implement safe native Linux filesystem publication.
+- [x] Implement and independently review native Linux filesystem publication; see [limits and test evidence](../../docs/restore-linux-implementation.md).
+- [ ] Prove restore-selection and filesystem-controller refinement.

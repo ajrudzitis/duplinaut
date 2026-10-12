@@ -29,8 +29,8 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | Chain planning | 17 strict obligations pass for exact selection/errors and descriptor provenance; six official naming profiles | Complete-core acceptance and thin iterator adapter proof |
 | Snapshot reconstruction | Three official backup dates match byte paths, contents and metadata; immutable prior-set delta bases; transactional failures | Controller/resource proofs and chain integration |
 | Multipart assembly | Official snapshot/delta source oracles; bounded ordered parts; provisional output and sticky failure tests | Formal refinement and footer-bearing/encrypted queued replay |
-| Repository browser and restore | Metadata-only catalog and identity-bound plain/gzip reconstruction; read-only restore selection; official three-date oracles | Filesystem publication, frontend integration and controller proofs |
-| Terminal interface | Local/S3 metadata history and explicit full-scan browsing; byte-safe paths and cancellation | Restore selection/publication, detailed progress and automated interaction coverage |
+| Repository browser and restore | Metadata-only catalog and identity-bound plain/gzip reconstruction; byte-preserving selection and reviewed native Linux publication; official three-date oracles | Frontend publication integration and controller proofs |
+| Terminal interface | Local/S3 metadata history and explicit full-scan browsing; byte-safe paths and cancellation | Publication interaction, detailed progress and automated interaction coverage |
 
 The [parsing requirements](docs/parsing-requirements.md) were written in RFC 2119/8174 language and independently reviewed **before implementation**. Public documentation leads format research; immutable official-source references and producer evidence resolve ambiguities.
 
@@ -96,6 +96,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers.
 - [ ] Complete verified snapshot indexing and native Linux restoration.
 - [x] Independently review and adopt Linux staging/publication requirements before implementation, including indeterminate syscall outcomes.
+- [x] Implement and independently review native Linux restoration; pass official three-date and fault-injection tests, enforce Duvet requirement coverage.
 - [ ] Complete native OpenPGP adapters and their [capability profile](docs/openpgp-profile.md).
 - [ ] Validate S3 with a live service and complete-reader consistency integration.
 - [ ] Complete the browsing/restoration TUI.

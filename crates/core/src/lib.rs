@@ -29,3 +29,6 @@ pub mod reader;
 
 #[cfg(unix)]
 pub mod local;
+
+#[cfg(target_os = "linux")]
+pub mod restore_linux;
