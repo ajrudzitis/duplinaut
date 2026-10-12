@@ -1,0 +1,102 @@
+{
+  "profile": "one-entry",
+  "producer": "duplicity 3.0.7 December 31, 2025",
+  "commands": [
+    [
+      "${DUPLICITY}",
+      "full",
+      "--no-encryption",
+      "--volsize",
+      "1",
+      "--concurrency",
+      "0",
+      "--archive-dir",
+      "${WORK}/restart-cache",
+      "--name",
+      "restart",
+      "--gpg-binary",
+      "${GPG}",
+      "--current-time",
+      "1700000000",
+      "${WORK}/restart-source",
+      "file://${WORK}/restart"
+    ],
+    [
+      "${DUPLICITY}",
+      "full",
+      "--no-encryption",
+      "--volsize",
+      "1",
+      "--concurrency",
+      "0",
+      "--archive-dir",
+      "${WORK}/restart-cache",
+      "--name",
+      "restart",
+      "--gpg-binary",
+      "${GPG}",
+      "--current-time",
+      "1700000000",
+      "${WORK}/restart-source",
+      "file://${WORK}/restart"
+    ],
+    [
+      "${DUPLICITY}",
+      "restore",
+      "--no-encryption",
+      "--archive-dir",
+      "${WORK}/restore-cache",
+      "--gpg-binary",
+      "${GPG}",
+      "file://${WORK}/restart",
+      "${WORK}/restored"
+    ],
+    [
+      "${DUPLICITY}",
+      "--version"
+    ]
+  ],
+  "controlled_interruption": {
+    "method": "SIGSTOP then SIGKILL of this recipe's producer process after volume2 upload",
+    "observed_exit_status": -9,
+    "retained_volume": 1,
+    "transient_source_omission": "f015",
+    "initial_source_files": 200,
+    "dropped_unretained_tail": true
+  },
+  "original_exploration_recipe_identity": {
+    "filename": "duplicity-reader-restart-one-probe.py",
+    "sha256": "8c8cea2629efc1dbc9a1c078709ae9fbbdff39258f6e85bec92568d0daae77dd"
+  },
+  "original_source_oracle_sha256": "48172099dd8b291ea5ac8808bb57c9805fec1b4087b1362e935954a92963b09e",
+  "source_oracle_comparison_verified": true,
+  "reproduction_recipe": {
+    "path": "../producer/generate_restart.py",
+    "sha256": "51c8a3b85764379f55847c2a1919648e5b28954992c53d0aa68ae691c626e708",
+    "successfully_executed_for_profile": true,
+    "scope": "reproduces source/profile semantics; did not produce these frozen original archive bytes"
+  },
+  "archive_byte_reproducible": false,
+  "objects": [
+    {
+      "path": "objects/duplicity-full-signatures.20231114T221320Z.sigtar.gz",
+      "bytes": 25234,
+      "sha256": "9b8463166ddeb79562be1dbad0a903d5386a362fc69794d7733e8f2d1a357aa5"
+    },
+    {
+      "path": "objects/duplicity-full.20231114T221320Z.manifest",
+      "bytes": 725,
+      "sha256": "5826fa46adae12f237ee61f64846af41968ee9ffb72d856a544f2135710a8420"
+    },
+    {
+      "path": "objects/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+      "bytes": 1050633,
+      "sha256": "0dd782ba904b9bfded2e7ae83622682fc5d05a5befced8871edb258dfab73b59"
+    },
+    {
+      "path": "objects/duplicity-full.20231114T221320Z.vol2.difftar.gz",
+      "bytes": 65674,
+      "sha256": "c481c4b54c746821d9afb698aaec6e18298104d42978ab5b6af3fe5ce590a574"
+    }
+  ]
+}

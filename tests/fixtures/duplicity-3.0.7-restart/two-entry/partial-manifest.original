@@ -1,0 +1,10 @@
+Hostname euler
+Localdir /tmp/duplicity-reader-restart-two-review/restart-source
+Volume 1:
+    StartingPath   .  
+    EndingPath     f015  
+    Hash SHA1 ae44adba3bbb092449d8c475f55b56d8968db4da
+Volume 2:
+    StartingPath   f016  
+    EndingPath     f031  
+    Hash SHA1 0b484c31c99b042a279eed40ef74d5d807bf933f

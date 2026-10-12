@@ -1,0 +1,42 @@
+{
+  "producer": {
+    "version": "duplicity 3.0.7 December 31, 2025",
+    "nix_package_identity": "/nix/store/5j4mk0k17j37nh8a7s2pcr5z0vblx73r-duplicity-3.0.7",
+    "executable_identity": "/nix/store/5j4mk0k17j37nh8a7s2pcr5z0vblx73r-duplicity-3.0.7/bin/duplicity",
+    "executable_sha256": "decbb78db85363ab4fc3904ce4617c9b20156e64286ce3cff8420632fb082780",
+    "python_runtime_identity": "/nix/store/9r02ykx9y35lf4gk6gc30gnag1y8ncp7-python3-3.13.15/bin/python3.13"
+  },
+  "gpg": {
+    "version": "gpg (GnuPG) 2.4.9",
+    "executable_identity": "/nix/store/krh2gxql1h8yx1h4l57vvphaw5wf1wqz-gnupg-2.4.9/bin/gpg",
+    "executable_sha256": "84daa9357266a8ef8e1e851ec029ea35130bfda4921313a68f0da97ea135f5c5",
+    "usage": "official producer version/startup dependency; fixtures are unencrypted"
+  },
+  "upstream_source_files": [
+    {
+      "name": "dup_main.py",
+      "sha256": "6ae35084d2c705ae3c55bb100750ae50328c46c3090dcb3631d837ae1d96023e"
+    },
+    {
+      "name": "diffdir.py",
+      "sha256": "434d30652e87eaa53bf4263b91947c4442fe0e49b3c219f5e5ea7bb2888e0d9f"
+    },
+    {
+      "name": "manifest.py",
+      "sha256": "8ba9ee049ddfe465645da70ea4d27c12f1d16bd8f9bdaec9d5a282a78d08d8eb"
+    },
+    {
+      "name": "gpg.py",
+      "sha256": "e39d6fbc645a08364fe9a9207f8e9bb3085f99ded8738a2c467630e7adaf9ddb"
+    },
+    {
+      "name": "dup_temp.py",
+      "sha256": "f2ae981676cd186b0689453c5f06bef9c1461ce0b9c4ef6c6829009b4c1bdc2a"
+    },
+    {
+      "name": "patchdir.py",
+      "sha256": "9cd4bbb8f27c1a7508c73903a448a8018e7202b344880945b3111d75619f7439"
+    }
+  ],
+  "reproduction_recipe_sha256": "51c8a3b85764379f55847c2a1919648e5b28954992c53d0aa68ae691c626e708"
+}

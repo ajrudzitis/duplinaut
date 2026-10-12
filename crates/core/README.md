@@ -41,7 +41,8 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Prove exact path/error adaptation, optional positive block boundaries and volume record completion diagnostics.
 - [x] Assemble ordinary 3.0.7 plain/gzip multipart operations with verified stored digests, complete containers, explicit bounds and sticky failure.
 - [x] Independently test multipart snapshot/delta source oracles and rejection after provisional output.
-- [ ] Acquire and accept queued-restart boundary behavior before claiming full restart assembly compatibility.
+- [x] Acquire and review original queued-restart and empty-tail producer fixtures; specify strict compatibility requirements.
+- [ ] Implement and independently test queued-restart boundary compatibility.
 - [x] Check whole-manifest-module arithmetic/bounds safety: 61 strict obligations pass; complete grammar semantics remain separate.
 - [ ] Prove complete manifest parser contextual semantics.
 - [ ] Prove complete multipart controller refinement.

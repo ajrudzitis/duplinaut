@@ -1,0 +1,96 @@
+{
+  "data_volumes": [
+    {
+      "object": "duplicity-full.20231114T221320Z.vol1.difftar.gz",
+      "stored_sha256": "93294a58d1edc65af0baea7605afd109b033b2d12c86325b2939bcde741ed75a",
+      "decoded_length": 1057280,
+      "entry_stream_bytes": 1057280,
+      "footer_bytes": 0,
+      "entries": [
+        {
+          "name_hex": "736e617073686f742f2e",
+          "bytes": 0
+        },
+        {
+          "name_hex": "736e617073686f742f66303030",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303031",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303032",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303033",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303034",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303035",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303036",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303037",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303038",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303039",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303130",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303131",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303132",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303133",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303134",
+          "bytes": 65500
+        },
+        {
+          "name_hex": "736e617073686f742f66303135",
+          "bytes": 65500
+        }
+      ]
+    },
+    {
+      "object": "duplicity-full.20231114T221320Z.vol2.difftar.gz",
+      "stored_sha256": "efb9289a63714560446191b7d69b4e3f650fb86c422d45d9fcff6688fa0f0f5e",
+      "decoded_length": 0,
+      "entry_stream_bytes": 0,
+      "footer_bytes": 0,
+      "entries": []
+    }
+  ],
+  "signature_archive": {
+    "object": "duplicity-full-signatures.20231114T221320Z.sigtar.gz",
+    "entry_count": 17,
+    "missing_relative_paths_from_data_oracle": [],
+    "scope": "original signature archive included unchanged; not accepted as authoritative data inventory in this controlled source-changing restart test"
+  },
+  "official_restore_compared": true
+}

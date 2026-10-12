@@ -1,0 +1,25 @@
+Last full backup left a partial set, restarting.
+Last full backup date: Tue Nov 14 22:13:20 2023
+RESTART: Volumes 2 to 2 failed to upload before termination.
+         Restarting backup at volume 2.
+Restarting after volume 1, file f015, block 0
+File f015 complete in backup set.
+Continuing restart on file f016.
+--------------[ Backup Statistics ]--------------
+StartTime 1791647319.57 (Sat Oct 10 15:48:39 2026)
+EndTime 1791647319.58 (Sat Oct 10 15:48:39 2026)
+ElapsedTime 0.01 (0.01 seconds)
+SourceFiles 18
+SourceFileSize 1117596 (1.07 MB)
+NewFiles 18
+NewFileSize 1117596 (1.07 MB)
+DeletedFiles 0
+ChangedFiles 0
+ChangedFileSize 0 (0 bytes)
+ChangedDeltaSize 0 (0 bytes)
+DeltaEntries 18
+RawDeltaSize 1113500 (1.06 MB)
+TotalDestinationSizeChange 131338 (128 KB)
+Errors 0
+-------------------------------------------------
+

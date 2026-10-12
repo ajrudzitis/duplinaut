@@ -298,13 +298,31 @@ Provenance: SRC-MAN; conservative selection is POLICY. Compare byte-component se
 
 The reader MUST retain the distinction between absent block boundaries and explicit numeric block boundaries.
 
-Provenance: SRC-MAN, SRC-MAIN, SRC-DIFF. A present EndingPath block `n` means multipart part `n` was emitted and the logical entry is still incomplete. A present StartingPath block gives the first continuing emitted part number. Absence means no continuing part is pending at that boundary; it can occur when a volume starts with a final short part and therefore does not imply part 1. Absence is not numeric zero.
+Provenance: SRC-MAN, SRC-MAIN, SRC-DIFF. A present EndingPath block `n` means multipart part `n` was emitted and remains incomplete at the actual last-entry boundary. A present StartingPath block describes the producer's remembered entry boundary: normally the first entry, but the second after queued restart replay. A one-entry queued replay can instead record root/None. An absent starting block does not establish that the actual first entry is ordinary or part 1; a final short multipart part also records no continuing block. Absence is not numeric zero. Known queued-start exceptions require PARSE-MAN-008..010; the ending and completion checks remain strict.
 
 ### PARSE-MAN-007
 
 The manifest parser MUST accept an optional counted Filelist section before or after volume records without interpreting its lines as volume fields.
 
 Provenance: SRC-MAN and official 3.0.7 fixtures. Parse action and token separately; preserve path bytes and reject malformed/count-inconsistent summaries. Filelist absence does not mean the snapshot is empty.
+
+### PARSE-MAN-008
+
+A supported nonempty volume MUST have an EndingPath matching its actual last classified logical-data entry path and pending multipart block state.
+
+Provenance: SRC-MAIN, SRC-DIFF, POLICY. Use component-valued paths. A 65536-byte multipart part records its part number; an ordinary or final short multipart entry records no block. The check survives queued replay because previous-index state was already established.
+
+### PARSE-MAN-009
+
+A reader accepting queued-restart compatibility MUST restrict a nonempty volume's StartingPath exception to the source-derived one-entry root/None or second-entry boundary forms with retained raw restart-rewrite evidence.
+
+Provenance: SRC-MAIN restart_position_iterator, SRC-DIFF queued __next__, original official 3.0.7 probes. The normal profile requires the actual first classified logical-data entry boundary. PAX/GNU metadata headers are not counted as logical-data entries. For a recognized rewritten volume, >=2 entries can record the second entry's path/block, and a sole queued entry can record root/None. A caller without this compatibility path reports an unsupported boundary profile rather than accepting arbitrary starts. Initial queued compatibility additionally requires a raw/gzip decoded entry stream with no footer bytes (`entry_stream_bytes == decoded_length`), as observed in original official 3.0.7 replay. Object filenames do not identify producer version. Queued encrypted or footer-bearing replay remains unsupported pending its own fixture/container review; the strict normal profile is unchanged. This exception cannot relax EndingPath, ordinal/part sequence, integrity, or complete-container checks.
+
+### PARSE-MAN-010
+
+A reader MUST scan every normalized volume of a restart-rewritten set when raw manifest intervals have not been certified to cover decoded entries by an object-identity-bound content index.
+
+Provenance: POLICY derived from the observed false lower boundary after queued replay. Raw repeated-volume evidence is retained through normalization. Scanning includes required source identities, manifest digests, complete containers, and completion validation; unsafe ranges cannot omit selected content. A derived trusted index may later enable conservative pruning independently of raw StartingPath hints.
 
 ## Tar containers and duplicity entries
 
@@ -381,6 +399,24 @@ Provenance: POLICY. A zero-length last part is valid producer behavior when cont
 The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
 
 Provenance: SRC-DIFF, SRC-MAIN, official multipart fixtures. For the inspected 3.0.7 profile every nonfinal part has exactly 65536 payload bytes; the final part is shorter, including a zero-byte part after an exact multiple. Validate these lengths and sequential numbers against manifest boundary markers. The last normalized volume needs no pending EndingPath block, every required volume must exist and pass integrity, and complete container parsing must succeed. There is no explicit final-part flag in the emitted name; valid tar EOF alone never establishes completion.
+
+### PARSE-MULTI-004
+
+Assembly MUST preserve pending logical-entry state across an empty volume while validating its supported empty-boundary marker shape.
+
+Provenance: SRC-MAIN get_indicies, SRC-DIFF remembered/previous indexes, actual official empty-tail output. Start is root/None; end is the previous actual decoded boundary or root/None when no prior entry exists. Empty data produces no operation or content and cannot satisfy a missing final short part. Exceptional restart-empty shapes remain unsupported until separately reviewed.
+
+### PARSE-MULTI-005
+
+Repeated ordinary operations for one path within a backup set MUST retain archive order for snapshot-state interpretation.
+
+Provenance: POLICY consistent with PARSE-STATE. Repetition does not coalesce operations or reopen a completed multipart entry.
+
+### PARSE-MULTI-006
+
+Assembly MUST reject an ordinary/multipart representation mixture or a second multipart logical entry for one path within the initial supported backup-set profile.
+
+Provenance: Conservative reader POLICY, not a universal producer-format claim. Sequential numbered parts of the same pending entry remain valid. Broader repeated multipart replacements require separate source/producer evidence, state semantics, and specification review.
 
 ## Librsync signatures
 
@@ -650,16 +686,16 @@ Provenance: User development decision. A checkpoint records its actual validatio
 
 ## Verification goals and acceptance scenarios
 
-This table is an initial mapping of obligations, not passing evidence. The verification agent owns the precise mathematical contracts and reviews the source author cannot establish alone.
+This table summarizes bounded reviewed checkpoints at the restart specification checkpoint; the assurance ledger remains the authority for passing evidence, source identity, and residual obligations. No row establishes complete-reader acceptance. The verification agent owns the precise mathematical contracts and reviews the source author cannot establish alone.
 
 | Goal | Requirements | Expected evidence | Current status |
 | --- | --- | --- | --- |
-| VG-PARSE | PARSE-GEN, PARSE-PATH, PARSE-NAME, PARSE-MAN, PARSE-TAR, PARSE-SIG | Refines reviewed byte grammar; bounded consumption and arithmetic; finite-input termination/panic freedom | Planned |
-| VG-DELTA | PARSE-DELTA | Command decoder refinement and concatenation of literal/basis slices; source/output bounds | Planned |
-| VG-ASSEMBLY | PARSE-MULTI, PARSE-MAN-004..006 | Ordered concatenation, restart normalization, conservative volume selection, completion conditions | Reviewed 3.0.7 contract; native implementation/proofs pending |
+| VG-PARSE | PARSE-GEN, PARSE-PATH, PARSE-NAME, PARSE-MAN, PARSE-TAR, PARSE-SIG | Refines reviewed byte grammar; bounded consumption and arithmetic; finite-input termination/panic freedom | Token/path/signature/tar helpers implemented with focused accepted proofs; complete component/controller obligations remain pending |
+| VG-DELTA | PARSE-DELTA | Command decoder refinement and concatenation of literal/basis slices; source/output bounds | Accepted 535-obligation delta checkpoint with official delta integration evidence; does not establish complete-reader acceptance |
+| VG-ASSEMBLY | PARSE-MULTI, PARSE-MAN-004..010 | Ordered concatenation, restart normalization, conservative volume selection, completion conditions | Restart normalization/component selection has an accepted 21-obligation checkpoint; ordinary multipart software is implemented and independently tested; queued-restart compatibility is specified but pending; controller/heap/completion proofs pending |
 | VG-STATE | PARSE-CHAIN, PARSE-STATE | Unique contiguous chain and path-state transitions | Reviewed 3.0.7 contract; native implementation/proofs pending |
 | VG-RESTORE | PARSE-PATH, RESTORE | Valid selected paths and destination mapping; filesystem contract review and integration tests | Planned |
-| VG-INTEGRATION | PARSE-ENV, PARSE-SOURCE, PARSE-BROWSE | Trusted-adapter contract review, corruption/decryption/source-change tests | Reviewed initial SEIPDv1 contract; native evidence pending |
+| VG-INTEGRATION | PARSE-ENV, PARSE-SOURCE, PARSE-BROWSE | Trusted-adapter contract review, corruption/decryption/source-change tests | S3 adapter and native hashes/plain/gzip have tested checkpoints; initial SEIPDv1 contract reviewed; crypto/browsing and aggregate reader gates remain pending |
 
 Official-producer scenarios: full and multiple incrementals; add/change/delete/recreate/type replacement; metadata-only changes; empty files/directories; symlinks; long and byte-valued paths; whitespace/quotes/backslashes; custom prefixes; short/legacy names where producers support them; gzip/raw/symmetric/public-key/signed objects; incompressible multipart data and deltas; restart manifests; missing signatures/volumes/chain links; all selected snapshot dates. Compare source trees and official restored trees for contents, paths, types, symlink targets, modes, and supported timestamps. Preserve producer version, exact command, environment, source-tree expectation, and archive digests.
 
@@ -687,6 +723,7 @@ Remaining implementation/compatibility holds:
 | ID | Unresolved question | Evidence and required next action | Affected requirements |
 | --- | --- | --- | --- |
 | OPEN-CRYPTO-ADDITIONAL | SEIPDv2/v6, additional algorithms/key policies and full certificate-validity semantics | Acquire matching official-producer evidence and review stricter adapter contracts before expanding the supported profile | PARSE-ENV-007..016 |
+| OPEN-RESTART-FOOTER | Queued replay bypasses iterator byte-offset accounting, potentially changing encrypted and later-version plaintext footer lengths | Acquire official queued/footer-bearing output and independently review its exact container rules; do not accept arbitrary trailing bytes | PARSE-TAR-005, PARSE-MAN-009, PARSE-MULTI-003 |
 | OPEN-HISTORICAL | Native acceptance of original 0.8.23/2.1.3/3.2.1 small plain corpora; historical encrypted/multipart shapes, additional legacy zones/metadata | Official plain chains and 0.8.23 short/UTC-legacy names are now source/restore checked. Run native comparisons and acquire encrypted/multipart cases before broader claims; do not generalize 3.0.7 constants | Historical compatibility and untested variants of every format subsystem |
 | OPEN-TAR-ADDITIONAL | Additional supported PAX fields/GNU variants and empty signature containers have no official fixture coverage yet | Generate targeted official or primary-format fixtures before accepting their implementation/testing milestones | PARSE-TAR-003,005 and metadata fidelity |
 

@@ -1,0 +1,65 @@
+{
+  "producer": "duplicity 3.0.7 December 31, 2025",
+  "profile": "one-entry",
+  "commands": [
+    [
+      "${DUPLICITY}",
+      "--version"
+    ],
+    [
+      "${DUPLICITY}",
+      "full",
+      "--no-encryption",
+      "--volsize",
+      "1",
+      "--concurrency",
+      "0",
+      "--archive-dir",
+      "${WORK}/cache",
+      "--name",
+      "restart-fixture",
+      "--gpg-binary",
+      "${GPG}",
+      "--current-time",
+      "1700000000",
+      "${WORK}/source",
+      "file://${OUTPUT}/objects"
+    ],
+    [
+      "${DUPLICITY}",
+      "full",
+      "--no-encryption",
+      "--volsize",
+      "1",
+      "--concurrency",
+      "0",
+      "--archive-dir",
+      "${WORK}/cache",
+      "--name",
+      "restart-fixture",
+      "--gpg-binary",
+      "${GPG}",
+      "--current-time",
+      "1700000000",
+      "${WORK}/source",
+      "file://${OUTPUT}/objects"
+    ],
+    [
+      "${DUPLICITY}",
+      "restore",
+      "--no-encryption",
+      "--archive-dir",
+      "${WORK}/restore-cache",
+      "--gpg-binary",
+      "${GPG}",
+      "file://${OUTPUT}/objects",
+      "${WORK}/restored"
+    ]
+  ],
+  "retained_volume": 1,
+  "transient_omitted_path": "f015",
+  "controlled_interruption": true,
+  "source_recipe_sha256": "51c8a3b85764379f55847c2a1919648e5b28954992c53d0aa68ae691c626e708",
+  "official_restore_verified": true,
+  "archive_byte_reproducible": false
+}

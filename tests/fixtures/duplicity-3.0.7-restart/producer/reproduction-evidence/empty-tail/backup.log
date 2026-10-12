@@ -1,0 +1,19 @@
+Last full backup date: none
+--------------[ Backup Statistics ]--------------
+StartTime 1791647854.69 (Sat Oct 10 15:57:34 2026)
+EndTime 1791647854.72 (Sat Oct 10 15:57:34 2026)
+ElapsedTime 0.03 (0.03 seconds)
+SourceFiles 17
+SourceFileSize 1052096 (1.00 MB)
+NewFiles 17
+NewFileSize 1052096 (1.00 MB)
+DeletedFiles 0
+ChangedFiles 0
+ChangedFileSize 0 (0 bytes)
+ChangedDeltaSize 0 (0 bytes)
+DeltaEntries 17
+RawDeltaSize 1048000 (1023 KB)
+TotalDestinationSizeChange 1050653 (1.00 MB)
+Errors 0
+-------------------------------------------------
+

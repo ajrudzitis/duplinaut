@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "profile": "one-entry",
+      "file_count": 17,
+      "stored_objects": 4,
+      "stored_bytes": 1142266,
+      "data_restore_verified": true,
+      "signature_inventory_verified": false
+    },
+    {
+      "profile": "two-entry",
+      "file_count": 18,
+      "stored_objects": 4,
+      "stored_bytes": 1209496,
+      "data_restore_verified": true,
+      "signature_inventory_verified": false
+    },
+    {
+      "profile": "empty-tail",
+      "file_count": 16,
+      "stored_objects": 4,
+      "stored_bytes": 1076480,
+      "data_restore_verified": true,
+      "signature_inventory_verified": true
+    }
+  ],
+  "full_reader_compatibility_claim": false
+}

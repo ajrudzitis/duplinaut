@@ -1,0 +1,27 @@
+Hostname euler
+Localdir /tmp/duplicity-reader-restart-review/empty-sixteen-source
+Volume 1:
+    StartingPath   .  
+    EndingPath     f015  
+    Hash SHA1 e24edce9c48786d974326b87fa742c4bb6f9606e
+Volume 2:
+    StartingPath   .  
+    EndingPath     f015  
+    Hash SHA1 a2fc6037d42c77448fb07bc22ec6cf0f124da2f3
+Filelist 16
+    new      f000
+    new      f001
+    new      f002
+    new      f003
+    new      f004
+    new      f005
+    new      f006
+    new      f007
+    new      f008
+    new      f009
+    new      f010
+    new      f011
+    new      f012
+    new      f013
+    new      f014
+    new      f015

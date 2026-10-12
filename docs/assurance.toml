@@ -230,6 +230,21 @@ proofs = []
 tests = [{ package = "duplicity-core", name = "continuation_markers_zero_final_and_empty_volumes" }, { package = "duplicity-core", name = "malformed_parts_lengths_markers_and_interleaving_rejected" }, { package = "duplicity-core", name = "component_metadata_growth_is_bounded_before_classification" }, { package = "duplicity-core", name = "all_volumes_integrity_container_limits_and_poisoning" }, { package = "duplicity-core", name = "official_multipart_snapshot_and_delta_match_source_tree_oracles" }, { package = "duplicity-core", name = "every_failure_class_latches_poison_before_publication" }]
 
 [[milestone]]
+id = "queued-restart-compatibility"
+gate = false
+requirements = ["PARSE-MAN-008", "PARSE-MAN-009", "PARSE-MAN-010", "PARSE-MULTI-004", "PARSE-MULTI-005", "PARSE-MULTI-006"]
+specified = true
+implemented = false
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+# Producer evidence accepted; native compatibility and refinement pending.
+implementations = []
+proofs = []
+tests = []
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

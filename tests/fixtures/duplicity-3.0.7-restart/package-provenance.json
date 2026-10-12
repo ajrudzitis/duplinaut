@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "purpose": "original official restart/empty-volume fixture evidence",
+  "artifacts": [
+    {
+      "path": "README.md",
+      "bytes": 5176,
+      "sha256": "a8bd7228f77d0305891fcda859456ffe9d903f0729bf3085bdac5d9bbbc96762"
+    },
+    {
+      "path": "empty-tail/boundary-observations.json",
+      "bytes": 2615,
+      "sha256": "6e8d0fae87b6fc99954af9e222352025a8e62f7c35274b03d68ad2f4812e3c4e"
+    },
+    {
+      "path": "empty-tail/expected.json",
+      "bytes": 5816,
+      "sha256": "c3c40c61b85cc57b3be77d6627ef3e4da4a7ea17d89f558c00ae0e920e6ee840"
+    },
+    {
+      "path": "empty-tail/objects/duplicity-full-signatures.20231114T221320Z.sigtar.gz",
+      "bytes": 25217,
+      "sha256": "610001b0c24b9c5c27b482cde785c88d9d9ff0a938bdf01d365dc90db4a38f86"
+    },
+    {
+      "path": "empty-tail/objects/duplicity-full.20231114T221320Z.manifest",
+      "bytes": 610,
+      "sha256": "544ea18842294b2dbe82e790daba648b37905528f68df6e2334d7cc091e65384"
+    },
+    {
+      "path": "empty-tail/objects/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+      "bytes": 1050633,
+      "sha256": "93294a58d1edc65af0baea7605afd109b033b2d12c86325b2939bcde741ed75a"
+    },
+    {
+      "path": "empty-tail/objects/duplicity-full.20231114T221320Z.vol2.difftar.gz",
+      "bytes": 20,
+      "sha256": "efb9289a63714560446191b7d69b4e3f650fb86c422d45d9fcff6688fa0f0f5e"
+    },
+    {
+      "path": "empty-tail/provenance.json",
+      "bytes": 2066,
+      "sha256": "6eb2a2cebc246ebec7a882c7ac1289806624f855691bacc34d1d6fa3a93a111f"
+    },
+    {
+      "path": "one-entry/boundary-observations.json",
+      "bytes": 2745,
+      "sha256": "7e5f2872ba26700e372c4873736ab919196aca8cc2bba84f54d0b8cd73e58530"
+    },
+    {
+      "path": "one-entry/expected.json",
+      "bytes": 6144,
+      "sha256": "a2a5f203e0f919e2adb822e29c2af821aaf2138fc779128b52baef498581d811"
+    },
+    {
+      "path": "one-entry/initial-backup.log",
+      "bytes": 28,
+      "sha256": "591b9aad59df1f7d47872eb3e87d745902942c16cc1ef84ba3e30553daa99b38"
+    },
+    {
+      "path": "one-entry/objects/duplicity-full-signatures.20231114T221320Z.sigtar.gz",
+      "bytes": 25234,
+      "sha256": "9b8463166ddeb79562be1dbad0a903d5386a362fc69794d7733e8f2d1a357aa5"
+    },
+    {
+      "path": "one-entry/objects/duplicity-full.20231114T221320Z.manifest",
+      "bytes": 725,
+      "sha256": "5826fa46adae12f237ee61f64846af41968ee9ffb72d856a544f2135710a8420"
+    },
+    {
+      "path": "one-entry/objects/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+      "bytes": 1050633,
+      "sha256": "0dd782ba904b9bfded2e7ae83622682fc5d05a5befced8871edb258dfab73b59"
+    },
+    {
+      "path": "one-entry/objects/duplicity-full.20231114T221320Z.vol2.difftar.gz",
+      "bytes": 65674,
+      "sha256": "c481c4b54c746821d9afb698aaec6e18298104d42978ab5b6af3fe5ce590a574"
+    },
+    {
+      "path": "one-entry/partial-manifest.original",
+      "bytes": 311,
+      "sha256": "1c7b332adb90d3429692cc04234092d663df905f706df4a73d6eeb3d669de44a"
+    },
+    {
+      "path": "one-entry/provenance.json",
+      "bytes": 2882,
+      "sha256": "cd35608e92b2466ea71c9b64c81b62b5aff25a9179547da29598bb3d45edb4cd"
+    },
+    {
+      "path": "one-entry/resume-backup.log",
+      "bytes": 820,
+      "sha256": "6d6bf8869b785b7cb633444ac06f6d1fc144a11d0d81cb7483ec0fbc3b256cfd"
+    },
+    {
+      "path": "one-entry/source-oracle.original.json",
+      "bytes": 3412,
+      "sha256": "48172099dd8b291ea5ac8808bb57c9805fec1b4087b1362e935954a92963b09e"
+    },
+    {
+      "path": "producer/generate_restart.py",
+      "bytes": 7657,
+      "sha256": "51c8a3b85764379f55847c2a1919648e5b28954992c53d0aa68ae691c626e708"
+    },
+    {
+      "path": "producer/reproduction-evidence/empty-tail/backup.log",
+      "bytes": 539,
+      "sha256": "b625956f00b5c2e2d4cf4b9093095770ecd7d03d5b598bd21fd84dc0052c2f42"
+    },
+    {
+      "path": "producer/reproduction-evidence/empty-tail/restore.log",
+      "bytes": 238,
+      "sha256": "d18741773401bac6b089177fbbdcda6180a9f5d4a50e8843c7a701b2bc5f0d4a"
+    },
+    {
+      "path": "producer/reproduction-evidence/empty-tail/run.json",
+      "bytes": 1012,
+      "sha256": "b16884188bbb6689d2cdaf25d597d2922ef5fb0850ca7f18d1c3fa7a5315b6ef"
+    },
+    {
+      "path": "producer/reproduction-evidence/one-entry/initial-backup.log",
+      "bytes": 28,
+      "sha256": "591b9aad59df1f7d47872eb3e87d745902942c16cc1ef84ba3e30553daa99b38"
+    },
+    {
+      "path": "producer/reproduction-evidence/one-entry/restore.log",
+      "bytes": 238,
+      "sha256": "d18741773401bac6b089177fbbdcda6180a9f5d4a50e8843c7a701b2bc5f0d4a"
+    },
+    {
+      "path": "producer/reproduction-evidence/one-entry/resume-backup.log",
+      "bytes": 820,
+      "sha256": "05fa72edd3210bade0533652b953ea41b54ba7810055844a389298af5b12d522"
+    },
+    {
+      "path": "producer/reproduction-evidence/one-entry/run.json",
+      "bytes": 1373,
+      "sha256": "dd280159f58e1baa168e605414c564840a8f6b57cf2e830231c22e447966fca1"
+    },
+    {
+      "path": "producer/reproduction-evidence/two-entry/initial-backup.log",
+      "bytes": 28,
+      "sha256": "591b9aad59df1f7d47872eb3e87d745902942c16cc1ef84ba3e30553daa99b38"
+    },
+    {
+      "path": "producer/reproduction-evidence/two-entry/restore.log",
+      "bytes": 238,
+      "sha256": "d18741773401bac6b089177fbbdcda6180a9f5d4a50e8843c7a701b2bc5f0d4a"
+    },
+    {
+      "path": "producer/reproduction-evidence/two-entry/resume-backup.log",
+      "bytes": 820,
+      "sha256": "27016cad1d880222d389fc28d8c68ba29b82c625061c9da84cb02f87a7f79628"
+    },
+    {
+      "path": "producer/reproduction-evidence/two-entry/run.json",
+      "bytes": 1373,
+      "sha256": "1879ac9a54ec6a6ef9077437bd855c2a2fe1fd5be868a132338b964121c2ff61"
+    },
+    {
+      "path": "producer-identities.json",
+      "bytes": 1674,
+      "sha256": "c9aef0f46feb714cb367f60b4292649b18564143af9e75c8d0fa99c02115bccd"
+    },
+    {
+      "path": "profiles.json",
+      "bytes": 708,
+      "sha256": "ae2cc7b5118d2386361b7359fdf747b959c6e2fb934214b6f8fe98cb2265e2b7"
+    },
+    {
+      "path": "two-entry/boundary-observations.json",
+      "bytes": 2845,
+      "sha256": "5db1751591f39c719082a31a2fe898e42868ba076aa81353661b3b502cb887ff"
+    },
+    {
+      "path": "two-entry/expected.json",
+      "bytes": 6472,
+      "sha256": "f4e74d14b478038668e2db219938c3d80c06df97e62a6edcd45ba5340854038a"
+    },
+    {
+      "path": "two-entry/initial-backup.log",
+      "bytes": 28,
+      "sha256": "591b9aad59df1f7d47872eb3e87d745902942c16cc1ef84ba3e30553daa99b38"
+    },
+    {
+      "path": "two-entry/objects/duplicity-full-signatures.20231114T221320Z.sigtar.gz",
+      "bytes": 26779,
+      "sha256": "e75e93f4b32162da8dff434fcb43a881a405c1385629682f8af0e472ae94b16b"
+    },
+    {
+      "path": "two-entry/objects/duplicity-full.20231114T221320Z.manifest",
+      "bytes": 746,
+      "sha256": "0a5e84cc5e585c16b1ee67598cf578f55aa12da644159515933c9573e81efce5"
+    },
+    {
+      "path": "two-entry/objects/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+      "bytes": 1050633,
+      "sha256": "8731f4b0a22094aa0697d1461313243df321017b3441f8056ce4ab9a21f1cedc"
+    },
+    {
+      "path": "two-entry/objects/duplicity-full.20231114T221320Z.vol2.difftar.gz",
+      "bytes": 131338,
+      "sha256": "bf6e4ab9fe11e4975509a49f271abb22b72b5c0d7ca8c0cbcf20a34f576accf9"
+    },
+    {
+      "path": "two-entry/partial-manifest.original",
+      "bytes": 311,
+      "sha256": "78c44789545833abdc14ae745d8831023176fed8bed68175a50074883cfe4736"
+    },
+    {
+      "path": "two-entry/provenance.json",
+      "bytes": 2883,
+      "sha256": "5a13cf1f54f8bc36e9b067593416484aa0f27f529194082b107aeca74ea0ad82"
+    },
+    {
+      "path": "two-entry/resume-backup.log",
+      "bytes": 820,
+      "sha256": "31e9ced0947358d46dfc5614a757d0ef5d776762da2a33f0313fcf0f1675a993"
+    },
+    {
+      "path": "two-entry/source-oracle.original.json",
+      "bytes": 3599,
+      "sha256": "ec964763e21caac5170029407b4c6d9b59df60c0a9a20022bb89bd2b6fc57906"
+    },
+    {
+      "path": "verify.py",
+      "bytes": 5834,
+      "sha256": "339ff9a18999f07d778c854b30f12850a0f46a62a1775ba9df6c766adefbcc63"
+    }
+  ]
+}
