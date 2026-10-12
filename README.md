@@ -94,6 +94,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [ ] Accept the first parser component with implementation, proofs, official tests, and independent review.
 - [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers.
 - [ ] Complete verified snapshot indexing and native Linux restoration.
+- [x] Independently review and adopt Linux staging/publication requirements before implementation, including indeterminate syscall outcomes.
 - [ ] Complete native OpenPGP adapters and their [capability profile](docs/openpgp-profile.md).
 - [ ] Validate S3 with a live service and complete-reader consistency integration.
 - [ ] Complete the browsing/restoration TUI.

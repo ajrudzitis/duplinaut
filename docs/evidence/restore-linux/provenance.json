@@ -1,0 +1,81 @@
+{
+  "artifacts": {
+    "linux-v6.18-btrfs-inode.c": {
+      "sha256": "17f608ba8c64dd16aefbe7fd5e24eca85566c7166cc8a0f13e457b1216ac8d17",
+      "size": 310196
+    },
+    "linux-v6.18-ext4-namei.c": {
+      "sha256": "9f8d5fcbb7ca3105f514244ed0a90d8539b95a9afe3771cc2c55424e1fedd864",
+      "size": 113418
+    },
+    "linux-v6.18-tag-object.json": {
+      "sha256": "1ac8f8023c7e2ae2ec24b56bcacd7043c4f6acc2950c533e270a899f68d06aa3",
+      "size": 2014
+    },
+    "linux-v6.18-tag.json": {
+      "sha256": "d8371eff72c2f74d6327e17a36a001921b2ef3d3d597183a1d228a8d92d65907",
+      "size": 364
+    },
+    "linux-v6.18-vfs-namei.c": {
+      "sha256": "22a87d724eb43ece32f77c144fdee6e89180446a54f0c3bfef023fc8016a6d33",
+      "size": 153525
+    },
+    "linux-v6.18-xfs-inode.c": {
+      "sha256": "da228f9976d62f66ec9915a75b836f5341a137e40586e9e16215910659eb793a",
+      "size": 83707
+    },
+    "parsing-requirements.patch": {
+      "sha256": "0bdd59d3ce49e5c3685680e0602f3fef8e0a3cc8c6c8d45c9d9779a553cb21ad",
+      "size": 28149
+    },
+    "parsing-requirements.proposed.md": {
+      "sha256": "b22b31f619d35caa06c7663ad1d5fb133e8cd594ecbfc8bb506926237b582374",
+      "size": 90109
+    },
+    "probe-linux-rename.receipt.json": {
+      "sha256": "97448b199401328aaa6c637f49042f442009ebcd18331f5333cc395a7a152667",
+      "size": 2674
+    },
+    "probe_linux_rename.py": {
+      "sha256": "0d8b5cf486afefa688c5b418449642651b304ee6db949aa7b665a514af4453ee",
+      "size": 3672
+    },
+    "restore-linux.proposed.md": {
+      "sha256": "795390fe34450bd5092d962b7e5b89d7c0519baecf01e121a2c5f5d41c0bc6a2",
+      "size": 30985
+    }
+  },
+  "linux_reference_commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+  "modified_requirement_ids": [
+    "RESTORE-006"
+  ],
+  "native_reference_receipt": "probe-linux-rename.receipt.json",
+  "new_requirement_ids": [
+    "RESTORE-007",
+    "RESTORE-008",
+    "RESTORE-009",
+    "RESTORE-010",
+    "RESTORE-011",
+    "RESTORE-012",
+    "RESTORE-013",
+    "RESTORE-014",
+    "RESTORE-015",
+    "RESTORE-016",
+    "RESTORE-017",
+    "RESTORE-018",
+    "RESTORE-019",
+    "RESTORE-020",
+    "RESTORE-021",
+    "RESTORE-022",
+    "RESTORE-023",
+    "RESTORE-024",
+    "RESTORE-025",
+    "RESTORE-026",
+    "RESTORE-027"
+  ],
+  "rustix_published_archive_sha256": "891efababe418670775f199f0d233d84843c227a0949a883ce15b37c78d6629d",
+  "rustix_version": "1.1.5",
+  "schema": 1,
+  "shared_spec_sha256": "22b53a85de53ebbad8234f5f2f2ae499e5fd1857f71b18e56c957d10ddab359b",
+  "status": "standalone profile independently accepted; regenerated full-spec final review pending; no implementation/proof completion"
+}

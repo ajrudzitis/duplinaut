@@ -234,7 +234,70 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: A restore selection requiring unsupported filesystem entry types MUST fail before publication with an entry-specific diagnostic.
 
   SECTION: [RESTORE-006](#restore-006)
-    TEXT[!MUST]: Cancellation or a handled restoration failure MUST leave the requested destination unpublished and attempt removal of temporary plaintext.
+    TEXT[!MUST]: Cancellation observed before a publication attempt or a handled failure before that attempt MUST leave the restored tree unpublished at the requested destination and attempt removal of temporary plaintext from exclusively owned staging.
+
+  SECTION: [RESTORE-007](#restore-007)
+    TEXT[!MUST]: The initial Linux backend MUST reject destination parents whose filesystem type is outside the reviewed local allowlist before creating staging.
+
+  SECTION: [RESTORE-008](#restore-008)
+    TEXT[!MUST]: The backend MUST reject a destination parent unless its opened directory is owned by the effective UID, has owner write/search permissions, and has neither group-class nor other-class write permission.
+
+  SECTION: [RESTORE-009](#restore-009)
+    TEXT[!MUST]: The backend MUST keep every provisional restored entry behind its selected profile's private directory boundary until publication or cleanup.
+
+  SECTION: [RESTORE-010](#restore-010)
+    TEXT[!MUST]: All operations on backup entries MUST use their original byte-valued single path components relative to retained directory FDs, without reopening a directory by a joined path or following a restored symlink.
+
+  SECTION: [RESTORE-011](#restore-011)
+    TEXT[!MUST]: The backend MUST validate the complete restore plan's destination names, supported metadata representations, and initial-profile restrictions before creating staging.
+
+  SECTION: [RESTORE-012](#restore-012)
+    TEXT[!MUST]: The backend MUST enforce independent checked budgets for created entries, retained directory FDs, owned metadata, path/name/target bytes, total regular payload bytes, forward work, staging-name attempts, and cleanup work before the associated allocation or syscall.
+
+  SECTION: [RESTORE-013](#restore-013)
+    TEXT[!MUST]: The backend MUST pre-reserve a journal state for every attempted creation and preserve possibly-created as well as definitely-created entries through handled failure cleanup.
+
+  SECTION: [RESTORE-014](#restore-014)
+    TEXT[!MUST]: Regular files MUST be created exclusively with `CREATE | EXCL | NOFOLLOW | CLOEXEC | WRONLY`, initial creation mode `0600`, and written with the exact immutable content in chunks no larger than 65536 bytes.
+
+  SECTION: [RESTORE-015](#restore-015)
+    TEXT[!MUST]: Symlinks MUST preserve the exact supported target bytes and receive their exact mtime through a no-follow operation relative to their retained parent FD.
+
+  SECTION: [RESTORE-016](#restore-016)
+    TEXT[!MUST]: The backend MUST remove inherited POSIX access ACLs from created regular files/directories and inherited default ACLs from created directories before publishing the tree.
+
+  SECTION: [RESTORE-017](#restore-017)
+    TEXT[!MUST]: Before publication the backend MUST verify each created entry's supported type, ordinary permissions and exact mtime, and each regular file's complete size, against the restore plan.
+
+  SECTION: [RESTORE-018](#restore-018)
+    TEXT[!MUST]: Directory final modes and mtimes MUST be applied through retained FDs after descendant creation, in reverse ancestor order, with restore-root metadata last.
+
+  SECTION: [RESTORE-019](#restore-019)
+    TEXT[!MUST]: When a genuinely empty complete plan has no source-root metadata, the backend MUST publish an empty root with explicit policy mode `0700` without reporting an invented source-root mtime.
+
+  SECTION: [RESTORE-020](#restore-020)
+    TEXT[!MUST]: The backend MUST make at most one publication attempt using its selected profile's directory-relative `NOREPLACE` rename, and only after all content, metadata and validation steps succeed.
+
+  SECTION: [RESTORE-021](#restore-021)
+    TEXT[!MUST]: Cancellation MUST be observed before each entry, each bounded write attempt and the final publication attempt, with successful publication taking precedence over a racing cancellation request.
+
+  SECTION: [RESTORE-022](#restore-022)
+    TEXT[!MUST]: On a handled failure or observed cancellation before any publication attempt, cleanup MUST attempt removal of journaled definitely-created or possibly-created entries inside exclusively owned staging using retained parent FDs and original component bytes, without following symlinks.
+
+  SECTION: [RESTORE-023](#restore-023)
+    TEXT[!MUST]: The result MUST distinguish unpublished failure/cancellation, published success, and publication-indeterminate outcomes, retaining post-success wrapper-removal faults as cleanup warnings on published success.
+
+  SECTION: [RESTORE-024](#restore-024)
+    TEXT[!MUST]: Restoration assurance evidence MUST separate pure plan/controller guarantees from trusted syscall, rustix, kernel, filesystem and allocator assumptions.
+
+  SECTION: [RESTORE-025](#restore-025)
+    TEXT[!MUST]: The backend MUST select and validate its publication profile before creating staging, without changing destination-parent permissions to qualify for either profile.
+
+  SECTION: [RESTORE-026](#restore-026)
+    TEXT[!MUST]: If a publication rename is attempted and returns an error, the backend MUST report publication uncertainty and refrain from modifying cleanup of the restore root, its descendants or its staging wrapper.
+
+  SECTION: [RESTORE-027](#restore-027)
+    TEXT[!MUST]: If creation of the first outer staging leaf returns an error other than a definite existing-entry collision, the backend MUST report its candidate as uncertain and leave that candidate untouched because exclusive ownership was not established.
 
   SECTION: [ASSURE-SPEC-001](#assure-spec-001)
     TEXT[!MUST]: Each parser component MUST have reviewed requirements and resolved blocking questions before its implementation begins.

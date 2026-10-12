@@ -1,0 +1,106 @@
+{
+  "effective_capabilities_hex": "0000000000000000",
+  "euid": 1000,
+  "kernel": "7.2.8",
+  "limitations": [
+    "ordinary rename permission probe, not NOREPLACE evidence",
+    "not production implementation or formal verification",
+    "no hostile other-UID or ACL race demonstrated"
+  ],
+  "mount": {
+    "device": "254:1",
+    "filesystem_type": "ext4",
+    "mountpoint": "/tmp"
+  },
+  "observations": [
+    {
+      "errno": 13,
+      "errno_name": "EACCES",
+      "parent_ordinary_mode": "0o700",
+      "profile": "cross-parent-wrapper",
+      "result": "error",
+      "root_mode": "0o0"
+    },
+    {
+      "errno": 13,
+      "errno_name": "EACCES",
+      "parent_ordinary_mode": "0o700",
+      "profile": "cross-parent-wrapper",
+      "result": "error",
+      "root_mode": "0o555"
+    },
+    {
+      "errno": 13,
+      "errno_name": "EACCES",
+      "parent_ordinary_mode": "0o700",
+      "profile": "cross-parent-wrapper",
+      "result": "error",
+      "root_mode": "0o400"
+    },
+    {
+      "observed_mode": "0o200",
+      "parent_ordinary_mode": "0o700",
+      "profile": "cross-parent-wrapper",
+      "result": "success",
+      "root_mode": "0o200"
+    },
+    {
+      "observed_mode": "0o700",
+      "parent_ordinary_mode": "0o700",
+      "profile": "cross-parent-wrapper",
+      "result": "success",
+      "root_mode": "0o700"
+    },
+    {
+      "observed_mode": "0o777",
+      "parent_ordinary_mode": "0o700",
+      "profile": "cross-parent-wrapper",
+      "result": "success",
+      "root_mode": "0o777"
+    },
+    {
+      "observed_mode": "0o0",
+      "parent_ordinary_mode": "0o700",
+      "profile": "private-parent-same-parent",
+      "result": "success",
+      "root_mode": "0o0"
+    },
+    {
+      "observed_mode": "0o555",
+      "parent_ordinary_mode": "0o700",
+      "profile": "private-parent-same-parent",
+      "result": "success",
+      "root_mode": "0o555"
+    },
+    {
+      "observed_mode": "0o400",
+      "parent_ordinary_mode": "0o700",
+      "profile": "private-parent-same-parent",
+      "result": "success",
+      "root_mode": "0o400"
+    },
+    {
+      "observed_mode": "0o200",
+      "parent_ordinary_mode": "0o700",
+      "profile": "private-parent-same-parent",
+      "result": "success",
+      "root_mode": "0o200"
+    },
+    {
+      "observed_mode": "0o700",
+      "parent_ordinary_mode": "0o700",
+      "profile": "private-parent-same-parent",
+      "result": "success",
+      "root_mode": "0o700"
+    },
+    {
+      "observed_mode": "0o777",
+      "parent_ordinary_mode": "0o700",
+      "profile": "private-parent-same-parent",
+      "result": "success",
+      "root_mode": "0o777"
+    }
+  ],
+  "python": "3.13.15",
+  "schema": 1
+}
