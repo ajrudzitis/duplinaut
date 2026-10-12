@@ -74,7 +74,8 @@ Stored-volume decoding checks SHA1 and MD5 declarations before decompression, re
 
 - [x] Plan metadata-only contiguous chains with explicit anchors and exact dates; reject missing links and ambiguous branches.
 - [x] Integrate original object identities, manifest/volume validation and snapshot states in a bounded plain/gzip reader.
-- [ ] Prove chain and repository-reader controller refinement; independently accept repository orchestration.
+- [x] Prove chain-controller deterministic selection/errors and borrowed provenance: 17 fresh strict obligations pass; completed-name predicate passes separately.
+- [ ] Prove repository-reader refinement and thin chain iterator adaptation; complete same-source core acceptance.
 
 - [x] Select immutable restore entries, required source ancestors and exact byte paths; reject selected unsupported types.
 - [ ] Prove restore-selection refinement and implement safe native Linux filesystem publication.

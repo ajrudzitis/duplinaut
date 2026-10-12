@@ -27,8 +27,19 @@ descriptor; source descriptor storage is borrowed. Every scanned descriptor
 consumes candidate-check budget, bounding the otherwise quadratic search work.
 Standard-library allocation/iteration remain trusted infrastructure. Native
 tests cover four official plain producer versions, short/legacy profiles and
-adversarial gaps, branches, descriptors and budgets. Formal controller refinement
-remains pending.
+adversarial gaps, branches, descriptors and budgets. A fresh strict whole-module
+Verus run passes 17 obligations. Exact deterministic success/error selection,
+original descriptor/index/target provenance, and valid contiguous timestamp
+progress refine an independent total model. Allocation failure is an explicit
+infrastructure outcome after successful header validation. The unchanged
+`sets()` iterator adapter is outside this proof. A separate strict check proves
+the completed-name scalar predicate (one obligation); complete name parsing and
+same-source complete-core acceptance remain pending.
+
+The verified controller uses `try_reserve`, whose empty-vector growth in the
+pinned Rust 1.98 implementation requests `max(input_count, 4)` slots. The existing
+metadata charge covers those slots. Allocator private heap overhead remains
+trusted; this change does not claim a global heap proof.
 
 A successful metadata plan establishes no required volume existence, stored-byte
 integrity, decryption/signature acceptance, complete multipart data, restored

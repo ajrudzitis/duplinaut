@@ -26,7 +26,7 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | Stored-object envelopes | Stored-byte SHA1/MD5 validation; bounded plain/gzip decoding; official-object integration tests | Native OpenPGP and controller verification |
 | Storage and S3 | Anchored local reads with change detection; 11 S3 tests using actual SDK HTTP handling | Live-service and complete-reader consistency integration |
 | Assurance tooling | Pinned tools, Duvet baseline, executable failure tests, independent review | Expand gates as components are accepted |
-| Chain planning | Explicit full anchor and exact date; six official naming profiles; gaps and branches rejected | Formal refinement and source/catalog integration |
+| Chain planning | 17 strict obligations pass for exact selection/errors and descriptor provenance; six official naming profiles | Complete-core acceptance and thin iterator adapter proof |
 | Snapshot reconstruction | Three official backup dates match byte paths, contents and metadata; immutable prior-set delta bases; transactional failures | Controller/resource proofs and chain integration |
 | Multipart assembly | Official snapshot/delta source oracles; bounded ordered parts; provisional output and sticky failure tests | Formal refinement and footer-bearing/encrypted queued replay |
 | Repository browser and restore | Metadata-only catalog and identity-bound plain/gzip reconstruction; read-only restore selection; official three-date oracles | Filesystem publication, frontend integration and controller proofs |

@@ -273,8 +273,10 @@ tested = true
 reviewed = true
 proof_required = true
 # Metadata-only local uniqueness; volume/restorability gates remain separate.
+# Whole chain module: 17 fresh strict obligations pass; completed-name scalar
+# contract passes separately. Thin sets() iterator and complete-core gate pending.
 implementations = [{ path = "crates/core/src/chain.rs", symbol = "new" }]
-proofs = []
+proofs = [{ id = "chain-descriptor", requirement = "PARSE-CHAIN-001", path = "crates/core/src/chain.rs", symbol = "from_manifest_name", kind = "contract" }, { id = "chain-controller", requirement = "PARSE-CHAIN-002", path = "crates/core/src/chain.rs", symbol = "new", kind = "contract" }]
 tests = [{ package = "duplicity-core", name = "descriptors_revalidate_completed_manifest_structure" }, { package = "duplicity-core", name = "explicit_anchor_exact_target_and_borrowed_order" }, { package = "duplicity-core", name = "gaps_duplicate_intervals_and_dead_end_branches_fail_explicitly" }, { package = "duplicity-core", name = "metadata_record_and_candidate_budgets_are_independent" }, { package = "duplicity-core", name = "official_manifest_names_plan_all_plain_producer_profiles" }]
 
 [[milestone]]

@@ -8,6 +8,9 @@
 use crate::generated::names::CanonicalTimestampFmt;
 use vest_lib::core::exec::parser::Parser;
 
+use vstd::prelude::*;
+
+verus! {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObjectKind {
     FullVolume,
@@ -45,9 +48,13 @@ pub struct ObjectName {
 
 impl ObjectName {
     /// A partial artifact cannot supply completed-set evidence.
-    pub fn completed(self) -> bool {
-        !self.partial && self.envelope != Envelope::Pkcs7
+    pub fn completed(self) -> (result: bool)
+        ensures result == (!self.partial && self.envelope != Envelope::Pkcs7),
+    {
+        !self.partial && !matches!(self.envelope, Envelope::Pkcs7)
     }
+}
+
 }
 
 #[derive(Clone, Copy, Debug)]
