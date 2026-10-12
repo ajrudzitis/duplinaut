@@ -212,7 +212,7 @@ fn every_official_archive_basename_is_classified() {
             }
         }
     }
-    assert!(count == 84, "only {count} producer artifacts exercised");
+    assert_eq!(count, 96, "producer artifact coverage changed");
 }
 
 #[test]
