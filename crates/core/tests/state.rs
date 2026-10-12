@@ -510,3 +510,58 @@ fn subtree_removal_preserves_near_prefixes_and_final_errors_are_atomic() {
         EntryType::Directory
     );
 }
+
+#[test]
+fn exact_payload_entry_and_live_limits_accept_without_spare_budget() {
+    let input = archive(&[("snapshot/.", b'5', b""), ("snapshot/file", b'0', b"abc")]);
+    let stored_capacity: usize = input
+        .entries()
+        .iter()
+        .map(|entry| entry.payload.capacity())
+        .sum();
+    let limits = StateLimits {
+        payload_bytes: 3,
+        file_bytes: 3,
+        entries: 2,
+        live_payload_bytes: stored_capacity + 3,
+        ..StateLimits::default()
+    };
+    let state = SnapshotState::from_full(&input, limits).unwrap();
+    assert_eq!(state.payload_bytes(), 3);
+    assert_eq!(state.len(), 2);
+    for insufficient in [
+        StateLimits {
+            payload_bytes: 2,
+            ..limits
+        },
+        StateLimits {
+            file_bytes: 2,
+            ..limits
+        },
+        StateLimits {
+            entries: 1,
+            ..limits
+        },
+        StateLimits {
+            live_payload_bytes: stored_capacity + 2,
+            ..limits
+        },
+    ] {
+        assert!(matches!(
+            SnapshotState::from_full(&input, insufficient),
+            Err(StateError::Limit)
+        ));
+    }
+    assert!(SnapshotState::from_full(
+        &archive(&[]),
+        StateLimits {
+            payload_bytes: 0,
+            file_bytes: 0,
+            entries: 0,
+            live_payload_bytes: 0,
+            ..StateLimits::default()
+        }
+    )
+    .unwrap()
+    .is_empty());
+}
