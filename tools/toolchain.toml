@@ -11,7 +11,7 @@ verus_syn_sha256 = "7d8b53574934e1f608dfccd809ce17f3733d6eb99c14ce8220326121929e
 
 [vest_lib_vendor]
 path = "vendor/vest_lib"
-tree_sha256 = "425bf40c89a2d0a9cf17a3076522b6b34658e6987f288ecc4c75239a6509c020"
+tree_sha256 = "86256b85e34d9b2897c0100947d016db5b95084f9afe4840ec1301b4d265b23d"
 
 [linux_x86_64]
 verus_url = "https://github.com/verus-lang/verus/releases/download/release/0.2026.09.06.8dea4a2/verus-0.2026.09.06.8dea4a2-x86-linux.zip"

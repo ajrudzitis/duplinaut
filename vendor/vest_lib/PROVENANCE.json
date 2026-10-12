@@ -2,9 +2,9 @@
   "upstream": "vest_lib",
   "version": "0.2.1",
   "archive_sha256": "f3f4d4698b6a56f5b23ae330d294a8d77fbb728fbf6d74946a18e0e46ba6e7a9",
-  "tree_sha256": "425bf40c89a2d0a9cf17a3076522b6b34658e6987f288ecc4c75239a6509c020",
+  "tree_sha256": "86256b85e34d9b2897c0100947d016db5b95084f9afe4840ec1301b4d265b23d",
   "tree_algorithm": "sha256(sorted relative UTF-8 paths, u64le name length, name, u64le contents length, contents); excludes PROVENANCE.json",
-  "source_change": "six fixed-width integer spec mapper inputs use explicit arrays; six checked constructive mapper lemmas and eighteen calls at existing proof sites; no native code changes",
+  "source_change": "six fixed-width integer spec mapper inputs use explicit arrays; six checked constructive mapper lemmas and eighteen calls at existing proof sites; no native code changes; local verifier::rlimit(60) on parse_cbor_with_child changes only proof resources",
   "files": [
     {
       "path": "Cargo.toml",
@@ -164,7 +164,7 @@
     },
     {
       "path": "src/cbor/format.rs",
-      "sha256": "dd4c744ec66301d5aa5466ebfd4fc2a9f5270e471bc13e3893377d2cc905acb6"
+      "sha256": "bf261e8630a4748ada20af98aa2cdff91514707ef557e0d7f7a5e2efe36cd8fd"
     },
     {
       "path": "src/cbor/head.rs",
@@ -581,6 +581,7 @@
     "solver": "Z3 4.16.0",
     "verified": 3183,
     "errors": 0,
-    "scope": "complete vendored library with its declared upstream trusted primitives; core algorithms separately require --no-cheating"
+    "scope": "complete vendored library with its declared upstream trusted primitives; core algorithms separately require --no-cheating",
+    "solver_budget": "default global limit 10; local limit 60 only on parse_cbor_with_child"
   }
 }
