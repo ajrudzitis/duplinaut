@@ -177,9 +177,11 @@ proof_required = true
 implementations = [{ path = "crates/core/src/manifest.rs", symbol = "parse" }, { path = "crates/core/src/manifest.rs", symbol = "volumes" }, { path = "crates/core/src/manifest.rs", symbol = "may_contain" }]
 # Individual fresh strict checks: 21 obligations across restart/selection helpers,
 # plus six exact path/boundary/positive-decimal/record-completion obligations.
-# Entire manifest module: 66 strict obligations pass for safety and existing contracts.
-# parse still lacks complete contextual grammar refinement; same-source core gate pending.
+# Entire manifest module: 79 fresh strict obligations pass, including exact
+# success/error refinement against the independent contextual grammar.
+# Same-source complete-core acceptance and allocator assurance remain pending.
 proofs = [
+  { id = "manifest-contextual-parse", requirement = "PARSE-MAN-001", path = "crates/core/src/manifest.rs", symbol = "parse", kind = "contract" },
   { id = "manifest-digest-duplicates", requirement = "PARSE-MAN-003", path = "crates/core/src/manifest.rs", symbol = "digest_duplicate", kind = "contract" },
   { id = "manifest-path-adapter", requirement = "PARSE-MAN-001", path = "crates/core/src/manifest.rs", symbol = "path", kind = "contract" },
   { id = "manifest-boundary", requirement = "PARSE-MAN-001", path = "crates/core/src/manifest.rs", symbol = "boundary", kind = "contract" },

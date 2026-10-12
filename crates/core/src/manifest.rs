@@ -554,21 +554,24 @@ proof fn lemma_normalized_ordered(records: Seq<VolumeRecord>, end: int, cap: u64
         }
     }
 }
-#[verifier::rlimit(20)]
-proof fn lemma_insert_members(records: Seq<VolumeRecord>, record: VolumeRecord)
+proof fn lemma_insert_contains(records: Seq<VolumeRecord>, record: VolumeRecord)
     requires ordered_records(records),
-    ensures
-        exists|i: int| 0 <= i < insert_record(records, record).len()
-            && insert_record(records, record)[i] == record,
-        forall|i: int| 0 <= i < insert_record(records, record).len() ==>
-            (if insert_record(records, record)[i].number == record.number {
-                insert_record(records, record)[i] == record
-            } else {
-                exists|j: int| 0 <= j < records.len() && records[j] == insert_record(records, record)[i]
-            }),
-        forall|j: int| 0 <= j < records.len() && records[j].number != record.number ==>
-            exists|i: int| 0 <= i < insert_record(records, record).len()
-                && insert_record(records, record)[i] == records[j],
+    ensures exists|i: int| 0 <= i < insert_record(records, record).len()
+        && insert_record(records, record)[i] == record,
+{
+    lemma_insertion_index(records, record.number, 0);
+    let index = insertion_index(records, record.number, 0);
+    let output = insert_record(records, record);
+    let replacement = index < records.len() && records[index].number == record.number;
+    assert(0 <= index < output.len() && output[index] == record);
+}
+proof fn lemma_insert_origin(records: Seq<VolumeRecord>, record: VolumeRecord)
+    requires ordered_records(records),
+    ensures forall|i: int| 0 <= i < insert_record(records, record).len() ==>
+        (if insert_record(records, record)[i].number == record.number {
+            insert_record(records, record)[i] == record
+        } else { exists|j: int| 0 <= j < records.len()
+            && records[j] == insert_record(records, record)[i] }),
 {
     lemma_insertion_index(records, record.number, 0);
     let index = insertion_index(records, record.number, 0);
@@ -591,11 +594,42 @@ proof fn lemma_insert_members(records: Seq<VolumeRecord>, record: VolumeRecord)
             assert(output[i].number != record.number);
         }
     }
+}
+proof fn lemma_insert_preserves(records: Seq<VolumeRecord>, record: VolumeRecord)
+    requires ordered_records(records),
+    ensures forall|j: int| 0 <= j < records.len() && records[j].number != record.number ==>
+        exists|i: int| 0 <= i < insert_record(records, record).len()
+            && insert_record(records, record)[i] == records[j],
+{
+    lemma_insertion_index(records, record.number, 0);
+    let index = insertion_index(records, record.number, 0);
+    let output = insert_record(records, record);
+    let replacement = index < records.len() && records[index].number == record.number;
+    assert(0 <= index < output.len() && output[index] == record);
     assert forall|j: int| 0 <= j < records.len() && records[j].number != record.number
         implies exists|i: int| 0 <= i < output.len() && output[i] == records[j] by {
         let new_index = if replacement || j < index { j } else { j + 1 };
         assert(0 <= new_index < output.len() && output[new_index] == records[j]);
     }
+}
+proof fn lemma_insert_members(records: Seq<VolumeRecord>, record: VolumeRecord)
+    requires ordered_records(records),
+    ensures
+        exists|i: int| 0 <= i < insert_record(records, record).len()
+            && insert_record(records, record)[i] == record,
+        forall|i: int| 0 <= i < insert_record(records, record).len() ==>
+            (if insert_record(records, record)[i].number == record.number {
+                insert_record(records, record)[i] == record
+            } else {
+                exists|j: int| 0 <= j < records.len() && records[j] == insert_record(records, record)[i]
+            }),
+        forall|j: int| 0 <= j < records.len() && records[j].number != record.number ==>
+            exists|i: int| 0 <= i < insert_record(records, record).len()
+                && insert_record(records, record)[i] == records[j],
+{
+    lemma_insert_contains(records, record);
+    lemma_insert_origin(records, record);
+    lemma_insert_preserves(records, record);
 }
 pub closed spec fn latest_record(records: Seq<VolumeRecord>, end: int, record: VolumeRecord) -> bool {
     exists|j: int| 0 <= j < end && record == records[j]
@@ -717,6 +751,574 @@ proof fn lemma_normalized_semantics(records: Seq<VolumeRecord>, end: int, cap: u
     }
 }
 
+// Contextual model draft: not yet connected to Manifest::parse.
+// These structures represent byte identities and ordered records, rather than
+// executable Vec capacities or allocation identities.
+pub ghost struct ManifestDigestValue {
+    pub algorithm: DigestAlgorithm,
+    pub name: Seq<u8>,
+    pub hex: Seq<u8>,
+}
+pub ghost struct ManifestBoundaryValue {
+    pub path: Seq<Seq<u8>>,
+    pub block: Option<u64>,
+}
+pub ghost struct ManifestVolumeValue {
+    pub number: u64,
+    pub start: ManifestBoundaryValue,
+    pub end: ManifestBoundaryValue,
+    pub hashes: Seq<ManifestDigestValue>,
+}
+pub ghost struct ManifestChangeValue {
+    pub action: FileAction,
+    pub path: Seq<Seq<u8>>,
+}
+pub ghost struct ManifestValue {
+    pub hostname: Option<Seq<u8>>,
+    pub localdir: Option<Seq<u8>>,
+    pub records: Seq<ManifestVolumeValue>,
+    pub filelist: Option<Seq<ManifestChangeValue>>,
+}
+// Used only by erased contextual specifications.
+#[allow(dead_code)]
+ghost struct ManifestPendingValue {
+    number: u64,
+    start: Option<ManifestBoundaryValue>,
+    end: Option<ManifestBoundaryValue>,
+    hashes: Seq<ManifestDigestValue>,
+}
+// Used only by erased contextual specifications.
+#[allow(dead_code)]
+ghost struct ManifestStateValue {
+    manifest: ManifestValue,
+    pending: Option<ManifestPendingValue>,
+    remaining: int,
+    filelist_closed: bool,
+    entries_reserved: int,
+    metadata_reserved: int,
+}
+pub open spec fn digest_value(value: DeclaredDigest) -> ManifestDigestValue {
+    ManifestDigestValue { algorithm: value.algorithm, name: value.name@, hex: value.hex@ }
+}
+pub open spec fn boundary_value(value: Boundary) -> ManifestBoundaryValue {
+    ManifestBoundaryValue { path: value.path@, block: value.block }
+}
+pub open spec fn volume_value(value: VolumeRecord) -> ManifestVolumeValue {
+    ManifestVolumeValue { number: value.number, start: boundary_value(value.start),
+        end: boundary_value(value.end), hashes: value.hashes@.map_values(|item| digest_value(item)) }
+}
+pub open spec fn change_value(value: FileChange) -> ManifestChangeValue {
+    ManifestChangeValue { action: value.action, path: value.path@ }
+}
+pub open spec fn manifest_value(value: Manifest) -> ManifestValue {
+    ManifestValue {
+        hostname: match value.hostname { None => None, Some(bytes) => Some(bytes@) },
+        localdir: match value.localdir { None => None, Some(bytes) => Some(bytes@) },
+        records: value.records@.map_values(|item| volume_value(item)),
+        filelist: match value.filelist {
+            None => None, Some(changes) => Some(changes@.map_values(|item| change_value(item))),
+        },
+    }
+}
+proof fn lemma_volume_map_push(records: Seq<VolumeRecord>, record: VolumeRecord)
+    ensures records.push(record).map_values(|item| volume_value(item))
+        == records.map_values(|item| volume_value(item)).push(volume_value(record)),
+{
+    assert(records.push(record).map_values(|item| volume_value(item)) =~=
+        records.map_values(|item| volume_value(item)).push(volume_value(record)));
+}
+proof fn lemma_change_map_push(changes: Seq<FileChange>, change: FileChange)
+    ensures changes.push(change).map_values(|item| change_value(item))
+        == changes.map_values(|item| change_value(item)).push(change_value(change)),
+{
+    assert(changes.push(change).map_values(|item| change_value(item)) =~=
+        changes.map_values(|item| change_value(item)).push(change_value(change)));
+}
+proof fn lemma_digest_map_push(hashes: Seq<DeclaredDigest>, hash: DeclaredDigest)
+    ensures hashes.push(hash).map_values(|item| digest_value(item))
+        == hashes.map_values(|item| digest_value(item)).push(digest_value(hash)),
+{
+    assert(hashes.push(hash).map_values(|item| digest_value(item)) =~=
+        hashes.map_values(|item| digest_value(item)).push(digest_value(hash)));
+}
+spec fn pending_value(value: PendingVolume) -> ManifestPendingValue {
+    ManifestPendingValue { number: value.number,
+        start: match value.start { None => None, Some(boundary) => Some(boundary_value(boundary)) },
+        end: match value.end { None => None, Some(boundary) => Some(boundary_value(boundary)) },
+        hashes: value.hashes@.map_values(|item| digest_value(item)),
+    }
+}
+spec fn state_value(manifest: Manifest, pending: Option<PendingVolume>, remaining: u64,
+    closed: bool, entry_count: usize, metadata_reserved: usize) -> ManifestStateValue {
+    ManifestStateValue { manifest: manifest_value(manifest),
+        pending: match pending { None => None, Some(volume) => Some(pending_value(volume)) },
+        remaining: remaining as int, filelist_closed: closed,
+        entries_reserved: entry_count as int, metadata_reserved: metadata_reserved as int,
+    }
+}
+spec fn initial_state() -> ManifestStateValue {
+    ManifestStateValue {
+        manifest: ManifestValue { hostname: None, localdir: None, records: Seq::empty(), filelist: None },
+        pending: None, remaining: 0, filelist_closed: false,
+        entries_reserved: 0, metadata_reserved: 0,
+    }
+}
+spec fn digest_value_model(bytes: Seq<u8>) -> Result<ManifestDigestValue, ManifestError> {
+    let (name, hex) = word_model(bytes);
+    if !digest_valid(bytes) { Err(ManifestError::Malformed) }
+    else { Ok(ManifestDigestValue { algorithm: digest_algorithm(name),
+        name: normalized(name), hex: normalized(hex) }) }
+}
+spec fn boundary_value_model(bytes: Seq<u8>, limits: ManifestLimits)
+    -> Result<ManifestBoundaryValue, ManifestError> {
+    match boundary_model(bytes, limits) {
+        Err(error) => Err(error),
+        Ok((path, block)) => Ok(ManifestBoundaryValue { path, block }),
+    }
+}
+spec fn complete_value(value: ManifestPendingValue) -> Result<ManifestVolumeValue, ManifestError> {
+    match (value.start, value.end) {
+        (Some(start), Some(end)) => {
+            if crate::path::components_less(end.path, start.path) || value.hashes.len() == 0 {
+                Err(ManifestError::Malformed)
+            } else if !(exists|i: int| 0 <= i < value.hashes.len()
+                && value.hashes[i].algorithm != DigestAlgorithm::Unsupported) {
+                Err(ManifestError::UnsupportedIntegrity)
+            } else { Ok(ManifestVolumeValue { number: value.number, start, end, hashes: value.hashes }) }
+        },
+        _ => Err(ManifestError::Malformed),
+    }
+}
+spec fn digest_values(hashes: Seq<DeclaredDigest>) -> Seq<ManifestDigestValue> {
+    hashes.map_values(|item| digest_value(item))
+}
+proof fn lemma_digest_value_members(hashes: Seq<DeclaredDigest>, hash: DeclaredDigest)
+    ensures
+        digest_present(hashes, hash) == (exists|i: int| 0 <= i < hashes.len()
+            && #[trigger] ascii_equal(digest_values(hashes)[i].name, digest_value(hash).name)),
+        digest_conflict(hashes, hash) == (exists|i: int| 0 <= i < hashes.len()
+            && #[trigger] ascii_equal(digest_values(hashes)[i].name, digest_value(hash).name)
+            && digest_values(hashes)[i].hex != digest_value(hash).hex),
+{
+    let mapped = digest_values(hashes);
+    assert forall|i: int| 0 <= i < hashes.len() implies
+        (digest_names_equal(hashes[i], hash) == ascii_equal(mapped[i].name, digest_value(hash).name)
+        && (hashes[i].hex@ != hash.hex@) == (mapped[i].hex != digest_value(hash).hex)) by {
+        assert(mapped[i] == digest_value(hashes[i]));
+    }
+}
+proof fn lemma_finish_value(pending: PendingVolume)
+    ensures match finish_model(pending) {
+        Ok(value) => complete_value(pending_value(pending)) == Ok(volume_value(value)),
+        Err(error) => complete_value(pending_value(pending)) == Err(error),
+    },
+{
+    let mapped = pending_value(pending).hashes;
+    assert(mapped.len() == pending.hashes@.len());
+    assert forall|i: int| 0 <= i < mapped.len() implies
+        mapped[i].algorithm == pending.hashes@[i].algorithm by {
+        assert(mapped[i] == digest_value(pending.hashes@[i]));
+    }
+    if exists|i: int| 0 <= i < pending.hashes@.len()
+        && pending.hashes@[i].algorithm != DigestAlgorithm::Unsupported {
+        let i = choose|i: int| 0 <= i < pending.hashes@.len()
+            && pending.hashes@[i].algorithm != DigestAlgorithm::Unsupported;
+        assert(mapped[i].algorithm != DigestAlgorithm::Unsupported);
+    }
+    if exists|i: int| 0 <= i < mapped.len()
+        && mapped[i].algorithm != DigestAlgorithm::Unsupported {
+        let i = choose|i: int| 0 <= i < mapped.len()
+            && mapped[i].algorithm != DigestAlgorithm::Unsupported;
+        assert(pending.hashes@[i].algorithm != DigestAlgorithm::Unsupported);
+    }
+}
+spec fn flush_state(state: ManifestStateValue) -> Result<ManifestStateValue, ManifestError> {
+    match state.pending {
+        None => Ok(state),
+        Some(volume) => match complete_value(volume) {
+            Err(error) => Err(error),
+            Ok(record) => Ok(ManifestStateValue {
+                manifest: ManifestValue { records: state.manifest.records.push(record), ..state.manifest },
+                pending: None, ..state
+            }),
+        },
+    }
+}
+// Exact lexical predicate; opacity confines pointwise quantifiers to its checked adapter.
+#[verifier::opaque]
+spec fn keyword_matches(left: Seq<u8>, right: Seq<u8>) -> bool {
+    ascii_equal(left, right)
+}
+fn manifest_keyword(left: &[u8], right: &[u8]) -> (result: bool)
+    ensures result == keyword_matches(left@, right@),
+{
+    proof { reveal(keyword_matches); }
+    equal_word(left, right)
+}
+spec fn interpret_line(state: ManifestStateValue, raw: Seq<u8>, limits: ManifestLimits)
+    -> Result<ManifestStateValue, ManifestError> {
+    let line = trimmed(raw);
+    if line.len() == 0 { Ok(state) }
+    else if state.metadata_reserved + 512 + 80 * line.len() > limits.metadata_bytes {
+        Err(ManifestError::Limit)
+    } else {
+        let state = ManifestStateValue {
+            metadata_reserved: state.metadata_reserved + 512 + 80 * line.len(), ..state
+        };
+        let indented = raw.len() > 0 && spacing(raw[0]);
+        let (field, value) = word_model(line);
+        if state.remaining > 0 {
+            if !indented { Err(ManifestError::Malformed) }
+            else {
+                let action = if keyword_matches(field, seq![b'n', b'e', b'w']) { Some(FileAction::New) }
+                    else if keyword_matches(field, seq![b'c', b'h', b'a', b'n', b'g', b'e', b'd']) { Some(FileAction::Changed) }
+                    else if keyword_matches(field, seq![b'd', b'e', b'l', b'e', b't', b'e', b'd']) { Some(FileAction::Deleted) }
+                    else { None };
+                match action {
+                    None => Err(ManifestError::Malformed),
+                    Some(action) => match manifest_token_model(value, limits.line_bytes as int) {
+                        Err(error) => Err(error),
+                        Ok((decoded, rest)) => {
+                            if rest.len() != 0 { Err(ManifestError::Malformed) }
+                            else {
+                                match manifest_path_model(decoded, limits) {
+                                    Err(error) => Err(error),
+                                    Ok(path) => match state.manifest.filelist {
+                                        None => Err(ManifestError::Malformed),
+                                        Some(list) => Ok(ManifestStateValue {
+                                            manifest: ManifestValue {
+                                                filelist: Some(list.push(ManifestChangeValue { action, path })),
+                                                ..state.manifest
+                                            },
+                                            remaining: state.remaining - 1, ..state
+                                        }),
+                                    },
+                                }
+                            }
+                        },
+                    },
+                }
+            }
+        } else if !indented {
+            if keyword_matches(field, seq![b'V', b'o', b'l', b'u', b'm', b'e'])
+                || keyword_matches(field, seq![b'F', b'i', b'l', b'e', b'l', b'i', b's', b't']) {
+                match flush_state(state) {
+                    Err(error) => Err(error),
+                    Ok(state) => {
+                        if keyword_matches(field, seq![b'V', b'o', b'l', b'u', b'm', b'e']) {
+                            if state.filelist_closed { Err(ManifestError::Malformed) }
+                            else if state.entries_reserved >= limits.entries { Err(ManifestError::Limit) }
+                            else if value.len() < 2 || value[value.len() as int - 1] != b':' {
+                                Err(ManifestError::Malformed)
+                            } else {
+                                match decimal_model(value.take(value.len() as int - 1), true) {
+                                    Err(error) => Err(error),
+                                    Ok(number) => Ok(ManifestStateValue {
+                                        entries_reserved: state.entries_reserved + 1,
+                                        pending: Some(ManifestPendingValue {
+                                            number, start: None, end: None, hashes: Seq::empty(),
+                                        }), ..state
+                                    }),
+                                }
+                            }
+                        } else {
+                            match state.manifest.filelist {
+                                Some(_) => Err(ManifestError::Malformed),
+                                None => match decimal_model(value, false) {
+                                    Err(error) => Err(error),
+                                    Ok(count) => {
+                                        if count as int > limits.entries as int - state.entries_reserved {
+                                            Err(ManifestError::Limit)
+                                        } else { Ok(ManifestStateValue {
+                                            remaining: count as int,
+                                            entries_reserved: state.entries_reserved + count as int,
+                                            filelist_closed: state.manifest.records.len() > 0,
+                                            manifest: ManifestValue { filelist: Some(Seq::empty()), ..state.manifest },
+                                            ..state
+                                        }) }
+                                    },
+                                },
+                            }
+                        }
+                    },
+                }
+            } else if keyword_matches(field, seq![b'H', b'o', b's', b't', b'n', b'a', b'm', b'e']) {
+                if state.pending.is_some() || state.manifest.hostname.is_some() || value.len() == 0 {
+                    Err(ManifestError::Malformed)
+                } else { Ok(ManifestStateValue {
+                    manifest: ManifestValue { hostname: Some(value), ..state.manifest }, ..state
+                }) }
+            } else if keyword_matches(field, seq![b'L', b'o', b'c', b'a', b'l', b'd', b'i', b'r']) {
+                if state.pending.is_some() || state.manifest.localdir.is_some() { Err(ManifestError::Malformed) }
+                else {
+                    match manifest_token_model(value, limits.line_bytes as int) {
+                        Err(error) => Err(error),
+                        Ok((decoded, rest)) => {
+                            if rest.len() != 0 { Err(ManifestError::Malformed) }
+                            else { Ok(ManifestStateValue {
+                                manifest: ManifestValue { localdir: Some(decoded), ..state.manifest }, ..state
+                            }) }
+                        },
+                    }
+                }
+            } else { Err(ManifestError::Malformed) }
+        } else {
+            match state.pending {
+                None => Err(ManifestError::Malformed),
+                Some(volume) => {
+                    if keyword_matches(field, seq![b'S', b't', b'a', b'r', b't', b'i', b'n', b'g', b'P', b'a', b't', b'h'])
+                        || keyword_matches(field, seq![b'E', b'n', b'd', b'i', b'n', b'g', b'P', b'a', b't', b'h']) {
+                        match boundary_value_model(value, limits) {
+                            Err(error) => Err(error),
+                            Ok(boundary) => {
+                                if keyword_matches(field, seq![b'S', b't', b'a', b'r', b't', b'i', b'n', b'g', b'P', b'a', b't', b'h']) {
+                                    if volume.start.is_some() { Err(ManifestError::Malformed) }
+                                    else { Ok(ManifestStateValue { pending: Some(ManifestPendingValue {
+                                        start: Some(boundary), ..volume
+                                    }), ..state }) }
+                                } else {
+                                    if volume.end.is_some() { Err(ManifestError::Malformed) }
+                                    else { Ok(ManifestStateValue { pending: Some(ManifestPendingValue {
+                                        end: Some(boundary), ..volume
+                                    }), ..state }) }
+                                }
+                            },
+                        }
+                    } else if keyword_matches(field, seq![b'H', b'a', b's', b'h']) {
+                        match digest_value_model(value) {
+                            Err(error) => Err(error),
+                            Ok(hash) => {
+                                let conflict = exists|i: int| 0 <= i < volume.hashes.len()
+                                    && ascii_equal(volume.hashes[i].name, hash.name)
+                                    && volume.hashes[i].hex != hash.hex;
+                                let duplicate = exists|i: int| 0 <= i < volume.hashes.len()
+                                    && ascii_equal(volume.hashes[i].name, hash.name);
+                                if conflict { Err(ManifestError::Malformed) }
+                                else if duplicate { Ok(state) }
+                                else if state.entries_reserved >= limits.entries { Err(ManifestError::Limit) }
+                                else { Ok(ManifestStateValue {
+                                    entries_reserved: state.entries_reserved + 1,
+                                    pending: Some(ManifestPendingValue {
+                                        hashes: volume.hashes.push(hash), ..volume
+                                    }), ..state
+                                }) }
+                            },
+                        }
+                    } else { Err(ManifestError::Malformed) }
+                },
+            }
+        }
+    }
+}
+spec fn finish_state(state: ManifestStateValue) -> Result<ManifestValue, ManifestError> {
+    if state.remaining != 0 { Err(ManifestError::Malformed) }
+    else {
+        match flush_state(state) {
+            Err(error) => Err(error),
+            Ok(state) => {
+                if state.manifest.records.len() == 0 { Err(ManifestError::Malformed) }
+                else { Ok(state.manifest) }
+            },
+        }
+    }
+}
+spec fn line_ending(bytes: Seq<u8>, cursor: int) -> int
+    decreases bytes.len() - cursor,
+{
+    if 0 <= cursor < bytes.len() && bytes[cursor] != b'\n' { line_ending(bytes, cursor + 1) }
+    else { cursor }
+}
+proof fn lemma_line_ending_bounds(bytes: Seq<u8>, cursor: int)
+    requires 0 <= cursor <= bytes.len(),
+    ensures cursor <= line_ending(bytes, cursor) <= bytes.len(),
+        line_ending(bytes, cursor) < bytes.len() ==> bytes[line_ending(bytes, cursor)] == b'\n',
+        forall|i: int| cursor <= i < line_ending(bytes, cursor) ==> bytes[i] != b'\n',
+    decreases bytes.len() - cursor,
+{
+    reveal_with_fuel(line_ending, 1);
+    if cursor < bytes.len() && bytes[cursor] != b'\n' {
+        lemma_line_ending_bounds(bytes, cursor + 1);
+    }
+}
+#[verifier::opaque]
+spec fn parse_state_model(bytes: Seq<u8>, cursor: int, state: ManifestStateValue, limits: ManifestLimits)
+    -> Result<ManifestValue, ManifestError>
+    decreases bytes.len() - cursor
+    via parse_state_decreases
+{
+    if !(0 <= cursor <= bytes.len()) { Err(ManifestError::Malformed) }
+    else if cursor == bytes.len() { finish_state(state) }
+    else {
+        let end = line_ending(bytes, cursor);
+        if end - cursor > limits.line_bytes { Err(ManifestError::Limit) }
+        else {
+            let stripped = if end > cursor && bytes[end - 1] == b'\r' { end - 1 } else { end };
+            let raw = bytes.subrange(cursor, stripped);
+            match interpret_line(state, raw, limits) {
+                Err(error) => Err(error),
+                Ok(next) => parse_state_model(bytes, if end < bytes.len() { end + 1 } else { end }, next, limits),
+            }
+        }
+    }
+}
+#[verifier::decreases_by]
+proof fn parse_state_decreases(bytes: Seq<u8>, cursor: int, state: ManifestStateValue, limits: ManifestLimits) {
+    if 0 <= cursor < bytes.len() { lemma_line_ending_bounds(bytes, cursor); }
+}
+pub closed spec fn manifest_model(bytes: Seq<u8>, limits: ManifestLimits) -> Result<ManifestValue, ManifestError> {
+    if bytes.len() > limits.metadata_bytes { Err(ManifestError::Limit) }
+    else { parse_state_model(bytes, 0, initial_state(), limits) }
+}
+
+struct ParseState {
+    manifest: Manifest,
+    pending: Option<PendingVolume>,
+    remaining: u64,
+    filelist_closed: bool,
+    entry_count: usize,
+    metadata_reserved: usize,
+}
+spec fn parse_value(state: ParseState) -> ManifestStateValue {
+    state_value(state.manifest, state.pending, state.remaining, state.filelist_closed,
+        state.entry_count, state.metadata_reserved)
+}
+// This adapter preserves the original branch and error precedence. It moves
+// existing vectors through the state; no clone or new allocation is introduced.
+#[allow(clippy::byte_char_slices)]
+// Verus expands the source's shorthand mutable destructuring into explicit fields.
+#[allow(non_shorthand_field_patterns)]
+#[verifier::spinoff_prover]
+#[verifier::rlimit(20)]
+fn parse_line(raw: &[u8], line: &[u8], limits: ManifestLimits, state: ParseState)
+    -> (result: Result<ParseState, ManifestError>)
+    requires line@ == trimmed(raw@), line.len() > 0,
+        state.entry_count <= limits.entries,
+        state.metadata_reserved <= limits.metadata_bytes,
+    ensures match result {
+        Ok(next) => interpret_line(parse_value(state), raw@, limits) == Ok(parse_value(next))
+            && next.entry_count <= limits.entries && next.metadata_reserved <= limits.metadata_bytes,
+        Err(error) => interpret_line(parse_value(state), raw@, limits) == Err(error),
+    },
+{
+    let ParseState { mut manifest, mut pending, mut remaining, mut filelist_closed,
+        mut entry_count, mut metadata_reserved } = state;
+    let ghost previous_state = state_value(manifest, pending, remaining, filelist_closed,
+        entry_count, metadata_reserved);
+    // Reserve before decoding: bytes in fields plus conservative vector,
+    // record and worst-case byte-component allocation overhead. This
+    // intentionally overestimates retained metadata rather than treating
+    // serialized bytes as the size of an allocated tree of vectors.
+    if metadata_reserved > limits.metadata_bytes
+        || limits.metadata_bytes - metadata_reserved < 512 { return Err(ManifestError::Limit); }
+    metadata_reserved += 512;
+    if line.len() > (limits.metadata_bytes - metadata_reserved) / 80 { return Err(ManifestError::Limit); }
+    metadata_reserved += line.len() * 80;
+    let ghost charged_state = state_value(manifest, pending, remaining, filelist_closed,
+        entry_count, metadata_reserved);
+    assert(charged_state == ManifestStateValue {
+        metadata_reserved: previous_state.metadata_reserved + 512 + 80 * line@.len(),
+        ..previous_state
+    });
+    let indented = raw.len() > 0 && space(raw[0]);
+    let (field, value) = word(line);
+    if remaining > 0 {
+        if !indented { return Err(ManifestError::Malformed); }
+        let action = if manifest_keyword(field, &[b'n', b'e', b'w']) { FileAction::New }
+            else if manifest_keyword(field, &[b'c', b'h', b'a', b'n', b'g', b'e', b'd']) { FileAction::Changed }
+            else if manifest_keyword(field, &[b'd', b'e', b'l', b'e', b't', b'e', b'd']) { FileAction::Deleted }
+            else { return Err(ManifestError::Malformed); };
+        let (decoded, rest) = match token(value, &limits) { Ok(value) => value, Err(error) => return Err(error) };
+        if rest.len() != 0 { return Err(ManifestError::Malformed); }
+        let path = match path(&decoded, &limits) { Ok(value) => value, Err(error) => return Err(error) };
+        match &mut manifest.filelist {
+            Some(list) => {
+                proof { lemma_change_map_push(list@, FileChange { action, path }); }
+                list.push(FileChange { action, path });
+            },
+            None => return Err(ManifestError::Malformed),
+        }
+        remaining -= 1;
+        assert(interpret_line(previous_state, raw@, limits) == Ok(state_value(manifest,
+            pending, remaining, filelist_closed, entry_count, metadata_reserved)));
+        return Ok(ParseState { manifest, pending, remaining, filelist_closed, entry_count, metadata_reserved });
+    }
+    if !indented {
+        if manifest_keyword(field, &[b'V', b'o', b'l', b'u', b'm', b'e']) || manifest_keyword(field, &[b'F', b'i', b'l', b'e', b'l', b'i', b's', b't']) {
+            if let Some(record) = pending {
+                proof { lemma_finish_value(record); }
+                let record = match finish(record) { Ok(value) => value, Err(error) => return Err(error) };
+                proof { lemma_volume_map_push(manifest.records@, record); }
+                manifest.records.push(record);
+            }
+            pending = None;
+            assert(flush_state(charged_state) == Ok(state_value(manifest, pending,
+                remaining, filelist_closed, entry_count, metadata_reserved)));
+            if manifest_keyword(field, &[b'V', b'o', b'l', b'u', b'm', b'e']) {
+                if filelist_closed { return Err(ManifestError::Malformed); }
+                if entry_count == limits.entries { return Err(ManifestError::Limit); }
+                entry_count += 1;
+                if value.len() < 2 || value[value.len() - 1] != b':' { return Err(ManifestError::Malformed); }
+                let number = match decimal(vstd::slice::slice_subrange(value, 0, value.len() - 1), true) {
+                    Ok(value) => value, Err(error) => return Err(error),
+                };
+                pending = Some(PendingVolume { number, start: None, end: None, hashes: Vec::new() });
+                assert(pending_value(pending.unwrap()).hashes =~= Seq::empty());
+            assert(interpret_line(previous_state, raw@, limits) == Ok(state_value(manifest,
+                pending, remaining, filelist_closed, entry_count, metadata_reserved)));
+            } else {
+                if manifest.filelist.is_some() { return Err(ManifestError::Malformed); }
+                remaining = match decimal(value, false) { Ok(value) => value, Err(error) => return Err(error) };
+                if remaining > (limits.entries - entry_count) as u64 { return Err(ManifestError::Limit); }
+                entry_count += remaining as usize;
+                filelist_closed = manifest.records.len() > 0;
+                manifest.filelist = Some(Vec::new());
+                assert(manifest.filelist.unwrap()@.map_values(|item| change_value(item)) =~= Seq::empty());
+            assert(interpret_line(previous_state, raw@, limits) == Ok(state_value(manifest,
+                pending, remaining, filelist_closed, entry_count, metadata_reserved)));
+            }
+        } else if manifest_keyword(field, &[b'H', b'o', b's', b't', b'n', b'a', b'm', b'e']) {
+            if pending.is_some() || manifest.hostname.is_some() || value.len() == 0 { return Err(ManifestError::Malformed); }
+            manifest.hostname = Some(owned(value));
+            assert(interpret_line(previous_state, raw@, limits) == Ok(state_value(manifest,
+                pending, remaining, filelist_closed, entry_count, metadata_reserved)));
+        } else if manifest_keyword(field, &[b'L', b'o', b'c', b'a', b'l', b'd', b'i', b'r']) {
+            if pending.is_some() || manifest.localdir.is_some() { return Err(ManifestError::Malformed); }
+            let (decoded, rest) = match token(value, &limits) { Ok(value) => value, Err(error) => return Err(error) };
+            if rest.len() != 0 { return Err(ManifestError::Malformed); }
+            manifest.localdir = Some(decoded);
+            assert(interpret_line(previous_state, raw@, limits) == Ok(state_value(manifest,
+                pending, remaining, filelist_closed, entry_count, metadata_reserved)));
+        } else { return Err(ManifestError::Malformed); }
+    } else {
+        let record = match &mut pending { Some(value) => value, None => return Err(ManifestError::Malformed) };
+        if manifest_keyword(field, &[b'S', b't', b'a', b'r', b't', b'i', b'n', b'g', b'P', b'a', b't', b'h']) || manifest_keyword(field, &[b'E', b'n', b'd', b'i', b'n', b'g', b'P', b'a', b't', b'h']) {
+            let boundary = match boundary(value, &limits) { Ok(value) => value, Err(error) => return Err(error) };
+            if manifest_keyword(field, &[b'S', b't', b'a', b'r', b't', b'i', b'n', b'g', b'P', b'a', b't', b'h']) {
+                if record.start.is_some() { return Err(ManifestError::Malformed); }
+                record.start = Some(boundary);
+            } else {
+                if record.end.is_some() { return Err(ManifestError::Malformed); }
+                record.end = Some(boundary);
+            }
+        } else if manifest_keyword(field, &[b'H', b'a', b's', b'h']) {
+            let hash = match digest(value) { Ok(value) => value, Err(error) => return Err(error) };
+            proof { lemma_digest_value_members(record.hashes@, hash); }
+            let duplicate = match digest_duplicate(&record.hashes, &hash) {
+                Ok(value) => value, Err(error) => return Err(error),
+            };
+            if !duplicate {
+                if entry_count == limits.entries { return Err(ManifestError::Limit); }
+                entry_count += 1;
+                proof { lemma_digest_map_push(record.hashes@, hash); }
+                record.hashes.push(hash);
+            }
+        } else { return Err(ManifestError::Malformed); }
+    }
+    assert(interpret_line(previous_state, raw@, limits) == Ok(state_value(manifest,
+        pending, remaining, filelist_closed, entry_count, metadata_reserved)));
+    Ok(ParseState { manifest, pending, remaining, filelist_closed, entry_count, metadata_reserved })
+}
+
 impl Manifest {
     //= docs/parsing-requirements.md#parse-man-001
     //# The manifest parser MUST recover ordered volume records containing volume number, starting path, ending path, optional block boundaries, and declared hashes.
@@ -728,125 +1330,86 @@ impl Manifest {
     //# An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
     // Explicit grammar bytes remain visible to the checked equality contract.
     #[allow(clippy::byte_char_slices)]
-    pub fn parse(bytes: &[u8], limits: ManifestLimits) -> Result<Self, ManifestError> {
+    #[verifier::spinoff_prover]
+    #[verifier::rlimit(20)]
+    pub fn parse(bytes: &[u8], limits: ManifestLimits) -> (result: Result<Self, ManifestError>)
+        ensures match result {
+            Ok(value) => manifest_model(bytes@, limits) == Ok(manifest_value(value)),
+            Err(error) => manifest_model(bytes@, limits) == Err(error),
+        },
+    {
+        proof { reveal(manifest_model); }
         if bytes.len() > limits.metadata_bytes { return Err(ManifestError::Limit); }
-        let mut manifest = Self { hostname: None, localdir: None, records: Vec::new(), filelist: None };
-        let mut pending: Option<PendingVolume> = None;
-        let mut remaining: u64 = 0;
-        let mut filelist_closed = false;
-        let mut entry_count = 0;
+        let mut state = ParseState {
+            manifest: Self { hostname: None, localdir: None, records: Vec::new(), filelist: None },
+            pending: None, remaining: 0, filelist_closed: false,
+            entry_count: 0, metadata_reserved: 0,
+        };
         let mut cursor = 0;
-        let mut metadata_reserved = 0;
+        proof {
+            let initial = state_value(state.manifest, state.pending, state.remaining, state.filelist_closed, state.entry_count, state.metadata_reserved);
+            assert(initial.manifest.records =~= Seq::empty());
+            assert(initial == initial_state());
+        }
         while cursor < bytes.len()
-            invariant cursor <= bytes.len(), entry_count <= limits.entries,
-                metadata_reserved <= limits.metadata_bytes,
+            invariant cursor <= bytes.len(), state.entry_count <= limits.entries,
+                state.metadata_reserved <= limits.metadata_bytes,
+                manifest_model(bytes@, limits) == parse_state_model(bytes@, cursor as int,
+                    state_value(state.manifest, state.pending, state.remaining, state.filelist_closed, state.entry_count, state.metadata_reserved), limits),
             decreases bytes.len() - cursor,
         {
             let start = cursor;
+            let ghost previous_state = state_value(state.manifest, state.pending, state.remaining, state.filelist_closed,
+                state.entry_count, state.metadata_reserved);
             while cursor < bytes.len() && bytes[cursor] != b'\n'
-                invariant start <= cursor <= bytes.len(),
+                invariant start <= cursor <= bytes.len(), cursor - start <= limits.line_bytes,
+                    line_ending(bytes@, start as int) == line_ending(bytes@, cursor as int),
+                    manifest_model(bytes@, limits) == parse_state_model(bytes@, start as int, previous_state, limits),
                 decreases bytes.len() - cursor,
             {
-                if cursor - start >= limits.line_bytes { return Err(ManifestError::Limit); }
+                if cursor - start >= limits.line_bytes {
+                    assert(manifest_model(bytes@, limits) == Err(ManifestError::Limit)) by {
+                        reveal_with_fuel(parse_state_model, 1);
+                        lemma_line_ending_bounds(bytes@, cursor as int + 1);
+                        reveal_with_fuel(line_ending, 1);
+                    }
+                    return Err(ManifestError::Limit);
+                }
+                proof { reveal_with_fuel(line_ending, 1); }
                 cursor += 1;
             }
+            proof { reveal_with_fuel(line_ending, 1); }
+            let ghost newline_end = cursor as int;
+            assert(line_ending(bytes@, start as int) == newline_end);
             let mut end = cursor;
             if end > start && bytes[end - 1] == b'\r' { end -= 1; }
             let raw = vstd::slice::slice_subrange(bytes, start, end);
             if cursor < bytes.len() { cursor += 1; }
+            let ghost next_cursor = cursor as int;
             let line = trim(raw);
+            assert(manifest_model(bytes@, limits) == match interpret_line(previous_state, raw@, limits) {
+                Err(error) => Err(error),
+                Ok(next) => parse_state_model(bytes@, next_cursor, next, limits),
+            }) by { reveal_with_fuel(parse_state_model, 1); }
             if line.len() == 0 { continue; }
-            // Reserve before decoding: bytes in fields plus conservative vector,
-            // record and worst-case byte-component allocation overhead. This
-            // intentionally overestimates retained metadata rather than treating
-            // serialized bytes as the size of an allocated tree of vectors.
-            if metadata_reserved > limits.metadata_bytes
-                || limits.metadata_bytes - metadata_reserved < 512 { return Err(ManifestError::Limit); }
-            metadata_reserved += 512;
-            if line.len() > (limits.metadata_bytes - metadata_reserved) / 80 { return Err(ManifestError::Limit); }
-            metadata_reserved += line.len() * 80;
-            let indented = raw.len() > 0 && space(raw[0]);
-            let (field, value) = word(line);
-            if remaining > 0 {
-                if !indented { return Err(ManifestError::Malformed); }
-                let action = if equal_word(field, &[b'n', b'e', b'w']) { FileAction::New }
-                    else if equal_word(field, &[b'c', b'h', b'a', b'n', b'g', b'e', b'd']) { FileAction::Changed }
-                    else if equal_word(field, &[b'd', b'e', b'l', b'e', b't', b'e', b'd']) { FileAction::Deleted }
-                    else { return Err(ManifestError::Malformed); };
-                let (decoded, rest) = match token(value, &limits) { Ok(value) => value, Err(error) => return Err(error) };
-                if rest.len() != 0 { return Err(ManifestError::Malformed); }
-                let path = match path(&decoded, &limits) { Ok(value) => value, Err(error) => return Err(error) };
-                match &mut manifest.filelist {
-                    Some(list) => list.push(FileChange { action, path }),
-                    None => return Err(ManifestError::Malformed),
-                }
-                remaining -= 1;
-                continue;
-            }
-            if !indented {
-                if equal_word(field, &[b'V', b'o', b'l', b'u', b'm', b'e']) || equal_word(field, &[b'F', b'i', b'l', b'e', b'l', b'i', b's', b't']) {
-                    if let Some(record) = pending {
-                        let record = match finish(record) { Ok(value) => value, Err(error) => return Err(error) };
-                        manifest.records.push(record);
-                    }
-                    pending = None;
-                    if equal_word(field, &[b'V', b'o', b'l', b'u', b'm', b'e']) {
-                        if filelist_closed { return Err(ManifestError::Malformed); }
-                        if entry_count == limits.entries { return Err(ManifestError::Limit); }
-                        entry_count += 1;
-                        if value.len() < 2 || value[value.len() - 1] != b':' { return Err(ManifestError::Malformed); }
-                        let number = match decimal(vstd::slice::slice_subrange(value, 0, value.len() - 1), true) {
-                            Ok(value) => value, Err(error) => return Err(error),
-                        };
-                        pending = Some(PendingVolume { number, start: None, end: None, hashes: Vec::new() });
-                    } else {
-                        if manifest.filelist.is_some() { return Err(ManifestError::Malformed); }
-                        remaining = match decimal(value, false) { Ok(value) => value, Err(error) => return Err(error) };
-                        if remaining > (limits.entries - entry_count) as u64 { return Err(ManifestError::Limit); }
-                        entry_count += remaining as usize;
-                        filelist_closed = manifest.records.len() > 0;
-                        manifest.filelist = Some(Vec::new());
-                    }
-                } else if equal_word(field, &[b'H', b'o', b's', b't', b'n', b'a', b'm', b'e']) {
-                    if pending.is_some() || manifest.hostname.is_some() || value.len() == 0 { return Err(ManifestError::Malformed); }
-                    manifest.hostname = Some(owned(value));
-                } else if equal_word(field, &[b'L', b'o', b'c', b'a', b'l', b'd', b'i', b'r']) {
-                    if pending.is_some() || manifest.localdir.is_some() { return Err(ManifestError::Malformed); }
-                    let (decoded, rest) = match token(value, &limits) { Ok(value) => value, Err(error) => return Err(error) };
-                    if rest.len() != 0 { return Err(ManifestError::Malformed); }
-                    manifest.localdir = Some(decoded);
-                } else { return Err(ManifestError::Malformed); }
-            } else {
-                let record = match &mut pending { Some(value) => value, None => return Err(ManifestError::Malformed) };
-                if equal_word(field, &[b'S', b't', b'a', b'r', b't', b'i', b'n', b'g', b'P', b'a', b't', b'h']) || equal_word(field, &[b'E', b'n', b'd', b'i', b'n', b'g', b'P', b'a', b't', b'h']) {
-                    let boundary = match boundary(value, &limits) { Ok(value) => value, Err(error) => return Err(error) };
-                    if equal_word(field, &[b'S', b't', b'a', b'r', b't', b'i', b'n', b'g', b'P', b'a', b't', b'h']) {
-                        if record.start.is_some() { return Err(ManifestError::Malformed); }
-                        record.start = Some(boundary);
-                    } else {
-                        if record.end.is_some() { return Err(ManifestError::Malformed); }
-                        record.end = Some(boundary);
-                    }
-                } else if equal_word(field, &[b'H', b'a', b's', b'h']) {
-                    let hash = match digest(value) { Ok(value) => value, Err(error) => return Err(error) };
-                    let duplicate = match digest_duplicate(&record.hashes, &hash) {
-                        Ok(value) => value, Err(error) => return Err(error),
-                    };
-                    if !duplicate {
-                        if entry_count == limits.entries { return Err(ManifestError::Limit); }
-                        entry_count += 1;
-                        record.hashes.push(hash);
-                    }
-                } else { return Err(ManifestError::Malformed); }
-            }
+            state = match parse_line(raw, line, limits, state) {
+                Ok(next) => next, Err(error) => return Err(error),
+            };
         }
-        if remaining != 0 { return Err(ManifestError::Malformed); }
-        if let Some(record) = pending {
+        let ghost terminal_state = state_value(state.manifest, state.pending, state.remaining, state.filelist_closed,
+            state.entry_count, state.metadata_reserved);
+        assert(manifest_model(bytes@, limits) == finish_state(terminal_state))
+            by { reveal_with_fuel(parse_state_model, 1); }
+        if state.remaining != 0 { return Err(ManifestError::Malformed); }
+        if let Some(record) = state.pending {
+            proof { lemma_finish_value(record); }
             let record = match finish(record) { Ok(value) => value, Err(error) => return Err(error) };
-            manifest.records.push(record);
+            proof { lemma_volume_map_push(state.manifest.records@, record); }
+                        state.manifest.records.push(record);
         }
-        if manifest.records.len() == 0 { return Err(ManifestError::Malformed); }
-        Ok(manifest)
+        if state.manifest.records.len() == 0 { return Err(ManifestError::Malformed); }
+        assert(finish_state(terminal_state) == Ok(manifest_value(state.manifest)));
+        Ok(state.manifest)
     }
 
     /// Ordered by volume number, last declaration wins, capped by final number.
