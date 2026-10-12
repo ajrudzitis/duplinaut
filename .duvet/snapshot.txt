@@ -114,13 +114,13 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The manifest parser MUST accept an optional counted Filelist section before or after volume records without interpreting its lines as volume fields.
 
   SECTION: [PARSE-MAN-008](#parse-man-008)
-    TEXT[!MUST]: A supported nonempty volume MUST have an EndingPath matching its actual last classified logical-data entry path and pending multipart block state.
+    TEXT[!MUST,implementation,test]: A supported nonempty volume MUST have an EndingPath matching its actual last classified logical-data entry path and pending multipart block state.
 
   SECTION: [PARSE-MAN-009](#parse-man-009)
-    TEXT[!MUST]: A reader accepting queued-restart compatibility MUST restrict a nonempty volume's StartingPath exception to the source-derived one-entry root/None or second-entry boundary forms with retained raw restart-rewrite evidence.
+    TEXT[!MUST,implementation,test]: A reader accepting queued-restart compatibility MUST restrict a nonempty volume's StartingPath exception to the source-derived one-entry root/None or second-entry boundary forms with retained raw restart-rewrite evidence.
 
   SECTION: [PARSE-MAN-010](#parse-man-010)
-    TEXT[!MUST]: A reader MUST scan every normalized volume of a restart-rewritten set when raw manifest intervals have not been certified to cover decoded entries by an object-identity-bound content index.
+    TEXT[!MUST,implementation,test]: A reader MUST scan every normalized volume of a restart-rewritten set when raw manifest intervals have not been certified to cover decoded entries by an object-identity-bound content index.
 
   SECTION: [PARSE-TAR-001](#parse-tar-001)
     TEXT[!MUST,implementation,test]: The tar parser MUST validate each header checksum and payload extent before accepting the entry it describes.
@@ -156,13 +156,13 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
 
   SECTION: [PARSE-MULTI-004](#parse-multi-004)
-    TEXT[!MUST]: Assembly MUST preserve pending logical-entry state across an empty volume while validating its supported empty-boundary marker shape.
+    TEXT[!MUST,implementation,test]: Assembly MUST preserve pending logical-entry state across an empty volume while validating its supported empty-boundary marker shape.
 
   SECTION: [PARSE-MULTI-005](#parse-multi-005)
-    TEXT[!MUST]: Repeated ordinary operations for one path within a backup set MUST retain archive order for snapshot-state interpretation.
+    TEXT[!MUST,implementation,test]: Repeated ordinary operations for one path within a backup set MUST retain archive order for snapshot-state interpretation.
 
   SECTION: [PARSE-MULTI-006](#parse-multi-006)
-    TEXT[!MUST]: Assembly MUST reject an ordinary/multipart representation mixture or a second multipart logical entry for one path within the initial supported backup-set profile.
+    TEXT[!MUST,implementation,test]: Assembly MUST reject an ordinary/multipart representation mixture or a second multipart logical entry for one path within the initial supported backup-set profile.
 
   SECTION: [PARSE-SIG-001](#parse-sig-001)
     TEXT[!MUST,implementation,test]: The signature parser MUST recognize the four reviewed signature magic values and reject other magic values as unsupported.

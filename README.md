@@ -27,7 +27,7 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | Storage and S3 | Exact-size and cancellation tests; 11 S3 tests using actual SDK HTTP handling; source review complete | Live-service and complete-reader consistency integration |
 | Assurance tooling | Pinned tools, Duvet baseline, executable failure tests, independent review | Expand gates as components are accepted |
 | Snapshot reconstruction | Three official backup dates match byte paths, contents and metadata; immutable prior-set delta bases; transactional failures | Controller/resource proofs and chain selection |
-| Multipart assembly | Official snapshot/delta source oracles; bounded ordered parts; provisional output and sticky failure tests | Formal refinement and queued-restart compatibility |
+| Multipart assembly | Official snapshot/delta source oracles; bounded ordered parts; provisional output and sticky failure tests | Formal refinement and footer-bearing/encrypted queued replay |
 | Repository browser and restore | Requirements and official source-tree oracles | Implementation, proofs, and compatibility matrix |
 | Terminal interface | Workspace scaffold | Browsing, restore selection, progress, and cancellation |
 

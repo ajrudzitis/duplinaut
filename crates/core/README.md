@@ -12,7 +12,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Librsync signatures | Reviewed four magics and checksum widths | Implemented; four tests pass; header uses Vest DSL | Header/controller/cursor refinement: 54 focused strict obligations pass | Payloads from 21 official signature archives pass | Independent semantic review complete; complete-core gate pending |
 | Tar containers and operations | Reviewed header, GNU/PAX and footer profiles | Implemented; thirteen tests pass; header uses Vest DSL | Exact header/arithmetic/footer: 37 focused strict obligations pass; PAX framing/keys and fractional time: 21 pass; controller pending | All 48 recorded plain gzip archives scan and classify | Native source reviewed; formal acceptance pending |
 | Stored-object integrity and plain/gzip envelopes | Reviewed stored-byte hash and envelope requirements | Implemented; four tests pass | Digest and decompression libraries are trusted adapters; controller proof pending | Recorded official manifest hashes and gzip objects pass | Native source reviewed; complete formal acceptance pending |
-| Multipart assembly | Reviewed ordinary 3.0.7 profile; queued-restart requirements and fixtures reviewed | Implemented; six tests pass; all stored volumes checked before publication | Controller refinement pending | Official three-volume snapshot and two-volume delta match independent source hashes | Independent native review complete; restart and formal acceptance pending |
+| Multipart assembly | Reviewed ordinary 3.0.7 profile; queued-restart requirements and fixtures reviewed | Implemented; six tests pass; all stored volumes checked before publication | Controller refinement pending | Official three-volume snapshot and two-volume delta match independent source hashes | Independent native review complete; footer-bearing restart and formal acceptance pending |
 | Snapshot reconstruction | Reviewed ordered state and preceding-set basis | Implemented; seven test groups pass | State/resource refinement pending | Three official 3.0.7 backup dates match byte paths, contents and metadata | Independent native review complete; formal acceptance pending |
 | Filesystem restoration | Requirements written | Pending | Pending | Pending | Pending |
 
@@ -43,7 +43,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Assemble ordinary 3.0.7 plain/gzip multipart operations with verified stored digests, complete containers, explicit bounds and sticky failure.
 - [x] Independently test multipart snapshot/delta source oracles and rejection after provisional output.
 - [x] Acquire and review original queued-restart and empty-tail producer fixtures; specify strict compatibility requirements.
-- [ ] Implement and independently test queued-restart boundary compatibility.
+- [x] Implement and independently test source-derived queued-restart raw/gzip boundary compatibility and full-scan selection.
 - [x] Check whole-manifest-module arithmetic/bounds safety: 66 strict obligations pass; complete grammar semantics remain separate.
 - [ ] Prove complete manifest parser contextual semantics.
 - [x] Prove exact digest duplicate/conflict detection; preserve first-conflict rejection and bounded append behavior.

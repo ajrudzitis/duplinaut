@@ -54,7 +54,7 @@ The metadata budget explicitly charges component-vector capacity (at least
 four outer slots, at most doubled component count), per-component byte-vector
 capacity (eight-byte minimum plus doubled total path bytes), and separately
 accounts for output/index/boundary path copies, entry slots and owned text.
-Four temporary path buffers are checked before classification using name
+Six temporary path buffers are checked before classification using name
 separator counts as an upper bound. The pinned standard library
 [BTree node layout](https://raw.githubusercontent.com/rust-lang/rust/1.98.0/library/alloc/src/collections/btree/node.rs)
 uses eleven keys/values and twelve edges; two conservative internal-node charges
@@ -64,14 +64,34 @@ These are conservative Rust capacity budgets, excluding allocator bookkeeping;
 allocator and standard-library allocation behavior remain trusted. Tar metadata
 and decoded-object buffers have separate limits. Formal heap bounds are pending.
 
-A remaining compatibility gap is explicitly recorded: the pinned producer's
-restart-position code can queue an already processed first entry. Returning that
-queued entry does not update the remembered starting index, so a restarted
-nonempty volume may report root/no block or its second actual entry as
-StartingPath. This checkpoint validates exact nonempty boundaries and can reject
-that restart shape. Manifest record normalization itself is used, but complete
-restart compatibility is not claimed. Obtain official restart output and have
-the specification agent review the boundary contract before broadening it.
+Queued restart compatibility now follows PARSE-MAN-009: retained raw repeated
+records for the specific normalized volume permit either a sole logical entry
+with root/no-block start, or an exact second-logical-entry starting boundary.
+Only the first entry's lower-bound check is deferred; every later entry remains
+inside the declared path interval, and every entry remains below the declared
+end. Normal exact-first boundaries retain their existing container profile.
+The queued exception requires a plain/gzip decoded stream ending exactly after
+the last entry and padding; a footer-bearing queued exception returns an explicit
+unsupported-boundary diagnostic. Ending boundaries, hashes, complete containers,
+part ordering, poisoning and final completion remain mandatory. Metadata headers
+do not count as logical entries. Raw occurrence counts have bounded precharged
+storage, and first/second/last path scratch capacity is charged before cloning.
+
+`Manifest::select_volumes` returns every normalized record whenever any raw
+number repeats, including a repeated suffix later discarded by normalization.
+Record-only `may_contain` describes a declared interval and cannot certify actual
+decoded coverage. The normal-profile selection path uses those hints; repeated
+sets cannot prune from raw hints without a future identity-bound content index.
+Selection limits charge raw number storage and normalized/output capacities
+before allocation. Sorting and allocation remain trusted standard-library work,
+and selection/controller refinement remains pending.
+
+The original official one-entry, two-entry and empty-tail restart fixtures pass
+native assembly and independent source-tree content/type/mode/time oracles.
+Their source-changing interruption recipe does not establish complete signature
+inventory or a consistent concurrently changing source snapshot. Queued encrypted
+and footer-bearing replay remain unsupported pending separate evidence. Native
+acceptance is distinct from the pending multipart/restart controller proofs.
 
 A normalized manifest without any volume records is incomplete; it cannot
 produce a completed empty archive. A recorded, hash-validated empty tar volume

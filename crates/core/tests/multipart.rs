@@ -57,6 +57,9 @@ fn assemble(
 //= docs/parsing-requirements.md#parse-multi-003
 //= type=test
 //# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+//= docs/parsing-requirements.md#parse-multi-004
+//= type=test
+//# Assembly MUST preserve pending logical-entry state across an empty volume while validating its supported empty-boundary marker shape.
 #[test]
 fn continuation_markers_zero_final_and_empty_volumes() {
     let full = member("multivol_snapshot/file/1", &vec![b'a'; 65536]);
@@ -90,6 +93,12 @@ fn continuation_markers_zero_final_and_empty_volumes() {
 //= docs/parsing-requirements.md#parse-multi-002
 //= type=test
 //# Multipart assembly MUST reject missing, duplicate, reversed, mixed-operation, or interleaved parts of the same logical entry.
+//= docs/parsing-requirements.md#parse-multi-005
+//= type=test
+//# Repeated ordinary operations for one path within a backup set MUST retain archive order for snapshot-state interpretation.
+//= docs/parsing-requirements.md#parse-multi-006
+//= type=test
+//# Assembly MUST reject an ordinary/multipart representation mixture or a second multipart logical entry for one path within the initial supported backup-set profile.
 #[test]
 fn malformed_parts_lengths_markers_and_interleaving_rejected() {
     let full = member("multivol_snapshot/file/1", &vec![1; 65536]);

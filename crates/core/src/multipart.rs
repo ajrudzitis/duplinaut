@@ -95,6 +95,7 @@ pub enum AssemblyError {
     Poisoned,
     VolumeOrder,
     Boundary,
+    UnsupportedBoundaryProfile,
     PartOrder,
     Interleaved,
     PartLength,
@@ -122,6 +123,8 @@ impl AssembledArchive {
 }
 pub struct MultipartAssembler<'a> {
     volumes: Vec<&'a VolumeRecord>,
+    /// Saturating raw-record counts (0, 1, or >=2), indexed by volume ordinal.
+    raw_occurrences: Vec<u8>,
     limits: AssemblyLimits,
     next_volume: usize,
     pending: Option<Pending>,
@@ -148,7 +151,7 @@ impl<'a> MultipartAssembler<'a> {
             .records
             .len()
             .max(4)
-            .checked_mul(2 * std::mem::size_of::<&VolumeRecord>())
+            .checked_mul(2 * std::mem::size_of::<&VolumeRecord>() + 1)
             .and_then(|bytes| bytes.checked_add(std::mem::size_of::<Self>()))
             .filter(|bytes| *bytes <= limits.max_metadata_bytes)
             .ok_or(AssemblyError::Limit)?;
@@ -166,8 +169,19 @@ impl<'a> MultipartAssembler<'a> {
                 return Err(AssemblyError::VolumeOrder);
             }
         }
+        // Capacity was charged before normalization or this allocation. A raw
+        // repeated record for this specific volume is required for an exception.
+        let mut raw_occurrences = vec![0u8; volumes.len()];
+        for record in &manifest.records {
+            if let Ok(number) = usize::try_from(record.number) {
+                if number > 0 && number <= volumes.len() {
+                    raw_occurrences[number - 1] = (raw_occurrences[number - 1] + 1).min(2);
+                }
+            }
+        }
         Ok(Self {
             volumes,
+            raw_occurrences,
             limits,
             next_volume: 0,
             pending: None,
@@ -184,6 +198,15 @@ impl<'a> MultipartAssembler<'a> {
     //= docs/parsing-requirements.md#parse-multi-003
     //= type=implementation
     //# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+    //= docs/parsing-requirements.md#parse-man-008
+    //= type=implementation
+    //# A supported nonempty volume MUST have an EndingPath matching its actual last classified logical-data entry path and pending multipart block state.
+    //= docs/parsing-requirements.md#parse-man-009
+    //= type=implementation
+    //# A reader accepting queued-restart compatibility MUST restrict a nonempty volume's StartingPath exception to the source-derived one-entry root/None or second-entry boundary forms with retained raw restart-rewrite evidence.
+    //= docs/parsing-requirements.md#parse-multi-004
+    //= type=implementation
+    //# Assembly MUST preserve pending logical-entry state across an empty volume while validating its supported empty-boundary marker shape.
     pub fn push_stored_volume(
         &mut self,
         number: u64,
@@ -224,9 +247,10 @@ impl<'a> MultipartAssembler<'a> {
         let volume = TarVolume::parse(&decoded, Termination::Data, self.limits.tar)
             .map_err(AssemblyError::Tar)?;
         let mut first = None;
+        let mut second = None;
         let mut last = None;
         for entry in &volume.entries {
-            // Bound parser growth and first/last/current boundary clones before
+            // Bound parser growth and first/second/last/current boundary clones before
             // classification allocates any path. Counting the operation prefix
             // and part suffix as components deliberately overestimates the path.
             let component_bound = entry
@@ -237,7 +261,7 @@ impl<'a> MultipartAssembler<'a> {
                 .checked_add(1)
                 .ok_or(AssemblyError::Limit)?;
             let scratch = path_capacity_charge(entry.name.len(), component_bound)?
-                .checked_mul(4)
+                .checked_mul(6)
                 .ok_or(AssemblyError::Limit)?;
             self.scratch_bytes = self.scratch_bytes.max(scratch);
             if self
@@ -254,7 +278,10 @@ impl<'a> MultipartAssembler<'a> {
                     self.limits.max_path_components,
                 )
                 .map_err(AssemblyError::Tar)?;
-            if classified.path.compare(&record.start.path) < 0
+            // Only the first lower-bound check may be deferred. Every later
+            // entry still lies in the declared interval; every entry remains
+            // below its ending boundary. No queued-start decision occurs yet.
+            if (first.is_some() && classified.path.compare(&record.start.path) < 0)
                 || classified.path.compare(&record.end.path) > 0
             {
                 return Err(AssemblyError::Boundary);
@@ -270,6 +297,8 @@ impl<'a> MultipartAssembler<'a> {
             };
             if first.is_none() {
                 first = Some(boundary.clone());
+            } else if second.is_none() {
+                second = Some(boundary.clone());
             }
             last = Some(boundary);
             self.accept_entry(
@@ -280,8 +309,24 @@ impl<'a> MultipartAssembler<'a> {
             )?;
         }
         if let Some(first) = first {
-            if first != record.start || last.as_ref() != Some(&record.end) {
+            if last.as_ref() != Some(&record.end) {
                 return Err(AssemblyError::Boundary);
+            }
+            if first != record.start {
+                let rewritten = self.raw_occurrences[self.next_volume] >= 2;
+                let queued_start = if let Some(second) = second {
+                    second == record.start
+                } else {
+                    record.start.path.components().is_empty() && record.start.block.is_none()
+                };
+                if !rewritten || !queued_start {
+                    return Err(AssemblyError::Boundary);
+                }
+                // Initial compatibility evidence covers only entry-aligned
+                // raw/gzip EOF. Reviewed normal starts retain normal footers.
+                if volume.entry_stream_bytes != decoded.len() {
+                    return Err(AssemblyError::UnsupportedBoundaryProfile);
+                }
             }
         } else {
             // Pinned producer's no-emission fallback uses root as start and
@@ -415,6 +460,12 @@ impl<'a> MultipartAssembler<'a> {
     //= docs/parsing-requirements.md#parse-multi-002
     //= type=implementation
     //# Multipart assembly MUST reject missing, duplicate, reversed, mixed-operation, or interleaved parts of the same logical entry.
+    //= docs/parsing-requirements.md#parse-multi-005
+    //= type=implementation
+    //# Repeated ordinary operations for one path within a backup set MUST retain archive order for snapshot-state interpretation.
+    //= docs/parsing-requirements.md#parse-multi-006
+    //= type=implementation
+    //# Assembly MUST reject an ordinary/multipart representation mixture or a second multipart logical entry for one path within the initial supported backup-set profile.
     fn accept_entry(
         &mut self,
         entry: &TarEntry<'_>,

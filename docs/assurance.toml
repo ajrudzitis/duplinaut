@@ -225,7 +225,7 @@ proved = false
 tested = true
 reviewed = true
 proof_required = true
-# Native 3.0.7 plain/gzip checkpoint; queued-restart and formal refinement pending.
+# Native 3.0.7 plain/gzip and narrowly reviewed queued-restart checkpoint; formal refinement pending.
 implementations = [{ path = "crates/core/src/multipart.rs", symbol = "push_stored_volume" }, { path = "crates/core/src/multipart.rs", symbol = "finish" }]
 proofs = []
 tests = [{ package = "duplicity-core", name = "continuation_markers_zero_final_and_empty_volumes" }, { package = "duplicity-core", name = "malformed_parts_lengths_markers_and_interleaving_rejected" }, { package = "duplicity-core", name = "component_metadata_growth_is_bounded_before_classification" }, { package = "duplicity-core", name = "all_volumes_integrity_container_limits_and_poisoning" }, { package = "duplicity-core", name = "official_multipart_snapshot_and_delta_match_source_tree_oracles" }, { package = "duplicity-core", name = "every_failure_class_latches_poison_before_publication" }]
@@ -235,15 +235,15 @@ id = "queued-restart-compatibility"
 gate = false
 requirements = ["PARSE-MAN-008", "PARSE-MAN-009", "PARSE-MAN-010", "PARSE-MULTI-004", "PARSE-MULTI-005", "PARSE-MULTI-006"]
 specified = true
-implemented = false
+implemented = true
 proved = false
-tested = false
-reviewed = false
+tested = true
+reviewed = true
 proof_required = true
-# Producer evidence accepted; native compatibility and refinement pending.
-implementations = []
+# Independent native review and official source-tree comparisons pass; formal refinement pending.
+implementations = [{ path = "crates/core/src/multipart.rs", symbol = "push_stored_volume" }, { path = "crates/core/src/selection.rs", symbol = "select_volumes" }]
 proofs = []
-tests = []
+tests = [{ package = "duplicity-core", name = "queued_exceptions_need_exact_shape_rewrite_and_entry_aligned_eof" }, { package = "duplicity-core", name = "queued_compatibility_preserves_parts_interval_and_volume_specific_evidence" }, { package = "duplicity-core", name = "selection_retains_all_normalized_records_when_any_raw_number_repeats" }, { package = "duplicity-core", name = "original_official_restart_archives_match_independent_source_oracles" }]
 
 [[milestone]]
 id = "snapshot-state"
