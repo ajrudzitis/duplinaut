@@ -15,6 +15,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Multipart assembly | Reviewed ordinary 3.0.7 profile; queued-restart requirements and fixtures reviewed | Implemented; six tests pass; all stored volumes checked before publication | Controller refinement pending | Official three-volume snapshot and two-volume delta match independent source hashes | Independent native review complete; footer-bearing restart and formal acceptance pending |
 | Chain planning | Reviewed explicit anchor, exact target and conservative local uniqueness | Implemented; five tests pass | Controller refinement pending | Eighteen dates across six official plain naming profiles | Independent native review complete; no restorability claim |
 | Snapshot reconstruction | Reviewed ordered state and preceding-set basis | Implemented; eight test groups pass | State/resource refinement pending | Three official 3.0.7 backup dates match byte paths, contents and metadata | Independent native review complete; formal acceptance pending |
+| Restore selection | Reviewed byte paths, ancestors and supported types | Implemented; three regression groups pass | Controller refinement pending | Native byte-path and near-prefix tests pass | Independent native review complete; no filesystem publication |
 | Filesystem restoration | Requirements written | Pending | Pending | Pending | Pending |
 
 - [x] Create the library and verification-enabled Cargo configuration.
@@ -73,3 +74,6 @@ Stored-volume decoding checks SHA1 and MD5 declarations before decompression, re
 
 - [x] Plan metadata-only contiguous chains with explicit anchors and exact dates; reject missing links and ambiguous branches.
 - [ ] Prove chain-controller refinement and integrate original object identities, manifest/volume validation and snapshot states.
+
+- [x] Select immutable restore entries, required source ancestors and exact byte paths; reject selected unsupported types.
+- [ ] Prove restore-selection refinement and implement safe native Linux filesystem publication.

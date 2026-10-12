@@ -219,7 +219,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
 
   SECTION: [RESTORE-001](#restore-001)
-    TEXT[!MUST]: A restoration MUST preserve each selected entry's backup-relative path beneath a destination that did not exist when publication began.
+    TEXT[!MUST,implementation,test]: A restoration MUST preserve each selected entry's backup-relative path beneath a destination that did not exist when publication began.
 
   SECTION: [RESTORE-002](#restore-002)
     TEXT[!MUST]: A restoration MUST write into private staging on the destination filesystem and publish the completed tree without replacing an existing destination.
@@ -231,7 +231,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: The reader MUST restore supported regular files, directories, and symlinks with ordinary permissions and supported modification times.
 
   SECTION: [RESTORE-005](#restore-005)
-    TEXT[!MUST]: A restore selection requiring unsupported filesystem entry types MUST fail before publication with an entry-specific diagnostic.
+    TEXT[!MUST,implementation,test]: A restore selection requiring unsupported filesystem entry types MUST fail before publication with an entry-specific diagnostic.
 
   SECTION: [RESTORE-006](#restore-006)
     TEXT[!MUST]: Cancellation or a handled restoration failure MUST leave the requested destination unpublished and attempt removal of temporary plaintext.

@@ -29,7 +29,7 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | Chain planning | Explicit full anchor and exact date; six official naming profiles; gaps and branches rejected | Formal refinement and source/catalog integration |
 | Snapshot reconstruction | Three official backup dates match byte paths, contents and metadata; immutable prior-set delta bases; transactional failures | Controller/resource proofs and chain integration |
 | Multipart assembly | Official snapshot/delta source oracles; bounded ordered parts; provisional output and sticky failure tests | Formal refinement and footer-bearing/encrypted queued replay |
-| Repository browser and restore | Requirements and official source-tree oracles | Implementation, proofs, and compatibility matrix |
+| Repository browser and restore | Read-only restore selection preserves byte paths and ancestors; official source-tree oracles | Catalog orchestration, filesystem publication and proofs |
 | Terminal interface | Workspace scaffold | Browsing, restore selection, progress, and cancellation |
 
 The [parsing requirements](docs/parsing-requirements.md) were written in RFC 2119/8174 language and independently reviewed **before implementation**. Public documentation leads format research; immutable official-source references and producer evidence resolve ambiguities.

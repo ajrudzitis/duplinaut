@@ -565,3 +565,169 @@ fn exact_payload_entry_and_live_limits_accept_without_spare_budget() {
     .unwrap()
     .is_empty());
 }
+
+//= docs/parsing-requirements.md#restore-001
+//= type=test
+//# A restoration MUST preserve each selected entry's backup-relative path beneath a destination that did not exist when publication began.
+#[test]
+fn restore_plan_preserves_component_paths_and_closes_directory_ancestors() {
+    use duplicity_core::restore_plan::{RestorePlan, RestorePlanLimits};
+    let state = initial();
+    let selected = [path(b"file")];
+    let plan = RestorePlan::from_roots(&state, &selected, RestorePlanLimits::default()).unwrap();
+    assert_eq!(plan.entries().len(), 2);
+    assert_eq!(plan.entries()[0].path(), &path(b"."));
+    assert_eq!(plan.entries()[1].path(), &selected[0]);
+    assert!(std::ptr::eq(
+        plan.entries()[1].entry(),
+        state.get(&selected[0]).unwrap()
+    ));
+    let overlapping = [path(b"dir/child"), path(b"dir"), path(b"dir/child")];
+    let plan = RestorePlan::from_roots(&state, &overlapping, RestorePlanLimits::default()).unwrap();
+    assert_eq!(plan.entries().len(), 3);
+    assert_eq!(plan.entries()[0].path(), &path(b"."));
+    assert_eq!(plan.entries()[1].path(), &path(b"dir"));
+    assert_eq!(plan.entries()[2].path(), &path(b"dir/child"));
+    assert_eq!(
+        RestorePlan::all(&state, RestorePlanLimits::default())
+            .unwrap()
+            .entries()
+            .len(),
+        state.len()
+    );
+}
+
+//= docs/parsing-requirements.md#restore-005
+//= type=test
+//# A restore selection requiring unsupported filesystem entry types MUST fail before publication with an entry-specific diagnostic.
+#[test]
+fn restore_plan_rejects_selected_special_types_missing_roots_and_budget_exhaustion() {
+    use duplicity_core::restore_plan::{RestorePlan, RestorePlanError, RestorePlanLimits};
+    let state = SnapshotState::from_full(
+        &archive(&[
+            ("snapshot/.", b'5', b""),
+            ("snapshot/device", b'3', b""),
+            ("snapshot/file", b'0', b"contents"),
+        ]),
+        StateLimits::default(),
+    )
+    .unwrap();
+    assert!(
+        matches!(RestorePlan::all(&state, RestorePlanLimits::default()), Err(RestorePlanError::Unsupported { path: bad }) if bad == &path(b"device"))
+    );
+    let roots = [path(b"file")];
+    assert_eq!(
+        RestorePlan::from_roots(&state, &roots, RestorePlanLimits::default())
+            .unwrap()
+            .entries()
+            .len(),
+        2
+    );
+    assert!(matches!(
+        RestorePlan::from_roots(&state, &[path(b"missing")], RestorePlanLimits::default()),
+        Err(RestorePlanError::MissingSelection { index: 0 })
+    ));
+    assert!(matches!(
+        RestorePlan::from_roots(&state, &[], RestorePlanLimits::default()),
+        Err(RestorePlanError::EmptySelection)
+    ));
+    for insufficient in [
+        RestorePlanLimits {
+            max_roots: 0,
+            ..RestorePlanLimits::default()
+        },
+        RestorePlanLimits {
+            max_state_entries: 2,
+            ..RestorePlanLimits::default()
+        },
+        RestorePlanLimits {
+            max_entries: 1,
+            ..RestorePlanLimits::default()
+        },
+        RestorePlanLimits {
+            max_metadata_bytes: 0,
+            ..RestorePlanLimits::default()
+        },
+        RestorePlanLimits {
+            max_candidate_checks: 2,
+            ..RestorePlanLimits::default()
+        },
+    ] {
+        assert!(matches!(
+            RestorePlan::from_roots(&state, &roots, insufficient),
+            Err(RestorePlanError::Limit)
+        ));
+    }
+    assert!(RestorePlan::from_roots(
+        &state,
+        &roots,
+        RestorePlanLimits {
+            max_entries: 2,
+            max_candidate_checks: 3,
+            ..RestorePlanLimits::default()
+        }
+    )
+    .is_ok());
+    let empty = SnapshotState::from_full(&archive(&[]), StateLimits::default()).unwrap();
+    assert!(RestorePlan::all(
+        &empty,
+        RestorePlanLimits {
+            max_entries: 0,
+            max_candidate_checks: 0,
+            ..RestorePlanLimits::default()
+        }
+    )
+    .unwrap()
+    .entries()
+    .is_empty());
+}
+
+#[test]
+fn restore_plan_distinguishes_byte_paths_and_component_prefix_siblings() {
+    use duplicity_core::restore_plan::{RestorePlan, RestorePlanLimits};
+    let mut byte_member = member("snapshot/x", b'0', b"byte file");
+    byte_member[9] = 0xff;
+    byte_member[148..156].fill(b' ');
+    let checksum: u64 = byte_member[..512].iter().map(|b| u64::from(*b)).sum();
+    byte_member[148..156].copy_from_slice(format!("{checksum:06o}\0 ").as_bytes());
+    let stored = [
+        member("snapshot/.", b'5', b""),
+        member("snapshot/a", b'5', b""),
+        member("snapshot/a/child", b'0', b"child"),
+        member("snapshot/a-", b'0', b"dash"),
+        member("snapshot/a0", b'0', b"zero"),
+        byte_member,
+    ]
+    .concat();
+    let hash: String = sha1::Sha1::digest(&stored)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let manifest = Manifest::parse(
+        format!("Volume 1:\n StartingPath .\n EndingPath \"\\xff\"\n Hash SHA1 {hash}\n")
+            .as_bytes(),
+        ManifestLimits::default(),
+    )
+    .unwrap();
+    let mut assembler = MultipartAssembler::new(&manifest, AssemblyLimits::default()).unwrap();
+    assembler
+        .push_stored_volume(1, &stored, Envelope::Plain)
+        .unwrap();
+    let state =
+        SnapshotState::from_full(&assembler.finish().unwrap(), StateLimits::default()).unwrap();
+    let byte_path = path(&[0xff]);
+    let byte_plan =
+        RestorePlan::from_roots(&state, std::slice::from_ref(&byte_path), RestorePlanLimits::default())
+            .unwrap();
+    assert_eq!(byte_plan.entries().len(), 2);
+    assert_eq!(byte_plan.entries()[1].path(), &byte_path);
+    assert_eq!(
+        byte_plan.entries()[1].entry().content().unwrap(),
+        b"byte file"
+    );
+    let directory =
+        RestorePlan::from_roots(&state, &[path(b"a")], RestorePlanLimits::default()).unwrap();
+    assert_eq!(directory.entries().len(), 3);
+    assert_eq!(directory.entries()[1].path(), &path(b"a"));
+    assert_eq!(directory.entries()[2].path(), &path(b"a/child"));
+}
