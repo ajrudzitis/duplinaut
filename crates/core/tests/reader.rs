@@ -466,3 +466,91 @@ fn discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation() {
         Err(ReaderError::Limit)
     ));
 }
+
+#[test]
+fn reader_budget_edges_accept_exact_and_reject_one_less() {
+    let source = Source::official();
+    let full_manifest = source
+        .objects
+        .iter()
+        .find(|(object, _)| {
+            object
+                .key
+                .ends_with("duplicity-full.20231114T221320Z.manifest")
+        })
+        .unwrap();
+    let full_volumes = source
+        .objects
+        .iter()
+        .filter(|(object, _)| {
+            object.key.contains("duplicity-full.") && object.key.ends_with(".difftar.gz")
+        })
+        .count();
+    assert_eq!(full_volumes, 3); // original producer inventory, not parsed hints
+    let comparisons = source.objects.len() * full_volumes;
+    let normalization = 4 * 2 * std::mem::size_of::<usize>();
+    for (exact, smaller) in [
+        (
+            ReaderLimits {
+                max_object_checks: comparisons,
+                ..Default::default()
+            },
+            ReaderLimits {
+                max_object_checks: comparisons - 1,
+                ..Default::default()
+            },
+        ),
+        (
+            ReaderLimits {
+                decoded_manifest_bytes: full_manifest.1.len(),
+                ..Default::default()
+            },
+            ReaderLimits {
+                decoded_manifest_bytes: full_manifest.1.len() - 1,
+                ..Default::default()
+            },
+        ),
+        (
+            ReaderLimits {
+                normalization_metadata_bytes: normalization,
+                ..Default::default()
+            },
+            ReaderLimits {
+                normalization_metadata_bytes: normalization - 1,
+                ..Default::default()
+            },
+        ),
+    ] {
+        let exact = Catalog::discover(
+            &source,
+            "backup/",
+            NameConfig::default(),
+            exact,
+            &Cancellation::default(),
+        )
+        .unwrap();
+        assert!(exact
+            .read_snapshot(
+                anchor(&exact),
+                Timestamp(1700000000),
+                &Cancellation::default()
+            )
+            .is_ok());
+        let smaller = Catalog::discover(
+            &source,
+            "backup/",
+            NameConfig::default(),
+            smaller,
+            &Cancellation::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            smaller.read_snapshot(
+                anchor(&smaller),
+                Timestamp(1700000000),
+                &Cancellation::default()
+            ),
+            Err(ReaderError::Limit | ReaderError::Envelope(_))
+        ));
+    }
+}

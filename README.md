@@ -87,7 +87,8 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Implement and review the read-only S3 adapter; test conditional reads, bounds, cancellation and persistent stream failures.
 - [x] Integrate metadata-only discovery and bounded plain/gzip chain reconstruction against original official objects.
 - [x] Independently review repository orchestration; test late incremental failures and cancellation.
-- [ ] Prove repository orchestration controller contracts and exact resource boundaries.
+- [x] Test exact reader object-comparison, decoded-manifest and normalization-metadata budget boundaries.
+- [ ] Prove repository orchestration controller contracts and complete resource accounting.
 - [x] Implement a local read-only source with anchored identity checks; test actual files and official three-date reconstruction.
 - [x] Build read-only terminal history and snapshot browsing; exercise an official chain in a real terminal.
 - [ ] Accept the first parser component with implementation, proofs, official tests, and independent review.

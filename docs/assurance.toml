@@ -305,7 +305,7 @@ proof_required = true
 # Independently reviewed native plain/gzip orchestration; no filesystem writes.
 implementations = [{ path = "crates/core/src/reader.rs", symbol = "discover" }, { path = "crates/core/src/reader.rs", symbol = "read_snapshot" }]
 proofs = []
-tests = [{ package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" }, { package = "duplicity-core", name = "identity_cancellation_and_exact_body_failures_publish_no_snapshot" }, { package = "duplicity-core", name = "missing_corrupt_and_ambiguous_objects_fail_explicitly" }, { package = "duplicity-core", name = "discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation" }]
+tests = [{ package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" }, { package = "duplicity-core", name = "identity_cancellation_and_exact_body_failures_publish_no_snapshot" }, { package = "duplicity-core", name = "missing_corrupt_and_ambiguous_objects_fail_explicitly" }, { package = "duplicity-core", name = "discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation" }, { package = "duplicity-core", name = "reader_budget_edges_accept_exact_and_reject_one_less" }]
 
 [[milestone]]
 id = "local-source"
