@@ -100,5 +100,5 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [ ] Validate S3 with a live service and complete-reader consistency integration.
 - [ ] Complete the browsing/restoration TUI.
 - [ ] Pass the supported official-producer compatibility matrix.
-- [ ] **Create GitHub Actions for builds and formal methods:** install pinned tools, check generated parsers, run Verus, enforce Duvet coverage/snapshot gates, and run native/official-fixture tests on pull requests and pushes; retain reports and verification evidence as artifacts.
+- [x] **Create GitHub Actions for builds and formal methods:** install pinned tools, check generated parsers, run Verus, enforce Duvet coverage/snapshot gates, and run native/official-fixture tests on pull requests and pushes; retain reports and verification evidence as artifacts. See [workflow validation](docs/github-actions.md); the first hosted run remains pending.
 - [ ] Publish the exact supported capabilities, verification claims, and trusted boundaries.
