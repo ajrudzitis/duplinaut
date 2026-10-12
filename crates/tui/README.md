@@ -7,6 +7,7 @@ Planned terminal backup browser and restore interface. The executable currently 
 | Browser and restore flow | Requirements written; interaction contracts pending | Pending | Calls verified core; display/I/O trusted | Pending | Pending |
 
 - [x] Create the executable crate with no unsupported feature claims.
+- [x] Escape terminal controls, non-ASCII bytes and literal escapes while retaining original path identity; native tests pass.
 - [ ] Implement snapshot and byte-preserving path navigation.
 - [ ] Implement restore selection, private credential entry and cancellation.
 - [ ] Test display escaping, errors and interaction flows.
