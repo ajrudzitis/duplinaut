@@ -15,6 +15,13 @@ scan; a second Enter starts it. Esc cancels active work or returns to history;
 paths, types, ordinary modes and regular-file sizes. All non-ASCII and control
 bytes are escaped, including literal escape characters.
 
+Space marks or unmarks the current path as a selection root. `p` previews those
+subtrees and their required source ancestors; with no marks it previews the
+whole snapshot. Previewing writes no files. Selections are limited to 1024 roots,
+4 MiB of cloned path metadata and 16 million path comparisons. Planning runs
+synchronously, so a large preview can delay terminal input; cancellation and
+publication remain separate work.
+
 The reader runs on a worker thread and keeps the original catalog identities
 across scans. Cancellation is cooperative; bounded synchronous parsing and
 kernel operations have no fixed cancellation latency. S3 connection setup uses
@@ -31,6 +38,10 @@ Native escaping and CLI tests pass. A real PTY smoke run loaded the official
 3.0.7 plain fixture through full plus two incremental sets, displayed 21 entries
 and 2,621,564 payload bytes, and restored terminal state on exit. This does not
 establish automated interaction coverage, live S3 acceptance or a frontend proof.
+An additional terminal run marked `a/b/child.txt` and previewed exactly four
+entries: the file and its three source directory ancestors. Independent source
+review accepted the read-only flow after fixing confirmation reset on an invalid
+anchor choice.
 
 | Component | Specification review | Implementation | Proof | Integration tests | Independent acceptance |
 | --- | --- | --- | --- | --- | --- |
@@ -39,7 +50,8 @@ establish automated interaction coverage, live S3 acceptance or a frontend proof
 - [x] Create the executable crate with no unsupported feature claims.
 - [x] Escape terminal controls, non-ASCII bytes and literal escapes while retaining original path identity; native tests pass.
 - [x] Implement metadata history, explicit anchors/dates, volume-scan disclosure and byte-preserving snapshot navigation.
-- [ ] Implement restore selection, private credential entry and cancellation.
+- [x] Implement byte-preserving selection and bounded restore previews; independently review the read-only flow.
+- [ ] Connect selection to native filesystem publication and implement private credential entry.
 - [ ] Test display escaping, errors and interaction flows.
 - [ ] Automate terminal interaction, cancellation, resize and S3 frontend tests.
 

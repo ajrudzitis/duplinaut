@@ -5,6 +5,7 @@ use duplicity_core::{
     chain::SetKind,
     names::{NameConfig, Timestamp},
     reader::{Catalog, ReaderLimits, ValidatedSnapshot},
+    restore_plan::RestorePlanError,
     source::{Cancellation, ObjectSource},
 };
 use ratatui::{
@@ -110,6 +111,7 @@ pub fn run(source: Arc<dyn ObjectSource>, prefix: String, initial: Cancellation)
         })?;
     let mut history: Vec<History> = Vec::new();
     let mut snapshot: Option<ValidatedSnapshot> = None;
+    let mut marked: Vec<usize> = Vec::new();
     let mut selected = 0usize;
     let mut anchor = None;
     let mut total = None;
@@ -131,6 +133,7 @@ pub fn run(source: Arc<dyn ObjectSource>, prefix: String, initial: Cancellation)
                             status = "Metadata only. Choose a full set with a, then a target date with Enter.".into();
                         }
                         Reply::Snapshot(value) => {
+                            marked.clear();
                             status = format!("Validated plain/gzip snapshot: {} entries, {} payload bytes. Filesystem restoration is under construction.", value.state().len(), value.state().payload_bytes());
                             snapshot = Some(value);
                         }
@@ -151,15 +154,15 @@ pub fn run(source: Arc<dyn ObjectSource>, prefix: String, initial: Cancellation)
                 let height = usize::from(areas[1].height.saturating_sub(2)).max(1);
                 let offset = selected.saturating_sub(height / 2).min(count.saturating_sub(height));
                 let items: Vec<ListItem> = if let Some(value) = &snapshot {
-                    value.state().entries().skip(offset).take(height).map(|(path, entry)|
-                        ListItem::new(format!("{:?} {:03o} {:>10}  {}", entry.entry_type(), entry.mode() & 0o777,
+                    value.state().entries().enumerate().skip(offset).take(height).map(|(index, (path, entry))|
+                        ListItem::new(format!("{} {:?} {:03o} {:>10}  {}", if marked.contains(&index) { "*" } else { " " }, entry.entry_type(), entry.mode() & 0o777,
                             entry.content().map_or(0, <[u8]>::len), display::path(path)))).collect()
                 } else { history.iter().skip(offset).take(height).map(|row| ListItem::new(row.label.as_str())).collect() };
                 let mut cursor = ListState::default().with_selected((count != 0).then_some(selected - offset));
                 frame.render_stateful_widget(List::new(items).block(Block::bordered().title(
                     if snapshot.is_some() { "Snapshot paths" } else { "History / metadata only" }))
                     .highlight_style(Style::default().bg(Color::DarkGray).fg(Color::White)), areas[1], &mut cursor);
-                frame.render_widget(Paragraph::new(format!("{status}\nUp/Down navigate | a anchor | Enter scan/confirm | Esc history/cancel | q quit"))
+                frame.render_widget(Paragraph::new(format!("{status}\nUp/Down | a anchor | Enter scan | Space mark | p preview marked/all | Esc back/cancel | q quit"))
                     .wrap(Wrap { trim: false }).block(Block::bordered()), areas[2]);
             })?;
             if !event::poll(Duration::from_millis(50))? {
@@ -179,6 +182,7 @@ pub fn run(source: Arc<dyn ObjectSource>, prefix: String, initial: Cancellation)
                 }
                 KeyCode::Esc => {
                     snapshot = None;
+                    marked.clear();
                     confirm = false;
                     selected = 0;
                     status = "Metadata history. Choose anchor and exact target date.".into();
@@ -191,7 +195,77 @@ pub fn run(source: Arc<dyn ObjectSource>, prefix: String, initial: Cancellation)
                     selected = selected.saturating_sub(1);
                     confirm = false;
                 }
+                KeyCode::Char(' ') if !busy && snapshot.is_some() && count != 0 => {
+                    if let Some(position) = marked.iter().position(|index| *index == selected) {
+                        marked.remove(position);
+                    } else if marked.len() < 1024 {
+                        marked
+                            .try_reserve_exact(1)
+                            .map_err(|_| io::Error::other("selection allocation failed"))?;
+                        marked.push(selected);
+                    } else {
+                        status = "Selection limit: 1024 roots.".into();
+                        continue;
+                    }
+                    status = format!("{} roots marked. p previews selected subtrees and source ancestors; no files are written.", marked.len());
+                }
+                KeyCode::Char('p') if !busy => {
+                    if let Some(value) = &snapshot {
+                        if value
+                            .state()
+                            .len()
+                            .checked_mul(marked.len())
+                            .is_none_or(|checks| checks > 16_000_000)
+                        {
+                            status =
+                                "Selection exceeds 16 million comparisons; choose fewer roots."
+                                    .into();
+                            continue;
+                        }
+                        marked.sort_unstable();
+                        let mut charge =
+                            marked.len() * std::mem::size_of::<duplicity_core::path::BackupPath>();
+                        for (index, (path, _)) in value.state().entries().enumerate() {
+                            if marked.binary_search(&index).is_ok() {
+                                charge = path
+                                    .components()
+                                    .iter()
+                                    .try_fold(charge, |sum, component| {
+                                        sum.checked_add(component.len()).and_then(|n| {
+                                            n.checked_add(std::mem::size_of::<Vec<u8>>())
+                                        })
+                                    })
+                                    .unwrap_or(usize::MAX);
+                            }
+                        }
+                        if charge > 4 * 1024 * 1024 {
+                            status =
+                                "Selection path metadata exceeds 4 MiB; choose fewer roots.".into();
+                            continue;
+                        }
+                        let mut roots = Vec::new();
+                        roots
+                            .try_reserve_exact(marked.len())
+                            .map_err(|_| io::Error::other("selection allocation failed"))?;
+                        for (index, (path, _)) in value.state().entries().enumerate() {
+                            if marked.binary_search(&index).is_ok() {
+                                roots.push(path.clone());
+                            }
+                        }
+                        let plan = if marked.is_empty() {
+                            value.restore_all(Default::default())
+                        } else {
+                            value.restore_roots(&roots, Default::default())
+                        };
+                        status = match plan {
+                            Ok(plan) => format!("Restore preview: {} entries including source ancestors. Filesystem publication is under construction; no files written.", plan.entries().len()),
+                            Err(RestorePlanError::Unsupported { path }) => format!("Unsupported selected entry: {}", display::path(path)),
+                            Err(error) => format!("Restore preview failed: {error:?}"),
+                        };
+                    }
+                }
                 KeyCode::Char('a') if !busy && snapshot.is_none() => {
+                    confirm = false;
                     if let Some(row) = history.get(selected) {
                         if row.kind == SetKind::Full {
                             anchor = Some(row.index);

@@ -91,6 +91,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [ ] Prove repository orchestration controller contracts and complete resource accounting.
 - [x] Implement a local read-only source with anchored identity checks; test actual files and official three-date reconstruction.
 - [x] Build read-only terminal history and snapshot browsing; exercise an official chain in a real terminal.
+- [x] Add bounded terminal restore-selection previews and independently review the read-only flow.
 - [ ] Accept the first parser component with implementation, proofs, official tests, and independent review.
 - [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers.
 - [ ] Complete verified snapshot indexing and native Linux restoration.
