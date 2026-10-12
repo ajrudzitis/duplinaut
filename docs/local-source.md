@@ -46,3 +46,5 @@ Four integration tests and one injected-interruption test cover changes, replace
 rename-before-EOF, symlink rejection, unsafe keys, cancellation, untrusted identities
 and limits. The fourth reconstructs all three original official backup dates
 through this adapter. Whole-backend formal verification is pending.
+Independent follow-up review accepted positional interruption handling, the
+root-spelling policy, and explicit allocation/diagnostic budget boundaries.

@@ -315,9 +315,9 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Initial independent review complete; positional/trailing-slash fixes await follow-up review.
+# Independent review includes positional interruption and trailing-slash fixes.
 implementations = [{ path = "crates/core/src/local.rs", symbol = "open" }]
 proofs = []
 tests = [{ package = "duplicity-core", name = "flat_regular_listing_and_anchored_repeated_reads" }, { package = "duplicity-core", name = "changes_replacements_and_eof_are_terminal" }, { package = "duplicity-core", name = "cancellation_limits_and_untrusted_descriptors" }, { package = "duplicity-core", name = "original_official_directory_reconstructs_three_dates" }, { package = "duplicity-core", name = "interrupted_post_read_validation_retries_without_losing_bytes" }]
