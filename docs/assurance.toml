@@ -44,13 +44,13 @@ tests = [{ package = "xtask", name = "tests::duvet_detects_changed_snapshot" }, 
 
 [[milestone]]
 id = "manifest-token"
-gate = false
+gate = true
 requirements = ["PARSE-MAN-002", "PARSE-MAN-003"]
 specified = true
 # Focused --no-cheating verification: 155 obligations, zero errors.
-# Complete same-source core verification remains pending.
+# Exact scoped contracts independently reviewed; fresh complete gate required.
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
@@ -60,6 +60,7 @@ proofs = [
   { id = "token-003", requirement = "PARSE-MAN-003", path = "crates/core/src/manifest_token.rs", symbol = "decode_token", kind = "contract" }
 ]
 tests = [
+  { package = "duplicity-core", name = "official_plain_manifests_all_producers" },
   { package = "duplicity-core", name = "quoted_and_unquoted_tokens_leave_delimiters_for_the_caller" },
   { package = "duplicity-core", name = "malformed_quotes_and_escapes_are_rejected" },
   { package = "duplicity-core", name = "escapes_preserve_every_byte_and_both_hex_cases" }
@@ -67,13 +68,13 @@ tests = [
 
 [[milestone]]
 id = "delta-wire"
-gate = false
+gate = true
 # Focused --no-cheating verification: 535 obligations, zero errors.
-# proved remains false until the complete same-source core gate passes.
+# Full same-source core verification and native tests passed; scoped gate enabled.
 requirements = ["PARSE-DELTA-001", "PARSE-DELTA-002", "PARSE-DELTA-003", "PARSE-DELTA-004", "PARSE-DELTA-005", "PARSE-DELTA-006", "PARSE-DELTA-007", "PARSE-DELTA-008"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true

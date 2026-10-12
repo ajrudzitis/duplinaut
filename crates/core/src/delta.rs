@@ -40,6 +40,9 @@ pub open spec fn decoded_meaning(command: DecodedCommand) -> CommandMeaning {
 }
 
 /// Parse one command, returning its exact consumed byte count.
+//= docs/parsing-requirements.md#parse-delta-007
+//= type=implementation
+//# Reserved delta opcodes MUST produce an unsupported-command error.
 pub fn decode_command<'a>(bytes: &'a [u8]) -> (result: Result<(usize, DecodedCommand<'a>), DeltaError>)
     ensures
         match result {
@@ -132,6 +135,9 @@ pub fn decode_command<'a>(bytes: &'a [u8]) -> (result: Result<(usize, DecodedCom
 //# Zero-length explicit literal and valid zero-length copy commands MUST consume their encoded arguments and leave reconstructed output unchanged.
 //= docs/parsing-requirements.md#parse-delta-008
 //# A complete delta stream MUST contain END immediately after its last complete command and contain no bytes after END.
+//= docs/parsing-requirements.md#parse-delta-001
+//= type=implementation
+//# The delta parser MUST require the reviewed delta magic before decoding commands.
 pub fn apply_delta(bytes: &[u8], basis: &[u8], max_output: usize) -> (result: Result<Vec<u8>, DeltaError>)
     ensures
         match result {
