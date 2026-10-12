@@ -308,6 +308,21 @@ proofs = []
 tests = [{ package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" }, { package = "duplicity-core", name = "identity_cancellation_and_exact_body_failures_publish_no_snapshot" }, { package = "duplicity-core", name = "missing_corrupt_and_ambiguous_objects_fail_explicitly" }, { package = "duplicity-core", name = "discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation" }]
 
 [[milestone]]
+id = "local-source"
+gate = false
+requirements = ["PARSE-SOURCE-001"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Initial independent review complete; positional/trailing-slash fixes await follow-up review.
+implementations = [{ path = "crates/core/src/local.rs", symbol = "open" }]
+proofs = []
+tests = [{ package = "duplicity-core", name = "flat_regular_listing_and_anchored_repeated_reads" }, { package = "duplicity-core", name = "changes_replacements_and_eof_are_terminal" }, { package = "duplicity-core", name = "cancellation_limits_and_untrusted_descriptors" }, { package = "duplicity-core", name = "original_official_directory_reconstructs_three_dates" }, { package = "duplicity-core", name = "interrupted_post_read_validation_retries_without_losing_bytes" }]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

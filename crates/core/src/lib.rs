@@ -26,3 +26,6 @@ pub mod chain;
 pub mod restore_plan;
 
 pub mod reader;
+
+#[cfg(unix)]
+pub mod local;

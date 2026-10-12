@@ -226,9 +226,15 @@ fn identity_cancellation_and_exact_body_failures_publish_no_snapshot() {
             &Cancellation::default(),
         );
         if mode == 5 {
-            assert!(matches!(result, Err(ReaderError::Source(SourceError::Changed))));
+            assert!(matches!(
+                result,
+                Err(ReaderError::Source(SourceError::Changed))
+            ));
         } else {
-            assert!(matches!(result, Err(ReaderError::Source(SourceError::Cancelled))));
+            assert!(matches!(
+                result,
+                Err(ReaderError::Source(SourceError::Cancelled))
+            ));
         }
         assert!(source.opens.load(Ordering::SeqCst) > 3);
     }

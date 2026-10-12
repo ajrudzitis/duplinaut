@@ -24,13 +24,13 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | Manifest tokens, manifests and byte paths | Official manifests pass; exact token and path refinements checked; 79 whole-manifest obligations pass, including contextual success/error refinement | Complete-core acceptance and selection-controller proofs |
 | Signatures and tar containers | Official archives pass; 54 signature and 37 tar-header/helper focused obligations pass | Complete tar/PAX controller refinement |
 | Stored-object envelopes | Stored-byte SHA1/MD5 validation; bounded plain/gzip decoding; official-object integration tests | Native OpenPGP and controller verification |
-| Storage and S3 | Exact-size and cancellation tests; 11 S3 tests using actual SDK HTTP handling; source review complete | Live-service and complete-reader consistency integration |
+| Storage and S3 | Anchored local reads with change detection; 11 S3 tests using actual SDK HTTP handling | Live-service and complete-reader consistency integration |
 | Assurance tooling | Pinned tools, Duvet baseline, executable failure tests, independent review | Expand gates as components are accepted |
 | Chain planning | Explicit full anchor and exact date; six official naming profiles; gaps and branches rejected | Formal refinement and source/catalog integration |
 | Snapshot reconstruction | Three official backup dates match byte paths, contents and metadata; immutable prior-set delta bases; transactional failures | Controller/resource proofs and chain integration |
 | Multipart assembly | Official snapshot/delta source oracles; bounded ordered parts; provisional output and sticky failure tests | Formal refinement and footer-bearing/encrypted queued replay |
 | Repository browser and restore | Metadata-only catalog and identity-bound plain/gzip reconstruction; read-only restore selection; official three-date oracles | Filesystem publication, frontend integration and controller proofs |
-| Terminal interface | Workspace scaffold | Browsing, restore selection, progress, and cancellation |
+| Terminal interface | Local/S3 metadata history and explicit full-scan browsing; byte-safe paths and cancellation | Restore selection/publication, detailed progress and automated interaction coverage |
 
 The [parsing requirements](docs/parsing-requirements.md) were written in RFC 2119/8174 language and independently reviewed **before implementation**. Public documentation leads format research; immutable official-source references and producer evidence resolve ambiguities.
 
@@ -88,7 +88,8 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Integrate metadata-only discovery and bounded plain/gzip chain reconstruction against original official objects.
 - [x] Independently review repository orchestration; test late incremental failures and cancellation.
 - [ ] Prove repository orchestration controller contracts and exact resource boundaries.
-- [ ] Implement a local read-only source with anchored identity checks.
+- [x] Implement a local read-only source with anchored identity checks; test actual files and official three-date reconstruction.
+- [x] Build read-only terminal history and snapshot browsing; exercise an official chain in a real terminal.
 - [ ] Accept the first parser component with implementation, proofs, official tests, and independent review.
 - [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers.
 - [ ] Complete verified snapshot indexing and native Linux restoration.

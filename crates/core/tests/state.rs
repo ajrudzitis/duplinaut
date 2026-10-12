@@ -716,9 +716,12 @@ fn restore_plan_distinguishes_byte_paths_and_component_prefix_siblings() {
     let state =
         SnapshotState::from_full(&assembler.finish().unwrap(), StateLimits::default()).unwrap();
     let byte_path = path(&[0xff]);
-    let byte_plan =
-        RestorePlan::from_roots(&state, std::slice::from_ref(&byte_path), RestorePlanLimits::default())
-            .unwrap();
+    let byte_plan = RestorePlan::from_roots(
+        &state,
+        std::slice::from_ref(&byte_path),
+        RestorePlanLimits::default(),
+    )
+    .unwrap();
     assert_eq!(byte_plan.entries().len(), 2);
     assert_eq!(byte_plan.entries()[1].path(), &byte_path);
     assert_eq!(

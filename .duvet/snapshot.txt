@@ -213,7 +213,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.
 
   SECTION: [PARSE-BROWSE-002](#parse-browse-002)
-    TEXT[!MUST]: When signature metadata cannot provide a requested listing, the reader MUST expose that a volume scan is required before starting that scan.
+    TEXT[!MUST,implementation]: When signature metadata cannot provide a requested listing, the reader MUST expose that a volume scan is required before starting that scan.
 
   SECTION: [PARSE-SOURCE-001](#parse-source-001)
     TEXT[!MUST,implementation,test]: The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.

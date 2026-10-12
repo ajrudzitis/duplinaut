@@ -8,6 +8,8 @@ license.workspace = true
 [dependencies]
 duplicity-core.workspace = true
 duplicity-s3.workspace = true
+ratatui = "=0.30.2"
+crossterm = "=0.29.0"
 
 [lints]
 workspace = true
