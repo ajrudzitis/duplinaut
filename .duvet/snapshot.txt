@@ -276,7 +276,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The acceptance build MUST fail on failed or incomplete required proofs, missing verification tools, stale generated parsers, or unreviewed verification exemptions.
 
   SECTION: [ASSURE-TEST-001](#assure-test-001)
-    TEXT[!MUST]: Compatibility tests MUST restore supported snapshots produced by official duplicity and compare contents and supported metadata with both their source tree and official restoration.
+    TEXT[!MUST,test]: Compatibility tests MUST restore supported snapshots produced by official duplicity and compare contents and supported metadata with both their source tree and official restoration.
 
   SECTION: [ASSURE-PROGRESS-001](#assure-progress-001)
     TEXT[!MUST]: README completion records MUST distinguish specification review, implementation, successful proofs, successful compatibility tests, and independent review for each completed component.

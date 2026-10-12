@@ -293,6 +293,21 @@ proofs = []
 tests = [{ package = "duplicity-core", name = "restore_plan_preserves_component_paths_and_closes_directory_ancestors" }, { package = "duplicity-core", name = "restore_plan_rejects_selected_special_types_missing_roots_and_budget_exhaustion" }, { package = "duplicity-core", name = "restore_plan_distinguishes_byte_paths_and_component_prefix_siblings" }]
 
 [[milestone]]
+id = "reader-orchestration"
+gate = false
+requirements = ["PARSE-SOURCE-001", "PARSE-CHAIN-001", "PARSE-CHAIN-002", "PARSE-MULTI-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = true
+# Independently reviewed native plain/gzip orchestration; no filesystem writes.
+implementations = [{ path = "crates/core/src/reader.rs", symbol = "discover" }, { path = "crates/core/src/reader.rs", symbol = "read_snapshot" }]
+proofs = []
+tests = [{ package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" }, { package = "duplicity-core", name = "identity_cancellation_and_exact_body_failures_publish_no_snapshot" }, { package = "duplicity-core", name = "missing_corrupt_and_ambiguous_objects_fail_explicitly" }, { package = "duplicity-core", name = "discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation" }]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

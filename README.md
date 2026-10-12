@@ -29,7 +29,7 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | Chain planning | Explicit full anchor and exact date; six official naming profiles; gaps and branches rejected | Formal refinement and source/catalog integration |
 | Snapshot reconstruction | Three official backup dates match byte paths, contents and metadata; immutable prior-set delta bases; transactional failures | Controller/resource proofs and chain integration |
 | Multipart assembly | Official snapshot/delta source oracles; bounded ordered parts; provisional output and sticky failure tests | Formal refinement and footer-bearing/encrypted queued replay |
-| Repository browser and restore | Read-only restore selection preserves byte paths and ancestors; official source-tree oracles | Catalog orchestration, filesystem publication and proofs |
+| Repository browser and restore | Metadata-only catalog and identity-bound plain/gzip reconstruction; read-only restore selection; official three-date oracles | Filesystem publication, frontend integration and controller proofs |
 | Terminal interface | Workspace scaffold | Browsing, restore selection, progress, and cancellation |
 
 The [parsing requirements](docs/parsing-requirements.md) were written in RFC 2119/8174 language and independently reviewed **before implementation**. Public documentation leads format research; immutable official-source references and producer evidence resolve ambiguities.
@@ -85,6 +85,10 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Integrate exact token, path, signature and tar helper refinement checkpoints.
 - [x] Validate stored-byte volume digests and decode bounded plain/gzip envelopes against official objects.
 - [x] Implement and review the read-only S3 adapter; test conditional reads, bounds, cancellation and persistent stream failures.
+- [x] Integrate metadata-only discovery and bounded plain/gzip chain reconstruction against original official objects.
+- [x] Independently review repository orchestration; test late incremental failures and cancellation.
+- [ ] Prove repository orchestration controller contracts and exact resource boundaries.
+- [ ] Implement a local read-only source with anchored identity checks.
 - [ ] Accept the first parser component with implementation, proofs, official tests, and independent review.
 - [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers.
 - [ ] Complete verified snapshot indexing and native Linux restoration.
