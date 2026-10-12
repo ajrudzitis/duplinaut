@@ -11,6 +11,9 @@ use crate::tar::{EntryType, TarTime};
 use std::collections::BTreeMap;
 use std::ops::Bound;
 use std::sync::Arc;
+use vstd::prelude::*;
+
+verus! {
 
 #[derive(Clone, Copy, Debug)]
 pub struct StateLimits {
@@ -49,6 +52,8 @@ pub enum StateError {
     Ancestor,
     Delta(DeltaError),
 }
+}
+
 #[derive(Debug)]
 pub struct SnapshotEntry {
     entry_type: EntryType,
@@ -448,28 +453,87 @@ fn check_budget(
     new_metadata: usize,
     new_capacity: usize,
 ) -> Result<(), StateError> {
-    let payload = state
-        .payload_bytes
-        .checked_add(new_payload)
-        .ok_or(StateError::Limit)?;
-    let metadata = state
-        .metadata_bytes
-        .checked_add(new_metadata)
-        .ok_or(StateError::Limit)?;
-    if payload > limits.payload_bytes
-        || metadata > limits.metadata_bytes
-        || fixed_payload
-            .checked_add(state.capacity_bytes)
-            .and_then(|bytes| bytes.checked_add(new_capacity))
-            .is_none_or(|bytes| bytes > limits.live_payload_bytes)
-        || fixed_metadata
-            .checked_add(metadata)
-            .is_none_or(|bytes| bytes > limits.live_metadata_bytes)
-    {
+    check_counts(
+        Charges {
+            payload: state.payload_bytes,
+            metadata: state.metadata_bytes,
+            capacity: state.capacity_bytes,
+        },
+        limits,
+        fixed_payload,
+        fixed_metadata,
+        new_payload,
+        new_metadata,
+        new_capacity,
+    )
+}
+
+verus! {
+/// Scalar projection of the same private native accounting counters. This is
+/// neither a container invariant nor an allocator-capacity specification.
+struct Charges {
+    payload: usize,
+    metadata: usize,
+    capacity: usize,
+}
+
+/// Mathematical acceptance criterion: natural-number totals must both fit the
+/// machine word and satisfy their independent logical/live resource ceilings.
+spec fn budget_fits(state: Charges, limits: StateLimits, fixed_payload: usize,
+    fixed_metadata: usize, new_payload: usize, new_metadata: usize, new_capacity: usize)
+    -> bool
+{
+    let payload = state.payload as nat + new_payload as nat;
+    let metadata = state.metadata as nat + new_metadata as nat;
+    let live_payload = fixed_payload as nat + state.capacity as nat + new_capacity as nat;
+    let live_metadata = fixed_metadata as nat + metadata;
+    payload <= usize::MAX && payload <= limits.payload_bytes
+        && metadata <= usize::MAX && metadata <= limits.metadata_bytes
+        && live_payload <= usize::MAX && live_payload <= limits.live_payload_bytes
+        && live_metadata <= usize::MAX && live_metadata <= limits.live_metadata_bytes
+}
+
+//= docs/parsing-requirements.md#parse-gen-003
+//= type=implementation
+//# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+fn check_counts(state: Charges, limits: StateLimits, fixed_payload: usize,
+    fixed_metadata: usize, new_payload: usize, new_metadata: usize, new_capacity: usize)
+    -> (result: Result<(), StateError>)
+    ensures result == if budget_fits(state, limits, fixed_payload, fixed_metadata,
+        new_payload, new_metadata, new_capacity) { Ok(()) } else { Err(StateError::Limit) },
+{
+    let payload = match state.payload.checked_add(new_payload) {
+        Some(n) => n,
+        None => return Err(StateError::Limit),
+    };
+    let metadata = match state.metadata.checked_add(new_metadata) {
+        Some(n) => n,
+        None => return Err(StateError::Limit),
+    };
+    if payload > limits.payload_bytes || metadata > limits.metadata_bytes {
         return Err(StateError::Limit);
     }
+    let retained_live_payload = match fixed_payload.checked_add(state.capacity) {
+        Some(n) => n,
+        None => return Err(StateError::Limit),
+    };
+    let live_payload = match retained_live_payload.checked_add(new_capacity) {
+        Some(n) => n,
+        None => return Err(StateError::Limit),
+    };
+    if live_payload > limits.live_payload_bytes { return Err(StateError::Limit); }
+    let live_metadata = match fixed_metadata.checked_add(metadata) {
+        Some(n) => n,
+        None => return Err(StateError::Limit),
+    };
+    if live_metadata > limits.live_metadata_bytes { return Err(StateError::Limit); }
     Ok(())
 }
+}
+
 fn path_charge(path: &BackupPath) -> Result<usize, StateError> {
     let mut bytes = path
         .components()

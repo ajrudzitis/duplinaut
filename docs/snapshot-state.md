@@ -61,10 +61,28 @@ and duplicity's restore deliberately skips symlink utime. Native tests separatel
 check preservation of actually emitted link metadata. No producer executable is
 invoked by the reader.
 
-Independent native review found no semantic blocker, and all 100 workspace tests,
-strict clippy and Duvet regression checks pass at this checkpoint. Formal controller
+Independent native review found no semantic blocker. Workspace tests, strict
+Clippy and Duvet regression checks passed at the initial native checkpoint. Formal controller
 refinement and resource-model proofs remain pending. The underlying delta kernel has its existing exact-output proofs;
 those do not constitute a proof of this new state controller.
+
+The first formal resource checkpoint verifies `check_counts` against
+`budget_fits`, an independent natural-number acceptance predicate. It returns
+exactly `Ok(())` when accumulated logical payload/metadata and conservative live
+payload/metadata totals fit `usize` and their respective limits; every other
+input returns exactly `StateError::Limit`. The native `check_budget` wrapper
+passes the same private counters through an allocation-free scalar projection.
+A strict `--no-cheating` state-module check reports four verified obligations and
+zero errors for the marked scalar surface. All twelve existing state/restore-plan
+integration groups and strict core-library Clippy pass on that source.
+
+This checkpoint establishes neither that map counters equal retained allocations
+nor that accounting charges bound allocator behavior. Preceding-set basis,
+ordered map transitions, subtree removal, final ancestors, error atomicity and
+complete controller/resource refinement remain pending. Native integration
+tests continue to cover those behaviors. The pure budget predicate contributes
+to PARSE-GEN-003/005; it does not complete either whole-reader requirement or
+PARSE-STATE-001/002.
 
 Infrastructure references used for this capacity/ownership review:
 [Arc ownership API](https://doc.rust-lang.org/std/sync/struct.Arc.html),
