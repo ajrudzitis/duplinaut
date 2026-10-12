@@ -259,35 +259,13 @@ impl SnapshotState {
                     }
                     let metadata = entry_charge(entry)?;
                     check_budget(&next, limits, fixed_payload, fixed_metadata, 0, metadata, 0)?;
-                    let live_remaining = limits
-                        .live_payload_bytes
-                        .checked_sub(
-                            fixed_payload
-                                .checked_add(next.capacity_bytes)
-                                .ok_or(StateError::Limit)?,
-                        )
-                        .ok_or(StateError::Limit)?;
-                    // Native delta output Vec growth can temporarily hold old
-                    // and new buffers. For pinned std byte Vec growth charge
-                    // max(8, 3*output_bound), rather than merely output length.
-                    let allocation_bound = if basis.is_some() {
-                        if live_remaining < 8 {
-                            0
-                        } else {
-                            live_remaining / 3
-                        }
-                    } else {
-                        live_remaining
-                    };
-                    let allowed = limits
-                        .file_bytes
-                        .min(
-                            limits
-                                .payload_bytes
-                                .checked_sub(next.payload_bytes)
-                                .ok_or(StateError::Limit)?,
-                        )
-                        .min(allocation_bound);
+                    let allowed = allowed_file_bytes(
+                        next.payload_bytes,
+                        next.capacity_bytes,
+                        fixed_payload,
+                        limits,
+                        basis.is_some(),
+                    )?;
                     let content = if entry.entry_type == EntryType::Regular {
                         let bytes = if let Some(basis) = basis {
                             //= docs/parsing-requirements.md#parse-state-002
@@ -532,6 +510,72 @@ fn check_counts(state: Charges, limits: StateLimits, fixed_payload: usize,
     if live_metadata > limits.live_metadata_bytes { return Err(StateError::Limit); }
     Ok(())
 }
+
+spec fn smaller(left: nat, right: nat) -> nat { if left < right { left } else { right } }
+
+/// Independent natural-number allowance, including the conservative nonempty
+/// byte-vector reallocation ceiling used for delta reconstruction.
+spec fn allowance_model(payload: usize, capacity: usize, fixed_payload: usize,
+    limits: StateLimits, delta: bool) -> Result<nat, StateError>
+{
+    let held = fixed_payload as nat + capacity as nat;
+    if held > usize::MAX || held > limits.live_payload_bytes || payload > limits.payload_bytes {
+        Err(StateError::Limit)
+    } else {
+        let remaining = (limits.live_payload_bytes as nat - held) as nat;
+        let allocation = if delta {
+            if remaining < 8 { 0nat } else { remaining / 3 }
+        } else { remaining };
+        Ok(smaller(smaller(limits.file_bytes as nat,
+            (limits.payload_bytes as nat - payload as nat) as nat), allocation))
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-003
+//= type=implementation
+//# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+fn allowed_file_bytes(payload: usize, capacity: usize, fixed_payload: usize,
+    limits: StateLimits, delta: bool) -> (result: Result<usize, StateError>)
+    ensures
+        match result {
+            Ok(allowed) => allowance_model(payload, capacity, fixed_payload, limits, delta)
+                == Ok(allowed as nat)
+                && allowed <= limits.file_bytes
+                && payload as nat + allowed as nat <= limits.payload_bytes
+                && fixed_payload as nat + capacity as nat <= limits.live_payload_bytes
+                && (!delta ==> fixed_payload as nat + capacity as nat + allowed as nat
+                    <= limits.live_payload_bytes)
+                && (delta && allowed > 0 ==>
+                    fixed_payload as nat + capacity as nat + 8 <= limits.live_payload_bytes
+                    && fixed_payload as nat + capacity as nat + 3 * (allowed as nat)
+                        <= limits.live_payload_bytes),
+            Err(e) => allowance_model(payload, capacity, fixed_payload, limits, delta) == Err(e),
+        },
+{
+    let held = match fixed_payload.checked_add(capacity) {
+        Some(n) => n,
+        None => return Err(StateError::Limit),
+    };
+    let live_remaining = match limits.live_payload_bytes.checked_sub(held) {
+        Some(n) => n,
+        None => return Err(StateError::Limit),
+    };
+    // Native delta output Vec growth can temporarily hold old/new buffers.
+    // Pinned byte Vec growth charges max(8,3*bound) for nonempty output.
+    let allocation_bound = if delta {
+        if live_remaining < 8 { 0 } else { live_remaining / 3 }
+    } else { live_remaining };
+    let logical_remaining = match limits.payload_bytes.checked_sub(payload) {
+        Some(n) => n,
+        None => return Err(StateError::Limit),
+    };
+    let allowed = limits.file_bytes.min(logical_remaining).min(allocation_bound);
+    Ok(allowed)
+}
+
 }
 
 fn path_charge(path: &BackupPath) -> Result<usize, StateError> {

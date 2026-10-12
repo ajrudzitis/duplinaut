@@ -76,6 +76,18 @@ A strict `--no-cheating` state-module check reports four verified obligations an
 zero errors for the marked scalar surface. All twelve existing state/restore-plan
 integration groups and strict core-library Clippy pass on that source.
 
+The second scalar checkpoint verifies `allowed_file_bytes` against
+`allowance_model`. Its exact result accounts for checked retained live payload,
+remaining logical payload and the minimum of per-file, logical and reconstruction
+allocation bounds. Successful snapshot allowances fit remaining live payload.
+For a nonzero delta allowance, both eight bytes and three times the allowance
+fit the remaining live budget, establishing the conservative
+`max(8, 3*allowance)` arithmetic ceiling. A zero delta allowance needs no minimum
+eight-byte guarantee. Native basis selection, snapshot reservation, and delta
+invocation remain unchanged. The marked state surface now has five strict
+verified obligations with zero errors; all twelve existing state/restore-plan
+integration groups and strict core-library Clippy pass on the checked source.
+
 This checkpoint establishes neither that map counters equal retained allocations
 nor that accounting charges bound allocator behavior. Preceding-set basis,
 ordered map transitions, subtree removal, final ancestors, error atomicity and
