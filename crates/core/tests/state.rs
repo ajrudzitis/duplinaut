@@ -566,6 +566,66 @@ fn exact_payload_entry_and_live_limits_accept_without_spare_budget() {
     .is_empty());
 }
 
+#[test]
+fn exact_metadata_and_live_metadata_limits_include_transition_scratch() {
+    use duplicity_core::multipart::LogicalEntry;
+    use std::mem::size_of;
+    let input = archive(&[("snapshot/.", b'5', b""), ("snapshot/file", b'0', b"abc")]);
+    let baseline = SnapshotState::from_full(&input, StateLimits::default()).unwrap();
+    // The documented logical budget includes the final ancestor stack, even
+    // though that transient storage is absent from the returned state's charge.
+    let logical = baseline.metadata_bytes() + 2 * size_of::<&BackupPath>();
+    let path_storage = |path: &BackupPath| {
+        size_of::<BackupPath>()
+            + path.components().capacity() * size_of::<Vec<u8>>()
+            + path.components().iter().map(Vec::capacity).sum::<usize>()
+    };
+    let archive_metadata = input.entries().len().max(4) * 2 * size_of::<LogicalEntry>()
+        + input
+            .entries()
+            .iter()
+            .map(|entry| {
+                path_storage(&entry.path)
+                    + entry.linkname.capacity()
+                    + entry.uname.capacity()
+                    + entry.gname.capacity()
+            })
+            .sum::<usize>();
+    let scratch = input
+        .entries()
+        .iter()
+        .map(|entry| path_storage(&entry.path))
+        .max()
+        .unwrap();
+    let live = size_of::<SnapshotState>() + archive_metadata + scratch + logical;
+    let exact = StateLimits {
+        metadata_bytes: logical,
+        live_metadata_bytes: live,
+        ..StateLimits::default()
+    };
+    assert_eq!(
+        SnapshotState::from_full(&input, exact)
+            .unwrap()
+            .metadata_bytes(),
+        baseline.metadata_bytes()
+    );
+    for insufficient in [
+        StateLimits {
+            metadata_bytes: logical - 1,
+            ..exact
+        },
+        StateLimits {
+            live_metadata_bytes: live - 1,
+            ..exact
+        },
+    ] {
+        assert!(matches!(
+            SnapshotState::from_full(&input, insufficient),
+            Err(StateError::Limit)
+        ));
+    }
+}
+
 //= docs/parsing-requirements.md#restore-001
 //= type=test
 //# A restoration MUST preserve each selected entry's backup-relative path beneath a destination that did not exist when publication began.
