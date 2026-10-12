@@ -43,8 +43,9 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Independently test multipart snapshot/delta source oracles and rejection after provisional output.
 - [x] Acquire and review original queued-restart and empty-tail producer fixtures; specify strict compatibility requirements.
 - [ ] Implement and independently test queued-restart boundary compatibility.
-- [x] Check whole-manifest-module arithmetic/bounds safety: 61 strict obligations pass; complete grammar semantics remain separate.
+- [x] Check whole-manifest-module arithmetic/bounds safety: 66 strict obligations pass; complete grammar semantics remain separate.
 - [ ] Prove complete manifest parser contextual semantics.
+- [x] Prove exact digest duplicate/conflict detection; preserve first-conflict rejection and bounded append behavior.
 - [ ] Prove complete multipart controller refinement.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.

@@ -388,6 +388,43 @@ fn digest(bytes: &[u8]) -> (result: Result<DeclaredDigest, ManifestError>)
     }
     Ok(DeclaredDigest { algorithm, name: normalized_name, hex: normalized_hex })
 }
+pub open spec fn digest_names_equal(left: DeclaredDigest, right: DeclaredDigest) -> bool {
+    ascii_equal(left.name@, right.name@)
+}
+pub open spec fn digest_conflict(hashes: Seq<DeclaredDigest>, hash: DeclaredDigest) -> bool {
+    exists|i: int| 0 <= i < hashes.len() && digest_names_equal(hashes[i], hash)
+        && hashes[i].hex@ != hash.hex@
+}
+pub open spec fn digest_present(hashes: Seq<DeclaredDigest>, hash: DeclaredDigest) -> bool {
+    exists|i: int| 0 <= i < hashes.len() && digest_names_equal(hashes[i], hash)
+}
+fn digest_duplicate(hashes: &[DeclaredDigest], hash: &DeclaredDigest)
+    -> (result: Result<bool, ManifestError>)
+    ensures match result {
+        Err(error) => error == ManifestError::Malformed && digest_conflict(hashes@, *hash),
+        Ok(duplicate) => !digest_conflict(hashes@, *hash) && duplicate == digest_present(hashes@, *hash),
+    },
+{
+    let mut i = 0;
+    let mut duplicate = false;
+    while i < hashes.len()
+        invariant i <= hashes.len(),
+            duplicate == (exists|j: int| 0 <= j < i && digest_names_equal(hashes@[j], *hash)),
+            forall|j: int| 0 <= j < i && digest_names_equal(hashes@[j], *hash)
+                ==> hashes@[j].hex@ == hash.hex@,
+        decreases hashes.len() - i,
+    {
+        if equal_word(&hashes[i].name, &hash.name) {
+            if hashes[i].hex != hash.hex {
+                assert(hashes@[i as int].hex@ != hash.hex@);
+                return Err(ManifestError::Malformed);
+            }
+            duplicate = true;
+        }
+        i += 1;
+    }
+    Ok(duplicate)
+}
 spec fn finish_model(pending: PendingVolume) -> Result<VolumeRecord, ManifestError> {
     match (pending.start, pending.end) {
         (Some(start), Some(end)) => {
@@ -589,7 +626,67 @@ pub open spec fn normalization_semantics(records: Seq<VolumeRecord>, end: int, c
     &&& forall|j: int| 0 <= j < end && records[j].number <= cap ==>
         exists|i: int| 0 <= i < output.len() && output[i].number == records[j].number
 }
-#[verifier::rlimit(20)]
+proof fn lemma_insert_capped(previous: Seq<VolumeRecord>, record: VolumeRecord, cap: u64)
+    requires ordered_records(previous), record.number <= cap,
+        forall|i: int| 0 <= i < previous.len() ==> previous[i].number <= cap,
+    ensures forall|i: int| 0 <= i < insert_record(previous, record).len()
+        ==> insert_record(previous, record)[i].number <= cap,
+{
+    lemma_insert_members(previous, record);
+    let output = insert_record(previous, record);
+    assert forall|i: int| 0 <= i < output.len() implies output[i].number <= cap by {
+        if output[i].number != record.number {
+            let j = choose|j: int| 0 <= j < previous.len() && previous[j] == output[i];
+        }
+    }
+}
+proof fn lemma_insert_latest(records: Seq<VolumeRecord>, end: int, previous: Seq<VolumeRecord>)
+    requires 0 < end <= records.len(), ordered_records(previous),
+        forall|i: int| 0 <= i < previous.len() ==> #[trigger] latest_record(records, end - 1, previous[i]),
+    ensures forall|i: int| 0 <= i < insert_record(previous, records[end - 1]).len()
+        ==> #[trigger] latest_record(records, end, insert_record(previous, records[end - 1])[i]),
+{
+    let record = records[end - 1];
+    lemma_insert_members(previous, record);
+    lemma_latest_new(records, end);
+    let output = insert_record(previous, record);
+    assert forall|i: int| 0 <= i < output.len() implies
+        #[trigger] latest_record(records, end, output[i]) by {
+        if output[i].number != record.number {
+            let p = choose|p: int| 0 <= p < previous.len() && previous[p] == output[i];
+            lemma_latest_preserved(records, end, previous[p]);
+        }
+    }
+}
+proof fn lemma_insert_covers(records: Seq<VolumeRecord>, end: int, cap: u64, previous: Seq<VolumeRecord>)
+    requires 0 < end <= records.len(), ordered_records(previous),
+        forall|j: int| 0 <= j < end - 1 && records[j].number <= cap ==>
+            exists|i: int| 0 <= i < previous.len() && previous[i].number == records[j].number,
+    ensures forall|j: int| 0 <= j < end && records[j].number <= cap ==>
+        exists|i: int| 0 <= i < insert_record(previous, records[end - 1]).len()
+            && #[trigger] insert_record(previous, records[end - 1])[i].number == records[j].number,
+{
+    let record = records[end - 1];
+    lemma_insert_members(previous, record);
+    let output = insert_record(previous, record);
+    assert forall|j: int| 0 <= j < end && records[j].number <= cap implies
+        exists|i: int| 0 <= i < output.len() && output[i].number == records[j].number by {
+        if records[j].number != record.number {
+            let p = choose|p: int| 0 <= p < previous.len() && previous[p].number == records[j].number;
+        }
+    }
+}
+proof fn lemma_skipped_latest(records: Seq<VolumeRecord>, end: int, cap: u64, previous: Seq<VolumeRecord>)
+    requires 0 < end <= records.len(), records[end - 1].number > cap,
+        forall|i: int| 0 <= i < previous.len() ==> previous[i].number <= cap,
+        forall|i: int| 0 <= i < previous.len() ==> #[trigger] latest_record(records, end - 1, previous[i]),
+    ensures forall|i: int| 0 <= i < previous.len() ==> #[trigger] latest_record(records, end, previous[i]),
+{
+    assert forall|i: int| 0 <= i < previous.len() implies
+        #[trigger] latest_record(records, end, previous[i]) by {
+        lemma_latest_preserved(records, end, previous[i]);
+    }
+}
 proof fn lemma_advance_semantics(records: Seq<VolumeRecord>, end: int, cap: u64,
     previous: Seq<VolumeRecord>)
     requires 0 < end <= records.len(),
@@ -601,35 +698,13 @@ proof fn lemma_advance_semantics(records: Seq<VolumeRecord>, end: int, cap: u64,
     let record = records[end - 1];
     if record.number <= cap {
         lemma_insert_ordered(previous, record);
-        lemma_insert_members(previous, record);
-        lemma_latest_new(records, end);
-        let output = insert_record(previous, record);
-        assert forall|i: int| 0 <= i < output.len() implies output[i].number <= cap by {
-            if output[i].number != record.number {
-                let j = choose|j: int| 0 <= j < previous.len() && previous[j] == output[i];
-            }
-        }
-        assert forall|i: int| 0 <= i < output.len() implies
-            #[trigger] latest_record(records, end, output[i]) by {
-            if output[i].number != record.number {
-                let p = choose|p: int| 0 <= p < previous.len() && previous[p] == output[i];
-                lemma_latest_preserved(records, end, previous[p]);
-            }
-        }
-        assert forall|j: int| 0 <= j < end && records[j].number <= cap implies
-            exists|i: int| 0 <= i < output.len() && output[i].number == records[j].number by {
-            if records[j].number != record.number {
-                let p = choose|p: int| 0 <= p < previous.len() && previous[p].number == records[j].number;
-            }
-        }
+        lemma_insert_capped(previous, record, cap);
+        lemma_insert_latest(records, end, previous);
+        lemma_insert_covers(records, end, cap, previous);
     } else {
-        assert forall|i: int| 0 <= i < previous.len() implies
-            #[trigger] latest_record(records, end, previous[i]) by {
-            lemma_latest_preserved(records, end, previous[i]);
-        }
+        lemma_skipped_latest(records, end, cap, previous);
     }
 }
-
 proof fn lemma_normalized_semantics(records: Seq<VolumeRecord>, end: int, cap: u64)
     requires 0 <= end <= records.len(),
     ensures normalization_semantics(records, end, cap, normalized_prefix(records, end, cap)),
@@ -754,18 +829,9 @@ impl Manifest {
                     }
                 } else if equal_word(field, &[b'H', b'a', b's', b'h']) {
                     let hash = match digest(value) { Ok(value) => value, Err(error) => return Err(error) };
-                    let mut i = 0;
-                    let mut duplicate = false;
-                    while i < record.hashes.len()
-                        invariant i <= record.hashes.len(),
-                        decreases record.hashes.len() - i,
-                    {
-                        if equal_word(&record.hashes[i].name, &hash.name) {
-                            if record.hashes[i].hex != hash.hex { return Err(ManifestError::Malformed); }
-                            duplicate = true;
-                        }
-                        i += 1;
-                    }
+                    let duplicate = match digest_duplicate(&record.hashes, &hash) {
+                        Ok(value) => value, Err(error) => return Err(error),
+                    };
                     if !duplicate {
                         if entry_count == limits.entries { return Err(ManifestError::Limit); }
                         entry_count += 1;
