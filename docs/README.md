@@ -42,3 +42,5 @@ Use Duvet links from authored `.vest` and Rust source to the exact normative tex
 The specification author owns normative changes, the software agent owns implementation, and the verification agent owns independent assurance evidence. Generated parser semantics are reviewed against requirements because the Vest frontend is unverified. Shared executable/proof files use sequential handoffs. A weakened contract or added trusted assumption requires explicit review before it changes completion status.
 
 Update these records with each accepted component. An unresolved question is retained with its provenance until its decision, affected requirements, proof consequences, and test expectations have all been recorded.
+
+The complete local `cargo xtask ci` gate also passed at commit `cebb18a`, source SHA-256 `e8135edea855491bb7a0f5d1e74325add60cf93bee863e7d9fbcb70293c77720`: fresh formal verification, generated-parser identity, Duvet coverage/snapshot enforcement, formatting, Clippy and workspace/declared milestone tests. Its receipt remains tooling-only; missing controller contracts and other pending milestones remain open. GitHub-hosted execution is still pending.
