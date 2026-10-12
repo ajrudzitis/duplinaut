@@ -79,9 +79,6 @@ fn copy_delta() -> Vec<u8> {
 //= docs/parsing-requirements.md#parse-state-002
 //= type=test
 //# A delta entry MUST use the reconstructed regular-file content for that same path from the preceding state as its basis.
-//= docs/parsing-requirements.md#parse-state-002
-//= type=test
-//# A delta entry MUST use the reconstructed regular-file content for that same path from the preceding state as its basis.
 #[test]
 fn immutable_preceding_set_basis_and_transactional_failure() {
     let previous = initial();
@@ -426,4 +423,90 @@ fn official_three_snapshot_dates_match_contents_types_and_metadata() {
         .apply_incremental(&second, StateLimits::default())
         .unwrap();
     check_oracle(&state, 2);
+}
+
+#[test]
+fn deleted_bases_remain_available_from_preceding_set() {
+    let previous = initial();
+    let delta = copy_delta();
+    let next = previous
+        .apply_incremental(
+            &archive(&[("deleted/file", b'0', b""), ("diff/file", b'0', &delta)]),
+            StateLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(next.get(&path(b"file")).unwrap().content().unwrap(), b"old");
+    let next = previous
+        .apply_incremental(
+            &archive(&[
+                ("deleted/dir", b'0', b""),
+                ("snapshot/dir", b'5', b""),
+                ("diff/dir/child", b'0', &delta),
+            ]),
+            StateLimits::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        next.get(&path(b"dir/child")).unwrap().content().unwrap(),
+        b"chi"
+    );
+}
+
+#[test]
+fn subtree_removal_preserves_near_prefixes_and_final_errors_are_atomic() {
+    let previous = SnapshotState::from_full(
+        &archive(&[
+            ("snapshot/.", b'5', b""),
+            ("snapshot/a", b'5', b""),
+            ("snapshot/a/child", b'0', b"child"),
+            ("snapshot/a-", b'0', b"dash"),
+            ("snapshot/a0", b'0', b"zero"),
+            ("snapshot/aλ", b'0', b"bytes"),
+        ]),
+        StateLimits::default(),
+    )
+    .unwrap();
+    for operation in ["deleted/a", "snapshot/a"] {
+        let next = previous
+            .apply_incremental(&archive(&[(operation, b'0', b"")]), StateLimits::default())
+            .unwrap();
+        assert!(next.get(&path(b"a/child")).is_none());
+        for (name, contents) in [
+            ("a-", b"dash".as_slice()),
+            ("a0", b"zero"),
+            ("aλ", b"bytes"),
+        ] {
+            assert_eq!(
+                next.get(&path(name.as_bytes())).unwrap().content().unwrap(),
+                contents
+            );
+        }
+    }
+    let invalid = archive(&[
+        ("snapshot/.", b'5', b""),
+        ("snapshot/a0", b'0', b"changed"),
+        ("snapshot/missing/child", b'0', b"orphan"),
+    ]);
+    assert!(matches!(
+        previous.apply_incremental(&invalid, StateLimits::default()),
+        Err(StateError::Ancestor)
+    ));
+    let invalid_root = archive(&[("snapshot/.", b'0', b"new root")]);
+    assert!(matches!(
+        previous.apply_incremental(&invalid_root, StateLimits::default()),
+        Err(StateError::RootType)
+    ));
+    assert_eq!(previous.len(), 6);
+    assert_eq!(
+        previous.get(&path(b"a0")).unwrap().content().unwrap(),
+        b"zero"
+    );
+    assert_eq!(
+        previous.get(&path(b"a/child")).unwrap().content().unwrap(),
+        b"child"
+    );
+    assert_eq!(
+        previous.get(&path(b".")).unwrap().entry_type(),
+        EntryType::Directory
+    );
 }

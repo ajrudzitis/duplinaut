@@ -13,7 +13,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Tar containers and operations | Reviewed header, GNU/PAX and footer profiles | Implemented; thirteen tests pass; header uses Vest DSL | Exact header/arithmetic/footer: 37 focused strict obligations pass; PAX framing/keys and fractional time: 21 pass; controller pending | All 48 recorded plain gzip archives scan and classify | Native source reviewed; formal acceptance pending |
 | Stored-object integrity and plain/gzip envelopes | Reviewed stored-byte hash and envelope requirements | Implemented; four tests pass | Digest and decompression libraries are trusted adapters; controller proof pending | Recorded official manifest hashes and gzip objects pass | Native source reviewed; complete formal acceptance pending |
 | Multipart assembly | Reviewed ordinary 3.0.7 profile; queued-restart requirements and fixtures reviewed | Implemented; six tests pass; all stored volumes checked before publication | Controller refinement pending | Official three-volume snapshot and two-volume delta match independent source hashes | Independent native review complete; restart and formal acceptance pending |
-| Snapshot reconstruction | Reviewed ordered state and preceding-set basis | Implemented; five test groups pass | State/resource refinement pending | Three official 3.0.7 backup dates match byte paths, contents and metadata | Independent native review complete; formal acceptance pending |
+| Snapshot reconstruction | Reviewed ordered state and preceding-set basis | Implemented; seven test groups pass | State/resource refinement pending | Three official 3.0.7 backup dates match byte paths, contents and metadata | Independent native review complete; formal acceptance pending |
 | Filesystem restoration | Requirements written | Pending | Pending | Pending | Pending |
 
 - [x] Create the library and verification-enabled Cargo configuration.
@@ -65,3 +65,6 @@ Stored-volume decoding checks SHA1 and MD5 declarations before decompression, re
 
 - [x] Reconstruct bounded immutable snapshot states and compare three official backup dates with source-tree oracles.
 - [ ] Prove snapshot-state controller and live resource model.
+
+- [x] Independently review state semantics; test deleted delta bases, near-prefix subtree isolation and final-validation atomicity.
+- [ ] Add exact success/rejection threshold tests for state payload, metadata, entry and live budgets.
