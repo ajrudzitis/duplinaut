@@ -109,3 +109,5 @@ offsets and publication/cancellation/uncertainty transitions. No such complete
 proof is claimed by implementation annotations or passing native tests.
 
 Independent source review and independent execution accepted this native checkpoint. The named-user ACL inheritance test requires both the effective UID and UID 1001 to be mapped in the test process user namespace. A sandbox mapping only UID 1000 cannot install that ACL and fails test setup; the exact test passed outside that sandbox, without a skip. Complete filesystem-controller formal acceptance remains pending.
+
+After adoption, the complete local `cargo xtask ci` gate passed at commit `fdce7c9`, source SHA-256 `834aeae159efd3ced91c980398c3ceb3e126aa334d8b01c11cf1ee3144f215f1`, including fresh strict core verification, generated-parser and Duvet gates, formatting, Clippy, and native tests. This accepts the existing tooling milestone and tested native checkpoint, not missing filesystem-controller contracts or untested filesystem families.
