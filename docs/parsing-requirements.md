@@ -29,6 +29,10 @@ Public documentation is the first reference:
 | DOC-LINUX-FS | [Linux statfs(2)](https://man7.org/linux/man-pages/man2/fstatfs.2.html) | Anchored filesystem identification |
 | DOC-LINUX-XATTR | [Linux removexattr(2)](https://man7.org/linux/man-pages/man2/removexattr.2.html) | FD-based inherited ACL removal and error meanings |
 | DOC-RUSTIX | [rustix 1.1.5](https://docs.rs/rustix/1.1.5/rustix/) | Safe directory-relative syscall wrappers; upstream/kernel filesystem trusted boundary |
+| DOC-RUST-ARGS-OS | [Rust args_os](https://doc.rust-lang.org/std/env/fn.args_os.html) | Original OS argument values without Unicode validation |
+| DOC-RUST-OSSTR | [Unix OsStrExt](https://doc.rust-lang.org/std/os/unix/ffi/trait.OsStrExt.html) | Original Unix path bytes |
+| DOC-RUST-THREAD | [Rust thread ownership](https://doc.rust-lang.org/std/thread/fn.spawn.html), [bounded channels](https://doc.rust-lang.org/std/sync/mpsc/fn.sync_channel.html) | Immutable worker ownership, joining and channel backpressure |
+| DOC-CROSSTERM-KEYS | [crossterm 0.29.0 key kinds and reporting limits](https://docs.rs/crossterm/0.29.0/crossterm/event/struct.KeyEvent.html#structfield.kind) | Reported event kinds and legacy terminal repeat limitations |
 | DOC-GZIP | [RFC 1952](https://www.rfc-editor.org/rfc/rfc1952) | Gzip member structure, CRC32 and uncompressed-size checks |
 | DOC-VEST | [Vest project documentation](https://github.com/secure-foundations/vest) | DSL, combinators, verification guarantees and frontend trust |
 | DOC-DUVET | [Duvet specifications](https://awslabs.github.io/duvet/specifications.html), [annotations](https://awslabs.github.io/duvet/annotations.html), [reports](https://awslabs.github.io/duvet/reports.html) | Markdown requirement extraction and evidence links |
@@ -726,6 +730,94 @@ Provenance: POLICY, SRC-LINUX-EXT4/VFS. Initial policy treats every publication 
 If creation of the first outer staging leaf returns an error other than a definite existing-entry collision, the backend MUST report its candidate as uncertain and leave that candidate untouched because exclusive ownership was not established.
 
 Provenance: POLICY, SRC-LINUX-EXT4. Do not adopt, chmod, open for modification, remove, or retry/reuse an uncertain candidate on arbitrary creation errors. A definite `EEXIST` collision may be skipped with bounded selection of a different leaf, always leaving the existing entry untouched. Success, followed by private-boundary validation, establishes the owned namespace needed for descendant creation and attempted-entry cleanup under RESTORE-013/022. An outer creation error occurs before any backup plaintext descendant is written, but can leave a metadata artifact; neither a late errno nor an inode observation alone proves it is safe to delete a potentially preexisting entry. Caller-selected unrelated entries, including the requested destination, remain untouched.
+
+## Native terminal restoration interaction
+
+Initial scope: local filesystem restoration of an already reconstructed immutable plain/gzip snapshot on Linux, through the adopted native backend. Destination configuration is supplied at process startup; no editable terminal path or credential widget is required. These frontend requirements add no cryptographic, global-resource, syscall, or crash-recovery guarantees beyond their referenced core contracts.
+
+### RESTORE-UI-001
+
+The frontend MUST accept a restoration destination only as a complete pair of `--restore-parent PATH` and `--restore-name NAME`, preserving their original OS bytes and rejecting duplicate, missing, oversized or invalid destination values before starting restoration.
+
+Provenance: POLICY, DOC-RUST-ARGS-OS, DOC-RUST-OSSTR. With neither option, browsing and read-only previews remain available. Either option alone is a configuration error, not an inferred default. Linux NAME is exactly one nonempty component, excluding NUL, slash, `.` and `..`; it can contain non-UTF-8 bytes, spaces, backslashes and option-like leading text. PATH is nonempty and contains no NUL. Initial byte limits are 65,536 for PATH and 4,096 for NAME, checked before frontend copies/escaping. OS argument acquisition itself remains standard-library/process infrastructure. Option names and S3 configuration values require explicit valid UTF-8 where their API requires it; never convert all arguments through Unicode or decode destination escapes. No automatic restoration occurs at startup. Destination eligibility remains the backend's decision.
+
+### RESTORE-UI-002
+
+The frontend MUST derive a restoration preview from the exact completed immutable snapshot and selected original byte-valued roots, including precisely the entries and source directory ancestors accepted by its `RestorePlan`.
+
+Provenance: RESTORE-001/005, reviewed RestorePlan. Marked roots select their subtrees; no marks explicitly means the whole snapshot. Deduplicate overlapping selections through the core plan. Preserve snapshot contents/metadata by immutable ownership; do not reconstruct a newer snapshot, replace the source, substitute displayed strings, or deep-copy payloads between preview and execution. A selected unsupported type or invalid plan yields a preview error and no executable confirmation.
+
+### RESTORE-UI-003
+
+The frontend MUST present a concrete restoration preview identifying the exact snapshot target, configured parent and new leaf, marked/all selection, included ancestors, resulting entry count, total regular payload bytes, no-replacement policy and supported metadata policy before offering publication confirmation.
+
+Provenance: POLICY. The destination and every selected root are byte-escaped, with full text accessible through bounded scrolling; counts include required ancestors. Distinguish zero payload from unknown values rather than overflow/wrapping. Explain that ordinary modes, supported mtimes and raw symlink targets follow the backend; ownership/ACL/xattr copying and crash durability are not promised. Identify a genuinely empty plan's policy root `0700` and unspecified root mtime when applicable. Automatic profile/parent/destination validation occurs after confirmation and before staging; the preview never promises that those checks or subsequent filesystem I/O will succeed. The parent pathname is caller-selected and may resolve through symlinks or later be rebound.
+
+### RESTORE-UI-004
+
+The frontend MUST start at most one restoration operation only when its displayed successful `r` preview receives the exact ASCII acknowledgment `restore` followed by Enter, and MUST clear that acknowledgment and disarm confirmation when its snapshot, roots or destination changes or the user leaves that preview.
+
+Provenance: POLICY, DOC-CROSSTERM-KEYS. The dedicated seven-byte maximum acknowledgment field starts empty for each successful preview. Ignore acknowledgment/confirmation input while preparing; consume pending terminal events until none are immediately available before displaying/arming the ready preview. A bounded drain may continue across event-loop iterations and leaves the preview unarmed while pending input remains. Enter with an empty/mismatched field never starts restoration. Backspace edits only this fixed acknowledgment; it is neither destination nor credential input. In this preview, character keys such as `r` edit the acknowledgment instead of triggering another preview. Ignore events explicitly reported as Repeat/Release, but legacy Unix terminals can report repeats as Press; do not claim physical-new-key detection or physical typing origin. The required observed multi-character sequence prevents a held Enter or a single held character from supplying acknowledgment. `p` remains read-only; history Enter retains the distinct volume-scan action. Snapshot changes/navigation, a new scan, marks, Esc, errors, completed requests and stale replies clear the field/disarm. Confirmed inputs move as one immutable request and clear the acknowledgment immediately; subsequent Enter events never enqueue duplicates.
+
+### RESTORE-UI-005
+
+The frontend MUST execute restoration through the adopted native `restore` API with its reviewed limits and profile policy, without implementing its own path extraction, destination replacement, staging cleanup or filesystem eligibility fallback.
+
+Provenance: RESTORE-007..027, native backend review. Initial frontend scope uses `RestoreLimits::default()` and automatic profile selection; there is no unsafe override or filesystem/permission workaround option. Backend invalid-destination, unsupported OS/filesystem/profile, fidelity, resource and syscall results remain explicit diagnostics. On non-Linux platforms reject restoration configuration/action as unsupported while retaining supported browsing. Native preflight may reject a confirmed request before creating staging; this is not a preview success claim being converted into backend success.
+
+### RESTORE-UI-006
+
+The frontend MUST retain one frozen operation's exact snapshot, roots, destination and bounded plan summary across preview and confirmation, and keep at most one active scan, preview or restoration with bounded request/reply queues.
+
+Provenance: POLICY, DOC-RUST-THREAD. Shared immutable snapshot ownership, such as `Arc<ValidatedSnapshot>`, permits worker-local borrowed plan creation without copying payloads. A confirmation worker may recreate the deterministic plan from that same snapshot and roots, but must compare its counts/payload summary before entering restoration. Request and reply queues each have capacity at most one; stale replies cannot mutate another operation's state. Source/catalog replacement, new scans and selection changes are disabled during active restoration. Worker/thread/channel failure before dispatch disarms confirmation and reports an error, never a successful publication.
+
+### RESTORE-UI-007
+
+The frontend MUST run plan preparation and filesystem restoration outside the terminal event/render loop, with an operation-specific cancellation token and explicit running/cancellation-requested states.
+
+Provenance: POLICY, RESTORE-021. Plan construction is bounded synchronous work and has no internal cancellation promise; observe cancellation before and after it and before entering the backend. While a restore runs, Esc requests cancellation and waits for its result. `q` likewise requests cancellation instead of immediately exiting; after the result is visible a subsequent `q` exits. No fixed cancellation latency, progress percentage or interruptible-kernel guarantee is claimed. Preview abandonment/other-operation cancellation must never reuse a cancelled token for a later restoration.
+
+### RESTORE-UI-008
+
+The frontend MUST preserve the backend's published, unpublished and publication-indeterminate outcome distinction, including successful-publication precedence over racing cancellation and all reported cleanup warnings or uncertainty.
+
+Provenance: RESTORE-021/023/026/027. Published results state completed publication and separately identify empty-wrapper cleanup warnings. Unpublished results identify initiating cause, cleanup attempts/failures/budget/truncation and any uncertain first-outer-leaf candidate; they do not claim all staging artifacts were removed. Indeterminate results state that publication was attempted and effects cannot be established, never displaying an untouched/absent destination, cancelled restoration or complete success instead. Reaching an exact byte count or setting a cancellation token supplies no substitute result.
+
+### RESTORE-UI-009
+
+The frontend MUST refrain from automatic retry, rollback, destination inspection-based outcome promotion or modifying cleanup after publication uncertainty or an unavailable worker outcome.
+
+Provenance: RESTORE-026/027. Preserve diagnostic names/identities for inspection without chmod, unlink, rename, overwrite, recovery or another restore in the same session after a publication-indeterminate result. An unpublished result containing an uncertain first staging candidate also disables another restore in that session; leave the candidate untouched. Only an ordinary definitely unpublished outcome permits a new `r` preview and fresh confirmation. Explicit user restart/manual recovery is outside the initial flow and confers no outcome-resolution assurance.
+
+### RESTORE-UI-010
+
+The frontend MUST render destination, selected paths, staging/candidate names and diagnostics using reversible terminal-safe byte escaping, preserving complete backend identity and warning fields in the accessible final result.
+
+Provenance: PARSE-PATH-001, reviewed terminal escaping. Printable ASCII except backslash displays literally; backslash doubles and every other byte uses `\xNN`. Never use display text as an input identity or render control bytes/ANSI from names/errors. Final receipts retain parent/root device-inode identities, profile, filesystem magic, original destination/staging names and empty-root-mtime policy. Label the supplied parent pathname as the requested path; an anchored parent identity does not prove that this textual pathname still locates the published root after rebinding. Viewport clipping does not discard the underlying receipt or silently truncate required diagnostics.
+
+### RESTORE-UI-011
+
+The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
+
+Provenance: POLICY. Initial independent frontend bounds are 1,024 roots, 4 MiB of owned root component/vector capacity, 16 million plan-candidate comparisons, 20 MiB of escaped preview text and 1 MiB of final rendered diagnostics. Charge all simultaneous frontend-owned root copies if any; snapshot payload/state and core/backend budgets are separate. Check arithmetic and escape expansion before allocations; reject excess rather than truncate identity/security-relevant text. Bounded queues, operation metadata, result ownership and lifecycle are reviewed explicitly. Allocator, terminal renderer and OS argument storage remain trusted infrastructure rather than a global heap proof.
+
+### RESTORE-UI-012
+
+On a controlled terminal I/O failure or shutdown during active restoration, the frontend MUST request cancellation, close or signal its worker request path, attempt terminal-state restoration, drain and join the worker without bounded-channel deadlock, retain its typed result, and attempt escaped final-result reporting through an available non-raw output sink before controlled exit.
+
+Provenance: POLICY, DOC-RUST-THREAD. Close all frontend-owned request senders or use an equivalent shutdown signal that prevents the worker from waiting indefinitely for another request after completion. Drain a reply or retain an equivalent result path before joining a worker that could be blocked sending it. Terminal failure never authorizes detaching and forgetting a possibly publishing operation. Teardown and output faults are retained/reported separately without discarding a known backend outcome or fabricating uncertainty. Reporting uses fallible writes, not panic-on-output-failure helpers; successful external delivery requires an available sink, since terminal and stderr can both be unwritable. A worker panic/disconnection without a final backend result is identified as `restoration outcome unavailable; inspection required`, with configured destination and available operation metadata, rather than a fabricated backend unpublished/cancelled result. Disable retries/modifying recovery. Fatal signals, process aborts, crashes and allocator-abort termination remain outside controlled-shutdown assurance; no receipt-recovery/delivery guarantee covers those cases.
+
+### RESTORE-UI-013
+
+The frontend MUST keep backup source access read-only and avoid collecting or exposing credentials, backup payload bytes or secret material through the restoration interaction, diagnostics or automatic logs.
+
+Provenance: PARSE-SOURCE-001, POLICY. The worker restores already validated in-memory entries and needs no further source request or bucket write. Initial destination flags contain paths, not passwords/keys; use the existing SDK credential provider outside this restoration flow. Do not dump environment/configuration/argv/SDK credential errors or file content to construct a receipt. User-requested path/identity diagnostics are preserved through escaping. No automatic receipt file, clipboard action, upload, bucket mutation or external-message delivery is part of this profile.
+
+### RESTORE-UI-014
+
+Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+
+Provenance: ASSURE-PROOF/TRACE, RESTORE-024. Duvet links target these canonical headings; passing annotations/counts or parser proofs cannot establish frontend lifecycle, kernel behavior, cancellation or complete restoration. Required scenarios include original-byte destinations/roots, stale previews/replies, acknowledgment reset/mismatch/preparation input/held Enter or single-character repeats, repeated confirmations, worker/terminal/output failure and channel backpressure, all three outcomes, cleanup warnings/uncertain candidates, success racing cancellation, unsupported configuration, bounded metadata and no source writes. Real PTY evidence checks displayed preview/result, key sequences and terminal-state restoration; pure tests alone do not establish that the actual terminal communicates the required choices.
 
 ## Verification and traceability requirements
 
