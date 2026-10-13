@@ -4,8 +4,8 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 
 | Component | Specification review | Implementation | Proof | Official compatibility tests | Independent acceptance |
 | --- | --- | --- | --- | --- | --- |
-| Delta decoder and application | Reviewed grammar and bounds | Implemented; 16 native tests pass | Focused verification: 535 obligations, zero errors | Official 0.8.23, 2.1.3, 3.0.7 and 3.2.1 payloads pass, including multipart | Independent semantic review complete; whole-workspace gate pending |
-| Manifest token decoding | Reviewed exact byte predicates | Implemented; three tests pass | Focused strict verification: 155 obligations, zero errors | Official manifests pass through this decoder | Independent semantic review complete; complete-core gate pending |
+| Delta decoder and application | Reviewed grammar and bounds | Implemented; 16 native tests pass | Focused verification: 535 obligations, zero errors | Official 0.8.23, 2.1.3, 3.0.7 and 3.2.1 payloads pass, including multipart | Scoped component accepted by fresh full CI |
+| Manifest token decoding | Reviewed exact byte predicates | Implemented; three token tests plus official manifests pass | Exact token contracts; 155 focused obligations and fresh full-core verification pass | Official manifests from four producer versions pass | Scoped component accepted by fresh full CI |
 | Byte-path validation and comparison | Reviewed root/component grammar | Implemented; three tests pass | Exact normalization, rejection diagnostics and comparison: 10 focused strict obligations pass | Archive fixture integration pending | Independent semantic review complete; complete-core gate pending |
 | Manifest framing and normalization | Reviewed fields, counts, hashes and restart semantics | Implemented; eight tests pass | Exact framing/digest helpers, last-declaration restart normalization and conservative selection checked; complete contextual parser refinement checked; same-source core gate pending | Plain manifests from all four producer versions pass | Software and helper contracts reviewed; complete formal acceptance pending |
 | Object names and timestamps | Reviewed canonical, legacy and short-name grammar | Implemented; six tests pass; canonical framing uses Vest DSL | Calendar and classification refinement pending | All 84 recorded official object basenames pass | Native source reviewed; formal acceptance pending |
@@ -80,3 +80,5 @@ Stored-volume decoding checks SHA1 and MD5 declarations before decompression, re
 - [x] Select immutable restore entries, required source ancestors and exact byte paths; reject selected unsupported types.
 - [x] Implement and independently review native Linux filesystem publication; see [limits and test evidence](../../docs/restore-linux-implementation.md).
 - [ ] Prove restore-selection and filesystem-controller refinement.
+
+The delta and manifest-token component gates passed complete local `cargo xtask ci` at commit `9af428f`, source SHA-256 `611a668f654385575f187a092bf0c8b14eeec974cc2528f4dbae1919140a574d`: 999 strict core obligations, zero errors, required official/native tests, Duvet coverage and all tooling gates. The receipt accepts tooling, manifest-token and delta-wire only. Other component/controller gates remain pending.
