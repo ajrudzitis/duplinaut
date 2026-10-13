@@ -92,7 +92,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Implement a local read-only source with anchored identity checks; test actual files and official three-date reconstruction.
 - [x] Build read-only terminal history and snapshot browsing; exercise an official chain in a real terminal.
 - [x] Add bounded terminal restore-selection previews and independently review the read-only flow.
-- [x] Accept the delta and manifest-token components with implementation, exact contracts, fresh full verification, official tests and independent review.
+- [x] Accept delta, manifest-token, byte-path, signatures and manifest-record components with exact contracts, fresh full verification, official tests and independent review.
 - [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers.
 - [ ] Complete verified snapshot indexing and native Linux restoration.
 - [x] Independently review and adopt Linux staging/publication requirements before implementation, including indeterminate syscall outcomes.
