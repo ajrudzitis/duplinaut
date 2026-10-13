@@ -102,6 +102,9 @@ fn inclusive_componentwise_selection_includes_descendants_and_shared_boundaries(
     assert!(manifest.records[0].may_contain(&path(b".")));
 }
 
+//= docs/parsing-requirements.md#parse-man-007
+//= type=test
+//# The manifest parser MUST accept an optional counted Filelist section before or after volume records without interpreting its lines as volume fields.
 #[test]
 fn filelist_positions_case_crlf_and_byte_tokens() {
     let list = "Filelist 2\n new \"quote\\x22\\xff\"\n deleted old\n";
@@ -222,6 +225,12 @@ fn explicit_limits_are_enforced_without_arithmetic_wrap() {
     .is_ok());
 }
 
+//= docs/parsing-requirements.md#parse-man-001
+//= type=test
+//# The manifest parser MUST recover ordered volume records containing volume number, starting path, ending path, optional block boundaries, and declared hashes.
+//= docs/parsing-requirements.md#parse-man-006
+//= type=test
+//# The reader MUST retain the distinction between absent block boundaries and explicit numeric block boundaries.
 #[test]
 fn official_multipart_boundaries_and_byte_path_values_are_independent_expectations() {
     let bytes = include_bytes!(

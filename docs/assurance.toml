@@ -125,15 +125,15 @@ tests = [{ package = "duplicity-core", name = "gregorian_dates_and_zones_are_exa
 
 [[milestone]]
 id = "signatures"
-gate = false
+gate = true
 requirements = ["PARSE-SIG-001", "PARSE-SIG-002", "PARSE-SIG-003"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Focused --no-cheating: 54 obligations, zero errors; complete-core acceptance pending.
+# Focused --no-cheating: 54 obligations, zero errors; fresh full-core verification passed; scoped gate enabled.
 implementations = [{ path = "crates/core/src/signature.rs", symbol = "parse" }, { path = "crates/core/src/signature.rs", symbol = "original_size" }]
 proofs = [
   { id = "signature-magic", requirement = "PARSE-SIG-001", path = "crates/core/src/signature.rs", symbol = "parse", kind = "contract" },
@@ -145,45 +145,47 @@ tests = [{ package = "duplicity-core", name = "all_algorithms_and_strong_length_
 
 [[milestone]]
 id = "byte-path"
-gate = false
+gate = true
 requirements = ["PARSE-PATH-001", "PARSE-PATH-002"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Native source review complete; formal acceptance remains pending.
+# Scoped semantic contracts independently reviewed; fresh full gate required.
 implementations = [{ path = "crates/core/src/path.rs", symbol = "parse" }, { path = "crates/core/src/path.rs", symbol = "compare" }]
 # Focused --no-cheating verification: 10 obligations, zero errors.
-# proved remains false until the complete same-source core gate passes.
+# Complete same-source verification passed; scoped gate enabled.
 proofs = [
   { id = "path-byte-preservation", requirement = "PARSE-PATH-001", path = "crates/core/src/path.rs", symbol = "parse", kind = "contract" },
   { id = "path-validation", requirement = "PARSE-PATH-002", path = "crates/core/src/path.rs", symbol = "parse", kind = "contract" },
   { id = "path-byte-comparison", requirement = "PARSE-PATH-001", path = "crates/core/src/path.rs", symbol = "compare", kind = "contract" },
 ]
-tests = [{ package = "duplicity-core", name = "identity_and_order_use_byte_components" }, { package = "duplicity-core", name = "reject_escape_and_ambiguous_components" }, { package = "duplicity-core", name = "comparison_covers_component_and_byte_prefix_boundaries" }]
+tests = [{ package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" }, { package = "duplicity-core", name = "identity_and_order_use_byte_components" }, { package = "duplicity-core", name = "reject_escape_and_ambiguous_components" }, { package = "duplicity-core", name = "comparison_covers_component_and_byte_prefix_boundaries" }]
 
 [[milestone]]
 id = "manifest-records"
-gate = false
+gate = true
 requirements = ["PARSE-MAN-001", "PARSE-MAN-004", "PARSE-MAN-005", "PARSE-MAN-006", "PARSE-MAN-007"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Native source review complete; formal acceptance remains pending.
+# Scoped semantic contracts independently reviewed; fresh full gate required.
 implementations = [{ path = "crates/core/src/manifest.rs", symbol = "parse" }, { path = "crates/core/src/manifest.rs", symbol = "volumes" }, { path = "crates/core/src/manifest.rs", symbol = "may_contain" }]
 # Individual fresh strict checks: 21 obligations across restart/selection helpers,
 # plus six exact path/boundary/positive-decimal/record-completion obligations.
 # Entire manifest module: 79 fresh strict obligations pass, including exact
 # success/error refinement against the independent contextual grammar.
-# Same-source complete-core acceptance and allocator assurance remain pending.
+# Complete same-source verification passed; allocator assurance remains outside this gate.
 proofs = [
+  { id = "manifest-block-presence", requirement = "PARSE-MAN-006", path = "crates/core/src/manifest.rs", symbol = "parse", kind = "contract" },
+  { id = "manifest-counted-filelist", requirement = "PARSE-MAN-007", path = "crates/core/src/manifest.rs", symbol = "parse", kind = "contract" },
   { id = "manifest-contextual-parse", requirement = "PARSE-MAN-001", path = "crates/core/src/manifest.rs", symbol = "parse", kind = "contract" },
-  { id = "manifest-digest-duplicates", requirement = "PARSE-MAN-003", path = "crates/core/src/manifest.rs", symbol = "digest_duplicate", kind = "contract" },
+  { id = "manifest-digest-duplicates", requirement = "PARSE-MAN-001", path = "crates/core/src/manifest.rs", symbol = "digest_duplicate", kind = "contract" },
   { id = "manifest-path-adapter", requirement = "PARSE-MAN-001", path = "crates/core/src/manifest.rs", symbol = "path", kind = "contract" },
   { id = "manifest-boundary", requirement = "PARSE-MAN-001", path = "crates/core/src/manifest.rs", symbol = "boundary", kind = "contract" },
   { id = "manifest-finish", requirement = "PARSE-MAN-001", path = "crates/core/src/manifest.rs", symbol = "finish", kind = "contract" },

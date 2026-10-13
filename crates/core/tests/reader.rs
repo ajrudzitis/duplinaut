@@ -120,6 +120,9 @@ fn anchor(catalog: &Catalog<'_>) -> usize {
 //= docs/parsing-requirements.md#assure-test-001
 //= type=test
 //# Compatibility tests MUST restore supported snapshots produced by official duplicity and compare contents and supported metadata with both their source tree and official restoration.
+//= docs/parsing-requirements.md#parse-path-001
+//= type=test
+//# The reader MUST preserve backup path components as bytes without lossy UTF-8 conversion.
 #[test]
 fn original_official_local_objects_reconstruct_all_three_dates_and_restore_plans() {
     let source = Source::official();
