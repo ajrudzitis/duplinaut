@@ -430,17 +430,22 @@ fn rust_files(path: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-fn contains_ident(tokens: TokenStream, needle: &str) -> bool {
-    tokens.into_iter().any(|token| match token {
-        TokenTree::Ident(id) => id == needle,
-        TokenTree::Group(group) => contains_ident(group.stream(), needle),
-        _ => false,
-    })
-}
-
 // Conservative default-configuration reachability. Conditional source files and
 // custom module paths need explicit future support, rather than accidental credit.
 fn reachable_sources(file: &Path, out: &mut BTreeSet<PathBuf>) -> Result<()> {
+    reachable_source(file, out, true)
+}
+
+fn reachable_source(file: &Path, out: &mut BTreeSet<PathBuf>, follow_modules: bool) -> Result<()> {
+    // Rust resolves child modules through the logical source path. Canonicalizing
+    // a symlink first could credit a different, uncompiled child declaration.
+    let mut prefix = PathBuf::new();
+    for component in file.components() {
+        prefix.push(component.as_os_str());
+        if fs::symlink_metadata(&prefix)?.file_type().is_symlink() {
+            return Ok(());
+        }
+    }
     let file = file
         .canonicalize()
         .with_context(|| format!("missing core module {}", file.display()))?;
@@ -448,10 +453,9 @@ fn reachable_sources(file: &Path, out: &mut BTreeSet<PathBuf>) -> Result<()> {
         return Ok(());
     }
     let source = fs::read_to_string(&file)?;
-    let tokens: TokenStream = source
-        .parse()
-        .map_err(|error| anyhow::anyhow!("cannot tokenize core module: {error}"))?;
-    if contains_ident(tokens.clone(), "cfg") || contains_ident(tokens.clone(), "cfg_attr") {
+    let parsed = verus_syn::parse_file(&source)
+        .context("cannot parse core module for proof reachability")?;
+    if conditional(&parsed.attrs) {
         return Ok(());
     }
     out.insert(file.clone());
@@ -464,46 +468,68 @@ fn reachable_sources(file: &Path, out: &mut BTreeSet<PathBuf>) -> Result<()> {
     } else {
         parent.join(file.file_stem().context("module name missing")?)
     };
-    reachable_tokens(tokens, &module_dir, parent, out)
+    reachable_items(&parsed.items, &module_dir, parent, out, follow_modules)
 }
 
-fn reachable_tokens(
-    tokens: TokenStream,
+fn reachable_items(
+    items: &[verus_syn::Item],
     module_dir: &Path,
     include_dir: &Path,
     out: &mut BTreeSet<PathBuf>,
+    follow_modules: bool,
 ) -> Result<()> {
-    let tokens: Vec<_> = tokens.into_iter().collect();
-    for (index, token) in tokens.iter().enumerate() {
-        if let TokenTree::Group(group) = token {
-            reachable_tokens(group.stream(), module_dir, include_dir, out)?;
-        }
-        if matches!(token, TokenTree::Ident(id) if id == "include")
-            && matches!(tokens.get(index+1), Some(TokenTree::Punct(p)) if p.as_char() == '!')
-        {
-            if let Some(TokenTree::Group(group)) = tokens.get(index + 2) {
-                let argument = group.stream().to_string();
-                let path: String = serde_json::from_str(&argument)
-                    .context("proof inclusion requires a literal include path")?;
-                reachable_sources(&include_dir.join(path), out)?;
-            }
-        }
-        if matches!(token, TokenTree::Ident(id) if id == "mod") {
-            if let Some(TokenTree::Ident(name)) = tokens.get(index + 1) {
-                if matches!(tokens.get(index+2), Some(TokenTree::Punct(p)) if p.as_char() == ';') {
-                    let flat = module_dir.join(format!("{name}.rs"));
+    for item in items {
+        match item {
+            verus_syn::Item::Mod(module) if follow_modules && !conditional(&module.attrs) => {
+                // Custom paths are deliberately outside this conservative profile.
+                if module.attrs.iter().any(|attr| attr.path().is_ident("path")) {
+                    continue;
+                }
+                if let Some((_, children)) = &module.content {
+                    reachable_items(
+                        children,
+                        &module_dir.join(module.ident.to_string()),
+                        include_dir,
+                        out,
+                        follow_modules,
+                    )?;
+                } else {
+                    let flat = module_dir.join(format!("{}.rs", module.ident));
                     let file = if flat.exists() {
                         flat
                     } else {
-                        module_dir.join(name.to_string()).join("mod.rs")
+                        module_dir.join(module.ident.to_string()).join("mod.rs")
                     };
                     reachable_sources(&file, out)?;
                 }
             }
+            verus_syn::Item::Macro(item) if !conditional(&item.attrs) => {
+                if item.mac.path.is_ident("include") {
+                    let path: verus_syn::LitStr = verus_syn::parse2(item.mac.tokens.clone())
+                        .context("proof inclusion requires a literal include path")?;
+                    // Include expansion has compiler-specific module resolution;
+                    // credit its own declarations, never nested module edges.
+                    reachable_source(&include_dir.join(path.value()), out, false)?;
+                } else if item.mac.path.is_ident("verus") {
+                    let inner: verus_syn::File = verus_syn::parse2(item.mac.tokens.clone())
+                        .context("cannot parse verus! reachability items")?;
+                    if !conditional(&inner.attrs) {
+                        reachable_items(
+                            &inner.items,
+                            module_dir,
+                            include_dir,
+                            out,
+                            follow_modules,
+                        )?;
+                    }
+                }
+            }
+            _ => {}
         }
     }
     Ok(())
 }
+
 fn audit_tokens(tokens: TokenStream) -> Result<()> {
     for token in tokens {
         match token {
@@ -575,7 +601,7 @@ pub fn check_proof_symbol(root: &Path, path: &str, symbol: &str, kind: ProofKind
         .with_context(|| format!("missing evidence source {path}"))?;
     let file = verus_syn::parse_file(&source)
         .with_context(|| format!("cannot parse Verus evidence {path}"))?;
-    if !proof_items(&file.items, symbol, kind, false)? {
+    if conditional(&file.attrs) || !proof_items(&file.items, symbol, kind, false)? {
         bail!(
             "required {kind:?} evidence {symbol} is not a supported verified declaration in {path}"
         );
@@ -602,7 +628,7 @@ fn proof_items(
             {
                 let file: verus_syn::File = verus_syn::parse2(item.mac.tokens.clone())
                     .context("cannot parse verus! evidence items")?;
-                if proof_items(&file.items, symbol, kind, true)? {
+                if !conditional(&file.attrs) && proof_items(&file.items, symbol, kind, true)? {
                     return Ok(true);
                 }
             }

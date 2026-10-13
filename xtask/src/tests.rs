@@ -293,6 +293,110 @@ fn unreachable_and_conditional_proof_declarations_rejected() {
     )
     .unwrap();
     assert!(validate_ledger(&temp.0, &ledger).is_err());
+    fs::write(
+        temp.0.join("crates/core/src/algorithm.rs"),
+        "#[cfg(any())] use missing::Ghost; verus! { exec fn decode() {} proof fn valid() {} }\n",
+    )
+    .unwrap();
+    fs::write(
+        temp.0.join("crates/core/src/lib.rs"),
+        "#[cfg(any())] mod absent; mod algorithm;\n",
+    )
+    .unwrap();
+    validate_ledger(&temp.0, &ledger).unwrap();
+    fs::write(
+        temp.0.join("crates/core/src/algorithm.rs"),
+        "#![cfg(any())] verus! { exec fn decode() {} proof fn valid() {} }\n",
+    )
+    .unwrap();
+    assert!(validate_ledger(&temp.0, &ledger).is_err());
+    fs::write(
+        temp.0.join("crates/core/src/algorithm.rs"),
+        "verus! { exec fn decode() {} proof fn valid() {} }\n",
+    )
+    .unwrap();
+    for root in [
+        "#[cfg_attr(any(), path=\"algorithm.rs\")] mod algorithm;",
+        "#[path=\"algorithm.rs\"] mod alias;",
+        "#[cfg(any())] include!(\"algorithm.rs\");",
+        "fn unused() { include!(\"algorithm.rs\"); }",
+        "unknown_macro! { mod algorithm; }",
+    ] {
+        fs::write(temp.0.join("crates/core/src/lib.rs"), root).unwrap();
+        assert!(
+            validate_ledger(&temp.0, &ledger).is_err(),
+            "accepted unsupported root: {root}"
+        );
+    }
+    fs::write(
+        temp.0.join("crates/core/src/lib.rs"),
+        "include!(\"algorithm.rs\");",
+    )
+    .unwrap();
+    validate_ledger(&temp.0, &ledger).unwrap();
+    for source in [
+        "verus! { #![cfg(any())] exec fn decode() {} proof fn valid() {} }",
+        "verus! { #![cfg_attr(any(), allow(dead_code))] exec fn decode() {} proof fn valid() {} }",
+        "#![cfg(any())] verus! { exec fn decode() {} proof fn valid() {} }",
+    ] {
+        fs::write(temp.0.join("crates/core/src/algorithm.rs"), source).unwrap();
+        assert!(validate_ledger(&temp.0, &ledger).is_err());
+        assert!(assurance::check_proof_symbol(
+            &temp.0,
+            "crates/core/src/algorithm.rs",
+            "valid",
+            assurance::ProofKind::Lemma
+        )
+        .is_err());
+    }
+    fs::write(
+        temp.0.join("crates/core/src/algorithm.rs"),
+        "verus! { exec fn decode() {} proof fn valid() {} }",
+    )
+    .unwrap();
+    let inline = temp.0.join("crates/core/src/inline");
+    fs::create_dir_all(inline.join("body")).unwrap();
+    fs::write(inline.join("body.rs"), "mod algorithm;").unwrap();
+    fs::write(inline.join("algorithm.rs"), "fn actual_unverified() {}").unwrap();
+    fs::write(
+        inline.join("body/algorithm.rs"),
+        "verus! { proof fn valid() {} }",
+    )
+    .unwrap();
+    ledger.milestone[0].proofs[0].path = "crates/core/src/inline/body/algorithm.rs".into();
+    fs::write(
+        temp.0.join("crates/core/src/lib.rs"),
+        "include!(\"inline/body.rs\");",
+    )
+    .unwrap();
+    assert!(validate_ledger(&temp.0, &ledger).is_err());
+    #[cfg(unix)]
+    {
+        let src = temp.0.join("crates/core/src");
+        fs::create_dir_all(src.join("logical")).unwrap();
+        fs::create_dir_all(src.join("physical/parent")).unwrap();
+        fs::write(src.join("physical/parent.rs"), "pub mod child;").unwrap();
+        fs::write(src.join("logical/child.rs"), "fn actual_unverified() {}").unwrap();
+        fs::write(
+            src.join("physical/parent/child.rs"),
+            "verus! { proof fn valid() {} }",
+        )
+        .unwrap();
+        std::os::unix::fs::symlink("physical/parent.rs", src.join("logical.rs")).unwrap();
+        ledger.milestone[0].proofs[0].path = "crates/core/src/physical/parent/child.rs".into();
+        fs::write(src.join("lib.rs"), "mod logical;").unwrap();
+        assert!(validate_ledger(&temp.0, &ledger).is_err());
+        // Directory aliases are excluded as source-path ancestors too.
+        std::os::unix::fs::symlink("physical", src.join("alias")).unwrap();
+        fs::write(src.join("lib.rs"), "include!(\"alias/parent.rs\");").unwrap();
+        ledger.milestone[0].proofs[0].path = "crates/core/src/alias/parent.rs".into();
+        fs::write(
+            src.join("physical/parent.rs"),
+            "verus! { proof fn valid() {} }",
+        )
+        .unwrap();
+        assert!(validate_ledger(&temp.0, &ledger).is_err());
+    }
 }
 
 //= docs/parsing-requirements.md#assure-build-001
