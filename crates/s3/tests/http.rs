@@ -468,3 +468,282 @@ fn body_checksum_error_after_exact_bytes_remains_failure_on_retry() {
         assert_eq!(repeated.to_string(), initial.to_string());
     }
 }
+
+fn official_repository_server(
+    fault: Arc<std::sync::atomic::AtomicUsize>,
+    cancel: Cancellation,
+) -> Server {
+    let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/plain");
+    let mut paths = std::fs::read_dir(directory)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect::<Vec<_>>();
+    paths.sort();
+    let objects = paths
+        .into_iter()
+        .enumerate()
+        .map(|(index, path)| {
+            let key = format!("backup/{}", path.file_name().unwrap().to_str().unwrap());
+            (
+                key,
+                (
+                    std::fs::read(path).unwrap(),
+                    format!("\"official-{index}\""),
+                ),
+            )
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let xml = format!(
+        "<ListBucketResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"><IsTruncated>false</IsTruncated>{}</ListBucketResult>",
+        objects.iter().map(|(key, (bytes, etag))| format!(
+            "<Contents><Key>{key}</Key><Size>{}</Size><ETag>{}</ETag></Contents>",
+            bytes.len(), etag.replace('"', "&quot;")
+        )).collect::<String>()
+    );
+    Server::start(move |request| {
+        let line = request.lines().next().unwrap();
+        assert!(
+            line.starts_with("GET "),
+            "source attempted a non-read operation"
+        );
+        if line.contains("list-type=2") {
+            return Response::body(xml.clone());
+        }
+        let uri = line.split_whitespace().nth(1).unwrap();
+        let key = uri
+            .split('?')
+            .next()
+            .unwrap()
+            .strip_prefix("/fixture/")
+            .unwrap();
+        let (bytes, etag) = objects.get(key).unwrap();
+        let conditional = request.lines().any(|line| {
+            line.split_once(':').is_some_and(|(name, value)| {
+                name.eq_ignore_ascii_case("if-match") && value.trim() == etag
+            })
+        });
+        if !conditional {
+            return Response::error(412, "PreconditionFailed");
+        }
+        if key.contains("to.20231116T221320Z.vol") {
+            match fault.load(Ordering::Acquire) {
+                1 => return Response::error(412, "PreconditionFailed"),
+                2 => cancel.cancel(),
+                _ => {}
+            }
+        }
+        Response::object(bytes.clone(), etag, None)
+    })
+}
+
+//= docs/parsing-requirements.md#parse-source-001
+//= type=test
+//# The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
+#[test]
+fn official_repository_sdk_late_changes_and_cancellation_publish_no_snapshot() {
+    use duplicity_core::{
+        names::{NameConfig, Timestamp},
+        reader::{Catalog, ReaderError, ReaderLimits},
+    };
+    let fault = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let cancel = Cancellation::default();
+    let server = official_repository_server(fault.clone(), cancel.clone());
+    let source = server.source();
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &cancel,
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, set)| set.start() == set.end())
+        .unwrap()
+        .0;
+    let baseline = catalog
+        .read_snapshot(anchor, Timestamp(1700000000), &cancel)
+        .unwrap();
+    let original_entries = baseline.state().len();
+    fault.store(1, Ordering::Release);
+    assert!(matches!(
+        catalog.read_snapshot(anchor, Timestamp(1700172800), &cancel),
+        Err(ReaderError::Source(SourceError::Changed))
+    ));
+    assert_eq!(baseline.state().len(), original_entries);
+    fault.store(2, Ordering::Release);
+    assert!(matches!(
+        catalog.read_snapshot(anchor, Timestamp(1700172800), &cancel),
+        Err(ReaderError::Source(SourceError::Cancelled))
+    ));
+    assert_eq!(baseline.state().len(), original_entries);
+    assert!(server
+        .requests
+        .try_iter()
+        .any(|request| request.contains("to.20231116T221320Z.vol")));
+}
+
+#[cfg(target_os = "linux")]
+//= docs/parsing-requirements.md#assure-test-001
+//= type=test
+//# Compatibility tests MUST restore supported snapshots produced by official duplicity and compare contents and supported metadata with both their source tree and official restoration.
+#[test]
+fn official_repository_sdk_three_dates_restore_against_source_oracles() {
+    use duplicity_core::{
+        names::{NameConfig, Timestamp},
+        reader::{Catalog, ReaderLimits},
+        restore_linux::{restore, RestoreLimits, RestoreOutcome},
+        restore_plan::RestorePlanLimits,
+        tar::EntryType,
+    };
+    use sha2::Digest;
+    use std::{
+        fs,
+        os::unix::{
+            ffi::{OsStrExt, OsStringExt},
+            fs::{MetadataExt, PermissionsExt},
+        },
+    };
+    struct Temp(std::path::PathBuf);
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let parent = Temp(std::env::temp_dir().join(format!(
+        "duplicity-sdk-restore-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    )));
+    fs::create_dir(&parent.0).unwrap();
+    fs::set_permissions(&parent.0, fs::Permissions::from_mode(0o700)).unwrap();
+    let cancel = Cancellation::default();
+    let server = official_repository_server(
+        Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        cancel.clone(),
+    );
+    let source = server.source();
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &cancel,
+    )
+    .unwrap();
+    assert_eq!(
+        server.requests.try_iter().count(),
+        1,
+        "discovery read object bodies"
+    );
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, set)| set.start() == set.end())
+        .unwrap()
+        .0;
+    let oracle: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/duplicity-3.0.7/expected.json"
+    ))
+    .unwrap();
+    for day in 0..3 {
+        let snapshot = catalog
+            .read_snapshot(anchor, Timestamp(1700000000 + day * 86400), &cancel)
+            .unwrap();
+        let expected = oracle["snapshots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["mode"] == "plain" && item["index"] == day as u64)
+            .unwrap()["entries"]
+            .as_array()
+            .unwrap();
+        assert_eq!(snapshot.state().len(), expected.len());
+        let leaf = format!("day{day}");
+        let plan = snapshot.restore_all(RestorePlanLimits::default()).unwrap();
+        let receipt = match restore(
+            &plan,
+            &parent.0,
+            leaf.as_bytes(),
+            &cancel,
+            RestoreLimits::default(),
+        ) {
+            RestoreOutcome::Published(receipt) => receipt,
+            other => panic!("SDK snapshot restore failed: {other:?}"),
+        };
+        assert_eq!(receipt.cleanup.failures, 0);
+        for (path, entry) in snapshot.state().entries() {
+            let raw = path
+                .components()
+                .iter()
+                .map(Vec::as_slice)
+                .collect::<Vec<_>>()
+                .join(&b'/');
+            let hex = raw
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>();
+            let expected = expected
+                .iter()
+                .find(|item| item["path_hex"] == hex)
+                .unwrap();
+            let mut actual = parent.0.join(&leaf);
+            for component in path.components() {
+                actual.push(std::ffi::OsString::from_vec(component.clone()));
+            }
+            let metadata = fs::symlink_metadata(&actual).unwrap();
+            assert_eq!(
+                metadata.mode() & 0o777,
+                expected["mode"].as_u64().unwrap() as u32
+            );
+            if expected["kind"] != "symlink" {
+                assert_eq!(
+                    metadata.mtime() as i128 * 1_000_000_000 + metadata.mtime_nsec() as i128,
+                    expected["mtime_ns"].as_i64().unwrap() as i128
+                );
+            }
+            match expected["kind"].as_str().unwrap() {
+                "file" => {
+                    assert_eq!(entry.entry_type(), EntryType::Regular);
+                    assert!(metadata.is_file());
+                    let bytes = fs::read(actual).unwrap();
+                    assert_eq!(bytes.len() as u64, expected["size"].as_u64().unwrap());
+                    assert_eq!(
+                        format!("{:x}", sha2::Sha256::digest(&bytes)),
+                        expected["sha256"].as_str().unwrap()
+                    );
+                }
+                "directory" => {
+                    assert_eq!(entry.entry_type(), EntryType::Directory);
+                    assert!(metadata.is_dir());
+                }
+                "symlink" => {
+                    assert_eq!(entry.entry_type(), EntryType::Symlink);
+                    assert!(metadata.is_symlink());
+                    let target = fs::read_link(actual).unwrap();
+                    assert_eq!(target.as_os_str().as_bytes(), entry.linkname());
+                    let target_hex = target
+                        .as_os_str()
+                        .as_bytes()
+                        .iter()
+                        .map(|byte| format!("{byte:02x}"))
+                        .collect::<String>();
+                    assert_eq!(target_hex, expected["symlink_target_hex"].as_str().unwrap());
+                    // Official source-only link touches are not emitted; the
+                    // backend must still preserve the actual archived mtime.
+                    assert_eq!(
+                        metadata.mtime() as i128 * 1_000_000_000 + metadata.mtime_nsec() as i128,
+                        entry.mtime().seconds as i128 * 1_000_000_000
+                            + entry.mtime().nanoseconds as i128
+                    );
+                }
+                other => panic!("unsupported oracle entry {other}"),
+            }
+        }
+    }
+    let requests = server.requests.try_iter().collect::<Vec<_>>();
+    assert!(requests.iter().any(|request| request.contains(".manifest")));
+    assert!(requests.iter().any(|request| request.contains(".vol")));
+}
