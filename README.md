@@ -34,6 +34,8 @@ A native Rust project for browsing duplicity backups and restoring selected file
 
 The [parsing requirements](docs/parsing-requirements.md) were written in RFC 2119/8174 language and independently reviewed **before implementation**. Public documentation leads format research; immutable official-source references and producer evidence resolve ambiguities.
 
+After GitHub Pages is configured to use Actions, successful pushes to `main` publish the rendered Duvet requirements report. Open the latest **Publish Duvet report** deployment from the [assurance workflow](.github/workflows/assurance.yml) to view it; GitHub displays the report URL in the deployment summary. Pull requests keep the report as a downloadable workflow artifact without publishing a site.
+
 ## Built around evidence
 
 Vest DSL definitions produce the parsing code used at runtime. Verus proofs connect that implementation to independently stated format and reconstruction semantics. A [documented direct-combinator fallback](crates/core/README.md#vest-dsl-and-fallback-record) handles a reviewed Vest frontend limitation.
@@ -103,4 +105,5 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [ ] Complete the browsing/restoration TUI.
 - [ ] Pass the supported official-producer compatibility matrix.
 - [x] **Create GitHub Actions for builds and formal methods:** install pinned tools, check generated parsers, run Verus, enforce Duvet coverage/snapshot gates, and run native/official-fixture tests on pull requests and pushes; retain reports and verification evidence as artifacts. See [workflow validation](docs/github-actions.md); the first hosted run remains pending.
+- [x] Publish the Duvet HTML report from successful `main` runs through GitHub Pages, with its live URL in the deployment summary.
 - [ ] Publish the exact supported capabilities, verification claims, and trusted boundaries.
