@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "status": "Frozen pipeline specification proposal; adapter and pipeline acceptance pending",
+  "repository_commit": "867e61c29c182aac6b390d4122abf12aa648e9ab",
+  "new_requirements": [
+    "PARSE-ENV-017",
+    "PARSE-ENV-018",
+    "PARSE-ENV-019",
+    "PARSE-ENV-020",
+    "PARSE-ENV-021",
+    "PARSE-ENV-022",
+    "PARSE-ENV-023",
+    "PARSE-ENV-024"
+  ],
+  "canonical_requirement_count": 138,
+  "inputs_sha256": {
+    "docs/parsing-requirements.md": "f54b9d01d8577084abe686bc739a72b5ca6132ad9682d578d4370b721829b1a0",
+    "docs/reader-orchestration.md": "28021e286f3654ea00628daa7367c67f4f4c66ee32d98344a614aa5c508e5b86",
+    "crates/core/src/reader.rs": "9fb1948dfaea62805090dabefde8599db6b07da199fc2191989fabca43dd93b7",
+    "crates/core/src/multipart.rs": "0021c7ad755577c6972d76a657c4e6d629066efba185bc76989cef7873304b9f",
+    "crates/core/src/tar.rs": "60411c162851d96e8274557e60b87b1616b8e969cdb8bc77a60cd82ff1896601"
+  },
+  "adapter_inputs_sha256": {
+    "docs/openpgp-implementation.md": "660342c54b49548d25697fab21d5610a5857a5b1f8f0af4c759ca46cf356cb4c",
+    "crates/core/src/openpgp.rs": "5bb0a54e3954ef6e9e6f5d041e0107851e6fbacabffe2509ccdcb948581c61d8"
+  },
+  "reference_evidence": {
+    "producer": "duplicity3.0.7",
+    "gpg": "2.4.9",
+    "objects": "9 untouched encrypted manifests and9 volumes across3profiles/3dates",
+    "ciphertext_digest_matches": 9,
+    "plaintext_digest_differs": 9,
+    "credentials": "intentionally public checked-in test keys/passphrase only",
+    "runtime_subprocesses": "none; reference check only"
+  },
+  "validation": {
+    "git_apply_check": "passed",
+    "unique_canonical_requirement_ids": true,
+    "production_edits": "none",
+    "runtime_tests": "not run; spec only"
+  },
+  "sha256": {
+    "openpgp-reader-integration.proposed.md": "eb53fbc6c6b8e8618dfe0eaa9e300a292be8d4641627c89c63865cd5689fb911",
+    "requirements.section.md": "e4572dd2768e4952d0fe92e900c3c373d8e6471ddd9858943997f447ca45383c",
+    "parsing-requirements.proposed.md": "07f30f11e16899f7dac3d0293ca6c773f41ff6f7afec819df8738d986d492c99",
+    "parsing-requirements.patch": "4c7ffcdf973b6b3836439b6272e12c0d00cf6e664bbff88ea1f058cf01d7ff0e",
+    "reference/check_ciphertext_digests.py": "84f0f4bc6ee43b22219b82042b324de5a6a7345ade620cef402c731df44260da",
+    "reference/official-ciphertext-digest-check.json": "76341f9f99567fa735e0258c8df3b5e365c33491f3cfc778b7d75c54fcdcca54"
+  }
+}

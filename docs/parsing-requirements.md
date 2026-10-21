@@ -271,6 +271,54 @@ The adapter MUST enforce configured key, session-key packet, signature, nesting,
 
 Provenance: POLICY. Defaults: exported key input 16 MiB; supplied certificates 64; subkeys/certificate 64; session-key packets/message 64; signatures/message 64; wrapping depth 8; iterated S2K encoded byte-count at most 65011712 per derivation; attempted derivations/message at most 64. Bound totals as well as per-item sizes. Resource rejection may precede authentication; it cannot become an accepted decoded object. The library's internal recursion limit or buffer size alone does not establish these project limits.
 
+### PARSE-ENV-017
+
+OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+
+Provenance: PARSE-ENV-005/006, SRC-HASH, SRC-MAIN and original encrypted fixture checks. Read through the original catalog identity, conditional source checks, exact declared size and real EOF; ciphertext never substitutes its literal plaintext for a stored-object digest. Missing/conflicting/unsupported or mismatching required digests fail without entering the volume decoder. Resource/cancellation rejection may precede integrity work. SHA1/MD5 compatibility digests still do not authenticate an unsigned manifest.
+
+### PARSE-ENV-018
+
+OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+
+Provenance: PARSE-ENV-003/007..016. Manifests have no enclosing duplicity volume digest; do not invent one. Source exact-size/identity/EOF checks and the adapter's complete SEIPDv1 MDC are required, plus document-signature authorization when configured. Bound the final manifest literal by both the crypto decoded-byte bound and the reader's decoded-manifest bound; intermediate compression/authenticated/key bounds remain independent. An unsigned encrypted manifest can supply volume hashes after MDC checks when caller policy permits it, but confers no signer-identity claim.
+
+### PARSE-ENV-019
+
+A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
+
+Provenance: PARSE-ENV-004/012, POLICY. Authorization is configured when `require_signature` is true or permitted full primary fingerprints are nonempty; required verification with an empty permitted list still fails closed. The same supplied policy applies to every required object, including mixed-envelope chains; no per-object omission or implicit switch to integrity-only recovery is permitted. Unused catalog artifacts and signature archives not read for reconstruction are outside this scope. A nonempty allowlist can permit different authorized primary signers on different required objects; this is not a same-signer or current-validity claim.
+
+### PARSE-ENV-020
+
+Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
+
+Provenance: PARSE-TAR-005, PARSE-MAN-009/010, POLICY. No public plaintext-plus-verified flag, externally constructible receipt/decoded object, arbitrary decoder callback or caller-supplied authentication assertion may bypass required source/digest/crypto checks. Existing public plain/gzip assembly stays safe and does not accept OpenPGP as decoded plaintext. Encrypted tar receives its exact original stored ciphertext for footer/top-off comparison and final/nonfinal status from the complete normalized manifest volume sequence. Never use `Termination::Data` as an encrypted fallback. Encrypted queued-restart StartingPath exceptions remain unsupported; they do not inherit the raw/gzip no-footer compatibility exception.
+
+### PARSE-ENV-021
+
+The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+
+Provenance: PARSE-ENV-009, POLICY. A per-read borrowed context can rebuild the adapter's reference-only Credentials value for each object; the supplied password/key slices remain owned by the caller. Credential discovery, secret-storage lifetime, worker credential acquisition and secure erasure are separate caller/frontend work. Parsing/unlocking and crypto-library temporary buffers remain the separately reviewed adapter boundary, not a guarantee of zero internal key copies or secure erasure.
+
+### PARSE-ENV-022
+
+Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
+
+Provenance: PARSE-GEN-005, POLICY. Initial defaults are 1,000,000 required-object records, 32 MiB of retained evidence capacity/name/identity/metadata, 64 distinct certificate metadata versions and 16 million evidence comparisons. Each manifest/data-volume record is tied to its original source identity and set/role/ordinal, with no unbounded key/name or repeated certificate clone. Intern identical certificate metadata once per read; equality includes full primary fingerprint, creation and the complete ordered signature-metadata sequence, not fingerprint alone. Distinct versions remain distinct or fail the version bound rather than losing expiry/revocation observations. Borrowed ownership may replace copies only when the returned snapshot retains the owner's lifetime/identity safely. Per-object adapter buffers and existing catalog/state/assembly limits remain separately charged; no global heap or crypto-latency proof follows.
+
+### PARSE-ENV-023
+
+Snapshot authentication evidence MUST distinguish integrity-only objects from configured signer authorization and preserve available complete signer fingerprints and certificate creation/expiry/revocation observations without implying current validity or Web-of-Trust acceptance.
+
+Provenance: PARSE-ENV-012/013, native adapter contract. Plain/gzip records have no OpenPGP integrity/signer claim. Successful OpenPGP objects have complete MDC checks; `authorized_signer = None` when policy was unconfigured is not proof the object was unsigned. Configured success means every presented document signature passed under a permitted certificate; the adapter's first authorized primary/component fingerprint is representative, not an exhaustive signer list. Retain certificate metadata through bounded pool references. Expiry fields retain their duration/absence interpretation and revocation fields remain observations for caller assessment, not an effective expiry or revocation policy decision. Packet filenames/timestamps and short issuer hints grant no object/destination identity or signer authority. Literal signatures do not attest filename-derived backup dates, key spelling, intended collection or freshness. Redacted evidence contains no key exports, passwords, session keys or plaintext payloads.
+
+### PARSE-ENV-024
+
+The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+
+Provenance: PARSE-CHAIN/STATE/MULTI, PARSE-ENV-014, POLICY. Evidence and decoded entries remain provisional until complete-chain success; a late incremental, integrity, signer, source-identity, footer, bound or cancellation failure returns neither a snapshot nor a successful partial-chain receipt. Scan every normalized required volume even for restart-rewritten manifests; encrypted compatibility holds cannot be bypassed by range hints. Observe cancellation before/after source and native-crypto work, per required object/set and before return; no fixed latency or interruption of a blocking cryptographic derivation is promised. The reader performs no filesystem publication, and subsequent restore/UI layers retain their independent publication contracts.
+
 ## Manifests
 
 Known emitted structure from SRC-MAN and actual 3.0.7 fixtures: optional `Hostname value` and `Localdir token` lines; volume sections beginning `Volume N:` with indented `StartingPath token [block]`, `EndingPath token [block]`, and `Hash algorithm hex` lines; optional `Filelist count` followed by indented `action token` records. Streaming manifests append Filelist **after** volume records; the alternate `Manifest.to_string` serialization places it before them. Both positions are supported. Field names are case-insensitive. A block number is optional positive decimal metadata and differs from a volume number. Paths denote slash-separated byte components; `.` denotes the root. LF or CRLF terminates lines; a final line can omit its terminator. Whitespace separating fields is ASCII space or tab. Duplicate singleton fields within a volume, incomplete volume records, unknown structural fields, and inconsistent file-list counts are rejected under the project profile. Blank lines are permitted between records.
