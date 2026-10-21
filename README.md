@@ -24,7 +24,7 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | Manifest tokens, manifests and byte paths | Official manifests pass; exact token and path refinements checked; 79 whole-manifest obligations pass, including contextual success/error refinement | Complete-core acceptance and selection-controller proofs |
 | Signatures and tar containers | Official archives pass; 54 signature and 37 tar-header/helper focused obligations pass | Complete tar/PAX controller refinement |
 | Stored-object envelopes | Stored-byte SHA1/MD5 validation; bounded plain/gzip decoding; official-object integration tests | Native OpenPGP and controller verification |
-| Storage and S3 | Anchored local reads with change detection; 11 S3 tests using actual SDK HTTP handling | Live-service and complete-reader consistency integration |
+| Storage and S3 | Anchored local reads with change detection; 11 S3 tests using actual SDK HTTP handling; independently reviewed complete-reader late-change, cancellation and three-date restore tests | Live-service integration |
 | Assurance tooling | Pinned tools, Duvet baseline, executable failure tests, independent review | Expand gates as components are accepted |
 | Chain planning | 17 strict obligations pass for exact selection/errors and descriptor provenance; six official naming profiles | Complete-core acceptance and thin iterator adapter proof |
 | Snapshot reconstruction | Three official backup dates match byte paths, contents and metadata; immutable prior-set delta bases; transactional failures | Controller/resource proofs and chain integration |
@@ -85,6 +85,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Integrate exact token, path, signature and tar helper refinement checkpoints.
 - [x] Validate stored-byte volume digests and decode bounded plain/gzip envelopes against official objects.
 - [x] Implement and review the read-only S3 adapter; test conditional reads, bounds, cancellation and persistent stream failures.
+- [x] Exercise complete-reader S3 SDK transfers against official source and restore oracles, including late mutation and cancellation; independently review the test harness.
 - [x] Integrate metadata-only discovery and bounded plain/gzip chain reconstruction against original official objects.
 - [x] Independently review repository orchestration; test late incremental failures and cancellation.
 - [x] Test exact reader object-comparison, decoded-manifest and normalization-metadata budget boundaries.
