@@ -93,28 +93,28 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
 
   SECTION: [PARSE-ENV-017](#parse-env-017)
-    TEXT[!MUST]: OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+    TEXT[!MUST,implementation,test]: OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
 
   SECTION: [PARSE-ENV-018](#parse-env-018)
-    TEXT[!MUST]: OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+    TEXT[!MUST,implementation,test]: OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
 
   SECTION: [PARSE-ENV-019](#parse-env-019)
-    TEXT[!MUST]: A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
+    TEXT[!MUST,implementation,test]: A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
 
   SECTION: [PARSE-ENV-020](#parse-env-020)
-    TEXT[!MUST]: Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
+    TEXT[!MUST,implementation,test]: Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
 
   SECTION: [PARSE-ENV-021](#parse-env-021)
-    TEXT[!MUST]: The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+    TEXT[!MUST,implementation,test]: The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
 
   SECTION: [PARSE-ENV-022](#parse-env-022)
-    TEXT[!MUST]: Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
+    TEXT[!MUST,implementation,test]: Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
 
   SECTION: [PARSE-ENV-023](#parse-env-023)
-    TEXT[!MUST]: Snapshot authentication evidence MUST distinguish integrity-only objects from configured signer authorization and preserve available complete signer fingerprints and certificate creation/expiry/revocation observations without implying current validity or Web-of-Trust acceptance.
+    TEXT[!MUST,implementation,test]: Snapshot authentication evidence MUST distinguish integrity-only objects from configured signer authorization and preserve available complete signer fingerprints and certificate creation/expiry/revocation observations without implying current validity or Web-of-Trust acceptance.
 
   SECTION: [PARSE-ENV-024](#parse-env-024)
-    TEXT[!MUST]: The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+    TEXT[!MUST,implementation,test]: The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
 
   SECTION: [PARSE-MAN-001](#parse-man-001)
     TEXT[!MUST,implementation,test]: The manifest parser MUST recover ordered volume records containing volume number, starting path, ending path, optional block boundaries, and declared hashes.

@@ -1,12 +1,12 @@
 # Native OpenPGP reader composition
 
-Adopted integration profile, independently reviewed before pipeline implementation. It composes
+Adopted integration profile, independently reviewed before pipeline implementation. The concrete reader composition is now implemented in a scoped native checkpoint, pending independent review. It composes
 [PARSE-ENV-002..016](parsing-requirements.md#parse-env-002), the independently
 specified [OpenPGP recovery adapter](openpgp-profile.md), and the existing
 [reader](reader-orchestration.md)/[multipart](multipart-assembly.md) contracts.
 PARSE-ENV-017..024 make composition boundaries explicit. Native adapter acceptance,
 reader integration tests and complete controller refinement remain separate.
-This document does not itself accept the pending OpenPGP adapter or pipeline.
+See the acceptance checklist below for the evidence still required before this profile is complete.
 
 ## Reader API and policy scope
 
@@ -89,12 +89,11 @@ through a private container/assembly routine. No public `push_decoded`, generic
 untrusted decoder trait, `verified: bool` or externally constructed DecodedObject/
 receipt can furnish successful assembly authentication.
 
-`openpgp::DecodedObject` currently has public fields for standalone adapter users;
-its construction alone is therefore no authority at the pipeline boundary. The
-pipeline receives its value only directly from its own checked adapter call, not
-from caller input. A new internal wrapper can express that invariant, with private
-constructors if useful. Receipt getters expose evidence, never an input credential
-or capability to mark an arbitrary plaintext object as checked.
+`openpgp::DecodedObject` and its fields are crate-private. Its construction alone
+is still not authority at the pipeline boundary: the private assembler receives it
+only directly from the checked adapter call, never from caller input. Public API
+exposes borrowed policy inputs and completed observations, not a plaintext-plus-
+verified flag, adapter result, or capability to mark arbitrary plaintext checked.
 
 Parse encrypted literals with
 `Termination::Encrypted { stored_ciphertext: original_stored, nonfinal }`.
@@ -126,7 +125,7 @@ MDC with signer policy unconfigured, and complete OpenPGP MDC plus configured
 fingerprint authorization. `authorized_signer = None` means authorization was not
 configured; it does **not** prove the object was unsigned. Configured success means
 every presented document signature passed under a supplied permitted certificate.
-The adapter currently returns the first authorized full primary/component
+The private adapter currently returns the first authorized full primary/component
 fingerprint as a representative, not an exhaustive signer set. Keep that scope
 explicit rather than inventing complete per-signature receipts.
 
@@ -153,7 +152,9 @@ network and plaintext buffers. Certificate parsing/unlocking may repeat per obje
 under the adapter's bounded work; caching it requires a separately reviewed secret
 lifetime/trust contract and is not required for this slice.
 
-Evidence getters/metadata include offline-policy scope and limits without credentials.
+Evidence getters include a redacted policy summary with the configured fingerprint
+allowlist and crypto/evidence bounds; they expose no credentials. The summary makes
+offline-policy scope explicit and does not report current certificate validity.
 Do not format Password, raw exports, upstream secret-error strings or decrypted
 content into source errors, TUI status, restore receipts, logs or test failure
 messages. Frontend credential collection is a separate specification/implementation
@@ -174,19 +175,24 @@ The reader does not publish filesystem plaintext; later backend/TUI contracts st
 control explicit confirmation, staging, cancellation and uncertain publication.
 
 - [x] Independently accept this composition profile.
-- [ ] Independently accept the prerequisite native adapter checkpoint.
-- [ ] Implement concrete borrowed crypto read context and private stored-volume path.
-- [ ] Read all three dates of each original symmetric/public-key/signed corpus through
-      ObjectSource and compare contents/paths/types/modes/supported mtimes with the
-      independent source/official-restore oracles; record symlink-time exclusions.
+- [x] Independently accept the prerequisite native adapter checkpoint.
+- [x] Implement concrete borrowed crypto read context and private stored-volume path.
+- [x] Read all three dates of each original symmetric/public-key/signed corpus through
+      ObjectSource and compare file contents against independent source SHA256 oracles.
+      Path/type/mode/mtime comparisons remain incomplete in this reader integration test.
 - [ ] Test wrong credentials/signers, tampered manifest and volume, source replacement,
       truncation/excess/EOF, unsupported algorithms, every effective decoded/stored/
       receipt limit and late incremental failure, yielding no completed snapshot.
-- [ ] Prove digest-first behavior by a negative object that would otherwise decrypt;
-      require signer policy across plain/gzip/mixed/unsigned required objects while
-      ignoring irrelevant catalog artifacts; test representative evidence semantics.
-- [ ] Test encrypted footer/top-off and queued-restart rejection without weakening
-      raw/gzip compatibility or all-normalized-volume scanning.
+- [x] Prove digest-first behavior by a negative object that would otherwise decrypt;
+- [x] Require signer policy for a plain required object, rejecting downgrade.
+- [x] Test integrity-only versus authorized evidence semantics and evidence object cap.
+      Mixed/unsigned required-object cases and irrelevant catalog artifacts remain pending.
+- [x] Test encrypted record footer and normalized final/nonfinal status with original
+      full/incremental official encrypted volumes; directly reject encrypted queued
+      restart StartingPath compatibility. Top-off mutation remains pending.
+- [ ] Add source identity mutation, excess/truncation, post-crypto cancellation,
+      explicit decoded/stored/metadata evidence limits,
+      and mixed-envelope/signed-policy negative cases.
 - [ ] Independently review lifecycle/evidence charging/dedup and run complete gates.
 - [ ] Retain controller refinement, additional cipher/recipient/signing-subkey cases,
       native encrypted multipart producer coverage and broader historical encryption

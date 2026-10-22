@@ -398,6 +398,7 @@ fn discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation() {
         "duplicity-full.invalid.manifest",
         "duplicity-full.20231114T221320Z.manifest.part",
         "duplicity-full.20241114T221320Z.manifest.gpg",
+        "duplicity-full.20241114T221320Z.manifest.p7m",
     ] {
         source.add(&format!("backup/{name}"), Vec::new());
     }

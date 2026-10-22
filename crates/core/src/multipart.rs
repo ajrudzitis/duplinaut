@@ -6,6 +6,7 @@
 use crate::envelope::{decode_verified_volume, EnvelopeError, EnvelopeLimits};
 use crate::manifest::{Boundary, Manifest, VolumeRecord};
 use crate::names::Envelope;
+use crate::openpgp::{self, Credentials, CryptoLimits};
 use crate::path::BackupPath;
 use crate::tar::{
     ArchiveKind, EntryType, Operation, TarEntry, TarError, TarLimits, TarTime, TarVolume,
@@ -103,6 +104,8 @@ pub enum AssemblyError {
     DuplicateEntry,
     Envelope(EnvelopeError),
     Tar(TarError),
+    Crypto(crate::openpgp::CryptoError),
+    Cancelled,
 }
 struct Pending {
     entry: LogicalEntry,
@@ -207,6 +210,12 @@ impl<'a> MultipartAssembler<'a> {
     //= docs/parsing-requirements.md#parse-multi-004
     //= type=implementation
     //# Assembly MUST preserve pending logical-entry state across an empty volume while validating its supported empty-boundary marker shape.
+    //= docs/parsing-requirements.md#parse-env-017
+    //= type=implementation
+    //# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+    //= docs/parsing-requirements.md#parse-env-020
+    //= type=implementation
+    //# Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
     pub fn push_stored_volume(
         &mut self,
         number: u64,
@@ -221,6 +230,63 @@ impl<'a> MultipartAssembler<'a> {
             self.failed = true;
         }
         result
+    }
+    /// Internal authenticated OpenPGP path. The caller cannot provide decoded
+    /// plaintext or an authentication receipt; this method checks the manifest
+    /// digest and invokes the concrete native adapter itself.
+    pub(crate) fn push_openpgp_volume(
+        &mut self,
+        number: u64,
+        stored: &[u8],
+        credentials: Credentials<'_>,
+        crypto_limits: CryptoLimits,
+        cancel: &crate::source::Cancellation,
+    ) -> Result<openpgp::DecodedObject, AssemblyError> {
+        if self.failed {
+            return Err(AssemblyError::Poisoned);
+        }
+        let record = self
+            .volumes
+            .get(self.next_volume)
+            .copied()
+            .ok_or(AssemblyError::VolumeOrder)?;
+        if number != record.number {
+            self.failed = true;
+            return Err(AssemblyError::VolumeOrder);
+        }
+        let decoded = match crate::envelope::verify_stored_digests(
+            stored,
+            &record.hashes,
+            crypto_limits.stored_bytes,
+        )
+        .map_err(AssemblyError::Envelope)
+        .and_then(|()| {
+            openpgp::decode(stored, credentials, crypto_limits).map_err(AssemblyError::Crypto)
+        }) {
+            Ok(decoded) => decoded,
+            Err(error) => {
+                self.failed = true;
+                return Err(error);
+            }
+        };
+        if cancel.is_cancelled() {
+            self.failed = true;
+            return Err(AssemblyError::Cancelled);
+        }
+        let nonfinal = self.next_volume < self.volumes.len() - 1;
+        let result = self.push_decoded_checked(
+            number,
+            &decoded.bytes,
+            crate::tar::Termination::Encrypted {
+                stored_ciphertext: stored,
+                nonfinal,
+            },
+            true,
+        );
+        if result.is_err() {
+            self.failed = true;
+        }
+        result.map(|()| decoded)
     }
     fn push_checked(
         &mut self,
@@ -244,8 +310,25 @@ impl<'a> MultipartAssembler<'a> {
                 .map_err(AssemblyError::Envelope)?;
         // OpenPGP is explicitly rejected by the envelope adapter. Its eventual
         // integration must supply the stricter encrypted footer profile here.
-        let volume = TarVolume::parse(&decoded, Termination::Data, self.limits.tar)
-            .map_err(AssemblyError::Tar)?;
+        self.push_decoded_checked(number, &decoded, Termination::Data, false)
+    }
+    fn push_decoded_checked(
+        &mut self,
+        number: u64,
+        decoded: &[u8],
+        termination: Termination<'_>,
+        encrypted: bool,
+    ) -> Result<(), AssemblyError> {
+        let record = self
+            .volumes
+            .get(self.next_volume)
+            .copied()
+            .ok_or(AssemblyError::VolumeOrder)?;
+        if number != record.number {
+            return Err(AssemblyError::VolumeOrder);
+        }
+        let volume =
+            TarVolume::parse(decoded, termination, self.limits.tar).map_err(AssemblyError::Tar)?;
         let mut first = None;
         let mut second = None;
         let mut last = None;
@@ -321,6 +404,9 @@ impl<'a> MultipartAssembler<'a> {
                 };
                 if !rewritten || !queued_start {
                     return Err(AssemblyError::Boundary);
+                }
+                if encrypted {
+                    return Err(AssemblyError::UnsupportedBoundaryProfile);
                 }
                 // Initial compatibility evidence covers only entry-aligned
                 // raw/gzip EOF. Reviewed normal starts retain normal footers.
@@ -538,3 +624,6 @@ impl<'a> MultipartAssembler<'a> {
         })
     }
 }
+
+#[cfg(test)]
+mod openpgp_tests;

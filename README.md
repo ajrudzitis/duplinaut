@@ -24,7 +24,7 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | Manifest tokens, manifests and byte paths | Official manifests pass; exact token and path refinements checked; 79 whole-manifest obligations pass, including contextual success/error refinement | Complete-core acceptance and selection-controller proofs |
 | Signatures and tar containers | Official archives pass; 54 signature and 37 tar-header/helper focused obligations pass | Complete tar/PAX controller refinement |
 | Stored-object envelopes | Stored-byte SHA1/MD5 validation; bounded plain/gzip decoding; official-object integration tests | Native OpenPGP and controller verification |
-| Native OpenPGP adapter | Private bounded decoder; 14 tests across 27 official encrypted objects; nine independent snapshot content oracles; separate source/security review | Reader pipeline composition, full controller proofs, broader algorithms |
+| Native OpenPGP reader | Private bounded decoder; borrowed reader policy; stored-ciphertext digest first; encrypted tar completion; per-object bounded evidence; official three-profile, three-date source oracle tests | Independent pipeline review, controller proofs, broader algorithms |
 | Storage and S3 | Anchored local reads with change detection; 11 S3 tests using actual SDK HTTP handling; independently reviewed complete-reader late-change, cancellation and three-date restore tests | Live-service integration |
 | Assurance tooling | Pinned tools, Duvet baseline, executable failure tests, independent review | Expand gates as components are accepted |
 | Chain planning | 17 strict obligations pass for exact selection/errors and descriptor provenance; six official naming profiles | Complete-core acceptance and thin iterator adapter proof |
@@ -102,7 +102,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Independently review and adopt Linux staging/publication requirements before implementation, including indeterminate syscall outcomes.
 - [x] Implement and independently review native Linux restoration; pass official three-date and fault-injection tests, enforce Duvet requirement coverage.
 - [x] Implement and independently review the private bounded OpenPGP adapter against all 27 official crypto objects and nine independent content oracles; document its trusted boundary.
-- [ ] Compose OpenPGP with stored-object digest checks and complete reader reconstruction; prove the reader controller and expand official algorithm compatibility.
+- [x] Compose OpenPGP with reader identity, ciphertext digest checks, global signature policy, encrypted tar parsing and whole-chain evidence; official three-profile/three-date tests and independent pipeline review pass. Formal reader-controller/resource proofs, remaining edge-case matrices and broader historical algorithm support remain open.
 - [ ] Validate S3 with a live service and complete-reader consistency integration.
 - [ ] Complete the browsing/restoration TUI.
 - [ ] Automate full terminal event-loop resize, cancellation and output-fault coverage; finish frontend controller proofs and encrypted credential flow.

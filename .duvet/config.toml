@@ -13,6 +13,14 @@ pattern = "crates/core/src/*.rs"
 type = "implementation"
 
 [[source]]
+pattern = "crates/core/src/reader/**/*.rs"
+type = "test"
+
+[[source]]
+pattern = "crates/core/src/multipart/**/*.rs"
+type = "test"
+
+[[source]]
 pattern = "crates/core/src/verified/*.rs"
 type = "implementation"
 
