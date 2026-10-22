@@ -18,6 +18,54 @@ use crate::verified::openpgp_admission::{
 use std::collections::BTreeMap;
 
 const CHUNK_BYTES: usize = 65536;
+
+// This observation point exists only in unit-test builds. It can request
+// cancellation at the two concrete wrapper boundaries below; it cannot
+// provide decoded data or replace any production callback.
+#[cfg(test)]
+mod openpgp_cancel_test_hook {
+    use crate::source::Cancellation;
+    use std::cell::Cell;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) enum Checkpoint {
+        AfterStoredDigest,
+        AfterNativeDecode,
+    }
+
+    thread_local! {
+        static CANCEL_AT: Cell<Option<Checkpoint>> = const { Cell::new(None) };
+        static HITS: Cell<usize> = const { Cell::new(0) };
+    }
+
+    pub(super) struct Guard;
+
+    impl Guard {
+        pub(super) fn cancel_at(checkpoint: Checkpoint) -> Self {
+            CANCEL_AT.with(|slot| assert_eq!(slot.replace(Some(checkpoint)), None));
+            HITS.with(|hits| hits.set(0));
+            Self
+        }
+
+        pub(super) fn hits(&self) -> usize {
+            HITS.with(Cell::get)
+        }
+    }
+
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            CANCEL_AT.with(|slot| slot.set(None));
+            HITS.with(|hits| hits.set(0));
+        }
+    }
+
+    pub(super) fn observe(checkpoint: Checkpoint, cancellation: &Cancellation) {
+        if CANCEL_AT.with(Cell::get) == Some(checkpoint) {
+            HITS.with(|hits| hits.set(hits.get() + 1));
+            cancellation.cancel();
+        }
+    }
+}
 // Logical Rust buffer capacities, excluding allocator bookkeeping. The pinned
 // std Vec growth profile starts byte buffers at eight and non-byte buffers at
 // four elements, then doubles. Path clones are charged the same upper bound.
@@ -291,6 +339,11 @@ impl<'a> MultipartAssembler<'a> {
                 return Err(AssemblyError::Envelope(error));
             }
         };
+        #[cfg(test)]
+        openpgp_cancel_test_hook::observe(
+            openpgp_cancel_test_hook::Checkpoint::AfterStoredDigest,
+            cancel,
+        );
         if cancel.is_cancelled() {
             self.failed = true;
             self.admission.reject();
@@ -310,6 +363,11 @@ impl<'a> MultipartAssembler<'a> {
                     return Err(AssemblyError::Crypto(error));
                 }
             };
+        #[cfg(test)]
+        openpgp_cancel_test_hook::observe(
+            openpgp_cancel_test_hook::Checkpoint::AfterNativeDecode,
+            cancel,
+        );
         if cancel.is_cancelled() {
             self.failed = true;
             self.admission.reject();

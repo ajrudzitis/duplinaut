@@ -53,7 +53,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Prove complete manifest parser contextual success and error semantics against an independent model.
 - [x] Prove exact digest duplicate/conflict detection; preserve first-conflict rejection and bounded append behavior.
 - [ ] Prove complete multipart controller refinement.
-- [ ] Add deterministic post-crypto cancellation coverage. Current cancellation tests cover pre-cancellation and cancellation observed by the public reader; no test-only decoder hooks are used to simulate the post-crypto boundary.
+- [x] Exercise the real multipart wrapper's post-digest and post-native-decode cancellation checkpoints using private, thread-local `cfg(test)` observation points and official ciphertext. The first test proves decode is not reached using wrong credentials; the second proves tar validation/commit are not reached using valid credentials. These hooks do not exist in release builds. Public-reader snapshot cancellation at those precise internal boundaries remains pending.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 

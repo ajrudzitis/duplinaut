@@ -297,3 +297,101 @@ fn authenticated_malformed_tar_is_rejected_before_admission_advances() {
     assert_eq!(assembler.admission.ordinal(), 0);
     assert!(assembler.admission.position().is_none());
 }
+
+fn official_symmetric_volume() -> (Manifest, Vec<u8>, Password) {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/symmetric");
+    let stored_manifest =
+        std::fs::read(root.join("duplicity-full.20231114T221320Z.manifest.gpg")).unwrap();
+    let stored_volume =
+        std::fs::read(root.join("duplicity-full.20231114T221320Z.vol1.difftar.gpg")).unwrap();
+    let password = Password::from("duplicity-reader-public-test-fixture");
+    let decoded = crate::openpgp::decode(
+        &stored_manifest,
+        Credentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..Credentials::default()
+        },
+        CryptoLimits::default(),
+    )
+    .unwrap();
+    let manifest = Manifest::parse(&decoded.bytes, ManifestLimits::default()).unwrap();
+    (manifest, stored_volume, password)
+}
+
+//= docs/parsing-requirements.md#parse-env-017
+//= type=test
+//# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+//= docs/parsing-requirements.md#parse-env-020
+//= type=test
+//# Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
+//= docs/parsing-requirements.md#parse-multi-003
+//= type=test
+//# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+#[test]
+fn cancellation_at_stored_digest_checkpoint_prevents_openpgp_decode() {
+    let (manifest, stored, _correct_password) = official_symmetric_volume();
+    let wrong_password = Password::from("wrong-password");
+    let mut assembler = MultipartAssembler::new(&manifest, AssemblyLimits::default()).unwrap();
+    let cancellation = crate::source::Cancellation::default();
+    let guard = super::openpgp_cancel_test_hook::Guard::cancel_at(
+        super::openpgp_cancel_test_hook::Checkpoint::AfterStoredDigest,
+    );
+
+    let result = assembler.push_openpgp_volume(
+        1,
+        &stored,
+        Credentials {
+            message_passwords: std::slice::from_ref(&wrong_password),
+            ..Credentials::default()
+        },
+        CryptoLimits::default(),
+        &cancellation,
+    );
+
+    assert!(matches!(result, Err(AssemblyError::Cancelled)));
+    assert_eq!(guard.hits(), 1);
+    assert_eq!(assembler.admission.ordinal(), 0);
+    assert!(assembler.admission.position().is_none());
+    assert!(assembler.failed);
+    assert!(matches!(assembler.finish(), Err(AssemblyError::Poisoned)));
+}
+
+//= docs/parsing-requirements.md#parse-env-017
+//= type=test
+//# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+//= docs/parsing-requirements.md#parse-env-020
+//= type=test
+//# Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
+//= docs/parsing-requirements.md#parse-multi-003
+//= type=test
+//# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+#[test]
+fn cancellation_after_native_decode_prevents_tar_validation_and_commit() {
+    let (manifest, stored, password) = official_symmetric_volume();
+    let mut assembler = MultipartAssembler::new(&manifest, AssemblyLimits::default()).unwrap();
+    let cancellation = crate::source::Cancellation::default();
+    let guard = super::openpgp_cancel_test_hook::Guard::cancel_at(
+        super::openpgp_cancel_test_hook::Checkpoint::AfterNativeDecode,
+    );
+
+    let result = assembler.push_openpgp_volume(
+        1,
+        &stored,
+        Credentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..Credentials::default()
+        },
+        CryptoLimits::default(),
+        &cancellation,
+    );
+
+    assert!(matches!(result, Err(AssemblyError::Cancelled)));
+    assert_eq!(guard.hits(), 1);
+    assert_eq!(assembler.admission.ordinal(), 0);
+    assert!(assembler.admission.position().is_none());
+    assert!(assembler.entries.is_empty());
+    assert!(assembler.pending.is_none());
+    assert!(assembler.failed);
+    assert!(matches!(assembler.finish(), Err(AssemblyError::Poisoned)));
+}

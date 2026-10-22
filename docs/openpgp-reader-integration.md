@@ -208,8 +208,15 @@ control explicit confirmation, staging, cancellation and uncertain publication.
       manifest digest and authenticated envelope. Current public-reader tests cover
       original official encrypted top-offs; parser-level mutation coverage remains
       separate and does not establish source-to-reader rejection for this mutation.
-- [ ] Test post-crypto cancellation, wrong reader credentials/signers, and tampered
-      encrypted manifests at the complete reader boundary.
+- [x] Exercise cancellation after stored-digest verification and after successful
+      native OpenPGP decoding through the actual private multipart wrapper. A
+      test-only, thread-local checkpoint requests cancellation and is absent from
+      non-test builds. Wrong credentials at the first checkpoint establish that
+      decryption was not reached; official valid ciphertext at the second establishes
+      that cancellation prevents tar validation and admission commit.
+- [ ] Test cancellation at those precise internal checkpoints through the complete
+      public reader/snapshot boundary, alongside wrong reader credentials/signers and
+      tampered encrypted manifests.
 - [x] Independently review the scoped lifecycle/evidence charging/dedup behavior; focused and complete gates pass on the adopted source.
 - [ ] Retain controller refinement, additional cipher/recipient/signing-subkey cases,
       native encrypted multipart producer coverage and broader historical encryption
