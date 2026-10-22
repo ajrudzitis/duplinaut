@@ -8,6 +8,7 @@ mod armor_crc_tests;
 #[cfg(test)]
 mod fixture_tests;
 mod framing;
+use crate::verified::openpgp_admission::{AuthenticatedPermit, DigestPermit, OpenPgpAdmission};
 use framing::{frames, native, Packet as Frame};
 use pgp::{
     composed::{
@@ -1135,6 +1136,20 @@ pub(crate) fn decode(
         authorized_signer,
         certificates,
     })
+}
+
+/// The digest capability is consumed by the exact function that invokes the
+/// native decoder; an authenticated capability exists only on decoder success.
+pub(crate) fn decode_after_digest(
+    stored: &[u8],
+    credentials: Credentials<'_>,
+    limits: CryptoLimits,
+    admission: &mut OpenPgpAdmission,
+    digest: DigestPermit,
+) -> Result<(DecodedObject, AuthenticatedPermit), CryptoError> {
+    let decoded = decode(stored, credentials, limits)?;
+    let authenticated = admission.authenticated(digest);
+    Ok((decoded, authenticated))
 }
 
 #[cfg(test)]

@@ -12,6 +12,9 @@ use crate::tar::{
     ArchiveKind, EntryType, Operation, TarEntry, TarError, TarLimits, TarTime, TarVolume,
     Termination,
 };
+use crate::verified::openpgp_admission::{
+    AuthenticatedPermit, OpenPgpAdmission, TarValidatedPermit,
+};
 use std::collections::BTreeMap;
 
 const CHUNK_BYTES: usize = 65536;
@@ -129,7 +132,7 @@ pub struct MultipartAssembler<'a> {
     /// Saturating raw-record counts (0, 1, or >=2), indexed by volume ordinal.
     raw_occurrences: Vec<u8>,
     limits: AssemblyLimits,
-    next_volume: usize,
+    admission: OpenPgpAdmission,
     pending: Option<Pending>,
     entries: Vec<LogicalEntry>,
     /// Value true denotes a multipart logical start, false an ordinary start.
@@ -182,11 +185,12 @@ impl<'a> MultipartAssembler<'a> {
                 }
             }
         }
+        let normalized_volume_count = volumes.len();
         Ok(Self {
             volumes,
             raw_occurrences,
             limits,
-            next_volume: 0,
+            admission: OpenPgpAdmission::new(normalized_volume_count),
             pending: None,
             entries: Vec::new(),
             started_paths: BTreeMap::new(),
@@ -231,6 +235,15 @@ impl<'a> MultipartAssembler<'a> {
         }
         result
     }
+    //= docs/parsing-requirements.md#parse-multi-003
+    //= type=implementation
+    //# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+    //= docs/parsing-requirements.md#parse-env-017
+    //= type=implementation
+    //# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+    //= docs/parsing-requirements.md#parse-env-020
+    //= type=implementation
+    //# Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
     /// Internal authenticated OpenPGP path. The caller cannot provide decoded
     /// plaintext or an authentication receipt; this method checks the manifest
     /// digest and invokes the concrete native adapter itself.
@@ -245,48 +258,88 @@ impl<'a> MultipartAssembler<'a> {
         if self.failed {
             return Err(AssemblyError::Poisoned);
         }
+        let position = self
+            .admission
+            .position()
+            .ok_or(AssemblyError::VolumeOrder)?;
         let record = self
             .volumes
-            .get(self.next_volume)
+            .get(position.ordinal)
             .copied()
             .ok_or(AssemblyError::VolumeOrder)?;
         if number != record.number {
             self.failed = true;
+            self.admission.reject();
             return Err(AssemblyError::VolumeOrder);
         }
-        let decoded = match crate::envelope::verify_stored_digests(
+        if cancel.is_cancelled() {
+            self.failed = true;
+            self.admission.reject();
+            return Err(AssemblyError::Cancelled);
+        }
+        if let Err(error) = crate::envelope::verify_stored_digests(
             stored,
             &record.hashes,
             crypto_limits.stored_bytes,
-        )
-        .map_err(AssemblyError::Envelope)
-        .and_then(|()| {
-            openpgp::decode(stored, credentials, crypto_limits).map_err(AssemblyError::Crypto)
-        }) {
+        ) {
+            self.failed = true;
+            self.admission.reject();
+            return Err(AssemblyError::Envelope(error));
+        }
+        let final_volume = position.final_volume;
+        let digest_permit = self.admission.digest_verified(position);
+        if cancel.is_cancelled() {
+            self.failed = true;
+            self.admission.reject();
+            return Err(AssemblyError::Cancelled);
+        }
+        let (decoded, authenticated_permit) = match openpgp::decode_after_digest(
+            stored,
+            credentials,
+            crypto_limits,
+            &mut self.admission,
+            digest_permit,
+        ) {
             Ok(decoded) => decoded,
             Err(error) => {
                 self.failed = true;
+                self.admission.reject();
+                return Err(AssemblyError::Crypto(error));
+            }
+        };
+        if cancel.is_cancelled() {
+            self.failed = true;
+            self.admission.reject();
+            return Err(AssemblyError::Cancelled);
+        }
+        let validated = match self.push_openpgp_decoded_checked(
+            number,
+            &decoded.bytes,
+            crate::tar::Termination::Encrypted {
+                stored_ciphertext: stored,
+                nonfinal: !final_volume,
+            },
+            true,
+            authenticated_permit,
+        ) {
+            Ok(validated) => validated,
+            Err(error) => {
+                self.failed = true;
+                self.admission.reject();
                 return Err(error);
             }
         };
         if cancel.is_cancelled() {
             self.failed = true;
+            self.admission.reject();
             return Err(AssemblyError::Cancelled);
         }
-        let nonfinal = self.next_volume < self.volumes.len() - 1;
-        let result = self.push_decoded_checked(
-            number,
-            &decoded.bytes,
-            crate::tar::Termination::Encrypted {
-                stored_ciphertext: stored,
-                nonfinal,
-            },
-            true,
-        );
-        if result.is_err() {
+        if !self.admission.commit_openpgp(validated) {
             self.failed = true;
+            self.admission.reject();
+            return Err(AssemblyError::Poisoned);
         }
-        result.map(|()| decoded)
+        Ok(decoded)
     }
     fn push_checked(
         &mut self,
@@ -294,9 +347,10 @@ impl<'a> MultipartAssembler<'a> {
         stored: &[u8],
         envelope: Envelope,
     ) -> Result<(), AssemblyError> {
+        let ordinal = self.admission.ordinal();
         let record = self
             .volumes
-            .get(self.next_volume)
+            .get(ordinal)
             .copied()
             .ok_or(AssemblyError::VolumeOrder)?;
         if number != record.number {
@@ -310,7 +364,9 @@ impl<'a> MultipartAssembler<'a> {
                 .map_err(AssemblyError::Envelope)?;
         // OpenPGP is explicitly rejected by the envelope adapter. Its eventual
         // integration must supply the stricter encrypted footer profile here.
-        self.push_decoded_checked(number, &decoded, Termination::Data, false)
+        self.push_decoded_checked(number, &decoded, Termination::Data, false)?;
+        self.admission.commit_plain();
+        Ok(())
     }
     fn push_decoded_checked(
         &mut self,
@@ -319,9 +375,10 @@ impl<'a> MultipartAssembler<'a> {
         termination: Termination<'_>,
         encrypted: bool,
     ) -> Result<(), AssemblyError> {
+        let ordinal = self.admission.ordinal();
         let record = self
             .volumes
-            .get(self.next_volume)
+            .get(ordinal)
             .copied()
             .ok_or(AssemblyError::VolumeOrder)?;
         if number != record.number {
@@ -396,7 +453,7 @@ impl<'a> MultipartAssembler<'a> {
                 return Err(AssemblyError::Boundary);
             }
             if first != record.start {
-                let rewritten = self.raw_occurrences[self.next_volume] >= 2;
+                let rewritten = self.raw_occurrences[ordinal] >= 2;
                 let queued_start = if let Some(second) = second {
                     second == record.start
                 } else {
@@ -453,9 +510,22 @@ impl<'a> MultipartAssembler<'a> {
             }
         }
         self.previous_boundary = Some(record.end.clone());
-        self.next_volume += 1;
         self.scratch_bytes = 0;
         Ok(())
+    }
+
+    /// Produce the final commit capability only after the same checked path
+    /// that parses the encrypted tar and validates all multipart boundaries.
+    fn push_openpgp_decoded_checked(
+        &mut self,
+        number: u64,
+        decoded: &[u8],
+        termination: Termination<'_>,
+        encrypted: bool,
+        authenticated: AuthenticatedPermit,
+    ) -> Result<TarValidatedPermit, AssemblyError> {
+        self.push_decoded_checked(number, decoded, termination, encrypted)?;
+        Ok(self.admission.tar_validated(authenticated))
     }
     fn charge_metadata(&mut self, amount: usize) -> Result<(), AssemblyError> {
         self.metadata_bytes = self
@@ -616,7 +686,7 @@ impl<'a> MultipartAssembler<'a> {
         if self.failed {
             return Err(AssemblyError::Poisoned);
         }
-        if self.next_volume != self.volumes.len() || self.pending.is_some() {
+        if !self.admission.is_complete() || self.pending.is_some() {
             return Err(AssemblyError::Incomplete);
         }
         Ok(AssembledArchive {

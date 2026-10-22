@@ -4,9 +4,136 @@ use crate::openpgp::{Credentials, CryptoLimits};
 use pgp::types::Password;
 use std::path::Path;
 
+//= docs/parsing-requirements.md#parse-env-017
+//= type=test
+//# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
 //= docs/parsing-requirements.md#parse-env-020
 //= type=test
 //# Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
+//= docs/parsing-requirements.md#parse-multi-003
+//= type=test
+//# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+#[test]
+fn admission_cursor_advances_only_after_digest_authentication_and_tar_stages() {
+    let mut cursor = crate::verified::openpgp_admission::OpenPgpAdmission::new(2);
+    let first = cursor.position().unwrap();
+    assert_eq!(first.ordinal, 0);
+    assert!(!first.final_volume);
+    let digest = cursor.digest_verified(first);
+    assert_eq!(cursor.ordinal(), 0);
+    let authenticated = cursor.authenticated(digest);
+    assert_eq!(cursor.ordinal(), 0);
+    let validated = cursor.tar_validated(authenticated);
+    assert_eq!(cursor.ordinal(), 0);
+    assert!(cursor.commit_openpgp(validated));
+    let second = cursor.position().unwrap();
+    assert_eq!(second.ordinal, 1);
+    assert!(second.final_volume);
+    let digest = cursor.digest_verified(second);
+    let authenticated = cursor.authenticated(digest);
+    let validated = cursor.tar_validated(authenticated);
+    assert!(cursor.commit_openpgp(validated));
+    assert!(cursor.is_complete());
+}
+
+#[test]
+fn rejected_authenticated_stage_keeps_the_normalized_ordinal() {
+    let mut cursor = crate::verified::openpgp_admission::OpenPgpAdmission::new(2);
+    let position = cursor.position().unwrap();
+    let digest = cursor.digest_verified(position);
+    let _authenticated = cursor.authenticated(digest);
+    cursor.reject();
+    assert_eq!(cursor.ordinal(), 0);
+    assert!(cursor.position().is_none());
+}
+
+//= docs/parsing-requirements.md#parse-env-017
+//= type=test
+//# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+//= docs/parsing-requirements.md#parse-env-020
+//= type=test
+//# Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
+#[test]
+fn digest_failure_and_observed_cancellation_do_not_advance_admission() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/symmetric");
+    let stored_manifest =
+        std::fs::read(root.join("duplicity-full.20231114T221320Z.manifest.gpg")).unwrap();
+    let stored_volume =
+        std::fs::read(root.join("duplicity-full.20231114T221320Z.vol1.difftar.gpg")).unwrap();
+    let password = Password::from("duplicity-reader-public-test-fixture");
+    let decoded = crate::openpgp::decode(
+        &stored_manifest,
+        Credentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..Credentials::default()
+        },
+        CryptoLimits::default(),
+    )
+    .unwrap();
+    let manifest = Manifest::parse(&decoded.bytes, ManifestLimits::default()).unwrap();
+
+    let mut wrong_digest = manifest.clone();
+    wrong_digest.records[0].hashes[0].hex = b"0000000000000000000000000000000000000000".to_vec();
+    let mut rejected = MultipartAssembler::new(&wrong_digest, AssemblyLimits::default()).unwrap();
+    let digest_result = rejected.push_openpgp_volume(
+        1,
+        &stored_volume,
+        Credentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..Credentials::default()
+        },
+        CryptoLimits::default(),
+        &crate::source::Cancellation::default(),
+    );
+    assert!(matches!(digest_result, Err(AssemblyError::Envelope(_))));
+    assert_eq!(rejected.admission.ordinal(), 0);
+    assert!(rejected.admission.position().is_none());
+
+    let mut wrong_password = MultipartAssembler::new(&manifest, AssemblyLimits::default()).unwrap();
+    let wrong = Password::from("wrong-password");
+    assert!(matches!(
+        wrong_password.push_openpgp_volume(
+            1,
+            &stored_volume,
+            Credentials {
+                message_passwords: std::slice::from_ref(&wrong),
+                ..Credentials::default()
+            },
+            CryptoLimits::default(),
+            &crate::source::Cancellation::default(),
+        ),
+        Err(AssemblyError::Crypto(_))
+    ));
+    assert_eq!(wrong_password.admission.ordinal(), 0);
+    assert!(wrong_password.admission.position().is_none());
+
+    let mut cancelled = MultipartAssembler::new(&manifest, AssemblyLimits::default()).unwrap();
+    let cancel = crate::source::Cancellation::default();
+    cancel.cancel();
+    assert!(matches!(
+        cancelled.push_openpgp_volume(
+            1,
+            &stored_volume,
+            Credentials {
+                message_passwords: std::slice::from_ref(&password),
+                ..Credentials::default()
+            },
+            CryptoLimits::default(),
+            &cancel,
+        ),
+        Err(AssemblyError::Cancelled)
+    ));
+    assert_eq!(cancelled.admission.ordinal(), 0);
+    assert!(cancelled.admission.position().is_none());
+}
+
+//= docs/parsing-requirements.md#parse-env-020
+//= type=test
+//# Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
+//= docs/parsing-requirements.md#parse-multi-003
+//= type=test
+//# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
 #[test]
 fn encrypted_queued_restart_start_exception_is_rejected() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -77,4 +204,6 @@ fn encrypted_queued_restart_start_exception_is_rejected() {
         Err(error) => error,
     };
     assert_eq!(error, AssemblyError::UnsupportedBoundaryProfile);
+    assert_eq!(assembler.admission.ordinal(), 0);
+    assert!(assembler.admission.position().is_none());
 }
