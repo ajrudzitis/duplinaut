@@ -214,9 +214,11 @@ control explicit confirmation, staging, cancellation and uncertain publication.
       non-test builds. Wrong credentials at the first checkpoint establish that
       decryption was not reached; official valid ciphertext at the second establishes
       that cancellation prevents tar validation and admission commit.
-- [ ] Test cancellation at those precise internal checkpoints through the complete
-      public reader/snapshot boundary, alongside wrong reader credentials/signers and
-      tampered encrypted manifests.
+- [x] Exercise those same two internal checkpoints through public
+      `Catalog::read_snapshot_with_crypto` calls using official symmetric fixture
+      ciphertext. Both return the public `Source(Cancelled)` outcome and no snapshot.
+- [ ] Test wrong reader credentials/signers and tampered encrypted manifests at the
+      public reader boundary.
 - [x] Independently review the scoped lifecycle/evidence charging/dedup behavior; focused and complete gates pass on the adopted source.
 - [ ] Retain controller refinement, additional cipher/recipient/signing-subkey cases,
       native encrypted multipart producer coverage and broader historical encryption

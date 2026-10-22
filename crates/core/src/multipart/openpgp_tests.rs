@@ -2,7 +2,121 @@ use super::*;
 use crate::manifest::ManifestLimits;
 use crate::openpgp::{Credentials, CryptoLimits};
 use pgp::types::Password;
-use std::path::Path;
+use std::{
+    io::{Cursor, Read},
+    path::Path,
+};
+
+struct OfficialSymmetricSource(Vec<(crate::source::StoredObject, Vec<u8>)>);
+
+impl crate::source::ObjectSource for OfficialSymmetricSource {
+    fn list(
+        &self,
+        prefix: &str,
+        _: crate::source::SourceLimits,
+        cancel: &crate::source::Cancellation,
+    ) -> Result<Vec<crate::source::StoredObject>, crate::source::SourceError> {
+        if cancel.is_cancelled() {
+            return Err(crate::source::SourceError::Cancelled);
+        }
+        Ok(self
+            .0
+            .iter()
+            .filter(|(object, _)| object.key.starts_with(prefix))
+            .map(|(object, _)| object.clone())
+            .collect())
+    }
+
+    fn open(
+        &self,
+        object: &crate::source::StoredObject,
+        _: crate::source::SourceLimits,
+        cancel: &crate::source::Cancellation,
+    ) -> Result<Box<dyn Read + Send>, crate::source::SourceError> {
+        if cancel.is_cancelled() {
+            return Err(crate::source::SourceError::Cancelled);
+        }
+        let (_, bytes) = self
+            .0
+            .iter()
+            .find(|(candidate, _)| candidate == object)
+            .ok_or(crate::source::SourceError::Missing)?;
+        Ok(Box::new(Cursor::new(bytes.clone())))
+    }
+}
+
+fn official_symmetric_source() -> OfficialSymmetricSource {
+    use sha2::Digest;
+
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/symmetric");
+    let objects = std::fs::read_dir(directory)
+        .unwrap()
+        .map(|entry| {
+            let entry = entry.unwrap();
+            let bytes = std::fs::read(entry.path()).unwrap();
+            let key = format!("backup/{}", entry.file_name().to_string_lossy());
+            let identity = crate::source::ObjectIdentity {
+                version_id: Some("official-fixture-v1".into()),
+                etag: Some(format!("{:x}", sha2::Sha256::digest(&bytes))),
+            };
+            (
+                crate::source::StoredObject {
+                    key,
+                    size: bytes.len() as u64,
+                    identity,
+                },
+                bytes,
+            )
+        })
+        .collect();
+    OfficialSymmetricSource(objects)
+}
+
+fn official_symmetric_catalog<'a>(
+    source: &'a OfficialSymmetricSource,
+) -> crate::reader::Catalog<'a> {
+    crate::reader::Catalog::discover(
+        source,
+        "backup/",
+        crate::names::NameConfig::default(),
+        crate::reader::ReaderLimits::default(),
+        &crate::source::Cancellation::default(),
+    )
+    .unwrap()
+}
+
+fn read_official_symmetric_with_cancel_hook(
+    checkpoint: super::openpgp_cancel_test_hook::Checkpoint,
+) -> (
+    Result<crate::reader::ValidatedSnapshot, crate::reader::ReaderError>,
+    usize,
+) {
+    let source = official_symmetric_source();
+    let catalog = official_symmetric_catalog(&source);
+    let (anchor, _, _) = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == crate::chain::SetKind::Full)
+        .unwrap();
+    let password = crate::reader::OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+    let context = crate::reader::CryptoReadContext {
+        credentials: crate::reader::CryptoCredentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..crate::reader::CryptoCredentials::default()
+        },
+        crypto_limits: crate::reader::OpenPgpLimits::default(),
+        evidence_limits: crate::reader::EvidenceLimits::default(),
+    };
+    let cancellation = crate::source::Cancellation::default();
+    let guard = super::openpgp_cancel_test_hook::Guard::cancel_at(checkpoint);
+    let result = catalog.read_snapshot_with_crypto(
+        anchor,
+        crate::names::Timestamp(1_700_000_000),
+        &cancellation,
+        &context,
+    );
+    (result, guard.hits())
+}
 
 fn digest_permit<'a>(
     cursor: &mut crate::verified::openpgp_admission::OpenPgpAdmission,
@@ -394,4 +508,43 @@ fn cancellation_after_native_decode_prevents_tar_validation_and_commit() {
     assert!(assembler.pending.is_none());
     assert!(assembler.failed);
     assert!(matches!(assembler.finish(), Err(AssemblyError::Poisoned)));
+}
+
+//= docs/parsing-requirements.md#parse-env-017
+//= type=test
+//# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+#[test]
+fn public_catalog_cancellation_after_stored_digest_returns_no_snapshot() {
+    let (result, hits) = read_official_symmetric_with_cancel_hook(
+        super::openpgp_cancel_test_hook::Checkpoint::AfterStoredDigest,
+    );
+    match result {
+        Err(crate::reader::ReaderError::Source(crate::source::SourceError::Cancelled)) => {}
+        Err(error) => panic!("public reader returned the wrong error: {error:?}"),
+        Ok(_) => panic!("public reader returned a snapshot after cancellation"),
+    }
+    assert_eq!(hits, 1);
+}
+
+//= docs/parsing-requirements.md#parse-env-020
+//= type=test
+//# Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+#[test]
+fn public_catalog_cancellation_after_native_decode_returns_no_snapshot() {
+    let (result, hits) = read_official_symmetric_with_cancel_hook(
+        super::openpgp_cancel_test_hook::Checkpoint::AfterNativeDecode,
+    );
+    assert!(matches!(
+        result,
+        Err(crate::reader::ReaderError::Source(
+            crate::source::SourceError::Cancelled
+        ))
+    ));
+    assert_eq!(hits, 1);
 }
