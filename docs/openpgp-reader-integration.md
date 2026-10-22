@@ -200,7 +200,7 @@ control explicit confirmation, staging, cancellation and uncertain publication.
       separate and does not establish source-to-reader rejection for this mutation.
 - [ ] Test post-crypto cancellation, wrong reader credentials/signers, and tampered
       encrypted manifests at the complete reader boundary.
-- [ ] Independently review lifecycle/evidence charging/dedup and run complete gates.
+- [x] Independently review the scoped lifecycle/evidence charging/dedup behavior; focused and complete gates pass on the adopted source.
 - [ ] Retain controller refinement, additional cipher/recipient/signing-subkey cases,
       native encrypted multipart producer coverage and broader historical encryption
       as explicit pending assurance work; no count/annotation confers completion.
