@@ -25,7 +25,10 @@ pub mod signature;
 mod verified;
 
 pub mod envelope;
-#[allow(dead_code, reason = "private native adapter awaits composed reader integration")]
+#[allow(
+    dead_code,
+    reason = "private native adapter awaits composed reader integration"
+)]
 pub(crate) mod openpgp;
 pub mod tar;
 

@@ -1,4 +1,4 @@
-use crate::openpgp::{Credentials, CryptoError, CryptoLimits, Limit, SecretExport, decode};
+use crate::openpgp::{decode, Credentials, CryptoError, CryptoLimits, Limit, SecretExport};
 use pgp::types::Password;
 use sha2::{Digest, Sha256};
 use std::path::Path;

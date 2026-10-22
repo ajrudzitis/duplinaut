@@ -8,11 +8,11 @@ mod armor_crc_tests;
 #[cfg(test)]
 mod fixture_tests;
 mod framing;
-use framing::{Packet as Frame, frames, native};
+use framing::{frames, native, Packet as Frame};
 use pgp::{
     composed::{
-        Deserializable, PlainSessionKey, SignedPublicKey, SignedSecretKey,
-        decrypt_session_key_with_password,
+        decrypt_session_key_with_password, Deserializable, PlainSessionKey, SignedPublicKey,
+        SignedSecretKey,
     },
     packet::{Packet, Signature, SignatureType, StreamDecryptor},
     types::{DecryptionKey, EskType, KeyDetails, Password, Seipdv1ReadMode},

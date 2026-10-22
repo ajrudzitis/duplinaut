@@ -1,11 +1,11 @@
-use crate::openpgp::{Credentials, CryptoError, CryptoLimits, Limit, decode};
+use crate::openpgp::{decode, Credentials, CryptoError, CryptoLimits, Limit};
 use pgp::{
     crypto::{hash::HashAlgorithm, sym::SymmetricKeyAlgorithm},
     packet::{SymEncryptedProtectedData, SymKeyEncryptedSessionKey},
     ser::Serialize,
     types::{Password, StringToKey},
 };
-use rand::{SeedableRng, rngs::StdRng};
+use rand::{rngs::StdRng, SeedableRng};
 use std::io::Write;
 
 fn packet(tag: u8, body: &[u8]) -> Vec<u8> {
