@@ -23,8 +23,8 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | Delta decoding and application | 16 tests; official historical and multipart payloads; 535 focused Verus obligations pass; independent semantic review complete | Complete-core acceptance gate |
 | Manifest tokens, manifests and byte paths | Official manifests pass; exact token and path refinements checked; 79 whole-manifest obligations pass, including contextual success/error refinement | Complete-core acceptance and selection-controller proofs |
 | Signatures and tar containers | Official archives pass; 54 signature and 37 tar-header/helper focused obligations pass | Complete tar/PAX controller refinement |
-| Stored-object envelopes | Stored-byte SHA1/MD5 validation; bounded plain/gzip decoding; official-object integration tests | Native OpenPGP and controller verification |
-| Native OpenPGP reader | Private bounded decoder; borrowed reader policy; stored-ciphertext digest first; encrypted tar completion; per-object bounded evidence; official three-profile, three-date source oracle tests | Independent pipeline review, controller proofs, broader algorithms |
+| Stored-object envelopes | Stored-byte SHA1/MD5 validation; bounded plain/gzip decoding; official-object integration tests | Reader-controller verification |
+| Native OpenPGP reader | Private bounded decoder; borrowed reader policy; stored-ciphertext digest first; encrypted tar completion; per-object bounded evidence; official three-profile, three-date source oracle tests | Controller proofs, remaining adversarial matrix, broader algorithms |
 | Storage and S3 | Anchored local reads with change detection; 11 S3 tests using actual SDK HTTP handling; independently reviewed complete-reader late-change, cancellation and three-date restore tests | Live-service integration |
 | Assurance tooling | Pinned tools, Duvet baseline, executable failure tests, independent review | Expand gates as components are accepted |
 | Chain planning | 17 strict obligations pass for exact selection/errors and descriptor provenance; six official naming profiles | Complete-core acceptance and thin iterator adapter proof |
@@ -43,7 +43,7 @@ Vest DSL definitions produce the parsing code used at runtime. Verus proofs conn
 
 Duvet connects requirement headings to implementation and test evidence. A committed snapshot detects traceability regressions; coverage queries enforce accepted milestones. Formal obligations and successful verification runs are indexed separately in the [assurance ledger](docs/assurance.toml). Annotation counts and proof-function counts do not establish semantic coverage.
 
-Official duplicity 3.0.7 fixtures include full and incremental chains, multipart content, byte paths, metadata changes, deletions, symlinks, and encrypted/signed archives. Source-tree expectations were checked against official restoration. Native crypto and older-producer acceptance remain pending.
+Official duplicity 3.0.7 fixtures include full and incremental chains, multipart content, byte paths, metadata changes, deletions, symlinks, and encrypted/signed archives. Source-tree expectations were checked against official restoration. The native OpenPGP reader composition for the recorded 3.0.7 symmetric, public-key and signed profiles is independently accepted; broader historical crypto support and complete-reader formal acceptance remain pending.
 
 Cryptography, compression, hashing, networking, and filesystem operations have explicit trusted adapter boundaries. Their integration tests and contract reviews are distinct from proofs of deterministic core algorithms. Specification, software, and verification agents work separately, with frozen executable handoffs for proof work.
 
