@@ -24,13 +24,14 @@ A native Rust project for browsing duplicity backups and restoring selected file
 | Manifest tokens, manifests and byte paths | Official manifests pass; exact token and path refinements checked; 79 whole-manifest obligations pass, including contextual success/error refinement | Complete-core acceptance and selection-controller proofs |
 | Signatures and tar containers | Official archives pass; 54 signature and 37 tar-header/helper focused obligations pass | Complete tar/PAX controller refinement |
 | Stored-object envelopes | Stored-byte SHA1/MD5 validation; bounded plain/gzip decoding; official-object integration tests | Native OpenPGP and controller verification |
+| Native OpenPGP adapter | Private bounded decoder; 14 tests across 27 official encrypted objects; nine independent snapshot content oracles; separate source/security review | Reader pipeline composition, full controller proofs, broader algorithms |
 | Storage and S3 | Anchored local reads with change detection; 11 S3 tests using actual SDK HTTP handling; independently reviewed complete-reader late-change, cancellation and three-date restore tests | Live-service integration |
 | Assurance tooling | Pinned tools, Duvet baseline, executable failure tests, independent review | Expand gates as components are accepted |
 | Chain planning | 17 strict obligations pass for exact selection/errors and descriptor provenance; six official naming profiles | Complete-core acceptance and thin iterator adapter proof |
 | Snapshot reconstruction | Three official backup dates match byte paths, contents and metadata; immutable prior-set delta bases; transactional failures | Controller/resource proofs and chain integration |
 | Multipart assembly | Official snapshot/delta source oracles; bounded ordered parts; provisional output and sticky failure tests | Formal refinement and footer-bearing/encrypted queued replay |
 | Repository browser and restore | Metadata-only catalog and identity-bound plain/gzip reconstruction; byte-preserving selection and reviewed native Linux publication; official three-date oracles | Frontend publication integration and controller proofs |
-| Terminal interface | Local/S3 metadata history and explicit full-scan browsing; byte-safe paths and cancellation | Publication interaction, detailed progress and automated interaction coverage |
+| Terminal interface | Local/S3 history and explicit full-scan browsing; byte-safe selection; reviewed worker-owned restore publication; 22 tests and real PTY evidence | Credential flow, controller proofs, comprehensive event-loop fault coverage |
 
 The [parsing requirements](docs/parsing-requirements.md) were written in RFC 2119/8174 language and independently reviewed **before implementation**. Public documentation leads format research; immutable official-source references and producer evidence resolve ambiguities.
 
@@ -94,15 +95,17 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [ ] Prove repository orchestration controller contracts and complete resource accounting.
 - [x] Implement a local read-only source with anchored identity checks; test actual files and official three-date reconstruction.
 - [x] Build read-only terminal history and snapshot browsing; exercise an official chain in a real terminal.
-- [x] Add bounded terminal restore-selection previews and independently review the read-only flow.
+- [x] Add bounded restore previews, frozen confirmation and worker-owned publication; independently review the terminal lifecycle, run 22 tests and verify a real PTY restore.
 - [x] Accept delta, manifest-token, byte-path, signatures and manifest-record components with exact contracts, fresh full verification, official tests and independent review.
 - [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers.
 - [ ] Complete verified snapshot indexing and native Linux restoration.
 - [x] Independently review and adopt Linux staging/publication requirements before implementation, including indeterminate syscall outcomes.
 - [x] Implement and independently review native Linux restoration; pass official three-date and fault-injection tests, enforce Duvet requirement coverage.
-- [ ] Complete native OpenPGP adapters and their [capability profile](docs/openpgp-profile.md).
+- [x] Implement and independently review the private bounded OpenPGP adapter against all 27 official crypto objects and nine independent content oracles; document its trusted boundary.
+- [ ] Compose OpenPGP with stored-object digest checks and complete reader reconstruction; prove the reader controller and expand official algorithm compatibility.
 - [ ] Validate S3 with a live service and complete-reader consistency integration.
 - [ ] Complete the browsing/restoration TUI.
+- [ ] Automate full terminal event-loop resize, cancellation and output-fault coverage; finish frontend controller proofs and encrypted credential flow.
 - [ ] Pass the supported official-producer compatibility matrix.
 - [x] **Create GitHub Actions for builds and formal methods:** install pinned tools, check generated parsers, run Verus, enforce Duvet coverage/snapshot gates, and run native/official-fixture tests on pull requests and pushes; retain reports and verification evidence as artifacts. See [workflow validation](docs/github-actions.md); the first hosted run remains pending.
 - [x] Publish the Duvet HTML report from successful `main` runs through GitHub Pages, with its live URL in the deployment summary.

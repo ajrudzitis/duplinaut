@@ -1,6 +1,6 @@
 # Native OpenPGP adapter profile
 
-This is an implementation note for [PARSE-ENV-002..016](parsing-requirements.md#parse-env-002), not independent proof or native compatibility evidence. The initial profile accepts authenticated SEIPDv1 archives. SEIPDv2/v6, proprietary GnuPG AEAD, unauthenticated SED, additional algorithms, and general certificate-validity policy remain follow-up work.
+This records the supported profile for [PARSE-ENV-002..016](parsing-requirements.md#parse-env-002). Native implementation evidence and the independent review are in [openpgp-implementation.md](openpgp-implementation.md). The initial profile accepts authenticated SEIPDv1 archives. SEIPDv2/v6, proprietary GnuPG AEAD, unauthenticated SED, additional algorithms, and general certificate-validity policy remain follow-up work.
 
 ## Pinned upstream reference
 
@@ -40,11 +40,13 @@ CheckFirst bounds an encrypted body, not every outer wrapper or key input. The a
 
 Fingerprint authorization is an offline recovery policy. It verifies data and bindings under explicitly supplied primary certificates; it does not assert current wall-clock validity, user-ID identity, revocation acceptance, or Web-of-Trust certification. Certificate metadata is exposed so callers can apply a separate validity policy.
 
-## Existing official evidence and pending acceptance
+## Accepted adapter evidence and remaining work
 
 The checked-in official duplicity 3.0.7 / GnuPG 2.4.9 corpus includes symmetric, public-key, and signed full-plus-two-incremental chains, encrypted secret-key exports, and known public test credentials. Its v4 signing primary is legacy Ed25519; its bound recipient subkey is legacy cv25519 ECDH. Inspection of the exported key confirms AES-128 usage-254 secret protection, SHA1 iterated/salted S2K with count 58720256, and SHA512 certification/binding signatures. Inspection of the signed full volume confirms PKESKv3 ECDH, tag18 SEIPDv1, ZLIB compression, and a version-3 one-pass binary Ed25519/SHA512 signature envelope. A one-pass packet is a hint, not signature-verification evidence.
 
-Native acceptance still requires decrypting every official crypto object, comparing decoded objects/source-tree restoration, and negative tests for wrong credentials/signers, mutations, truncations, unsupported variants, packet boundaries/counts/depth, and all input/output limits. RSA and other permitted algorithm variants require targeted independently produced positive/negative evidence before their compatibility milestones are complete. Tests and trusted-contract review do not constitute a Verus proof of cryptography.
+The private native adapter now decrypts all 27 checked-in official encrypted objects with three credential/signature profiles. A separate test-only tar and delta oracle reconstructs nine official encrypted snapshots and matches their independent source SHA-256 maps. Fourteen focused native tests cover credentials, authenticated mutation/truncation, signatures, compression EOF, packet and derivation limits, RSA MPI bounds, recursive signature MPI tails, and armor CRC behavior. An external compile-fail doctest ensures callers cannot access the low-level decoder or construct its decoded result. Independent source review accepted this adapter checkpoint; implementation details and limitations are recorded in [the implementation ledger](openpgp-implementation.md).
+
+The adapter is not yet composed with reader source identity and stored-object digest validation, manifest/volume ordering, encrypted tar termination, or whole-chain publication. No Verus proof is claimed for this native Rust controller or its upstream cryptographic, packet, and compression dependencies. The fixture corpus does not establish official RSA decryption, all AES variants, official signing-subkey compatibility, or broader historical compatibility. Tests and trusted-contract review do not constitute a proof of cryptography.
 
 An additional isolated GnuPG 2.4.9 inspection of `signed/duplicity-full.20231114T221320Z.vol1.difftar.gpg` returned `DECRYPTION_INFO 2 9 0` (MDC plus AES-256), `GOODMDC`, `DECRYPTION_OKAY`, and `VALIDSIG D06847BAC3B117C46BB68BDA6F23173BAD8A7656 ... 4 0 22 10 00 ...` (v4 binary Ed25519/SHA512 signature). Its recipient subkey fingerprint is `33D7BB233183C2F1310DED2E5B28A0C84002F3F7`. GnuPG reported undefined certification trust; that does not invalidate cryptographic fingerprint-based verification. Signature/literal packet timestamps reflect actual producer wall time, separately from the deterministic duplicity backup dates.
 

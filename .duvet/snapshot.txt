@@ -72,7 +72,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
 
   SECTION: [PARSE-ENV-010](#parse-env-010)
-    TEXT[!MUST]: The adapter MUST enforce its configured ciphertext bound before materializing an encrypted object and authenticate the complete SEIPDv1 payload before releasing plaintext to message or duplicity parsers.
+    TEXT[!MUST,implementation]: The adapter MUST enforce its configured ciphertext bound before materializing an encrypted object and authenticate the complete SEIPDv1 payload before releasing plaintext to message or duplicity parsers.
 
   SECTION: [PARSE-ENV-011](#parse-env-011)
     TEXT[!MUST]: The adapter MUST consume every accepted message and compression layer to its authenticated end and reject unexpected trailing packets or bytes.
@@ -237,7 +237,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.
 
   SECTION: [PARSE-BROWSE-002](#parse-browse-002)
-    TEXT[!MUST,implementation]: When signature metadata cannot provide a requested listing, the reader MUST expose that a volume scan is required before starting that scan.
+    TEXT[!MUST]: When signature metadata cannot provide a requested listing, the reader MUST expose that a volume scan is required before starting that scan.
 
   SECTION: [PARSE-SOURCE-001](#parse-source-001)
     TEXT[!MUST,implementation,test]: The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
@@ -324,46 +324,46 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: If creation of the first outer staging leaf returns an error other than a definite existing-entry collision, the backend MUST report its candidate as uncertain and leave that candidate untouched because exclusive ownership was not established.
 
   SECTION: [RESTORE-UI-001](#restore-ui-001)
-    TEXT[!MUST]: The frontend MUST accept a restoration destination only as a complete pair of `--restore-parent PATH` and `--restore-name NAME`, preserving their original OS bytes and rejecting duplicate, missing, oversized or invalid destination values before starting restoration.
+    TEXT[!MUST,implementation,test]: The frontend MUST accept a restoration destination only as a complete pair of `--restore-parent PATH` and `--restore-name NAME`, preserving their original OS bytes and rejecting duplicate, missing, oversized or invalid destination values before starting restoration.
 
   SECTION: [RESTORE-UI-002](#restore-ui-002)
-    TEXT[!MUST]: The frontend MUST derive a restoration preview from the exact completed immutable snapshot and selected original byte-valued roots, including precisely the entries and source directory ancestors accepted by its `RestorePlan`.
+    TEXT[!MUST,implementation]: The frontend MUST derive a restoration preview from the exact completed immutable snapshot and selected original byte-valued roots, including precisely the entries and source directory ancestors accepted by its `RestorePlan`.
 
   SECTION: [RESTORE-UI-003](#restore-ui-003)
-    TEXT[!MUST]: The frontend MUST present a concrete restoration preview identifying the exact snapshot target, configured parent and new leaf, marked/all selection, included ancestors, resulting entry count, total regular payload bytes, no-replacement policy and supported metadata policy before offering publication confirmation.
+    TEXT[!MUST,implementation]: The frontend MUST present a concrete restoration preview identifying the exact snapshot target, configured parent and new leaf, marked/all selection, included ancestors, resulting entry count, total regular payload bytes, no-replacement policy and supported metadata policy before offering publication confirmation.
 
   SECTION: [RESTORE-UI-004](#restore-ui-004)
-    TEXT[!MUST]: The frontend MUST start at most one restoration operation only when its displayed successful `r` preview receives the exact ASCII acknowledgment `restore` followed by Enter, and MUST clear that acknowledgment and disarm confirmation when its snapshot, roots or destination changes or the user leaves that preview.
+    TEXT[!MUST,implementation,test]: The frontend MUST start at most one restoration operation only when its displayed successful `r` preview receives the exact ASCII acknowledgment `restore` followed by Enter, and MUST clear that acknowledgment and disarm confirmation when its snapshot, roots or destination changes or the user leaves that preview.
 
   SECTION: [RESTORE-UI-005](#restore-ui-005)
-    TEXT[!MUST]: The frontend MUST execute restoration through the adopted native `restore` API with its reviewed limits and profile policy, without implementing its own path extraction, destination replacement, staging cleanup or filesystem eligibility fallback.
+    TEXT[!MUST,implementation,test]: The frontend MUST execute restoration through the adopted native `restore` API with its reviewed limits and profile policy, without implementing its own path extraction, destination replacement, staging cleanup or filesystem eligibility fallback.
 
   SECTION: [RESTORE-UI-006](#restore-ui-006)
-    TEXT[!MUST]: The frontend MUST retain one frozen operation's exact snapshot, roots, destination and bounded plan summary across preview and confirmation, and keep at most one active scan, preview or restoration with bounded request/reply queues.
+    TEXT[!MUST,implementation,test]: The frontend MUST retain one frozen operation's exact snapshot, roots, destination and bounded plan summary across preview and confirmation, and keep at most one active scan, preview or restoration with bounded request/reply queues.
 
   SECTION: [RESTORE-UI-007](#restore-ui-007)
-    TEXT[!MUST]: The frontend MUST run plan preparation and filesystem restoration outside the terminal event/render loop, with an operation-specific cancellation token and explicit running/cancellation-requested states.
+    TEXT[!MUST,implementation,test]: The frontend MUST run plan preparation and filesystem restoration outside the terminal event/render loop, with an operation-specific cancellation token and explicit running/cancellation-requested states.
 
   SECTION: [RESTORE-UI-008](#restore-ui-008)
-    TEXT[!MUST]: The frontend MUST preserve the backend's published, unpublished and publication-indeterminate outcome distinction, including successful-publication precedence over racing cancellation and all reported cleanup warnings or uncertainty.
+    TEXT[!MUST,implementation,test]: The frontend MUST preserve the backend's published, unpublished and publication-indeterminate outcome distinction, including successful-publication precedence over racing cancellation and all reported cleanup warnings or uncertainty.
 
   SECTION: [RESTORE-UI-009](#restore-ui-009)
-    TEXT[!MUST]: The frontend MUST refrain from automatic retry, rollback, destination inspection-based outcome promotion or modifying cleanup after publication uncertainty or an unavailable worker outcome.
+    TEXT[!MUST,implementation,test]: The frontend MUST refrain from automatic retry, rollback, destination inspection-based outcome promotion or modifying cleanup after publication uncertainty or an unavailable worker outcome.
 
   SECTION: [RESTORE-UI-010](#restore-ui-010)
-    TEXT[!MUST]: The frontend MUST render destination, selected paths, staging/candidate names and diagnostics using reversible terminal-safe byte escaping, preserving complete backend identity and warning fields in the accessible final result.
+    TEXT[!MUST,implementation,test]: The frontend MUST render destination, selected paths, staging/candidate names and diagnostics using reversible terminal-safe byte escaping, preserving complete backend identity and warning fields in the accessible final result.
 
   SECTION: [RESTORE-UI-011](#restore-ui-011)
-    TEXT[!MUST]: The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
+    TEXT[!MUST,implementation]: The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
 
   SECTION: [RESTORE-UI-012](#restore-ui-012)
-    TEXT[!MUST]: On a controlled terminal I/O failure or shutdown during active restoration, the frontend MUST request cancellation, close or signal its worker request path, attempt terminal-state restoration, drain and join the worker without bounded-channel deadlock, retain its typed result, and attempt escaped final-result reporting through an available non-raw output sink before controlled exit.
+    TEXT[!MUST,implementation,test]: On a controlled terminal I/O failure or shutdown during active restoration, the frontend MUST request cancellation, close or signal its worker request path, attempt terminal-state restoration, drain and join the worker without bounded-channel deadlock, retain its typed result, and attempt escaped final-result reporting through an available non-raw output sink before controlled exit.
 
   SECTION: [RESTORE-UI-013](#restore-ui-013)
-    TEXT[!MUST]: The frontend MUST keep backup source access read-only and avoid collecting or exposing credentials, backup payload bytes or secret material through the restoration interaction, diagnostics or automatic logs.
+    TEXT[!MUST,implementation]: The frontend MUST keep backup source access read-only and avoid collecting or exposing credentials, backup payload bytes or secret material through the restoration interaction, diagnostics or automatic logs.
 
   SECTION: [RESTORE-UI-014](#restore-ui-014)
-    TEXT[!MUST]: Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+    TEXT[!MUST,implementation]: Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
 
   SECTION: [ASSURE-SPEC-001](#assure-spec-001)
     TEXT[!MUST]: Each parser component MUST have reviewed requirements and resolved blocking questions before its implementation begins.
