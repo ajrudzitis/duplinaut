@@ -1,16 +1,18 @@
-```text
- ____  _   _ ____  _     ___ ____ ___ _____ __   __
-|  _ \| | | |  _ \| |   |_ _/ ___|_ _|_   _|\ \ / /
-| | | | | | | |_) | |    | | |    | |  | |   \ V /
-| |_| | |_| |  __/| |___ | | |___ | |  | |    | |
-|____/ \___/|_|   |_____|___\____|___| |_|    |_|
+<p align="center">
+  <img src="assets/branding/duplinaut-logo.png" width="420" alt="Duplinaut — an astronaut carrying a backup folder">
+</p>
 
-             B A C K U P   R E A D E R
+```text
+ ____  _   _ ____  _     ___ _   _    _    _   _ _____
+|  _ \| | | |  _ \| |   |_ _| \ | |  / \  | | | |_   _|
+| | | | | | | |_) | |    | ||  \| | / _ \ | | | | | |
+| |_| | |_| |  __/| |___ | || |\  |/ ___ \| |_| | | |
+|____/ \___/|_|   |_____|___|_| \_/_/   \_\\___/  |_|
 ```
 
 **Browse history. Recover files. Verify the reader.**
 
-A native Rust project for browsing duplicity backups and restoring selected files from local archives and S3. The reader runs without duplicity, GnuPG, or librsync executables; the official application supplies independent test fixtures.
+**Duplinaut** is a native Rust reader for browsing duplicity backups and restoring selected files from local archives and S3. It runs without duplicity, GnuPG, or librsync executables; the official application supplies independent test fixtures.
 
 [Requirements](docs/parsing-requirements.md) | [Assurance progress](docs/README.md) | [Tool setup](tools/README.md) | [Official fixtures](tests/fixtures/README.md)
 
@@ -35,7 +37,7 @@ A native Rust project for browsing duplicity backups and restoring selected file
 
 The [parsing requirements](docs/parsing-requirements.md) were written in RFC 2119/8174 language and independently reviewed **before implementation**. Public documentation leads format research; immutable official-source references and producer evidence resolve ambiguities.
 
-After GitHub Pages is configured to use Actions, successful pushes to `main` publish the rendered Duvet requirements report. Open the latest **Publish Duvet report** deployment from the [assurance workflow](.github/workflows/assurance.yml) to view it; GitHub displays the report URL in the deployment summary. Pull requests keep the report as a downloadable workflow artifact without publishing a site.
+After GitHub Pages is configured to use Actions, successful pushes to `main` publish the rendered Duvet requirements report. [View the latest Duvet report](https://ajrudzitis.github.io/duplinaut/) or open the latest **Publish Duvet report** deployment from the [assurance workflow](.github/workflows/assurance.yml). Pull requests keep the report as a downloadable workflow artifact without publishing a site.
 
 ## Built around evidence
 
