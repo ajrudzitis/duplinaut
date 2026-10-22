@@ -11,7 +11,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 | Object names and timestamps | Reviewed canonical, legacy and short-name grammar | Implemented; six tests pass; canonical framing uses Vest DSL | Calendar and classification refinement pending | All 84 recorded official object basenames pass | Native source reviewed; formal acceptance pending |
 | Librsync signatures | Reviewed four magics and checksum widths | Implemented; four tests pass; header uses Vest DSL | Exact wire/cursor/unknown-size contracts; 54 focused obligations and fresh full-core verification pass | Payloads from 21 official signature archives pass | Scoped component accepted; native Iterator boundary reviewed |
 | Tar containers and operations | Reviewed header, GNU/PAX and footer profiles | Implemented; thirteen tests pass; header uses Vest DSL | Exact header/arithmetic/footer: 37 focused strict obligations pass; PAX framing/keys and fractional time: 21 pass; controller pending | All 48 recorded plain gzip archives scan and classify | Native source reviewed; formal acceptance pending |
-| Stored-object integrity and envelopes | Reviewed stored-byte hash, plain/gzip and private OpenPGP reader paths | Plain/gzip plus digest-first OpenPGP reader integration; official encrypted chains and evidence tests | Digest/crypto libraries and reader controller remain trusted; controller proof pending | Official original encrypted symmetric, public-key and signed snapshots pass three-date source hash oracles | Independent pipeline review complete |
+| Stored-object integrity and envelopes | Reviewed stored-byte hash, plain/gzip and private OpenPGP reader paths | Plain/gzip plus digest-first OpenPGP reader integration; official encrypted chains and evidence tests | 10 scoped OpenPGP admission cursor/token obligations pass within 1,009 core obligations; this does not prove native wrapper call order or digest/crypto/tar facts; reader controller proof pending | Official original encrypted symmetric, public-key and signed snapshots pass three-date source hash oracles | Independent pipeline and scoped cursor proof review complete |
 | Multipart assembly | Reviewed ordinary 3.0.7 profile; queued-restart requirements and fixtures reviewed | Implemented; six tests pass; all stored volumes checked before publication | Controller refinement pending | Official three-volume snapshot and two-volume delta match independent source hashes | Independent native review complete; footer-bearing restart and formal acceptance pending |
 | Chain planning | Reviewed explicit anchor, exact target and conservative local uniqueness | Implemented; five tests pass | Controller refinement pending | Eighteen dates across six official plain naming profiles | Independent native review complete; no restorability claim |
 | Snapshot reconstruction | Reviewed ordered state and preceding-set basis | Implemented; nine test groups pass | Exact scalar budget acceptance and file allowance: five strict obligations pass; state/counter/resource refinement pending | Three official 3.0.7 backup dates match byte paths, contents and metadata | Independent native review complete; formal acceptance pending |
@@ -43,6 +43,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Prove exact volume selection and inclusion of every selected descendant in a declared inclusive interval.
 - [x] Prove exact path/error adaptation, optional positive block boundaries and volume record completion diagnostics.
 - [x] Assemble ordinary 3.0.7 plain/gzip multipart operations with verified stored digests, complete containers, explicit bounds and sticky failure.
+- [x] Add a private OpenPGP admission cursor and stage-token gate; prove normalized ordinal/finality, stage transitions and commit advancement; retain factual digest/decrypt/tar call order as trusted wrapper code.
 - [x] Independently test multipart snapshot/delta source oracles and rejection after provisional output.
 - [x] Acquire and review original queued-restart and empty-tail producer fixtures; specify strict compatibility requirements.
 - [x] Implement and independently test source-derived queued-restart raw/gzip boundary compatibility and full-scan selection.
@@ -50,6 +51,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Prove complete manifest parser contextual success and error semantics against an independent model.
 - [x] Prove exact digest duplicate/conflict detection; preserve first-conflict rejection and bounded append behavior.
 - [ ] Prove complete multipart controller refinement.
+- [ ] Prove the wrapper’s digest-result-to-permit bridge and add post-crypto-cancel/tar-failure boundary tests.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 
