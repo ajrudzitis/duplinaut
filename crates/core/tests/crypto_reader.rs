@@ -16,6 +16,13 @@ use std::{
 struct FixtureSource {
     values: Vec<(StoredObject, Vec<u8>)>,
     opens: AtomicUsize,
+    open_behavior: Option<(String, OpenBehavior)>,
+}
+#[derive(Clone, Copy)]
+enum OpenBehavior {
+    IdentityChanged,
+    Truncate,
+    Excess,
 }
 impl FixtureSource {
     fn new(mode: &str, tamper_key: Option<&str>) -> Self {
@@ -46,6 +53,46 @@ impl FixtureSource {
         Self {
             values,
             opens: AtomicUsize::new(0),
+            open_behavior: None,
+        }
+    }
+    fn with_open_behavior(mut self, fragment: &str, behavior: OpenBehavior) -> Self {
+        self.open_behavior = Some((fragment.to_owned(), behavior));
+        self
+    }
+    fn signed_full_plain_incrementals() -> Self {
+        let root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7");
+        let mut values = Vec::new();
+        for (mode, predicate) in [("signed", "duplicity-full."), ("plain", "duplicity-inc.")] {
+            for item in std::fs::read_dir(root.join(mode)).unwrap() {
+                let item = item.unwrap();
+                let filename = item.file_name().to_string_lossy().into_owned();
+                if !filename.starts_with(predicate)
+                    || filename.contains("signatures")
+                    || !filename.contains("manifest") && !filename.contains("vol")
+                {
+                    continue;
+                }
+                let key = format!("backup/{filename}");
+                let bytes = std::fs::read(item.path()).unwrap();
+                values.push((
+                    StoredObject {
+                        key,
+                        size: bytes.len() as u64,
+                        identity: ObjectIdentity {
+                            version_id: Some(format!("{mode}-v1")),
+                            etag: Some(format!("{:x}", Sha256::digest(&bytes))),
+                        },
+                    },
+                    bytes,
+                ));
+            }
+        }
+        Self {
+            values,
+            opens: AtomicUsize::new(0),
+            open_behavior: None,
         }
     }
 }
@@ -83,6 +130,21 @@ impl ObjectSource for FixtureSource {
             .ok_or(SourceError::Missing)?;
         if expected != object {
             return Err(SourceError::Changed);
+        }
+        if let Some((fragment, behavior)) = &self.open_behavior {
+            if object.key.contains(fragment) {
+                match behavior {
+                    OpenBehavior::IdentityChanged => return Err(SourceError::Changed),
+                    OpenBehavior::Truncate => {
+                        return Ok(Box::new(Cursor::new(bytes[..bytes.len() - 1].to_vec())))
+                    }
+                    OpenBehavior::Excess => {
+                        let mut excess = bytes.clone();
+                        excess.push(0);
+                        return Ok(Box::new(Cursor::new(excess)));
+                    }
+                }
+            }
         }
         Ok(Box::new(Cursor::new(bytes.clone())))
     }
@@ -218,6 +280,14 @@ fn original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidenc
             let policy = evidence.policy().expect("recorded per-read policy");
             assert_eq!(policy.authorization_configured, mode == "signed");
             assert_eq!(policy.require_signature, mode == "signed");
+            assert_eq!(policy.crypto_limits.stored_bytes, 256 * 1024 * 1024);
+            assert_eq!(policy.crypto_limits.authenticated_bytes, 256 * 1024 * 1024);
+            assert_eq!(policy.crypto_limits.decoded_bytes, 8 * 1024 * 1024 * 1024);
+            assert_eq!(policy.crypto_limits.expanded_bytes, 8 * 1024 * 1024 * 1024);
+            assert_eq!(policy.evidence_limits.max_objects, 1_000_000);
+            assert_eq!(policy.evidence_limits.max_metadata_bytes, 32 * 1024 * 1024);
+            assert_eq!(policy.evidence_limits.max_certificate_versions, 64);
+            assert_eq!(policy.evidence_limits.max_comparisons, 16_000_000);
             assert_eq!(
                 policy.permitted_primary_fingerprints.len(),
                 usize::from(mode == "signed")
@@ -229,6 +299,39 @@ fn original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidenc
                     duplicity_core::reader::AuthenticationKind::OpenPgpIntegrity
                 }));
             if mode == "signed" {
+                assert_eq!(
+                    evidence.certificates().len(),
+                    1,
+                    "exact versions are interned"
+                );
+                let certificate = &evidence.certificates()[0];
+                assert_eq!(
+                    certificate.primary_fingerprint,
+                    [
+                        0xd0, 0x68, 0x47, 0xba, 0xc3, 0xb1, 0x17, 0xc4, 0x6b, 0xb6, 0x8b, 0xda,
+                        0x6f, 0x23, 0x17, 0x3b, 0xad, 0x8a, 0x76, 0x56,
+                    ]
+                );
+                assert!(certificate.created_seconds > 1_600_000_000);
+                assert!(!certificate.signatures.is_empty());
+                assert!(certificate
+                    .signatures
+                    .iter()
+                    .all(|signature| signature.created_seconds.is_some()));
+                // The official fixture certificate has no expiration or revocation
+                // observations; assert those explicit absences are retained too.
+                assert!(certificate
+                    .signatures
+                    .iter()
+                    .all(|signature| signature.key_expiry_seconds.is_none()));
+                assert!(certificate
+                    .signatures
+                    .iter()
+                    .all(|signature| signature.signature_expiry_seconds.is_none()));
+                assert!(certificate
+                    .signatures
+                    .iter()
+                    .all(|signature| !signature.revocation));
                 assert!(evidence.objects().iter().all(|record| {
                     record.authorized_signer.as_ref().is_some_and(|signer| {
                         signer.primary_fingerprint
@@ -236,7 +339,7 @@ fn original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidenc
                                 0xd0, 0x68, 0x47, 0xba, 0xc3, 0xb1, 0x17, 0xc4, 0x6b, 0xb6, 0x8b,
                                 0xda, 0x6f, 0x23, 0x17, 0x3b, 0xad, 0x8a, 0x76, 0x56,
                             ]
-                    }) && !record.certificate_versions.is_empty()
+                    }) && record.certificate_versions == [0]
                 }));
             } else {
                 assert!(evidence
@@ -248,6 +351,15 @@ fn original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidenc
                 .objects()
                 .iter()
                 .all(|record| record.identity.version_id.as_deref() == Some("fixture-v1")));
+            assert!(evidence.objects().iter().all(|record| {
+                record.key.starts_with("backup/")
+                    && record.set_start <= record.set_end
+                    && (record.manifest || record.ordinal > 0)
+            }));
+            assert!(evidence.objects().iter().all(|record| record
+                .certificate_versions
+                .iter()
+                .all(|index| *index < evidence.certificates().len())));
         }
     }
 }
@@ -384,6 +496,7 @@ fn global_signature_policy_and_evidence_limits_fail_closed() {
             })
             .collect(),
         opens: AtomicUsize::new(0),
+        open_behavior: None,
     };
     let catalog = Catalog::discover(
         &source,
@@ -508,4 +621,262 @@ fn ciphertext_limit_is_checked_before_object_open() {
         Err(ReaderError::Limit)
     ));
     assert_eq!(source.opens.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-source-001
+//= type=test
+//# The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+fn crypto_reader_rejects_source_identity_change_and_inexact_manifest_bodies() {
+    for (behavior, expected_kind) in [
+        (OpenBehavior::IdentityChanged, None),
+        (
+            OpenBehavior::Truncate,
+            Some(std::io::ErrorKind::UnexpectedEof),
+        ),
+        (OpenBehavior::Excess, Some(std::io::ErrorKind::InvalidData)),
+    ] {
+        let source = FixtureSource::new("symmetric", None)
+            .with_open_behavior("duplicity-full.20231114T221320Z.manifest.gpg", behavior);
+        let catalog = Catalog::discover(
+            &source,
+            "backup/",
+            NameConfig::default(),
+            ReaderLimits::default(),
+            &Cancellation::default(),
+        )
+        .unwrap();
+        let anchor = catalog
+            .manifests()
+            .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+            .unwrap()
+            .0;
+        let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+        let context = CryptoReadContext {
+            credentials: CryptoCredentials {
+                message_passwords: std::slice::from_ref(&password),
+                ..CryptoCredentials::default()
+            },
+            crypto_limits: OpenPgpLimits::default(),
+            evidence_limits: EvidenceLimits::default(),
+        };
+        let result = catalog.read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1700000000),
+            &Cancellation::default(),
+            &context,
+        );
+        match expected_kind {
+            None => assert!(matches!(
+                result,
+                Err(ReaderError::Source(SourceError::Changed))
+            )),
+            Some(kind) => match result {
+                Err(ReaderError::Source(SourceError::Io(error))) => {
+                    assert_eq!(error.kind(), kind)
+                }
+                _ => panic!("inexact source body unexpectedly succeeded"),
+            },
+        }
+        assert_eq!(source.opens.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-019
+//= type=test
+//# A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+fn signer_policy_rejects_plain_incremental_after_signed_encrypted_full() {
+    let source = FixtureSource::signed_full_plain_incrementals();
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .unwrap()
+        .0;
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/test-keys");
+    let public = std::fs::read(root.join("public.asc")).unwrap();
+    let secret = std::fs::read(root.join("secret.asc")).unwrap();
+    let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+    let secret_exports = [SecretExport {
+        bytes: &secret,
+        password: Some(&password),
+    }];
+    let signer_exports = [public.as_slice()];
+    let permitted_signers = [[
+        0xd0, 0x68, 0x47, 0xba, 0xc3, 0xb1, 0x17, 0xc4, 0x6b, 0xb6, 0x8b, 0xda, 0x6f, 0x23, 0x17,
+        0x3b, 0xad, 0x8a, 0x76, 0x56,
+    ]];
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &permitted_signers,
+            require_signature: true,
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    let result = catalog.read_snapshot_with_crypto(
+        anchor,
+        Timestamp(1700172800),
+        &Cancellation::default(),
+        &context,
+    );
+    match result {
+        Err(error) => assert!(
+            matches!(
+                error,
+                ReaderError::Crypto(duplicity_core::reader::OpenPgpError::Unsigned)
+            ),
+            "mixed-chain signer policy failed as {error:?}"
+        ),
+        Ok(_) => panic!("mixed-chain signer policy returned a snapshot"),
+    }
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-018
+//= type=test
+//# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+//= docs/parsing-requirements.md#parse-env-022
+//= type=test
+//# Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
+fn crypto_decoded_and_each_receipt_bound_fail_through_catalog_reader() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7");
+    let secret = std::fs::read(root.join("test-keys/secret.asc")).unwrap();
+    let public = std::fs::read(root.join("test-keys/public.asc")).unwrap();
+    let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+    let secret_exports = [SecretExport {
+        bytes: &secret,
+        password: Some(&password),
+    }];
+    let signer_exports = [public.as_slice()];
+    let permitted_signers = [[
+        0xd0, 0x68, 0x47, 0xba, 0xc3, 0xb1, 0x17, 0xc4, 0x6b, 0xb6, 0x8b, 0xda, 0x6f, 0x23, 0x17,
+        0x3b, 0xad, 0x8a, 0x76, 0x56,
+    ]];
+    let cases = [
+        ("symmetric", false, 0, 1_000_000, 64, 16_000_000, "decoded"),
+        ("symmetric", false, usize::MAX, 1, 64, 16_000_000, "objects"),
+        (
+            "signed",
+            true,
+            usize::MAX,
+            1_000_000,
+            0,
+            16_000_000,
+            "versions",
+        ),
+        ("signed", true, usize::MAX, 1_000_000, 64, 0, "comparisons"),
+    ];
+    for (mode, signed, decoded_bytes, max_objects, versions, comparisons, expected) in cases {
+        let source = FixtureSource::new(mode, None);
+        let catalog = Catalog::discover(
+            &source,
+            "backup/",
+            NameConfig::default(),
+            ReaderLimits::default(),
+            &Cancellation::default(),
+        )
+        .unwrap();
+        let anchor = catalog
+            .manifests()
+            .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+            .unwrap()
+            .0;
+        let evidence_limits = EvidenceLimits {
+            max_objects,
+            max_metadata_bytes: usize::MAX,
+            max_certificate_versions: versions,
+            max_comparisons: comparisons,
+        };
+        let context = CryptoReadContext {
+            credentials: if signed {
+                CryptoCredentials {
+                    secret_exports: &secret_exports,
+                    signer_exports: &signer_exports,
+                    permitted_signers: &permitted_signers,
+                    require_signature: true,
+                    ..CryptoCredentials::default()
+                }
+            } else {
+                CryptoCredentials {
+                    message_passwords: std::slice::from_ref(&password),
+                    ..CryptoCredentials::default()
+                }
+            },
+            crypto_limits: OpenPgpLimits {
+                decoded_bytes,
+                ..OpenPgpLimits::default()
+            },
+            evidence_limits,
+        };
+        let result = catalog.read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1700000000),
+            &Cancellation::default(),
+            &context,
+        );
+        match (expected, result) {
+            ("decoded", Err(ReaderError::Crypto(error))) => {
+                assert_eq!(format!("{error:?}"), "Limit(Decoded)")
+            }
+            ("objects" | "versions" | "comparisons", Err(ReaderError::Limit)) => {}
+            (_, Err(error)) => panic!("{expected} bound returned {error:?}"),
+            (_, Ok(_)) => panic!("{expected} bound returned a completed snapshot"),
+        }
+    }
+
+    let source = FixtureSource::new("symmetric", None);
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .unwrap()
+        .0;
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits {
+            max_metadata_bytes: std::mem::size_of::<
+                duplicity_core::reader::AuthenticationPolicySummary,
+            >(),
+            ..EvidenceLimits::default()
+        },
+    };
+    assert!(matches!(
+        catalog.read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1700000000),
+            &Cancellation::default(),
+            &context,
+        ),
+        Err(ReaderError::Limit)
+    ));
 }

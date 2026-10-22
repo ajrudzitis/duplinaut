@@ -180,19 +180,26 @@ control explicit confirmation, staging, cancellation and uncertain publication.
 - [x] Read all three dates of each original symmetric/public-key/signed corpus through
       ObjectSource and compare file contents against independent source SHA256 oracles.
       Path/type/mode/mtime comparisons remain incomplete in this reader integration test.
-- [ ] Test wrong credentials/signers, tampered manifest and volume, source replacement,
-      truncation/excess/EOF, unsupported algorithms, every effective decoded/stored/
-      receipt limit and late incremental failure, yielding no completed snapshot.
+- [ ] Test wrong credentials/signers, tampered manifest, unsupported algorithms, and
+      post-crypto cancellation, yielding no completed snapshot.
+- [x] Exercise source identity change, truncation and excess through the public
+      `Catalog::read_snapshot_with_crypto`/`ObjectSource` path; no snapshot is returned.
 - [x] Prove digest-first behavior by a negative object that would otherwise decrypt;
 - [x] Require signer policy for a plain required object, rejecting downgrade.
-- [x] Test integrity-only versus authorized evidence semantics and evidence object cap.
-      Mixed/unsigned required-object cases and irrelevant catalog artifacts remain pending.
+- [x] Test integrity-only versus authorized evidence semantics, evidence object cap,
+      metadata-byte cap, certificate-version cap and comparison-work cap.
+- [x] Reject a plain incremental manifest after a signed encrypted full set under the
+      same chain-wide signer policy. An unsigned OpenPGP incremental and irrelevant
+      catalog artifacts remain pending.
 - [x] Test encrypted record footer and normalized final/nonfinal status with original
       full/incremental official encrypted volumes; directly reject encrypted queued
-      restart StartingPath compatibility. Top-off mutation remains pending.
-- [ ] Add source identity mutation, excess/truncation, post-crypto cancellation,
-      explicit decoded/stored/metadata evidence limits,
-      and mixed-envelope/signed-policy negative cases.
+      restart StartingPath compatibility.
+- [ ] Mutate a nonfinal encrypted ciphertext top-off while regenerating a matching
+      manifest digest and authenticated envelope. Current public-reader tests cover
+      original official encrypted top-offs; parser-level mutation coverage remains
+      separate and does not establish source-to-reader rejection for this mutation.
+- [ ] Test post-crypto cancellation, wrong reader credentials/signers, and tampered
+      encrypted manifests at the complete reader boundary.
 - [ ] Independently review lifecycle/evidence charging/dedup and run complete gates.
 - [ ] Retain controller refinement, additional cipher/recipient/signing-subkey cases,
       native encrypted multipart producer coverage and broader historical encryption

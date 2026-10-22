@@ -333,6 +333,28 @@ proofs = []
 tests = [{ package = "duplicity-core", name = "flat_regular_listing_and_anchored_repeated_reads" }, { package = "duplicity-core", name = "changes_replacements_and_eof_are_terminal" }, { package = "duplicity-core", name = "cancellation_limits_and_untrusted_descriptors" }, { package = "duplicity-core", name = "original_official_directory_reconstructs_three_dates" }, { package = "duplicity-core", name = "interrupted_post_read_validation_retries_without_losing_bytes" }]
 
 [[milestone]]
+id = "openpgp-reader-edge-tests"
+gate = false
+requirements = ["PARSE-SOURCE-001", "PARSE-ENV-017", "PARSE-ENV-018", "PARSE-ENV-019", "PARSE-ENV-022", "PARSE-ENV-023", "PARSE-ENV-024"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = true
+# Independently reviewed public Catalog/Source edge tests only. Authenticated
+# ciphertext top-off mutation, post-crypto cancellation, and controller refinement
+# remain pending.
+implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_with_crypto" }]
+proofs = []
+tests = [
+  { package = "duplicity-core", name = "crypto_reader_rejects_source_identity_change_and_inexact_manifest_bodies" },
+  { package = "duplicity-core", name = "signer_policy_rejects_plain_incremental_after_signed_encrypted_full" },
+  { package = "duplicity-core", name = "crypto_decoded_and_each_receipt_bound_fail_through_catalog_reader" },
+  { package = "duplicity-core", name = "original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidence" }
+]
+
+[[milestone]]
 id = "linux-restoration"
 gate = false
 requirements = ["RESTORE-001", "RESTORE-002", "RESTORE-003", "RESTORE-004", "RESTORE-005", "RESTORE-006", "RESTORE-007", "RESTORE-008", "RESTORE-009", "RESTORE-010", "RESTORE-011", "RESTORE-012", "RESTORE-013", "RESTORE-014", "RESTORE-015", "RESTORE-016", "RESTORE-017", "RESTORE-018", "RESTORE-019", "RESTORE-020", "RESTORE-021", "RESTORE-022", "RESTORE-023", "RESTORE-024", "RESTORE-025", "RESTORE-026", "RESTORE-027"]
