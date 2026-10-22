@@ -89,6 +89,16 @@ through a private container/assembly routine. No public `push_decoded`, generic
 untrusted decoder trait, `verified: bool` or externally constructed DecodedObject/
 receipt can furnish successful assembly authentication.
 
+The private `OpenPgpAdmission::verify_stored_digest` native wrapper is the only
+Rust-visible producer of `DigestPermit`. Its body invokes
+`verify_stored_digests` and only then calls the Verus cursor transition. This is
+a source-reviewed native boundary: Verus proves the cursor transition contract,
+not the wrapper's factual call order, the SHA1/MD5 implementations or their
+comparison with manifest declarations. An `external_body` bridge was rejected
+because the repository's no-cheating audit intentionally prohibits project
+algorithm external bodies. SHA1 and MD5 remain format-compatibility checks, not
+authenticity claims.
+
 `openpgp::DecodedObject` and its fields are crate-private. Its construction alone
 is still not authority at the pipeline boundary: the private assembler receives it
 only directly from the checked adapter call, never from caller input. Public API

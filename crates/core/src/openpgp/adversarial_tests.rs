@@ -19,7 +19,7 @@ fn literal(bytes: &[u8]) -> Vec<u8> {
     body.extend_from_slice(bytes);
     packet(11, &body)
 }
-fn seal(bytes: &[u8]) -> Vec<u8> {
+pub(crate) fn seal(bytes: &[u8]) -> Vec<u8> {
     let key = [0x42; 32];
     let wrapper = SymKeyEncryptedSessionKey::encrypt_v4(
         &Password::from("test only"),
@@ -43,6 +43,9 @@ fn seal(bytes: &[u8]) -> Vec<u8> {
         packet(18, &encrypted.to_bytes().unwrap()),
     ]
     .concat()
+}
+pub(crate) fn seal_literal(bytes: &[u8]) -> Vec<u8> {
+    seal(&literal(bytes))
 }
 fn recover(
     bytes: &[u8],

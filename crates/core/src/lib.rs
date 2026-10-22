@@ -13,6 +13,9 @@
 //! ```compile_fail,E0603
 //! use duplicity_core::openpgp::DecodedObject;
 //! ```
+//! ```compile_fail,E0603
+//! use duplicity_core::verified::openpgp_admission::DigestPermit;
+//! ```
 pub mod delta;
 pub mod generated;
 pub mod manifest_token;

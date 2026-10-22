@@ -44,6 +44,8 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Prove exact path/error adaptation, optional positive block boundaries and volume record completion diagnostics.
 - [x] Assemble ordinary 3.0.7 plain/gzip multipart operations with verified stored digests, complete containers, explicit bounds and sticky failure.
 - [x] Add a private OpenPGP admission cursor and stage-token gate; prove normalized ordinal/finality, stage transitions and commit advancement; retain factual digest/decrypt/tar call order as trusted wrapper code.
+- [x] Make the private native stored-digest gate the sole Rust-visible producer of `DigestPermit`; source review confirms it calls the stored-byte checker before the proved cursor transition. The wrapper does not formally prove call order or SHA1/MD5 correctness.
+- [x] Exercise a valid authenticated OpenPGP object whose literal fails tar validation; reject it without advancing the admission cursor.
 - [x] Independently test multipart snapshot/delta source oracles and rejection after provisional output.
 - [x] Acquire and review original queued-restart and empty-tail producer fixtures; specify strict compatibility requirements.
 - [x] Implement and independently test source-derived queued-restart raw/gzip boundary compatibility and full-scan selection.
@@ -51,7 +53,7 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Prove complete manifest parser contextual success and error semantics against an independent model.
 - [x] Prove exact digest duplicate/conflict detection; preserve first-conflict rejection and bounded append behavior.
 - [ ] Prove complete multipart controller refinement.
-- [ ] Prove the wrapper’s digest-result-to-permit bridge and add post-crypto-cancel/tar-failure boundary tests.
+- [ ] Add deterministic post-crypto cancellation coverage. Current cancellation tests cover pre-cancellation and cancellation observed by the public reader; no test-only decoder hooks are used to simulate the post-crypto boundary.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 

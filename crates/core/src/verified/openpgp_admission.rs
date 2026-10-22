@@ -1,10 +1,12 @@
 //! Verified state machine used by the private OpenPGP volume admission path.
 //!
 //! Verus proves normalized cursor/finality and stage-token state transitions.
-//! The private native wrapper threads the tokens through digest, decoder, and
-//! tar-success helpers. Verus does not prove those helpers' factual call order
-//! or the digest/crypto/tar implementations themselves.
+//! A source-reviewed native gate calls the stored-byte digest checker before
+//! it can invoke the private Verus digest transition. Verus does not prove the
+//! gate's call order, the SHA1/MD5 implementations, or crypto/tar behavior.
 #![allow(clippy::len_zero)]
+use crate::envelope::{verify_stored_digests, EnvelopeError};
+use crate::manifest::DeclaredDigest;
 use vstd::prelude::*;
 
 verus! {
@@ -14,11 +16,13 @@ pub struct Position {
 }
 
 /// Non-copy stage token created by the wrapper after its stored-byte digest check.
-pub struct DigestPermit {
+pub struct DigestPermit<'a> {
     ordinal: usize,
     final_volume: bool,
+    /// The exact stored object whose declarations were checked.
+    stored: &'a [u8],
 }
-impl DigestPermit {
+impl DigestPermit<'_> {
     pub closed spec fn ordinal_value(&self) -> usize { self.ordinal }
     pub closed spec fn final_value(&self) -> bool { self.final_volume }
 }
@@ -79,7 +83,11 @@ impl OpenPgpAdmission {
         })
     }
 
-    pub fn digest_verified(&mut self, position: Position) -> (result: DigestPermit)
+    fn digest_verified<'a>(
+        &mut self,
+        position: Position,
+        stored: &'a [u8],
+    ) -> (result: DigestPermit<'a>)
         requires old(self).phase_value() == 0,
             old(self).next_value() < old(self).count_value(),
             position.ordinal == old(self).next_value(),
@@ -91,10 +99,10 @@ impl OpenPgpAdmission {
             result.final_value() == position.final_volume,
     {
         self.phase = 1;
-        DigestPermit { ordinal: position.ordinal, final_volume: position.final_volume }
+        DigestPermit { ordinal: position.ordinal, final_volume: position.final_volume, stored }
     }
 
-    pub fn authenticated(&mut self, permit: DigestPermit) -> (result: AuthenticatedPermit)
+    pub fn authenticated(&mut self, permit: DigestPermit<'_>) -> (result: AuthenticatedPermit)
         requires old(self).phase_value() == 1,
             old(self).next_value() < old(self).count_value(),
             permit.ordinal_value() == old(self).next_value(),
@@ -178,4 +186,37 @@ impl OpenPgpAdmission {
         self.next
     }
 }
+}
+
+/// Native, source-reviewed bridge to the formal cursor transition.
+///
+/// This is the only Rust-visible producer of `DigestPermit`. The call to
+/// `verify_stored_digests` and the following transition are deliberately in
+/// one private module boundary. The digest implementation and the factual
+/// call-order relation are trusted native code, not Verus-proved properties.
+impl OpenPgpAdmission {
+    pub(crate) fn verify_stored_digest<'a>(
+        &mut self,
+        position: Position,
+        stored: &'a [u8],
+        declarations: &[DeclaredDigest],
+        stored_limit: usize,
+    ) -> Result<DigestPermit<'a>, EnvelopeError> {
+        verify_stored_digests(stored, declarations, stored_limit)?;
+        Ok(self.digest_verified(position, stored))
+    }
+}
+
+/// Consume the digest capability and decode only its borrowed, checked bytes.
+/// Keeping this at the token's private-field boundary prevents pairing a check
+/// of object A with a decode of object B inside another reader call.
+pub(crate) fn decode_after_digest(
+    admission: &mut OpenPgpAdmission,
+    credentials: crate::openpgp::Credentials<'_>,
+    limits: crate::openpgp::CryptoLimits,
+    digest: DigestPermit<'_>,
+) -> Result<(crate::openpgp::DecodedObject, AuthenticatedPermit), crate::openpgp::CryptoError> {
+    let decoded = crate::openpgp::decode(digest.stored, credentials, limits)?;
+    let authenticated = admission.authenticated(digest);
+    Ok((decoded, authenticated))
 }

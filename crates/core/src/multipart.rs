@@ -277,36 +277,39 @@ impl<'a> MultipartAssembler<'a> {
             self.admission.reject();
             return Err(AssemblyError::Cancelled);
         }
-        if let Err(error) = crate::envelope::verify_stored_digests(
+        let final_volume = position.final_volume;
+        let digest_permit = match self.admission.verify_stored_digest(
+            position,
             stored,
             &record.hashes,
             crypto_limits.stored_bytes,
         ) {
-            self.failed = true;
-            self.admission.reject();
-            return Err(AssemblyError::Envelope(error));
-        }
-        let final_volume = position.final_volume;
-        let digest_permit = self.admission.digest_verified(position);
+            Ok(permit) => permit,
+            Err(error) => {
+                self.failed = true;
+                self.admission.reject();
+                return Err(AssemblyError::Envelope(error));
+            }
+        };
         if cancel.is_cancelled() {
             self.failed = true;
             self.admission.reject();
             return Err(AssemblyError::Cancelled);
         }
-        let (decoded, authenticated_permit) = match openpgp::decode_after_digest(
-            stored,
-            credentials,
-            crypto_limits,
-            &mut self.admission,
-            digest_permit,
-        ) {
-            Ok(decoded) => decoded,
-            Err(error) => {
-                self.failed = true;
-                self.admission.reject();
-                return Err(AssemblyError::Crypto(error));
-            }
-        };
+        let (decoded, authenticated_permit) =
+            match crate::verified::openpgp_admission::decode_after_digest(
+                &mut self.admission,
+                credentials,
+                crypto_limits,
+                digest_permit,
+            ) {
+                Ok(decoded) => decoded,
+                Err(error) => {
+                    self.failed = true;
+                    self.admission.reject();
+                    return Err(AssemblyError::Crypto(error));
+                }
+            };
         if cancel.is_cancelled() {
             self.failed = true;
             self.admission.reject();
