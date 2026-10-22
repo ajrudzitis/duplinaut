@@ -10,7 +10,8 @@ fn help_describes_capabilities_without_requiring_a_terminal() {
     let text = String::from_utf8(output.stdout).unwrap();
     assert!(text.contains("local DIRECTORY"));
     assert!(text.contains("s3 BUCKET"));
-    assert!(text.contains("restoration are under construction"));
+    assert!(text.contains("type restore, then Enter"));
+    assert!(text.contains("p remains read-only"));
 }
 
 #[test]

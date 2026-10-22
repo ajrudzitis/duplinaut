@@ -1,56 +1,42 @@
 use duplicity_core::source::{Cancellation, ObjectSource};
-use duplicity_s3::{S3Config, S3Source};
-use std::{io::IsTerminal, sync::Arc};
-
+use duplicity_s3::S3Source;
+use std::{
+    io::{self, IsTerminal, Write},
+    sync::Arc,
+};
 fn main() {
     if let Err(error) = run() {
-        eprintln!("duplicity-tui: {error}");
+        let safe = duplicity_tui::display::bytes(error.to_string().as_bytes());
+        let _ = writeln!(io::stderr(), "duplicity-tui: {safe}");
         std::process::exit(2);
     }
 }
 fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.is_empty() || args == ["--help"] {
-        println!("Usage: duplicity-tui local DIRECTORY\n       duplicity-tui s3 BUCKET [PREFIX] [--region REGION] [--profile PROFILE] [--endpoint URL] [--path-style]\n\nPlain/gzip history and snapshot browsing. OpenPGP and filesystem restoration are under construction.");
+    let Some(config) =
+        duplicity_tui::cli::parse(std::env::args_os().skip(1)).map_err(io::Error::other)?
+    else {
+        writeln!(io::stdout(), "{}", duplicity_tui::cli::HELP)?;
         return Ok(());
-    }
-    if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
+    };
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
         return Err("interactive browsing requires a terminal".into());
     }
     let cancel = Cancellation::default();
-    let (source, prefix): (Arc<dyn ObjectSource>, String) = match args[0].as_str() {
+    let (source, prefix): (Arc<dyn ObjectSource>, String) = match config.source {
         #[cfg(unix)]
-        "local" if args.len() == 2 => (
-            Arc::new(duplicity_core::local::LocalSource::new(&args[1])?),
+        duplicity_tui::cli::Source::Local(path) => (
+            Arc::new(duplicity_core::local::LocalSource::new(path)?),
             String::new(),
         ),
-        "s3" if args.len() >= 2 => {
-            let mut config = S3Config::new(&args[1]);
-            let mut index = 2;
-            if args.get(index).is_some_and(|arg| !arg.starts_with("--")) {
-                config.prefix = args[index].clone();
-                index += 1;
-            }
-            while let Some(option) = args.get(index) {
-                if option == "--path-style" {
-                    config.force_path_style = true;
-                    index += 1;
-                    continue;
-                }
-                let value = args.get(index + 1).ok_or("missing S3 option value")?;
-                match option.as_str() {
-                    "--region" => config.region = Some(value.clone()),
-                    "--profile" => config.profile = Some(value.clone()),
-                    "--endpoint" => config.endpoint = Some(value.clone()),
-                    _ => return Err("unknown S3 option".into()),
-                }
-                index += 2;
-            }
+        #[cfg(not(unix))]
+        duplicity_tui::cli::Source::Local(_) => {
+            return Err("local source unsupported on this OS".into())
+        }
+        duplicity_tui::cli::Source::S3(config) => {
             let prefix = config.prefix.clone();
             (Arc::new(S3Source::connect(config, &cancel)?), prefix)
         }
-        _ => return Err("invalid arguments; use --help".into()),
     };
-    duplicity_tui::browser::run(source, prefix, cancel)?;
+    duplicity_tui::browser::run_configured(source, prefix, cancel, config.destination)?;
     Ok(())
 }

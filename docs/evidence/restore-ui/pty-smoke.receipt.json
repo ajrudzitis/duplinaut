@@ -1,0 +1,15 @@
+{
+  "exit_code": 0,
+  "destination_bytes_hex": "646573742dff",
+  "read_only_preview_no_write": true,
+  "pending_input_no_write": true,
+  "empty_enter_no_write": true,
+  "observed_acknowledgment_publication": true,
+  "terminal_modes_restored": true,
+  "transcript_bytes": 15215,
+  "limitations": [
+    "PTY smoke only, not comprehensive terminal IO fault proof",
+    "frontend worker native tests cover three-date source oracles",
+    "kernel IO can block without fixed cancellation latency"
+  ]
+}

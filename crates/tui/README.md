@@ -1,7 +1,7 @@
 # duplicity-tui
 
 Read-only terminal history and snapshot browser for local directories and S3.
-Filesystem restoration and OpenPGP support are still being built.
+Native Linux restoration is implemented as a software checkpoint with independent frontend acceptance pending. OpenPGP remains unsupported.
 
 ```sh
 cargo run -p duplicity-tui -- local /path/to/backup
@@ -20,7 +20,7 @@ subtrees and their required source ancestors; with no marks it previews the
 whole snapshot. Previewing writes no files. Selections are limited to 1024 roots,
 4 MiB of cloned path metadata and 16 million path comparisons. Planning runs
 synchronously, so a large preview can delay terminal input; cancellation and
-publication remain separate work.
+executable r preview and publication run on the lifecycle worker.
 
 The reader runs on a worker thread and keeps the original catalog identities
 across scans. Cancellation is cooperative; bounded synchronous parsing and
@@ -45,14 +45,29 @@ anchor choice.
 
 | Component | Specification review | Implementation | Proof | Integration tests | Independent acceptance |
 | --- | --- | --- | --- | --- | --- |
-| Browser and restore flow | Browse requirements written; restore interaction pending | Read-only browsing works; restore pending | Component proofs remain separate; display/I/O trusted | Escaping/CLI tests and manual official-chain PTY smoke pass | Pending |
+| Browser and restore flow | Browse requirements written; restore interaction adopted before implementation | Read-only browsing and native Linux restore work; acceptance pending | Component proofs remain separate; display/I/O trusted | Escaping/CLI tests and manual official-chain PTY smoke pass | Pending |
 
 - [x] Create the executable crate with no unsupported feature claims.
 - [x] Escape terminal controls, non-ASCII bytes and literal escapes while retaining original path identity; native tests pass.
 - [x] Implement metadata history, explicit anchors/dates, volume-scan disclosure and byte-preserving snapshot navigation.
 - [x] Implement byte-preserving selection and bounded restore previews; independently review the read-only flow.
-- [ ] Connect selection to native filesystem publication and implement private credential entry.
+- [x] Connect explicitly acknowledged selection to native Linux publication; use the existing SDK credential provider.
 - [ ] Test display escaping, errors and interaction flows.
 - [ ] Automate terminal interaction, cancellation, resize and S3 frontend tests.
 
 See [requirements](../../docs/parsing-requirements.md) and the [machine ledger](../../docs/assurance.toml).
+
+Native Linux restoration now has an isolated working software checkpoint. Start
+with paired `--restore-parent PARENT --restore-name LEAF`; `r` freezes a preview,
+then type `restore` and press Enter. `p` remains read-only. Active q/Esc cancels
+and waits for a typed outcome; q again after completion exits. No overwrite or
+bucket-write path is exposed. Success or uncertainty disables further restores.
+
+- [x] Implement paired raw-OS destination flags and frozen worker previews.
+- [x] Connect one acknowledged immutable request to the reviewed native backend.
+- [x] Add CLI/lifecycle/outcome and original three-date worker restoration tests.
+- [x] Record a real PTY smoke with raw-byte destination and terminal mode restoration.
+- [ ] Complete independent frontend software acceptance and formal controller proofs.
+- [ ] Add comprehensive terminal-loop fault injection, resize/cancel and live S3 tests.
+
+See [implementation evidence and bounds](../../docs/restore-interaction-implementation.md).
