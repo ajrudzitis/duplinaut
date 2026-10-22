@@ -102,7 +102,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Independently review and adopt Linux staging/publication requirements before implementation, including indeterminate syscall outcomes.
 - [x] Implement and independently review native Linux restoration; pass official three-date and fault-injection tests, enforce Duvet requirement coverage.
 - [x] Implement and independently review the private bounded OpenPGP adapter against all 27 official crypto objects and nine independent content oracles; document its trusted boundary.
-- [x] Compose OpenPGP with reader identity, ciphertext digest checks, global signature policy, encrypted tar parsing and whole-chain evidence; official three-profile/three-date tests and independent pipeline review pass. Formal reader-controller/resource proofs, remaining edge-case matrices and broader historical algorithm support remain open.
+- [ ] Compose OpenPGP with reader identity, ciphertext digest checks, global signature policy, encrypted tar parsing and whole-chain evidence; implementation and official three-profile/three-date tests are complete. Independent pipeline review, formal reader-controller/resource proofs, remaining edge-case matrices and broader historical algorithm support remain open.
 - [ ] Validate S3 with a live service and complete-reader consistency integration.
 - [ ] Complete the browsing/restoration TUI.
 - [ ] Automate full terminal event-loop resize, cancellation and output-fault coverage; finish frontend controller proofs and encrypted credential flow.
