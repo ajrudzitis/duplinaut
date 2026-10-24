@@ -126,7 +126,7 @@ Duvet, Clippy, builds, workspace tests, integrations, and doctests passed. The
 broader reader controller and complete resource-accounting obligations remain
 open.
 
-## Ordered volume-scan cursor proof candidate
+## Ordered volume-scan cursor proof
 
 `start_volume_scan_cursor` binds the reservation's planned position count to the
 checked product of normalized-volume and catalog-object counts. At the start of
@@ -141,5 +141,9 @@ covers preserved successful scan behavior and the exact/short work budget.
 The proof covers the cursor transition and the production gates only. It does
 not prove Rust iterator semantics, that the native identity predicate is
 correct, cancellation timing, the entire reader controller, or global resource
-accounting. The `reader-volume-scan-cursor` milestone remains unproved and
-pending independent review.
+accounting. The `reader-volume-scan-cursor` milestone remains unproved. The
+candidate `f1b7244` was independently accepted, and exact-source `cargo xtask
+ci` passed with source SHA-256
+`e32ccd5939de104017c8fdfb7a83f9cf597166868b0d5d725000bb625a776c35`. Verus,
+Duvet, Clippy, builds, workspace tests, integrations, and doctests passed. Rust
+iterator semantics and the broader reader controller remain open.

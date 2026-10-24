@@ -94,7 +94,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Integrate metadata-only discovery and bounded plain/gzip chain reconstruction against original official objects.
 - [x] Independently review repository orchestration; test late incremental failures and cancellation.
 - [x] Test exact reader object-comparison, decoded-manifest and normalization-metadata budget boundaries.
-- [ ] Prove repository orchestration controller contracts and complete resource accounting. Scoped per-object comparison charging, unique required-volume candidate transitions, and cumulative volume-scan work reservation are independently accepted; enumeration refinement, cancellation, and complete resource accounting remain open.
+- [ ] Prove repository orchestration controller contracts and complete resource accounting. Scoped per-object comparison charging, unique candidate accumulation, cumulative work reservation, and ordered scan-cursor completion are independently accepted; iterator semantics, cancellation, and complete resource accounting remain open.
 - [x] Implement a local read-only source with anchored identity checks; test actual files and official three-date reconstruction.
 - [x] Build read-only terminal history and snapshot browsing; exercise an official chain in a real terminal.
 - [x] Add bounded restore previews, frozen confirmation and worker-owned publication; independently review the terminal lifecycle, run 22 tests and verify a real PTY restore.
