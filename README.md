@@ -37,7 +37,7 @@
 
 The [parsing requirements](docs/parsing-requirements.md) were written in RFC 2119/8174 language and independently reviewed **before implementation**. Public documentation leads format research; immutable official-source references and producer evidence resolve ambiguities.
 
-After GitHub Pages is configured to use Actions, successful pushes to `main` publish the rendered Duvet requirements report. [View the latest Duvet report](https://ajrudzitis.github.io/duplinaut/) or open the latest **Publish Duvet report** deployment from the [assurance workflow](.github/workflows/assurance.yml). Pull requests keep the report as a downloadable workflow artifact without publishing a site.
+Successful pushes to `main` publish the rendered Duvet requirements report. [View the latest Duvet report](https://aleksrudzitis.com/duplinaut/) or open the latest **Publish Duvet report** deployment from the [assurance workflow](.github/workflows/assurance.yml). Pull requests keep the report as a downloadable workflow artifact without publishing a site.
 
 ## Built around evidence
 
@@ -110,6 +110,6 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [ ] Complete the browsing/restoration TUI.
 - [ ] Automate full terminal event-loop resize, cancellation and output-fault coverage; finish frontend controller proofs and encrypted credential flow.
 - [ ] Pass the supported official-producer compatibility matrix.
-- [x] **Create GitHub Actions for builds and formal methods:** install pinned tools, check generated parsers, run Verus, enforce Duvet coverage/snapshot gates, and run native/official-fixture tests on pull requests and pushes; retain reports and verification evidence as artifacts. The first hosted assurance gate passed; Pages publishing needs GitHub Pages enabled in repository settings. See [workflow validation](docs/github-actions.md).
+- [x] **Create GitHub Actions for builds and formal methods:** install pinned tools, check generated parsers, run Verus, enforce Duvet coverage/snapshot gates, and run native/official-fixture tests on pull requests and pushes; retain reports and verification evidence as artifacts. The first hosted assurance gate passed; GitHub Pages is enabled and the first successful publication is pending. See [workflow validation](docs/github-actions.md).
 - [x] Publish the Duvet HTML report from successful `main` runs through GitHub Pages, with its live URL in the deployment summary.
 - [ ] Publish the exact supported capabilities, verification claims, and trusted boundaries.

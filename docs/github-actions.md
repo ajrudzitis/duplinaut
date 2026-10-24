@@ -58,8 +58,9 @@ in their provenance. Uploading diagnostic artifacts uses GitHub's job-scoped
 artifact service, not a repository write token. A separate Pages job publishes
 only the generated Duvet report after successful pushes to `main`; it has the
 `pages: write` and `id-token: write` permissions required for OIDC deployment.
-Pull requests do not publish a Pages site. Configure the repository's Pages
-deployment source as **GitHub Actions** once before the first hosted deployment.
+Pull requests do not publish a Pages site. The repository's Pages deployment
+source is configured as **GitHub Actions**; its first successful publication is
+pending.
 
 Both actions use complete immutable commit identities, resolved against their
 official release tags on 2026-10-11:
@@ -105,16 +106,17 @@ record. No concurrency rule cancels an older run automatically.
 - [x] Independent workflow and artifact-scope review.
 - [x] Publish the Duvet HTML report to GitHub Pages after successful `main` CI runs and show the site URL in the Actions summary.
 - [x] First GitHub-hosted bootstrap and complete assurance run passed on `3f48aef` (run [39728994859](https://github.com/ajrudzitis/duplinaut/actions/runs/39728994859)); the assurance job passed and uploaded the Duvet report.
-- [ ] Enable GitHub Pages for the repository and confirm a successful hosted deployment.
+- [x] Enable GitHub Pages for the repository with Actions as the deployment source.
+- [ ] Confirm the first successful hosted Pages deployment.
 
 Local actionlint validation used the official Linux amd64 archive with SHA-256
 `8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8`, matching
 the upstream checksum manifest. ShellCheck was unavailable for that validation;
 `bash -n` checks shell syntax, not shell behavior. The first hosted assurance job
 passed its complete build/formal/test gate and retained reports. Its separate
-Pages deploy job returned 404 because GitHub Pages is not yet enabled for this
-repository; enable Pages with **GitHub Actions** as the deployment source to
-activate the README link. Any formal-gate failure, including proof resource
+Pages deploy job returned 404 because Pages had not yet been enabled. Pages is
+now enabled with **GitHub Actions** as the source; a successful deployment
+remains to be confirmed. Any formal-gate failure, including proof resource
 exhaustion, deliberately remains a failed workflow rather than a reason to
 bypass verification.
 
