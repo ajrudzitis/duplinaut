@@ -46,6 +46,60 @@ pub struct ObjectName {
     pub short: bool,
 }
 
+/// Gregorian days between 1901-01-01 and January 1 of `year`.
+///
+/// This is the bounded calendar arithmetic kernel used by the native long-name
+/// timestamp parser. The parser still owns and validates the date fields.
+pub open spec fn days_before_year_model(year: int) -> int
+    recommends year >= 1901,
+    decreases year - 1901,
+{
+    if year <= 1901 {
+        0
+    } else {
+        days_before_year_model(year - 1)
+            + if year_is_leap(year - 1) { 366int } else { 365int }
+    }
+}
+
+pub open spec fn year_is_leap(year: int) -> bool {
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
+pub proof fn days_before_year_step(year: int)
+    requires 1901 <= year < 2100,
+    ensures days_before_year_model(year + 1)
+        == days_before_year_model(year) + if year_is_leap(year) { 366int } else { 365int },
+{
+    reveal(days_before_year_model);
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+pub fn days_before_year(year: u16) -> (result: i64)
+    requires 1901 <= year <= 2100,
+    ensures result as int == days_before_year_model(year as int),
+{
+    let mut current = 1901u16;
+    let mut days = 0i64;
+    while current < year
+        invariant 1901 <= current <= year <= 2100,
+            days as int == days_before_year_model(current as int),
+            0 <= days <= (current as i64 - 1901) * 366,
+        decreases year - current,
+    {
+        proof { days_before_year_step(current as int); }
+        days += if current % 4 == 0 && (current % 100 != 0 || current % 400 == 0) {
+            366
+        } else {
+            365
+        };
+        current += 1;
+    }
+    days
+}
+
 impl ObjectName {
     /// A partial artifact cannot supply completed-set evidence.
     pub fn completed(self) -> (result: bool)
@@ -195,15 +249,7 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
         }
         _ => return Err(NameError::Malformed),
     };
-    // Bounded calendar loop is intentionally transparent for the future proof.
-    let mut days = 0i64;
-    for previous in 1901..y {
-        days += if previous % 4 == 0 && (previous % 100 != 0 || previous % 400 == 0) {
-            366
-        } else {
-            365
-        };
-    }
+    let mut days = days_before_year(y as u16);
     for previous in 1..m {
         days += match previous {
             2 if leap => 29,
