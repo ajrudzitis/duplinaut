@@ -22,6 +22,7 @@ use crate::source::{
     Cancellation, CheckedReader, ObjectSource, SourceError, SourceLimits, StoredObject,
 };
 use crate::state::{SnapshotState, StateError, StateLimits};
+use crate::verified::reader_accounting::charge_object_check;
 pub use pgp::types::Password as OpenPgpPassword;
 use std::io::Read;
 
@@ -799,9 +800,7 @@ impl<'a> Catalog<'a> {
                     if cancel.is_cancelled() {
                         return Err(ReaderError::Source(SourceError::Cancelled));
                     }
-                    checks = checks
-                        .checked_add(1)
-                        .filter(|n| *n <= self.limits.max_object_checks)
+                    checks = charge_object_check(checks, self.limits.max_object_checks)
                         .ok_or(ReaderError::Limit)?;
                     if object.name.is_some_and(|volume| {
                         volume.completed()

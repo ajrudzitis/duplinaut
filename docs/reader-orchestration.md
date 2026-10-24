@@ -60,3 +60,20 @@ source and reconstruct full plus two incrementals. They also test corruption,
 missing/ambiguous/duplicate objects, nested collections, changed identities,
 cancellation, short/excess bodies, diagnostics, unsupported crypto and limits.
 No external backup application or external write occurs at reader runtime.
+
+## Bounded-controller proof checkpoint (candidate; review pending)
+
+`verified::reader_accounting::charge_object_check` is the scalar transition used
+by the required-volume matcher before it inspects each catalog object. Verus
+proves that a successful transition increases the charged count by exactly one
+without exceeding the configured maximum, and that exhaustion returns no next
+count. The repository loop propagates exhaustion as `ReaderError::Limit`; the
+existing integration tests exercise the exact object-check boundary.
+
+This checkpoint is linked to [PARSE-GEN-003](parsing-requirements.md#parse-gen-003),
+[PARSE-GEN-005](parsing-requirements.md#parse-gen-005), and
+[PARSE-CHAIN-002](parsing-requirements.md#parse-chain-002). It proves one
+per-object budget transition only. It does not prove the enclosing nested scan,
+volume identity predicate, cancellation timing, global resource accounting,
+allocator behavior, or complete repository reader. Independent review and the
+full acceptance gate remain pending; the README milestone stays unchecked.

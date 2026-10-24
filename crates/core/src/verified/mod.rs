@@ -12,3 +12,4 @@ pub(crate) mod tar_pax;
 pub(crate) mod tar_time;
 
 pub(crate) mod openpgp_admission;
+pub(crate) mod reader_accounting;
