@@ -143,3 +143,13 @@ errors; Duvet, formatting, strict checks, all workspace tests and doctests passe
 The before-create-hook test exercises cleanup after the conservative journal
 state is set but before the creation syscall. It does not prove cleanup syscall
 safety or the complete controller.
+
+The publication cleanup-authority decision was independently accepted at
+`7debf1f` (tree `c57a2ffaa69760b3796eb3dce4df7919a4e3d64b`) and passed
+exact-source full `cargo xtask ci` with SHA-256
+`bf311f34179c7c864273d6787c9ca37db2280e715a7f63859e46dbdeabed9d65`.
+Verus reported 2,047 vstd, 3,183 Vest and 1,024 core obligations with zero
+errors; Duvet queries/trace, formatting, strict checks, tests and doctests passed.
+The contract limits post-attempt cleanup authority to removing an empty wrapper
+after reported success; it does not prove the rename's kernel effects or earlier
+controller ordering.

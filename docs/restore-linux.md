@@ -216,7 +216,7 @@ safety, staging ownership or the full Linux controller. This scoped proof and
 behavior test were independently accepted; the Linux restoration milestone
 remains unproved.
 
-## Publication cleanup-authority proof candidate
+## Publication cleanup-authority proof
 
 `decide_publication_cleanup` is a Verus-verified decision helper called for
 the publication attempt result (the before-hook, rename syscall, and
@@ -230,5 +230,5 @@ published receipt. The production tests exercise attempted-publication errors,
 racing cancellation, and wrapper cleanup failure. This proves only the pure
 post-attempt decision and its integration at this branch; it does not prove
 the rename syscall's effects, complete controller ordering, or general
-filesystem cleanup safety. This candidate is pending independent review; the
+filesystem cleanup safety. This scoped proof was independently accepted; the
 Linux restoration milestone remains unproved.
