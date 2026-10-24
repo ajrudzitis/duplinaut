@@ -478,18 +478,9 @@ pub(crate) fn subtract_charges(
                 || capacity < remove_capacity,
         },
 {
-    let next_payload = match payload.checked_sub(remove_payload) {
-        Some(next) => next,
-        None => return None,
-    };
-    let next_metadata = match metadata.checked_sub(remove_metadata) {
-        Some(next) => next,
-        None => return None,
-    };
-    let next_capacity = match capacity.checked_sub(remove_capacity) {
-        Some(next) => next,
-        None => return None,
-    };
+    let next_payload = payload.checked_sub(remove_payload)?;
+    let next_metadata = metadata.checked_sub(remove_metadata)?;
+    let next_capacity = capacity.checked_sub(remove_capacity)?;
     Some((next_payload, next_metadata, next_capacity))
 }
 
