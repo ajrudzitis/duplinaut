@@ -48,7 +48,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The reader MUST decode unencrypted raw objects and gzip-enveloped objects according to their classified envelope.
 
   SECTION: [PARSE-ENV-002](#parse-env-002)
-    TEXT[!MUST]: The reader MUST support symmetric and public-key OpenPGP objects within the explicitly documented crypto capability profile.
+    TEXT[!MUST,test]: The reader MUST support symmetric and public-key OpenPGP objects within the explicitly documented crypto capability profile.
 
   SECTION: [PARSE-ENV-003](#parse-env-003)
     TEXT[!MUST]: The reader MUST finish the supported OpenPGP message integrity checks before accepting an object for successful restoration.

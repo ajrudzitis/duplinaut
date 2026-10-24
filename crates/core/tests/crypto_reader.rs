@@ -471,6 +471,88 @@ fn public_crypto_reader_rejects_wrong_symmetric_credentials_without_snapshot_or_
 }
 
 #[test]
+//= docs/parsing-requirements.md#parse-env-002
+//= type=test
+//# The reader MUST support symmetric and public-key OpenPGP objects within the explicitly documented crypto capability profile.
+//= docs/parsing-requirements.md#parse-env-018
+//= type=test
+//# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+fn public_crypto_reader_rejects_unsupported_pkesk_algorithm_without_snapshot() {
+    let manifest_name = "duplicity-full.20231114T221320Z.manifest.gpg";
+    // The official public-key fixture begins with one v3 PKESK packet. Change
+    // only its public-key algorithm octet, retaining packet framing, object
+    // length, filename and catalog identity. The adapter must reject this
+    // unsupported profile before trying credentials or parsing a manifest.
+    let mut source = FixtureSource::new("public-key", None);
+    let (_, bytes) = source
+        .values
+        .iter_mut()
+        .find(|(object, _)| object.key.ends_with(manifest_name))
+        .expect("official public-key full manifest fixture");
+    assert_eq!(bytes.first(), Some(&0x84), "fixture uses old-format tag 1");
+    let body_len = bytes.get(1).copied().expect("PKESK length byte") as usize;
+    assert!(
+        body_len >= 10 && bytes.len() > 11,
+        "complete v3 PKESK fixture"
+    );
+    assert_eq!(bytes[2], 3, "fixture uses PKESK version 3");
+    assert!(matches!(bytes[11], 1 | 2 | 18), "known supported baseline");
+    bytes[11] = 99;
+    let (object, bytes) = source
+        .values
+        .iter_mut()
+        .find(|(object, _)| object.key.ends_with(manifest_name))
+        .expect("same manifest identity");
+    object.identity.etag = Some(format!("{:x}", Sha256::digest(bytes)));
+
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .expect("same-size algorithm mutation preserves catalog structure");
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .expect("full manifest remains discoverable")
+        .0;
+    let secret = std::fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/duplicity-3.0.7/test-keys/secret.asc"),
+    )
+    .unwrap();
+    let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+    let secret_exports = [SecretExport {
+        bytes: &secret,
+        password: Some(&password),
+    }];
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            secret_exports: &secret_exports,
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    assert!(matches!(
+        catalog.read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1700000000),
+            &Cancellation::default(),
+            &context,
+        ),
+        Err(ReaderError::Crypto(
+            duplicity_core::reader::OpenPgpError::Unsupported
+        ))
+    ));
+}
+
+#[test]
 //= docs/parsing-requirements.md#parse-env-018
 //= type=test
 //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
