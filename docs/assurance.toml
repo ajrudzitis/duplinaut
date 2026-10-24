@@ -118,9 +118,8 @@ proved = false
 tested = true
 reviewed = true
 proof_required = true
-# Native parser source review is complete; the exact days-before-year calendar
-# kernel is a bounded Verus checkpoint. Full name grammar/controller refinement
-# and independent review remain pending.
+# Native parser review is complete; exact days-before-year calendar refinement
+# is independently accepted. Full name grammar/controller refinement remains pending.
 implementations = [{ path = "crates/core/src/names.rs", symbol = "parse_name" }, { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }, { path = "crates/core/src/names.rs", symbol = "days_before_year" }]
 proofs = [{ id = "name-days-before-year", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "days_before_year", kind = "contract" }]
 tests = [{ package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" }, { package = "duplicity-core", name = "exact_names_suffixes_prefixes_and_limits" }, { package = "duplicity-core", name = "base36_overflow_and_increment_order" }, { package = "duplicity-core", name = "every_official_archive_basename_is_classified" }, { package = "duplicity-core", name = "every_supported_calendar_day_is_contiguous" }, { package = "duplicity-core", name = "truncated_and_byte_invalid_framing_is_rejected" }]
