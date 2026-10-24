@@ -211,7 +211,8 @@ control explicit confirmation, staging, cancellation and uncertain publication.
       digests, and require `Termination` rejection without admission advancement.
       This exercises authenticated encrypted termination and top-off comparison;
       it does not exercise re-encrypting the manifest or the public catalog/source
-      path. Independent review and the full assurance gate remain pending.
+      path. Independent review accepted the test and the exact-source full
+      assurance gate passed.
 - [x] Exercise cancellation after stored-digest verification and after successful
       native OpenPGP decoding through the actual private multipart wrapper. A
       test-only, thread-local checkpoint requests cancellation and is absent from
