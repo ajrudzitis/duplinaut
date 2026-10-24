@@ -104,17 +104,19 @@ record. No concurrency rule cancels an older run automatically.
 - [x] Validate each embedded Bash script with `bash -n`.
 - [x] Independent workflow and artifact-scope review.
 - [x] Publish the Duvet HTML report to GitHub Pages after successful `main` CI runs and show the site URL in the Actions summary.
-- [ ] First GitHub-hosted bootstrap and complete assurance run.
+- [x] First GitHub-hosted bootstrap and complete assurance run passed on `3f48aef` (run [39728994859](https://github.com/ajrudzitis/duplinaut/actions/runs/39728994859)); the assurance job passed and uploaded the Duvet report.
+- [ ] Enable GitHub Pages for the repository and confirm a successful hosted deployment.
 
 Local actionlint validation used the official Linux amd64 archive with SHA-256
 `8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8`, matching
 the upstream checksum manifest. ShellCheck was unavailable for that validation;
-`bash -n` checks shell syntax, not shell behavior. The local workflow validation
-is not a remote Actions run or a successful full formal build. No workflow was
-pushed or dispatched during preparation. Remote execution remains pending until
-the workflow is adopted and GitHub runs it; no authentication was requested just
-to create or review these local files. Any formal-gate failure, including proof resource exhaustion, deliberately remains
-a failed workflow rather than a reason to bypass verification.
+`bash -n` checks shell syntax, not shell behavior. The first hosted assurance job
+passed its complete build/formal/test gate and retained reports. Its separate
+Pages deploy job returned 404 because GitHub Pages is not yet enabled for this
+repository; enable Pages with **GitHub Actions** as the deployment source to
+activate the README link. Any formal-gate failure, including proof resource
+exhaustion, deliberately remains a failed workflow rather than a reason to
+bypass verification.
 
 To reproduce workflow linting with an available actionlint installation:
 
