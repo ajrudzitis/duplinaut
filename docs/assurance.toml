@@ -386,9 +386,10 @@ specified = true
 implemented = true
 proved = false
 tested = true
-# Prior scoped checkpoints are independently accepted; the streaming summary
-# candidate is pending review, and broader controller/syscall refinement remains open.
-reviewed = false
+# Streaming summary and prior scoped checkpoints are independently accepted;
+# traversal/fact provenance, parent-FD mapping, and broader controller/syscall
+# refinement remain open.
+reviewed = true
 proof_required = true
 # Native acceptance only; exact controller/kernel refinement remains pending.
 implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "advance_restore_preflight_summary" }]

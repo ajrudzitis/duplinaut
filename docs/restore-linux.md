@@ -247,7 +247,7 @@ behavior, or the complete restore preflight/controller. This scoped proof was
 independently accepted; the overall Linux restoration milestone remains
 unproved.
 
-## Streaming preflight summary proof candidate
+## Streaming preflight summary proof
 
 `advance_restore_preflight_summary` is called during `prepare`'s existing
 validation traversal. Each successful transition atomically updates component
@@ -260,7 +260,7 @@ The proof covers one transition over caller-supplied current-entry facts; it
 does not prove that the traversal visits every plan entry exactly once or that
 the entry type/length facts are correctly derived. Those fact-provenance and
 whole-loop obligations remain open, as does the overall Linux restoration
-milestone.
+milestone. This scoped proof was independently accepted.
 
 ## Cleanup-schedule reservation proof
 

@@ -183,3 +183,13 @@ errors; Duvet, formatting, strict checks and workspace tests passed. The proof
 checks the NUL-terminated name charge and both counters atomically before the
 corresponding `CString` allocations; it does not establish complete allocator
 or resource accounting.
+
+The streaming restore preflight-summary transition was independently accepted
+at `602bd99` (tree `215572446a06a0aead8b6183c9997d6d41629e38`) and passed
+exact-source full `cargo xtask ci` with SHA-256
+`db9de6810e209ace4d417f20d6d7961562760c83225db9a138b719440457b12e`.
+Verus reported 2,047 vstd, 3,183 Vest and 1,036 core obligations with zero
+errors; Duvet, strict checks and all workspace tests passed. The transition
+atomically updates paired name/metadata, payload, directory and regular-file
+summary values from supplied entry facts. It does not prove the traversal's
+coverage/order or the derivation of those facts from the underlying state.
