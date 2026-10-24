@@ -173,3 +173,13 @@ errors; Duvet, strict checks and all workspace tests passed, including the
 inherited-ACL integration test with the required host filesystem support. The
 proof bounds cleanup-call allowance by the pre-reserved `2*C` budget; syscall
 effects and the full cleanup controller remain outside its claim.
+
+The paired name/metadata charge transition was independently accepted at
+`e132e24` (tree `8b9e659c96732712fbcea19448474f800250f1fa`) and passed exact-source
+full `cargo xtask ci` with SHA-256
+`9a8b403be5d0e517ffb6e4464658cd30b97ef53e5b5a7270089a467f28a01ceb`.
+Verus reported 2,047 vstd, 3,183 Vest and 1,033 core obligations with zero
+errors; Duvet, formatting, strict checks and workspace tests passed. The proof
+checks the NUL-terminated name charge and both counters atomically before the
+corresponding `CString` allocations; it does not establish complete allocator
+or resource accounting.
