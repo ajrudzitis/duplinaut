@@ -215,3 +215,20 @@ transitions and their production call order. It does not prove cleanup syscall
 safety, staging ownership or the full Linux controller. This scoped proof and
 behavior test were independently accepted; the Linux restoration milestone
 remains unproved.
+
+## Publication cleanup-authority proof candidate
+
+`decide_publication_cleanup` is a Verus-verified decision helper called for
+the publication attempt result (the before-hook, rename syscall, and
+after-hook result combined by the controller). It classifies an error as
+`Indeterminate`, granting no modifying cleanup, and a successful rename as
+`Published`. The only cleanup capability after success is removal of the
+now-empty wrapper; the published root is never authorized for cleanup. A
+cancellation request racing with successful rename does not change the
+published decision, and wrapper-removal errors remain warnings on the
+published receipt. The production tests exercise attempted-publication errors,
+racing cancellation, and wrapper cleanup failure. This proves only the pure
+post-attempt decision and its integration at this branch; it does not prove
+the rename syscall's effects, complete controller ordering, or general
+filesystem cleanup safety. This candidate is pending independent review; the
+Linux restoration milestone remains unproved.

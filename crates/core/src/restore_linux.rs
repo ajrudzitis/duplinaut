@@ -6,6 +6,9 @@ use crate::{
     source::Cancellation,
     state::SnapshotEntry,
     tar::{EntryType, TarTime},
+    verified::restore_publication::{
+        decide_publication_cleanup, PublicationCleanup, PublicationDecision,
+    },
 };
 use rustix::{
     fd::{AsFd, BorrowedFd, OwnedFd},
@@ -1057,9 +1060,13 @@ fn restore_with<H: Hooks>(
             }
         })
         .and_then(|()| w.hooks.after(Op::Publish));
-    match renamed {
-        Err(error) => RestoreOutcome::PublicationIndeterminate(Indeterminate { error, receipt }),
-        Ok(()) => {
+    let decision =
+        decide_publication_cleanup(renamed.is_ok(), cancel.is_cancelled(), wrapper.is_some());
+    match (renamed, decision) {
+        (Err(error), _) => {
+            RestoreOutcome::PublicationIndeterminate(Indeterminate { error, receipt })
+        }
+        (Ok(()), PublicationDecision::Published(PublicationCleanup::EmptyWrapper)) => {
             if wrapper.is_some() {
                 let mut left = 1;
                 cleanup_call(
@@ -1072,6 +1079,8 @@ fn restore_with<H: Hooks>(
             }
             RestoreOutcome::Published(receipt)
         }
+        (Ok(()), PublicationDecision::Published(PublicationCleanup::None))
+        | (Ok(()), PublicationDecision::Indeterminate) => RestoreOutcome::Published(receipt),
     }
 }
 

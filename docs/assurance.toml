@@ -387,15 +387,16 @@ implemented = true
 proved = false
 tested = true
 # Journal transitions/cleanup behavior, scalar forward-work decrement, and bounded
-# regular-file write-offset refinements are independently accepted;
-# filesystem-controller/syscall refinement remains open.
-reviewed = true
+# regular-file write-offset refinements are independently accepted. The publication
+# cleanup-authority proof candidate is pending review.
+reviewed = false
 proof_required = true
 # Native acceptance only; exact controller/kernel refinement remains pending.
-implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }]
+implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }]
 proofs = [
   { id = "linux-write-offset", requirement = "RESTORE-014", path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset", kind = "contract" },
-  { id = "linux-forward-work", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work", kind = "contract" }
+  { id = "linux-forward-work", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work", kind = "contract" },
+  { id = "linux-publication-cleanup-authority", requirement = "RESTORE-026", path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup", kind = "contract" }
 ]
 tests = [
   { package = "duplicity-core", name = "restore_linux::tests::before_create_hook_failure_cleans_possibly_created_entry" },
