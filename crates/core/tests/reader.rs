@@ -472,6 +472,9 @@ fn discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation() {
 }
 
 #[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
 fn reader_budget_edges_accept_exact_and_reject_one_less() {
     let source = Source::official();
     let full_manifest = source

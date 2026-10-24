@@ -12,7 +12,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: A parser MUST terminate without panicking on every finite input within its configured resource limits.
 
   SECTION: [PARSE-GEN-005](#parse-gen-005)
-    TEXT[!MUST,implementation]: The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    TEXT[!MUST,implementation,test]: The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
 
   SECTION: [PARSE-GEN-006](#parse-gen-006)
     TEXT[!MUST]: The core reader MUST perform its runtime operations without invoking duplicity, GnuPG, or librsync command-line tools.
