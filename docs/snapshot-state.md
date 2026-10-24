@@ -119,11 +119,16 @@ allowance applies to nonempty output.
 
 The complete local `cargo xtask ci` gate passed after this scalar proof was adopted at commit `474ffd4`, source SHA-256 `4b7b0f11d3fda0f7494c3a269bd57963ccfc07e399e19b5817918dd4c07ac4a0`. Fresh full-workspace verification checked 998 core obligations with zero errors; all existing generation, traceability, lint and test gates passed. The accepted milestone remains tooling-only, and full state/controller proofs remain pending.
 
-The component-prefix predicate has a separate scoped verification candidate in
+The component-prefix predicate has a separate scoped accepted verification in
 `BackupPath::is_component_prefix_of`. Its model equates a prefix with a shorter
 or equal component sequence whose corresponding elements are all equal. The
 production subtree-removal loop uses this helper instead of `Vec::starts_with`,
 and a Duvet-linked test checks root, equality, descendants and a near-prefix
 sibling such as `a` versus `a-`. This proves path-prefix classification only;
 it does not prove BTreeMap range ordering, iteration, removal, or complete state
-transitions. The candidate remains pending independent review.
+transitions. Candidate `e5b602b` passed exact-source full `cargo xtask ci` with
+source SHA-256 `3253d014838986e755bac17497a742f6cc99c393d81f5348ce80a430144c1ea0`.
+Duvet matched 138 requirements and 517 references; Verus/Vest reported 2,047
+vstd, 3,183 Vest and 1,019 core obligations with zero errors; formatting, strict
+Clippy, all workspace tests and doctests passed. Complete state/controller
+refinement remains pending.

@@ -274,9 +274,9 @@ specified = true
 implemented = true
 proved = false
 tested = true
-# The new component-prefix proof is a scoped candidate pending independent review;
+# Scoped counter and component-prefix proofs are independently accepted;
 # formal state/resource refinement remains pending.
-reviewed = false
+reviewed = true
 proof_required = true
 # Native controller tests pass; formal state/resource refinement pending.
 implementations = [{ path = "crates/core/src/state.rs", symbol = "apply" }, { path = "crates/core/src/state.rs", symbol = "subtract_charges" }, { path = "crates/core/src/path.rs", symbol = "is_component_prefix_of" }]
