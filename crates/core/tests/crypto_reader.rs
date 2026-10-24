@@ -474,6 +474,79 @@ fn public_crypto_reader_rejects_wrong_symmetric_credentials_without_snapshot_or_
 //= docs/parsing-requirements.md#parse-env-018
 //= type=test
 //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+//= docs/parsing-requirements.md#parse-env-019
+//= type=test
+//# A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
+//= docs/parsing-requirements.md#parse-env-021
+//= type=test
+//# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+fn public_crypto_reader_rejects_valid_signature_from_disallowed_primary_signer() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7");
+    let source = FixtureSource::new("signed", None);
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .unwrap()
+        .0;
+
+    // Supply the actual fixture recipient secret and its password, plus the
+    // correct signer certificate. Only the authorization allowlist is wrong.
+    let secret = std::fs::read(root.join("test-keys/secret.asc")).unwrap();
+    let signer = std::fs::read(root.join("test-keys/public.asc")).unwrap();
+    let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+    let secret_exports = [SecretExport {
+        bytes: &secret,
+        password: Some(&password),
+    }];
+    let signer_exports = [signer.as_slice()];
+    let disallowed_signer = [[0x55; 20]];
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &disallowed_signer,
+            require_signature: true,
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+
+    let error = match catalog.read_snapshot_with_crypto(
+        anchor,
+        Timestamp(1700000000),
+        &Cancellation::default(),
+        &context,
+    ) {
+        Ok(_) => panic!("reader accepted a valid signature from a disallowed signer"),
+        Err(ReaderError::Crypto(error)) => error,
+        Err(error) => panic!("wrong signer returned an unexpected error: {error:?}"),
+    };
+    assert_eq!(
+        error,
+        duplicity_core::reader::OpenPgpError::SignerNotAllowed
+    );
+    assert!(!format!("{error:?}").contains("duplicity-reader-public-test-fixture"));
+    assert!(!error
+        .to_string()
+        .contains("duplicity-reader-public-test-fixture"));
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-018
+//= type=test
+//# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
 //= docs/parsing-requirements.md#parse-env-024
 //= type=test
 //# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.

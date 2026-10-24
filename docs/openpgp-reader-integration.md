@@ -197,8 +197,14 @@ control explicit confirmation, staging, cancellation and uncertain publication.
       digest or malformed listing can mask native MDC rejection. Credentials are
       borrowed and the wrong test secret is absent from the formatted error.
       Independent review and the exact-source full assurance gate passed.
-- [ ] Test wrong signer authorization, unsupported algorithms, and additional
-      reader-boundary crypto cases, yielding no completed snapshot.
+- [ ] Test unsupported algorithms and additional reader-boundary crypto cases,
+      yielding no completed snapshot.
+- [x] On the public `Catalog::read_snapshot_with_crypto` boundary, use the official
+      signed 3.0.7 chain with its correct recipient secret, password and signer
+      certificate but an unrelated permitted primary fingerprint. The reader
+      returns native `SignerNotAllowed` (not a credential or MDC error), no
+      snapshot, and no secret in diagnostics. Independent review and full CI are
+      pending.
 - [x] Exercise source identity change, truncation and excess through the public
       `Catalog::read_snapshot_with_crypto`/`ObjectSource` path; no snapshot is returned.
 - [x] Prove digest-first behavior by a negative object that would otherwise decrypt;
