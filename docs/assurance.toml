@@ -386,9 +386,9 @@ specified = true
 implemented = true
 proved = false
 tested = true
-# Forward-work decrement refinement is a scoped candidate pending independent review;
-# the filesystem controller and syscall boundary remain unproved.
-reviewed = false
+# Scalar forward-work decrement and bounded regular-file write-offset refinements
+# are independently accepted; filesystem-controller/syscall refinement remains open.
+reviewed = true
 proof_required = true
 # Native acceptance only; exact controller/kernel refinement remains pending.
 implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }]

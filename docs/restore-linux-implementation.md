@@ -122,3 +122,13 @@ workspace tests and doctests passed. The verified transition accepts only positi
 write counts bounded by the current slice end and returns the checked next offset;
 syscall behavior, chunk selection, retry budgets and the broader filesystem
 controller remain outside this proof.
+
+The scalar forward-work decrement was independently accepted at `3ec75fd`
+(tree `02b4e1a189a553df340c8fe7d8c4347308dc1f22`) and passed exact-source full
+`cargo xtask ci` with SHA-256
+`3739d0e5722074b3439eb1d0213bcffde7f938dcd3caafa16a4ec3370bb14d46`.
+Verus reported 2,047 vstd, 3,183 Vest and 1,021 core obligations with zero errors;
+Duvet matched 138 requirements and 522 references. Formatting, strict Clippy,
+workspace tests and doctests passed. The helper proves one-unit decrement for
+positive work and exhaustion at zero; complete call-site accounting, syscall
+duration, cancellation races and cleanup remain outside its claim.
