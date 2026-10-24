@@ -433,6 +433,121 @@ fn official_symmetric_volume() -> (Manifest, Vec<u8>, Password) {
     (manifest, stored_volume, password)
 }
 
+fn encrypt_test_seipdv1(plaintext: &[u8], password: &Password) -> Vec<u8> {
+    use pgp::{
+        composed::MessageBuilder,
+        crypto::{hash::HashAlgorithm, sym::SymmetricKeyAlgorithm},
+        types::StringToKey,
+    };
+    use rand::{rngs::StdRng, SeedableRng};
+
+    let mut rng = StdRng::seed_from_u64(0x6475_706c_696e_6175);
+    let mut message = MessageBuilder::from_bytes("", plaintext.to_vec())
+        .seipd_v1(&mut rng, SymmetricKeyAlgorithm::AES256);
+    message
+        .encrypt_with_password(
+            StringToKey::new_iterated(&mut rng, HashAlgorithm::Sha256, 0),
+            password,
+        )
+        .unwrap();
+    message.to_vec(&mut rng).unwrap()
+}
+
+fn replace_declared_digests(record: &mut crate::manifest::VolumeRecord, stored: &[u8]) {
+    use crate::manifest::DigestAlgorithm;
+    use sha1::Digest as _;
+
+    for digest in &mut record.hashes {
+        let bytes = match digest.algorithm {
+            DigestAlgorithm::Sha1 => sha1::Sha1::digest(stored).to_vec(),
+            DigestAlgorithm::Md5 => md5::Md5::digest(stored).to_vec(),
+            DigestAlgorithm::Unsupported => continue,
+        };
+        digest.hex = bytes
+            .iter()
+            .flat_map(|byte| {
+                [
+                    b"0123456789abcdef"[(byte >> 4) as usize],
+                    b"0123456789abcdef"[(byte & 15) as usize],
+                ]
+            })
+            .collect();
+    }
+}
+
+//= docs/parsing-requirements.md#parse-env-017
+//= type=test
+//# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+//= docs/parsing-requirements.md#parse-env-020
+//= type=test
+//# Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
+//= docs/parsing-requirements.md#parse-tar-005
+//= type=test
+//# The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.
+#[test]
+fn authenticated_nonfinal_topoff_must_match_regenerated_ciphertext_prefix() {
+    let (mut manifest, official_ciphertext, password) = official_symmetric_volume();
+    let decoded = crate::openpgp::decode(
+        &official_ciphertext,
+        Credentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..Credentials::default()
+        },
+        CryptoLimits::default(),
+    )
+    .unwrap();
+    // Reuse actual official tar records, then place a deliberate nonfinal
+    // top-off after the official encrypted zero footer. The changed bytes are
+    // encrypted below, so the native adapter must authenticate them normally.
+    let mut plaintext = decoded.bytes;
+    let topoff = b"not-the-ciphertext-prefix";
+    plaintext.extend_from_slice(topoff);
+    let ciphertext = encrypt_test_seipdv1(&plaintext, &password);
+    assert_ne!(&ciphertext[..topoff.len()], topoff);
+    let round_trip = crate::openpgp::decode(
+        &ciphertext,
+        Credentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..Credentials::default()
+        },
+        CryptoLimits::default(),
+    )
+    .expect("mutated test object must have valid SEIPDv1 integrity");
+    assert_eq!(round_trip.bytes, plaintext);
+
+    // The official full manifest has one final volume. Add a following
+    // normalized record so this same tar object is admitted at a nonfinal
+    // ordinal, and regenerate every supported digest from its exact ciphertext.
+    let mut first = manifest.records[0].clone();
+    replace_declared_digests(&mut first, &ciphertext);
+    let mut second = manifest.records[0].clone();
+    second.number = 2;
+    manifest.records[0] = first;
+    manifest.records.push(second);
+
+    let mut assembler = MultipartAssembler::new(&manifest, AssemblyLimits::default()).unwrap();
+    let result = assembler.push_openpgp_volume(
+        1,
+        &ciphertext,
+        Credentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..Credentials::default()
+        },
+        CryptoLimits::default(),
+        &crate::source::Cancellation::default(),
+    );
+    assert!(
+        matches!(
+            result,
+            Err(AssemblyError::Tar(crate::tar::TarError::Termination))
+        ),
+        "expected authenticated ciphertext top-off mismatch, got {:?}",
+        result.as_ref().err()
+    );
+    assert_eq!(assembler.admission.ordinal(), 0);
+    assert!(assembler.failed);
+}
+
 //= docs/parsing-requirements.md#parse-env-017
 //= type=test
 //# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.

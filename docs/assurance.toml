@@ -357,15 +357,15 @@ proved = false
 tested = true
 reviewed = true
 proof_required = true
-# Independently reviewed public Catalog/Source edge tests only. Authenticated
-# ciphertext top-off mutation, post-crypto cancellation, and controller refinement
-# remain pending.
+# Public Catalog/Source edge tests and the new private multipart authenticated
+# top-off rejection test; independent review/full gate for the latter are pending.
 implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_with_crypto" }]
 proofs = []
 tests = [
   { package = "duplicity-core", name = "crypto_reader_rejects_source_identity_change_and_inexact_manifest_bodies" },
   { package = "duplicity-core", name = "signer_policy_rejects_plain_incremental_after_signed_encrypted_full" },
   { package = "duplicity-core", name = "crypto_decoded_and_each_receipt_bound_fail_through_catalog_reader" },
+  { package = "duplicity-core", name = "multipart::openpgp_tests::authenticated_nonfinal_topoff_must_match_regenerated_ciphertext_prefix" },
   { package = "duplicity-core", name = "original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidence" }
 ]
 

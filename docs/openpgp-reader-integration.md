@@ -204,10 +204,14 @@ control explicit confirmation, staging, cancellation and uncertain publication.
 - [x] Test encrypted record footer and normalized final/nonfinal status with original
       full/incremental official encrypted volumes; directly reject encrypted queued
       restart StartingPath compatibility.
-- [ ] Mutate a nonfinal encrypted ciphertext top-off while regenerating a matching
-      manifest digest and authenticated envelope. Current public-reader tests cover
-      original official encrypted top-offs; parser-level mutation coverage remains
-      separate and does not establish source-to-reader rejection for this mutation.
+- [x] At the private multipart boundary, start from an official encrypted full-volume
+      tar stream, append a deliberately incorrect nonfinal top-off, encrypt it as a
+      fresh SEIPDv1 object, verify native decryption/MDC and decoded-byte equality,
+      regenerate the in-memory manifest record's supported stored-ciphertext
+      digests, and require `Termination` rejection without admission advancement.
+      This exercises authenticated encrypted termination and top-off comparison;
+      it does not exercise re-encrypting the manifest or the public catalog/source
+      path. Independent review and the full assurance gate remain pending.
 - [x] Exercise cancellation after stored-digest verification and after successful
       native OpenPGP decoding through the actual private multipart wrapper. A
       test-only, thread-local checkpoint requests cancellation and is absent from
