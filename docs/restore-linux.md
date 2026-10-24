@@ -231,6 +231,21 @@ prove that the input counts completely account for every allocation or syscall,
 nor the filesystem controller. This scoped proof was independently accepted;
 the Linux restoration milestone remains unproved.
 
+## Paired name and metadata charge proof candidate
+
+`charge_name_metadata` takes the current name-byte and owned-metadata totals,
+the raw component or target length, and both independent limits. It checks the
+NUL-terminator increment and both counter increments, returning the exact
+paired next totals only when both limits fit. A failed charge returns `None`
+without publishing either updated total. `prepare` uses the returned pair for
+each leaf component and symlink target before constructing the corresponding
+`CString`. The focused test covers exact bounds, each limit one byte short,
+and overflow in the terminator or either accumulated total. This checkpoint
+proves the paired charge decision and its pre-allocation call ordering; it does
+not prove that every allocation is included in these totals, allocator
+behavior, or the complete restore preflight/controller. The overall Linux
+restoration milestone remains unproved pending independent review.
+
 ## Cleanup-schedule reservation proof
 
 `cleanup_schedule_bound` models cleanup calls selected by the current prepared

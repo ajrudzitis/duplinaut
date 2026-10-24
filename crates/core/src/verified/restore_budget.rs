@@ -93,6 +93,61 @@ pub(crate) fn restore_preflight(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NameMetadataCharge {
+    pub name_bytes: usize,
+    pub metadata_bytes: usize,
+}
+
+pub open spec fn name_metadata_charge_model(
+    names: usize,
+    metadata: usize,
+    byte_len: usize,
+    name_limit: usize,
+    metadata_limit: usize,
+) -> Option<NameMetadataCharge> {
+    let amount = byte_len as int + 1;
+    let names_after = names as int + amount;
+    let metadata_after = metadata as int + amount;
+    if amount <= usize::MAX as int
+        && names_after <= usize::MAX as int
+        && metadata_after <= usize::MAX as int
+        && names_after <= name_limit as int
+        && metadata_after <= metadata_limit as int
+    {
+        Some(NameMetadataCharge {
+            name_bytes: names_after as usize,
+            metadata_bytes: metadata_after as usize,
+        })
+    } else {
+        None
+    }
+}
+
+//= docs/parsing-requirements.md#restore-012
+//= type=implementation
+//# The backend MUST enforce independent checked budgets for created entries, retained directory FDs, owned metadata, path/name/target bytes, total regular payload bytes, forward work, staging-name attempts, and cleanup work before the associated allocation or syscall.
+pub(crate) fn charge_name_metadata(
+    names: usize,
+    metadata: usize,
+    byte_len: usize,
+    name_limit: usize,
+    metadata_limit: usize,
+) -> (result: Option<NameMetadataCharge>)
+    ensures result == name_metadata_charge_model(names, metadata, byte_len, name_limit, metadata_limit),
+{
+    let amount = byte_len.checked_add(1)?;
+    let names_after = names.checked_add(amount)?;
+    let metadata_after = metadata.checked_add(amount)?;
+    if names_after > name_limit || metadata_after > metadata_limit {
+        return None;
+    }
+    Some(NameMetadataCharge {
+        name_bytes: names_after,
+        metadata_bytes: metadata_after,
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CleanupSchedule {
     pub created_entries: usize,
     pub reserved_work: usize,

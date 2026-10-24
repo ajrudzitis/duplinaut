@@ -391,14 +391,15 @@ tested = true
 reviewed = true
 proof_required = true
 # Native acceptance only; exact controller/kernel refinement remains pending.
-implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound" }]
+implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata" }]
 proofs = [
   { id = "linux-write-offset", requirement = "RESTORE-014", path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset", kind = "contract" },
   { id = "linux-forward-work", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work", kind = "contract" },
   { id = "linux-publication-cleanup-authority", requirement = "RESTORE-026", path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup", kind = "contract" },
   { id = "linux-multidimensional-preflight", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight", kind = "contract" },
   { id = "linux-cleanup-reservation-bound", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound", kind = "contract" },
-  { id = "linux-cleanup-journal-schedule", requirement = "RESTORE-022", path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound", kind = "contract" }
+  { id = "linux-cleanup-journal-schedule", requirement = "RESTORE-022", path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound", kind = "contract" },
+  { id = "linux-name-metadata-charge", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata", kind = "contract" }
 ]
 tests = [
   { package = "duplicity-core", name = "restore_linux::tests::before_create_hook_failure_cleans_possibly_created_entry" },
@@ -408,6 +409,7 @@ tests = [
   { package = "duplicity-core", name = "restore_linux::tests::short_interrupted_zero_writes_and_forward_faults_keep_cleanup_reserved" },
   { package = "duplicity-core", name = "restore_linux::tests::write_offset_transition_rejects_zero_and_out_of_range_progress" },
   { package = "duplicity-core", name = "restore_linux::tests::forward_work_transition_decrements_once_or_fails_closed" },
+  { package = "duplicity-core", name = "restore_linux::tests::name_metadata_charge_checks_both_limits_and_overflow_atomically" },
   { package = "duplicity-core", name = "restore_linux::tests::root_profiles_restrictive_descendants_and_preflight_mode_checks" },
   { package = "duplicity-core", name = "restore_linux::tests::inherited_acl_is_removed_before_widened_final_permissions" },
   { package = "duplicity-core", name = "restore_linux::tests::fractional_negative_time_is_exact_or_fails_before_publication" },

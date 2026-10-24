@@ -8,8 +8,8 @@ use crate::{
     tar::{EntryType, TarTime},
     verified::{
         restore_budget::{
-            cleanup_schedule_bound, restore_preflight, CleanupSchedule, RestorePreflightLimits,
-            RestorePreflightNeed,
+            charge_name_metadata, cleanup_schedule_bound, restore_preflight, CleanupSchedule,
+            RestorePreflightLimits, RestorePreflightNeed,
         },
         restore_publication::{
             decide_publication_cleanup, PublicationCleanup, PublicationDecision,
@@ -339,8 +339,16 @@ fn prepare<'a>(
         }
         let parts = entry.path().components();
         if let Some(name) = parts.last() {
-            checked_add(&mut names, name.len() + 1, limits.name_bytes)?;
-            checked_add(&mut metadata, name.len() + 1, limits.metadata_bytes)?;
+            let charge = charge_name_metadata(
+                names,
+                metadata,
+                name.len(),
+                limits.name_bytes,
+                limits.metadata_bytes,
+            )
+            .ok_or(Cause::Limit)?;
+            names = charge.name_bytes;
+            metadata = charge.metadata_bytes;
         }
         match entry.entry().entry_type() {
             EntryType::Directory => {}
@@ -358,8 +366,16 @@ fn prepare<'a>(
                 {
                     return Err(Cause::InvalidPlan);
                 }
-                checked_add(&mut names, target.len() + 1, limits.name_bytes)?;
-                checked_add(&mut metadata, target.len() + 1, limits.metadata_bytes)?;
+                let charge = charge_name_metadata(
+                    names,
+                    metadata,
+                    target.len(),
+                    limits.name_bytes,
+                    limits.metadata_bytes,
+                )
+                .ok_or(Cause::Limit)?;
+                names = charge.name_bytes;
+                metadata = charge.metadata_bytes;
             }
             _ => return Err(Cause::InvalidPlan),
         }
@@ -1119,6 +1135,36 @@ mod tests {
         sync::atomic::{AtomicU64, Ordering},
     };
     static NEXT: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-012
+    //= type=test
+    //# The backend MUST enforce independent checked budgets for created entries, retained directory FDs, owned metadata, path/name/target bytes, total regular payload bytes, forward work, staging-name attempts, and cleanup work before the associated allocation or syscall.
+    fn name_metadata_charge_checks_both_limits_and_overflow_atomically() {
+        use crate::verified::restore_budget::charge_name_metadata;
+
+        assert_eq!(
+            charge_name_metadata(4, 7, 2, 7, 10),
+            Some(crate::verified::restore_budget::NameMetadataCharge {
+                name_bytes: 7,
+                metadata_bytes: 10,
+            })
+        );
+        assert_eq!(charge_name_metadata(4, 7, 2, 6, 10), None);
+        assert_eq!(charge_name_metadata(4, 7, 2, 7, 9), None);
+        assert_eq!(
+            charge_name_metadata(usize::MAX, 0, 0, usize::MAX, usize::MAX),
+            None
+        );
+        assert_eq!(
+            charge_name_metadata(0, 0, usize::MAX, usize::MAX, usize::MAX),
+            None
+        );
+        assert_eq!(
+            charge_name_metadata(0, usize::MAX, 0, usize::MAX, usize::MAX),
+            None
+        );
+    }
 
     #[test]
     //= docs/parsing-requirements.md#restore-012
