@@ -18,6 +18,13 @@ pub open spec fn components_less(left: Seq<Seq<u8>>, right: Seq<Seq<u8>>) -> boo
         && left.take(i) == right.take(i) && bytes_less(left[i], right[i])
 }
 
+/// True when `prefix` is the same component sequence as `path` or an ancestor.
+/// Component equality preserves boundaries: `a` is not a prefix of `a-`.
+pub open spec fn component_prefix(prefix: Seq<Seq<u8>>, path: Seq<Seq<u8>>) -> bool {
+    prefix.len() <= path.len()
+        && forall|i: int| 0 <= i < prefix.len() ==> prefix[i] == path[i]
+}
+
 pub open spec fn valid_component(component: Seq<u8>) -> bool {
     component.len() > 0 && component != seq![46u8] && component != seq![46u8, 46u8]
         && forall|i: int| 0 <= i < component.len() ==> component[i] != 0 && component[i] != 47
@@ -207,6 +214,57 @@ impl BackupPath {
     pub fn components(&self) -> (result: &Vec<Vec<u8>>)
         ensures result@.map_values(|component: Vec<u8>| component@) == self@,
     { &self.components }
+
+    /// Component-wise ancestor test, including equality and the empty root.
+    //= docs/parsing-requirements.md#parse-state-001
+    //= type=implementation
+    //# Snapshot interpretation MUST apply additions, replacement content, deltas, deletions, and file-type changes in chain order to the selected backup-relative path state.
+    pub fn is_component_prefix_of(&self, path: &Self) -> (result: bool)
+        ensures result == component_prefix(self@, path@),
+    {
+        reveal(BackupPath::view);
+        let mut index = 0;
+        while index < self.components.len() && index < path.components.len()
+            invariant
+                index <= self.components.len(),
+                index <= path.components.len(),
+                forall|i: int| 0 <= i < index ==> self@[i] == path@[i],
+            decreases self.components.len() - index,
+        {
+            if self.components[index] != path.components[index] {
+                proof {
+                    reveal(component_prefix);
+                    reveal(BackupPath::view);
+                    assert(self@[index as int] == self.components[index as int]@);
+                    assert(path@[index as int] == path.components[index as int]@);
+                    assert(self@[index as int] != path@[index as int]);
+                    if self@.len() <= path@.len() {
+                        assert(!(forall|i: int| 0 <= i < self@.len()
+                            ==> self@[i] == path@[i]));
+                    }
+                }
+                return false;
+            }
+            index += 1;
+        }
+        let result = index == self.components.len();
+        proof {
+            reveal(component_prefix);
+            reveal(BackupPath::view);
+            if result {
+                assert(index == self@.len());
+                assert(index <= path@.len());
+                assert forall|i: int| 0 <= i < self@.len()
+                    implies self@[i] == path@[i] by {
+                    assert(i < index);
+                }
+            } else {
+                assert(index == path@.len());
+                assert(path@.len() < self@.len());
+            }
+        }
+        result
+    }
 
     /// Compare byte-component sequences, independently of terminal rendering.
     /// Returns -1, 0, or 1. This kernel supplies manifest range comparisons.

@@ -393,9 +393,7 @@ impl SnapshotState {
                 .range((Bound::Included(path), Bound::Unbounded))
                 .next()
             {
-                Some((candidate, _)) if candidate.components().starts_with(path.components()) => {
-                    candidate.clone()
-                }
+                Some((candidate, _)) if path.is_component_prefix_of(candidate) => candidate.clone(),
                 _ => break,
             };
             let entry = self.entries.remove(&key).ok_or(StateError::Ancestor)?;

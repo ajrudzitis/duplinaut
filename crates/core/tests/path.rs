@@ -90,3 +90,21 @@ fn comparison_covers_component_and_byte_prefix_boundaries() {
         }
     }
 }
+
+//= docs/parsing-requirements.md#parse-state-001
+//= type=test
+//# Snapshot interpretation MUST apply additions, replacement content, deltas, deletions, and file-type changes in chain order to the selected backup-relative path state.
+#[test]
+fn component_prefix_covers_root_equality_descendants_and_sibling_boundaries() {
+    let root = parse(b".").unwrap();
+    let a = parse(b"a").unwrap();
+    let child = parse(b"a/child").unwrap();
+    let sibling = parse(b"a-").unwrap();
+
+    assert!(root.is_component_prefix_of(&root));
+    assert!(root.is_component_prefix_of(&a));
+    assert!(a.is_component_prefix_of(&a));
+    assert!(a.is_component_prefix_of(&child));
+    assert!(!a.is_component_prefix_of(&sibling));
+    assert!(!child.is_component_prefix_of(&a));
+}

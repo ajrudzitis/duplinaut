@@ -274,20 +274,21 @@ specified = true
 implemented = true
 proved = false
 tested = true
-# Native review and the scoped componentwise charge-subtraction proof are accepted;
+# The new component-prefix proof is a scoped candidate pending independent review;
 # formal state/resource refinement remains pending.
-reviewed = true
+reviewed = false
 proof_required = true
 # Native controller tests pass; formal state/resource refinement pending.
-implementations = [{ path = "crates/core/src/state.rs", symbol = "apply" }, { path = "crates/core/src/state.rs", symbol = "subtract_charges" }]
+implementations = [{ path = "crates/core/src/state.rs", symbol = "apply" }, { path = "crates/core/src/state.rs", symbol = "subtract_charges" }, { path = "crates/core/src/path.rs", symbol = "is_component_prefix_of" }]
 # Checked scalar acceptance only; does not prove counter/container invariants.
 proofs = [
   { id = "state-budget-arithmetic", requirement = "PARSE-GEN-003", path = "crates/core/src/state.rs", symbol = "check_counts", kind = "contract" },
   { id = "state-budget-limits", requirement = "PARSE-GEN-005", path = "crates/core/src/state.rs", symbol = "check_counts", kind = "contract" },
   { id = "state-file-allowance", requirement = "PARSE-GEN-005", path = "crates/core/src/state.rs", symbol = "allowed_file_bytes", kind = "contract" },
-  { id = "state-charge-subtraction", requirement = "PARSE-GEN-005", path = "crates/core/src/state.rs", symbol = "subtract_charges", kind = "contract" }
+  { id = "state-charge-subtraction", requirement = "PARSE-GEN-005", path = "crates/core/src/state.rs", symbol = "subtract_charges", kind = "contract" },
+  { id = "state-component-prefix", requirement = "PARSE-STATE-001", path = "crates/core/src/path.rs", symbol = "is_component_prefix_of", kind = "contract" }
 ]
-tests = [{ package = "duplicity-core", name = "immutable_preceding_set_basis_and_transactional_failure" }, { package = "duplicity-core", name = "directory_preservation_type_replacement_deletion_and_recreation" }, { package = "duplicity-core", name = "missing_ancestors_root_types_empty_state_and_unsupported_metadata" }, { package = "duplicity-core", name = "resulting_and_live_limits_prevent_partial_state_success" }, { package = "duplicity-core", name = "official_three_snapshot_dates_match_contents_types_and_metadata" }, { package = "duplicity-core", name = "exact_payload_entry_and_live_limits_accept_without_spare_budget" }, { package = "duplicity-core", name = "exact_metadata_and_live_metadata_limits_include_transition_scratch" }, { package = "duplicity-core", name = "deleted_bases_remain_available_from_preceding_set" }, { package = "duplicity-core", name = "subtree_removal_preserves_near_prefixes_and_final_errors_are_atomic" }, { package = "duplicity-core", name = "componentwise_subtraction_rejects_each_underflow" }]
+tests = [{ package = "duplicity-core", name = "immutable_preceding_set_basis_and_transactional_failure" }, { package = "duplicity-core", name = "directory_preservation_type_replacement_deletion_and_recreation" }, { package = "duplicity-core", name = "missing_ancestors_root_types_empty_state_and_unsupported_metadata" }, { package = "duplicity-core", name = "resulting_and_live_limits_prevent_partial_state_success" }, { package = "duplicity-core", name = "official_three_snapshot_dates_match_contents_types_and_metadata" }, { package = "duplicity-core", name = "exact_payload_entry_and_live_limits_accept_without_spare_budget" }, { package = "duplicity-core", name = "exact_metadata_and_live_metadata_limits_include_transition_scratch" }, { package = "duplicity-core", name = "deleted_bases_remain_available_from_preceding_set" }, { package = "duplicity-core", name = "subtree_removal_preserves_near_prefixes_and_final_errors_are_atomic" }, { package = "duplicity-core", name = "componentwise_subtraction_rejects_each_underflow" }, { package = "duplicity-core", name = "component_prefix_covers_root_equality_descendants_and_sibling_boundaries" }]
 
 [[milestone]]
 id = "chain-planning"
