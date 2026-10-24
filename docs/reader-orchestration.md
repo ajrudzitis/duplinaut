@@ -148,7 +148,7 @@ ci` passed with source SHA-256
 Duvet, Clippy, builds, workspace tests, integrations, and doctests passed. Rust
 iterator semantics and the broader reader controller remain open.
 
-## Catalog discovery metadata charge proof candidate
+## Catalog discovery metadata charge proof
 
 `Catalog::discover` now calls a verified initialization transition after the
 source listing is returned and before allocating the sorted order or catalog
@@ -165,8 +165,14 @@ Direct tests cover exact-limit acceptance, one-byte-short rejection,
 multiplication/addition overflow, and object-charge atomicity. A reader test
 exercises rejection before catalog construction. The Duvet links map these
 proofs and tests to [PARSE-GEN-005](parsing-requirements.md#parse-gen-005).
-This candidate remains pending independent review and does not complete the
-reader assurance milestone.
+This proof was independently accepted after correcting its wording to describe
+requested slots rather than physical capacity. It does not complete the reader
+assurance milestone. Exact-source `cargo xtask ci` passed with source SHA-256
+`4a113cd0adc1257dc99065bfb0d73a4980cca82a24d5d28d70118ad9cd560dfd`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,053 core obligations with zero errors;
+Duvet, formatting, strict Clippy, workspace tests, integrations, and doctests
+passed. The broader reader resource-accounting and allocator guarantees remain
+open.
 
 The proof is limited to the checked charge transitions and their production
 call order. It excludes allocation internals of `source.list`, actual allocator

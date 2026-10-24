@@ -411,11 +411,10 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate pending independent review. The proof covers checked charge
-# transitions and their production call order, not source.list internals,
-# allocator behavior, string-capacity provenance, or total heap accounting.
+# Independently accepted scoped charge transitions; source.list internals,
+# allocator behavior, capacity provenance and total heap accounting remain excluded.
 implementations = [
   { path = "crates/core/src/reader.rs", symbol = "discover" },
   { path = "crates/core/src/verified/catalog_accounting.rs", symbol = "initialize_catalog_metadata" },
