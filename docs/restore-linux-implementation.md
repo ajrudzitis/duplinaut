@@ -104,10 +104,21 @@ Pinned safe wrappers are rustix 1.1.5 fs/process/time and
 [getrandom 0.3.4 fill](https://docs.rs/getrandom/0.3.4/getrandom/fn.fill.html).
 The native tests do not establish behavior on untested Btrfs/XFS/tmpfs, hostile
 same-UID/privileged writers or compromised kernels/filesystems. Required future
-proofs include budget-before-action, exact parent mapping, journal coverage, write
-offsets and publication/cancellation/uncertainty transitions. No such complete
-proof is claimed by implementation annotations or passing native tests.
+proofs include budget-before-action, exact parent mapping, journal coverage, syscall
+refinement and publication/cancellation/uncertainty transitions. No complete
+controller proof is claimed by implementation annotations or passing native tests.
 
 Independent source review and independent execution accepted this native checkpoint. The named-user ACL inheritance test requires both the effective UID and UID 1001 to be mapped in the test process user namespace. A sandbox mapping only UID 1000 cannot install that ACL and fails test setup; the exact test passed outside that sandbox, without a skip. Complete filesystem-controller formal acceptance remains pending.
 
 After adoption, the complete local `cargo xtask ci` gate passed at commit `fdce7c9`, source SHA-256 `834aeae159efd3ced91c980398c3ceb3e126aa334d8b01c11cf1ee3144f215f1`, including fresh strict core verification, generated-parser and Duvet gates, formatting, Clippy, and native tests. This accepts the existing tooling milestone and tested native checkpoint, not missing filesystem-controller contracts or untested filesystem families.
+
+The scoped regular-file write-offset transition was independently accepted at
+`7d8b3e4` (tree `e125f42b7bb4795bcafdd3cc11899b77124a980f`) and passed the full
+exact-source `cargo xtask ci` gate with SHA-256
+`5cf9315643ba58bfc14a3c6acde83433acdb51ad04f57de2d0b0c650fdad3168`.
+Verus reported 2,047 vstd, 3,183 Vest and 1,020 core obligations with zero errors;
+Duvet matched 138 requirements and 519 references, and formatting, strict Clippy,
+workspace tests and doctests passed. The verified transition accepts only positive
+write counts bounded by the current slice end and returns the checked next offset;
+syscall behavior, chunk selection, retry budgets and the broader filesystem
+controller remain outside this proof.
