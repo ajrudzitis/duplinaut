@@ -6,8 +6,11 @@ use crate::{
     source::Cancellation,
     state::SnapshotEntry,
     tar::{EntryType, TarTime},
-    verified::restore_publication::{
-        decide_publication_cleanup, PublicationCleanup, PublicationDecision,
+    verified::{
+        restore_budget::{restore_preflight, RestorePreflightLimits, RestorePreflightNeed},
+        restore_publication::{
+            decide_publication_cleanup, PublicationCleanup, PublicationDecision,
+        },
     },
 };
 use rustix::{
@@ -290,42 +293,13 @@ fn prepare<'a>(
     {
         return Err(Cause::InvalidPlan);
     }
-    let overhead = if profile == Profile::ProtectedParentWrapper {
-        2usize
-    } else {
-        1
-    };
-    let created = entries
-        .len()
-        .saturating_sub(usize::from(root.is_some()))
-        .checked_add(overhead)
-        .ok_or(Cause::Limit)?;
-    if created > limits.entries || limits.staging_attempts == 0 {
-        return Err(Cause::Limit);
-    }
-    let directories = entries
+    let directory_count = entries
         .iter()
         .filter(|e| e.entry().entry_type() == EntryType::Directory)
-        .count()
-        .checked_add(usize::from(root.is_none()))
-        .ok_or(Cause::Limit)?;
-    let active = usize::from(
-        entries
-            .iter()
-            .any(|e| e.entry().entry_type() == EntryType::Regular),
-    );
-    if directories
-        .checked_add(overhead)
-        .and_then(|n| n.checked_add(active))
-        .filter(|n| *n <= limits.directory_fds)
-        .is_none()
-    {
-        return Err(Cause::Limit);
-    }
-    let cleanup_required = created.checked_mul(2).ok_or(Cause::Limit)?;
-    if cleanup_required > limits.cleanup_work {
-        return Err(Cause::Limit);
-    }
+        .count();
+    let active_file = entries
+        .iter()
+        .any(|e| e.entry().entry_type() == EntryType::Regular);
     let mut names = (dest.len() + 1 + 128)
         .checked_add(parent_bytes)
         .ok_or(Cause::Limit)?;
@@ -369,7 +343,6 @@ fn prepare<'a>(
             EntryType::Regular => {
                 payload = payload
                     .checked_add(entry.entry().content().ok_or(Cause::InvalidPlan)?.len() as u64)
-                    .filter(|n| *n <= limits.payload_bytes)
                     .ok_or(Cause::Limit)?;
             }
             EntryType::Symlink => {
@@ -403,6 +376,24 @@ fn prepare<'a>(
             }
         }
     }
+    let cleanup_required = restore_preflight(
+        RestorePreflightNeed {
+            entry_count: entries.len(),
+            root_exists: root.is_some(),
+            directory_count,
+            active_file,
+            wrapper: profile == Profile::ProtectedParentWrapper,
+            payload_bytes: payload,
+        },
+        RestorePreflightLimits {
+            entry_count: limits.entries,
+            directory_fds: limits.directory_fds,
+            cleanup_work: limits.cleanup_work,
+            payload_bytes: limits.payload_bytes,
+            staging_attempts: limits.staging_attempts,
+        },
+    )
+    .ok_or(Cause::Limit)?;
     let mut nodes: Vec<Node<'_>> = Vec::new();
     nodes
         .try_reserve_exact(entries.len())
@@ -1702,6 +1693,7 @@ mod tests {
                     matches!(result,RestoreOutcome::Unpublished(ref error)if error.cause==Cause::Limit)
                 );
                 assert!(!temp.0.join("other").exists());
+                assert_eq!(stdfs::read_dir(&temp.0).unwrap().count(), 1);
             }
         }
         let temp = Temp::new(0o700);

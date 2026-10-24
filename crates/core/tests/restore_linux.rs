@@ -187,6 +187,12 @@ fn official_three_dates_publish_both_profiles_exact_supported_metadata() {
     }
 }
 #[test]
+//= docs/parsing-requirements.md#restore-011
+//= type=test
+//# The backend MUST validate the complete restore plan's destination names, supported metadata representations, and initial-profile restrictions before creating staging.
+//= docs/parsing-requirements.md#restore-012
+//= type=test
+//# The backend MUST enforce independent checked budgets for created entries, retained directory FDs, owned metadata, path/name/target bytes, total regular payload bytes, forward work, staging-name attempts, and cleanup work before the associated allocation or syscall.
 fn existing_destinations_never_replaced_and_preflight_limits_do_not_stage() {
     let source = LocalSource::new(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
