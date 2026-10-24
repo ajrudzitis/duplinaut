@@ -125,3 +125,21 @@ ci` passed with source SHA-256
 Duvet, Clippy, builds, workspace tests, integrations, and doctests passed. The
 broader reader controller and complete resource-accounting obligations remain
 open.
+
+## Ordered volume-scan cursor proof candidate
+
+`start_volume_scan_cursor` binds the reservation's planned position count to the
+checked product of normalized-volume and catalog-object counts. At the start of
+each production nested-loop body, `advance_volume_scan_cursor` checks the
+enumerated pair `(volume_index, object_index)` against the next flattened
+position and advances it once. Before `assembler.finish()`, the reader requires
+both cursor completion and equality between consumed checks and the reserved
+end. Direct tests cover a complete lexicographic scan, an incomplete scan, and
+skipped, reordered, repeated, or extra positions; the official reader test
+covers preserved successful scan behavior and the exact/short work budget.
+
+The proof covers the cursor transition and the production gates only. It does
+not prove Rust iterator semantics, that the native identity predicate is
+correct, cancellation timing, the entire reader controller, or global resource
+accounting. The `reader-volume-scan-cursor` milestone remains unproved and
+pending independent review.

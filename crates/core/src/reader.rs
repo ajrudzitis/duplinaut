@@ -23,7 +23,8 @@ use crate::source::{
 };
 use crate::state::{SnapshotState, StateError, StateLimits};
 use crate::verified::reader_volume_scan::{
-    charge_volume_object, record_volume_candidate, reserve_volume_scan, VolumeScan, VolumeScanError,
+    advance_volume_scan_cursor, charge_volume_object, record_volume_candidate, reserve_volume_scan,
+    start_volume_scan_cursor, volume_scan_cursor_complete, VolumeScan, VolumeScanError,
 };
 pub use pgp::types::Password as OpenPgpPassword;
 use std::io::Read;
@@ -801,7 +802,10 @@ impl<'a> Catalog<'a> {
                 self.limits.max_object_checks,
             )
             .ok_or(ReaderError::Limit)?;
-            for record in &volumes {
+            let mut cursor =
+                start_volume_scan_cursor(reservation, volumes.len(), self.objects.len())
+                    .ok_or(ReaderError::Limit)?;
+            for (volume_index, record) in volumes.iter().enumerate() {
                 if cancel.is_cancelled() {
                     return Err(ReaderError::Source(SourceError::Cancelled));
                 }
@@ -813,6 +817,8 @@ impl<'a> Catalog<'a> {
                     if cancel.is_cancelled() {
                         return Err(ReaderError::Source(SourceError::Cancelled));
                     }
+                    cursor = advance_volume_scan_cursor(cursor, volume_index, object_index)
+                        .ok_or(ReaderError::Limit)?;
                     let charged = charge_volume_object(
                         scan,
                         reservation.final_checks,
@@ -936,7 +942,7 @@ impl<'a> Catalog<'a> {
                     )?;
                 }
             }
-            if checks != reservation.final_checks {
+            if !volume_scan_cursor_complete(cursor) || checks != reservation.final_checks {
                 return Err(ReaderError::Limit);
             }
             let archive = assembler.finish().map_err(ReaderError::Assembly)?;
