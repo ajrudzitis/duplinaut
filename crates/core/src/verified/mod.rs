@@ -12,6 +12,7 @@ pub(crate) mod tar_pax;
 pub(crate) mod tar_time;
 
 pub(crate) mod catalog_accounting;
+pub(crate) mod multipart_metadata;
 pub(crate) mod openpgp_admission;
 pub(crate) mod reader_accounting;
 pub(crate) mod reader_volume_scan;

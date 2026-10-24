@@ -446,6 +446,31 @@ proofs = []
 tests = [{ package = "duplicity-core", name = "flat_regular_listing_and_anchored_repeated_reads" }, { package = "duplicity-core", name = "changes_replacements_and_eof_are_terminal" }, { package = "duplicity-core", name = "cancellation_limits_and_untrusted_descriptors" }, { package = "duplicity-core", name = "original_official_directory_reconstructs_three_dates" }, { package = "duplicity-core", name = "interrupted_post_read_validation_retries_without_losing_bytes" }]
 
 [[milestone]]
+id = "multipart-metadata-admission"
+gate = false
+requirements = ["PARSE-GEN-005", "PARSE-MULTI-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate pending independent review. It verifies the bounded admission
+# arithmetic and constructor call order only; normalization semantics and
+# allocator behavior/capacity provenance remain outside this checkpoint.
+# The PARSE-MULTI-003 test also exercises successful completion after exact
+# admission; that completion condition is not part of the arithmetic proof.
+implementations = [
+  { path = "crates/core/src/multipart.rs", symbol = "new" },
+  { path = "crates/core/src/verified/multipart_metadata.rs", symbol = "reserve_multipart_metadata" }
+]
+proofs = [{ id = "multipart-metadata-reservation", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/multipart_metadata.rs", symbol = "reserve_multipart_metadata", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "verified::multipart_metadata::tests::multipart_metadata_reservation_checks_exact_short_and_overflow" },
+  { package = "duplicity-core", name = "multipart_metadata_budget_admits_exact_charge_and_rejects_before_normalization" }
+]
+
+[[milestone]]
 id = "openpgp-reader-edge-tests"
 gate = false
 requirements = ["PARSE-SOURCE-001", "PARSE-ENV-017", "PARSE-ENV-018", "PARSE-ENV-019", "PARSE-ENV-022", "PARSE-ENV-023", "PARSE-ENV-024"]

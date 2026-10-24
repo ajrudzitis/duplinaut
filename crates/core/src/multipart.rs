@@ -12,6 +12,7 @@ use crate::tar::{
     ArchiveKind, EntryType, Operation, TarEntry, TarError, TarLimits, TarTime, TarVolume,
     Termination,
 };
+use crate::verified::multipart_metadata::reserve_multipart_metadata;
 use crate::verified::openpgp_admission::{
     AuthenticatedPermit, OpenPgpAdmission, TarValidatedPermit,
 };
@@ -192,6 +193,9 @@ pub struct MultipartAssembler<'a> {
     failed: bool,
 }
 impl<'a> MultipartAssembler<'a> {
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=implementation
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
     pub fn new(manifest: &'a Manifest, limits: AssemblyLimits) -> Result<Self, AssemblyError> {
         if manifest.records.is_empty() {
             return Err(AssemblyError::Incomplete);
@@ -201,14 +205,15 @@ impl<'a> MultipartAssembler<'a> {
         if manifest.records.len() > limits.max_volumes {
             return Err(AssemblyError::Limit);
         }
-        let metadata_bytes = manifest
-            .records
-            .len()
-            .max(4)
-            .checked_mul(2 * std::mem::size_of::<&VolumeRecord>() + 1)
-            .and_then(|bytes| bytes.checked_add(std::mem::size_of::<Self>()))
-            .filter(|bytes| *bytes <= limits.max_metadata_bytes)
-            .ok_or(AssemblyError::Limit)?;
+        let metadata_bytes = reserve_multipart_metadata(
+            manifest.records.len(),
+            std::mem::size_of::<&VolumeRecord>(),
+            std::mem::size_of::<u8>(),
+            std::mem::size_of::<Self>(),
+            limits.max_metadata_bytes,
+        )
+        .ok_or(AssemblyError::Limit)?;
+        let metadata_bytes = metadata_bytes.bytes;
         let volumes = manifest.volumes();
         if volumes.is_empty() {
             return Err(AssemblyError::Incomplete);

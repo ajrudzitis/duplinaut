@@ -51,6 +51,52 @@ fn assemble(
     assembler.finish()
 }
 
+#[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+//= docs/parsing-requirements.md#parse-multi-003
+//= type=test
+//# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+fn multipart_metadata_budget_admits_exact_charge_and_rejects_before_normalization() {
+    let bytes = [member("snapshot/file", b"x")];
+    let manifest = make_manifest(&bytes, &[("file", "file")]);
+    let slots = manifest.records.len().max(4);
+    let per_slot = 2 * std::mem::size_of::<&duplicity_core::manifest::VolumeRecord>()
+        + std::mem::size_of::<u8>();
+    let exact = slots
+        .checked_mul(per_slot)
+        .and_then(|charge| charge.checked_add(std::mem::size_of::<MultipartAssembler<'static>>()))
+        .unwrap();
+    let mut limits = AssemblyLimits {
+        max_metadata_bytes: exact,
+        ..AssemblyLimits::default()
+    };
+    let _exact_assembler = MultipartAssembler::new(&manifest, limits).unwrap();
+    assert_eq!(
+        assemble(&bytes, &[("file", "file")])
+            .unwrap()
+            .entries()
+            .len(),
+        1
+    );
+
+    limits.max_metadata_bytes = exact - 1;
+    assert!(matches!(
+        MultipartAssembler::new(&manifest, limits),
+        Err(AssemblyError::Limit)
+    ));
+
+    // If normalization/order validation ran before the budget check, this
+    // deliberately invalid ordinal would produce VolumeOrder instead.
+    let mut invalid_ordinal = make_manifest(&bytes, &[("file", "file")]);
+    invalid_ordinal.records[0].number = 2;
+    assert!(matches!(
+        MultipartAssembler::new(&invalid_ordinal, limits),
+        Err(AssemblyError::Limit)
+    ));
+}
+
 //= docs/parsing-requirements.md#parse-multi-001
 //= type=test
 //# Multipart assembly MUST concatenate payloads for one operation and path in consecutive part-number order starting at 1.

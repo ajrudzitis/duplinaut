@@ -179,3 +179,30 @@ call order. It excludes allocation internals of `source.list`, actual allocator
 behavior, the provenance or accuracy of reported string capacities, and a
 total heap bound. Accordingly, the count is a conservative metadata accounting
 model rather than a proof of process-wide memory consumption.
+
+## Multipart metadata admission proof candidate
+
+Before calling `Manifest::volumes()` or allocating the raw-occurrence vector,
+`MultipartAssembler::new` now asks a verified checked-arithmetic transition to
+reserve metadata from the raw manifest-record count. The formula charges
+`max(4, raw_record_count)` logical slots for twice the `VolumeRecord` reference
+size (the conservative normalized-view allowance) and one byte per
+raw-occurrence slot, then adds the `MultipartAssembler` shell. Overflow or a
+charge above `max_metadata_bytes` returns `None`, which the constructor maps
+to `AssemblyError::Limit` before it reaches normalization or assembler state
+construction.
+
+Tests cover exact-limit acceptance, one-byte-short rejection, arithmetic
+overflow, and constructor rejection before ordinal validation; the source
+ordering puts the verified admission result before both allocation paths. The
+proof and tests are linked to [PARSE-GEN-005](parsing-requirements.md#parse-gen-005).
+This candidate is pending review and does not prove the overall multipart
+assembly milestone.
+
+The verified claim is the reservation arithmetic and the constructor's
+fail-closed use of its result. Manifest normalization semantics remain covered
+by their separate proof. This candidate does not prove the allocator's actual
+growth behavior or capacity provenance, allocations inside normalization,
+whether allocation succeeds, or total process heap usage. The slot count is a
+conservative accounting model from the raw input count, not a refinement of
+`Vec`'s concrete capacity.
