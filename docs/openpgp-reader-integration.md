@@ -199,7 +199,7 @@ control explicit confirmation, staging, cancellation and uncertain publication.
       Independent review and the exact-source full assurance gate passed.
 - [ ] Test unsupported algorithms and additional reader-boundary crypto cases,
       yielding no completed snapshot.
-- [x] On the public `Catalog::read_snapshot_with_crypto` boundary, use the official
+- [ ] On the public `Catalog::read_snapshot_with_crypto` boundary, use the official
       signed 3.0.7 chain with its correct recipient secret, password and signer
       certificate but an unrelated permitted primary fingerprint. The reader
       returns native `SignerNotAllowed` (not a credential or MDC error), no
