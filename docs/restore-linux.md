@@ -172,7 +172,7 @@ Root ordinary modes without owner write under searchable parents remain held; th
 
 An isolated Python syscall probe at effective UID 1000 on the current `/tmp` filesystem moved a directory from a `0700` wrapper into its parent. Modes `0000`, `0555` and `0400` failed with `EACCES`; modes `0200`, `0700` and `0777` succeeded, preserving exact mode. A separate same-parent probe under parent mode `0700` succeeded for all six modes, including `0000`/`0555`, preserving each exactly. This confirms the documented cross-parent root write requirement and the private-parent alternative for the observed environment. The probe uses ordinary rename solely to test that permission rule; it is not evidence for production `NOREPLACE`, cancellation, ACL removal or complete filesystem restoration. See the [reproduction script](evidence/restore-linux/probe_linux_rename.py) and [JSON receipt](evidence/restore-linux/probe-linux-rename.receipt.json) for actual identities and outcomes.
 
-## Bounded regular-file write-offset proof candidate
+## Bounded regular-file write-offset proof
 
 `verified::restore_write::advance_write_offset` is called after each successful
 regular-file write. Its Verus contract permits progress only when the new offset
@@ -183,11 +183,10 @@ impossible syscall result larger than that slice cannot skip later bytes. The bo
 covers partial and exact completion, zero progress, offset/length mismatch,
 overrun and the machine-word maximum. This proves only one arithmetic cursor
 transition. It does not prove syscall results, chunk selection, retry/work
-accounting, filesystem contents or the Linux publication controller. The
-candidate is pending independent review; the Linux restoration milestone remains
-unproved.
+accounting, filesystem contents or the Linux publication controller. The proof
+was independently accepted; the Linux restoration milestone remains unproved.
 
-## Forward-work counter proof candidate
+## Forward-work counter proof
 
 `Forward::tick` preserves its cancellation-first check, then calls the verified
 `decrement_forward_work` before invoking hooks or a filesystem operation. The
@@ -197,5 +196,22 @@ test checks zero, one, ordinary, and machine-maximum inputs. This establishes
 the scalar counter transition only. It does not prove that every production
 operation is charged exactly once, that cancellation cannot race the check, or
 that work limits bound hook/syscall duration, cleanup work, or the full Linux
-restore controller. The candidate remains pending independent review; the
-Linux restoration milestone remains unproved.
+restore controller. The proof was independently accepted; the Linux restoration
+milestone remains unproved.
+
+## Creation-journal transition proof
+
+The private Linux creation journal has verified transitions from
+`Unattempted` to `PossiblyCreated` before work charging, hooks and the creation
+syscall, and from `PossiblyCreated` to `Created` immediately after syscall
+success and before the post-operation hook. Failure or cancellation before the
+syscall leaves `PossiblyCreated`, preserving the conservative cleanup state;
+post-hook failure leaves `Created`. Unit coverage rejects out-of-order
+transitions. A failure injected by the before-create hook verifies that a
+`PossiblyCreated` entry is included in cleanup before any creation syscall;
+the existing after-create-hook failure test covers cleanup of `Created`
+entries. This proves only the journal enum
+transitions and their production call order. It does not prove cleanup syscall
+safety, staging ownership or the full Linux controller. This scoped proof and
+behavior test were independently accepted; the Linux restoration milestone
+remains unproved.

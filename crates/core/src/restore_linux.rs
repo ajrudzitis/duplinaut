@@ -1332,6 +1332,53 @@ mod tests {
         assert!(!fault.seen.contains(&Op::CleanupMode));
         assert!(!fault.seen.contains(&Op::CleanupUnlink));
     }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-013
+    //= type=test
+    //# The backend MUST pre-reserve a journal state for every attempted creation and preserve possibly-created as well as definitely-created entries through handled failure cleanup.
+    //= docs/parsing-requirements.md#restore-022
+    //= type=test
+    //# On a handled failure or observed cancellation before any publication attempt, cleanup MUST attempt removal of journaled definitely-created or possibly-created entries inside exclusively owned staging using retained parent FDs and original component bytes, without following symlinks.
+    fn before_create_hook_failure_cleans_possibly_created_entry() {
+        let state = state(0o700, 0o000, 0o777);
+        let temp = Temp::new(0o700);
+        let mut fault = Fault {
+            before: Some(Op::CreateFile),
+            ..Fault::default()
+        };
+        let result = run(&state, &temp, &mut fault, &Cancellation::default());
+
+        assert!(matches!(
+            result,
+            RestoreOutcome::Unpublished(ref error)
+                if error.cause == Cause::Syscall(Errno::IO)
+                    && error.cleanup.failures == 0
+                    && error.cleanup.attempted == 5
+        ));
+        assert!(fault.seen.contains(&Op::CreateFile));
+        let create = fault
+            .seen
+            .iter()
+            .position(|op| *op == Op::CreateFile)
+            .unwrap();
+        let first_cleanup = fault
+            .seen
+            .iter()
+            .position(|op| *op == Op::CleanupUnlink)
+            .unwrap();
+        assert!(create < first_cleanup);
+        assert_eq!(
+            fault
+                .seen
+                .iter()
+                .filter(|op| **op == Op::CleanupUnlink)
+                .count(),
+            3
+        );
+        assert_eq!(stdfs::read_dir(&temp.0).unwrap().count(), 0);
+    }
+
     #[test]
     //= docs/parsing-requirements.md#restore-020
     //= type=test

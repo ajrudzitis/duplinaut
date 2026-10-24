@@ -397,6 +397,7 @@ proofs = [
   { id = "linux-forward-work", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work", kind = "contract" }
 ]
 tests = [
+  { package = "duplicity-core", name = "restore_linux::tests::before_create_hook_failure_cleans_possibly_created_entry" },
   { package = "duplicity-core", name = "restore_linux::tests::attempted_descendant_side_effect_errors_cleanup_but_outer_uncertainty_is_untouched" },
   { package = "duplicity-core", name = "restore_linux::tests::publication_side_effect_errors_never_run_modifying_cleanup" },
   { package = "duplicity-core", name = "restore_linux::tests::cancellation_rename_race_success_wins_and_wrapper_cleanup_warns" },
