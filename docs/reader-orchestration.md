@@ -61,7 +61,7 @@ missing/ambiguous/duplicate objects, nested collections, changed identities,
 cancellation, short/excess bodies, diagnostics, unsupported crypto and limits.
 No external backup application or external write occurs at reader runtime.
 
-## Bounded-controller proof checkpoint (candidate; review pending)
+## Bounded-controller proof checkpoint
 
 `verified::reader_accounting::charge_object_check` is the scalar transition used
 by the required-volume matcher before it inspects each catalog object. Verus
@@ -74,5 +74,8 @@ This checkpoint is linked to [PARSE-GEN-005](parsing-requirements.md#parse-gen-0
 [PARSE-CHAIN-002](parsing-requirements.md#parse-chain-002). It proves one
 per-object budget transition only. It does not prove the enclosing nested scan,
 volume identity predicate, cancellation timing, global resource accounting,
-allocator behavior, or complete repository reader. Independent review and the
-full acceptance gate remain pending; the README milestone stays unchecked.
+allocator behavior, or complete repository reader. Independent review accepted
+candidate `dd0ca3e`, and the exact-source full `cargo xtask ci` gate passed with
+source SHA-256 `5c9428d96d7d8d0fa5548a9cbda82e8d79b4d7d27c849acd85a13cb532631087`.
+The README milestone stays unchecked because the surrounding controller and
+complete resource-accounting obligations remain open.
