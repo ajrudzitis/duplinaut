@@ -22,7 +22,9 @@ use crate::source::{
     Cancellation, CheckedReader, ObjectSource, SourceError, SourceLimits, StoredObject,
 };
 use crate::state::{SnapshotState, StateError, StateLimits};
-use crate::verified::reader_accounting::charge_object_check;
+use crate::verified::reader_volume_scan::{
+    charge_volume_object, record_volume_candidate, VolumeScan, VolumeScanError,
+};
 pub use pgp::types::Password as OpenPgpPassword;
 use std::io::Read;
 
@@ -795,14 +797,25 @@ impl<'a> Catalog<'a> {
                 if cancel.is_cancelled() {
                     return Err(ReaderError::Source(SourceError::Cancelled));
                 }
-                let mut candidate = None;
-                for object in &self.objects {
+                let mut scan = VolumeScan {
+                    checked_objects: checks,
+                    candidate_index: None,
+                };
+                for (object_index, object) in self.objects.iter().enumerate() {
                     if cancel.is_cancelled() {
                         return Err(ReaderError::Source(SourceError::Cancelled));
                     }
-                    checks = charge_object_check(checks, self.limits.max_object_checks)
-                        .ok_or(ReaderError::Limit)?;
-                    if object.name.is_some_and(|volume| {
+                    let charged = charge_volume_object(
+                        scan,
+                        self.limits.max_object_checks,
+                        object_index,
+                        self.objects.len(),
+                    )
+                    .map_err(|error| match error {
+                        VolumeScanError::Limit => ReaderError::Limit,
+                        VolumeScanError::Duplicate => ReaderError::DuplicateArtifact,
+                    })?;
+                    let matches = object.name.is_some_and(|volume| {
                         volume.completed()
                             && volume.start == name.start
                             && volume.end == name.end
@@ -815,16 +828,22 @@ impl<'a> Catalog<'a> {
                                         ObjectKind::IncrementalVolume
                                     )
                             )
-                    }) {
-                        if candidate.is_some() {
-                            return Err(ReaderError::DuplicateArtifact);
-                        }
-                        candidate = Some(object);
-                    }
+                    });
+                    scan =
+                        record_volume_candidate(charged, matches).map_err(|error| match error {
+                            VolumeScanError::Limit => ReaderError::Limit,
+                            VolumeScanError::Duplicate => ReaderError::DuplicateArtifact,
+                        })?;
                 }
-                let object = candidate.ok_or(ReaderError::MissingVolume {
-                    number: record.number,
-                })?;
+                checks = scan.checked_objects;
+                let object = match scan.candidate_index {
+                    Some(index) => self.objects.get(index).ok_or(ReaderError::Limit)?,
+                    None => {
+                        return Err(ReaderError::MissingVolume {
+                            number: record.number,
+                        })
+                    }
+                };
                 let envelope = object.name.unwrap().envelope;
                 if signer_required && envelope != Envelope::OpenPgp {
                     return Err(ReaderError::Crypto(CryptoError::Unsigned));

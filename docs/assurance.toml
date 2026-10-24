@@ -338,6 +338,28 @@ proofs = []
 tests = [{ package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" }, { package = "duplicity-core", name = "identity_cancellation_and_exact_body_failures_publish_no_snapshot" }, { package = "duplicity-core", name = "missing_corrupt_and_ambiguous_objects_fail_explicitly" }, { package = "duplicity-core", name = "discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation" }, { package = "duplicity-core", name = "reader_budget_edges_accept_exact_and_reject_one_less" }]
 
 [[milestone]]
+id = "reader-volume-candidate-scan"
+gate = false
+requirements = ["PARSE-GEN-005", "PARSE-CHAIN-002"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate transition pending review; object enumeration, identity predicate,
+# cancellation/controller and global resource-accounting refinement remain open.
+implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "charge_volume_object" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "record_volume_candidate" }]
+proofs = [
+  { id = "reader-volume-scan-charge", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "charge_volume_object", kind = "contract" },
+  { id = "reader-volume-unique-candidate", requirement = "PARSE-CHAIN-002", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "record_volume_candidate", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::reader_volume_scan::tests::volume_scan_charges_before_matching_and_rejects_a_second_candidate" },
+  { package = "duplicity-core", name = "missing_corrupt_and_ambiguous_objects_fail_explicitly" }
+]
+
+[[milestone]]
 id = "local-source"
 gate = false
 requirements = ["PARSE-SOURCE-001"]

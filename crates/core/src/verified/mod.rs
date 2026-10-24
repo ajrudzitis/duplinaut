@@ -13,6 +13,7 @@ pub(crate) mod tar_time;
 
 pub(crate) mod openpgp_admission;
 pub(crate) mod reader_accounting;
+pub(crate) mod reader_volume_scan;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_budget;
 #[cfg(target_os = "linux")]

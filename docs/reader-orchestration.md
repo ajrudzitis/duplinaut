@@ -79,3 +79,21 @@ candidate `dd0ca3e`, and the exact-source full `cargo xtask ci` gate passed with
 source SHA-256 `5c9428d96d7d8d0fa5548a9cbda82e8d79b4d7d27c849acd85a13cb532631087`.
 The README milestone stays unchecked because the surrounding controller and
 complete resource-accounting obligations remain open.
+
+## Volume candidate scan proof candidate
+
+The required-volume matcher now calls `charge_volume_object` before reading the
+current object's name to evaluate the native identity predicate. That
+transition carries the checked-object count and the current catalog index into
+`record_volume_candidate`. The second transition preserves no-match state,
+records one matching index, and fails explicitly if another object also
+matches. Existing catalog-boundary and duplicate-artifact behavior remains
+covered by integration tests; a direct transition test covers the exact limit
+and duplicate cases.
+
+These contracts prove the budget-before-predicate call and one-step candidate
+accumulation only. They do not prove that enumeration visits each object once
+or in order, that the native object-identity predicate is correct, cancellation
+timing, the entire nested matcher, or global resource accounting. The
+reader-volume-scan assurance milestone remains `proved=false` and awaits
+independent review; complete reader orchestration remains unproved.
