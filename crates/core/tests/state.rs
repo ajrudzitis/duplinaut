@@ -453,6 +453,9 @@ fn deleted_bases_remain_available_from_preceding_set() {
 }
 
 #[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
 fn subtree_removal_preserves_near_prefixes_and_final_errors_are_atomic() {
     let previous = SnapshotState::from_full(
         &archive(&[
@@ -466,10 +469,12 @@ fn subtree_removal_preserves_near_prefixes_and_final_errors_are_atomic() {
         StateLimits::default(),
     )
     .unwrap();
+    assert_eq!(previous.payload_bytes(), 18);
     for operation in ["deleted/a", "snapshot/a"] {
         let next = previous
             .apply_incremental(&archive(&[(operation, b'0', b"")]), StateLimits::default())
             .unwrap();
+        assert_eq!(next.payload_bytes(), 13);
         assert!(next.get(&path(b"a/child")).is_none());
         for (name, contents) in [
             ("a-", b"dash".as_slice()),
@@ -497,6 +502,7 @@ fn subtree_removal_preserves_near_prefixes_and_final_errors_are_atomic() {
         Err(StateError::RootType)
     ));
     assert_eq!(previous.len(), 6);
+    assert_eq!(previous.payload_bytes(), 18);
     assert_eq!(
         previous.get(&path(b"a0")).unwrap().content().unwrap(),
         b"zero"

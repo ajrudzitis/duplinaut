@@ -407,18 +407,18 @@ impl SnapshotState {
         let payload = entry.content.as_ref().map_or(0, |bytes| bytes.len());
         let capacity = entry.content.as_ref().map_or(0, |bytes| bytes.capacity());
         let metadata = entry.metadata_charge;
-        self.payload_bytes = self
-            .payload_bytes
-            .checked_sub(payload)
-            .ok_or(StateError::Limit)?;
-        self.metadata_bytes = self
-            .metadata_bytes
-            .checked_sub(metadata)
-            .ok_or(StateError::Limit)?;
-        self.capacity_bytes = self
-            .capacity_bytes
-            .checked_sub(capacity)
-            .ok_or(StateError::Limit)?;
+        let (payload_bytes, metadata_bytes, capacity_bytes) = subtract_charges(
+            self.payload_bytes,
+            self.metadata_bytes,
+            self.capacity_bytes,
+            payload,
+            metadata,
+            capacity,
+        )
+        .ok_or(StateError::Limit)?;
+        self.payload_bytes = payload_bytes;
+        self.metadata_bytes = metadata_bytes;
+        self.capacity_bytes = capacity_bytes;
         Ok(())
     }
 }
@@ -453,6 +453,44 @@ struct Charges {
     payload: usize,
     metadata: usize,
     capacity: usize,
+}
+
+/// Compute all three accounting results before mutating the counters.
+pub(crate) fn subtract_charges(
+    payload: usize,
+    metadata: usize,
+    capacity: usize,
+    remove_payload: usize,
+    remove_metadata: usize,
+    remove_capacity: usize,
+) -> (result: Option<(usize, usize, usize)>)
+    ensures
+        match result {
+            Some((next_payload, next_metadata, next_capacity)) =>
+                payload >= remove_payload
+                    && metadata >= remove_metadata
+                    && capacity >= remove_capacity
+                    && next_payload as int + remove_payload as int == payload as int
+                    && next_metadata as int + remove_metadata as int == metadata as int
+                    && next_capacity as int + remove_capacity as int == capacity as int,
+            None => payload < remove_payload
+                || metadata < remove_metadata
+                || capacity < remove_capacity,
+        },
+{
+    let next_payload = match payload.checked_sub(remove_payload) {
+        Some(next) => next,
+        None => return None,
+    };
+    let next_metadata = match metadata.checked_sub(remove_metadata) {
+        Some(next) => next,
+        None => return None,
+    };
+    let next_capacity = match capacity.checked_sub(remove_capacity) {
+        Some(next) => next,
+        None => return None,
+    };
+    Some((next_payload, next_metadata, next_capacity))
 }
 
 /// Mathematical acceptance criterion: natural-number totals must both fit the
