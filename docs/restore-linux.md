@@ -171,3 +171,18 @@ Root ordinary modes without owner write under searchable parents remain held; th
 ## Native reference probe status
 
 An isolated Python syscall probe at effective UID 1000 on the current `/tmp` filesystem moved a directory from a `0700` wrapper into its parent. Modes `0000`, `0555` and `0400` failed with `EACCES`; modes `0200`, `0700` and `0777` succeeded, preserving exact mode. A separate same-parent probe under parent mode `0700` succeeded for all six modes, including `0000`/`0555`, preserving each exactly. This confirms the documented cross-parent root write requirement and the private-parent alternative for the observed environment. The probe uses ordinary rename solely to test that permission rule; it is not evidence for production `NOREPLACE`, cancellation, ACL removal or complete filesystem restoration. See the [reproduction script](evidence/restore-linux/probe_linux_rename.py) and [JSON receipt](evidence/restore-linux/probe-linux-rename.receipt.json) for actual identities and outcomes.
+
+## Bounded regular-file write-offset proof candidate
+
+`verified::restore_write::advance_write_offset` is called after each successful
+regular-file write. Its Verus contract permits progress only when the new offset
+is within the current write-end bound and the write count is nonzero; otherwise
+it returns `None`, which production maps to a fidelity error. The production
+caller supplies the end of the current at-most-65536-byte slice, so an
+impossible syscall result larger than that slice cannot skip later bytes. The boundary test
+covers partial and exact completion, zero progress, offset/length mismatch,
+overrun and the machine-word maximum. This proves only one arithmetic cursor
+transition. It does not prove syscall results, chunk selection, retry/work
+accounting, filesystem contents or the Linux publication controller. The
+candidate is pending independent review; the Linux restoration milestone remains
+unproved.

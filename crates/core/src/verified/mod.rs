@@ -13,3 +13,5 @@ pub(crate) mod tar_time;
 
 pub(crate) mod openpgp_admission;
 pub(crate) mod reader_accounting;
+#[cfg(target_os = "linux")]
+pub(crate) mod restore_write;

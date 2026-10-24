@@ -608,9 +608,12 @@ fn populate(p: &mut Prepared<'_>, w: &mut Forward<'_, impl Hooks>) -> Result<(),
                 while offset < content.len() {
                     let end = content.len().min(offset.saturating_add(65536));
                     match w.write(file.as_fd(), &content[offset..end]) {
-                        Ok(0) => return Err(Cause::Fidelity),
-                        Ok(n) if n <= end - offset => offset += n,
-                        Ok(_) => return Err(Cause::Fidelity),
+                        Ok(n) => {
+                            offset = crate::verified::restore_write::advance_write_offset(
+                                offset, n, end,
+                            )
+                            .ok_or(Cause::Fidelity)?;
+                        }
                         Err(Cause::Syscall(Errno::INTR)) => continue,
                         Err(e) => return Err(e),
                     }
@@ -1086,6 +1089,27 @@ mod tests {
         sync::atomic::{AtomicU64, Ordering},
     };
     static NEXT: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-014
+    //= type=test
+    //# Regular files MUST be created exclusively with `CREATE | EXCL | NOFOLLOW | CLOEXEC | WRONLY`, initial creation mode `0600`, and written with the exact immutable content in chunks no larger than 65536 bytes.
+    fn write_offset_transition_rejects_zero_and_out_of_range_progress() {
+        use crate::verified::restore_write::advance_write_offset;
+
+        assert_eq!(advance_write_offset(0, 1, 1), Some(1));
+        assert_eq!(advance_write_offset(2, 3, 10), Some(5));
+        assert_eq!(
+            advance_write_offset(usize::MAX - 2, 2, usize::MAX),
+            Some(usize::MAX)
+        );
+        assert_eq!(advance_write_offset(0, 0, 1), None);
+        assert_eq!(advance_write_offset(2, 1, 1), None);
+        assert_eq!(advance_write_offset(4, 2, 5), None);
+        assert_eq!(advance_write_offset(1, 4, 4), None);
+        assert_eq!(advance_write_offset(5, 1, 5), None);
+    }
+
     struct Temp(PathBuf);
     impl Temp {
         fn new(mode: u32) -> Self {

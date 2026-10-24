@@ -386,16 +386,19 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = true
+# Bounded regular-file write-offset refinement is a scoped candidate pending independent review;
+# the filesystem controller and syscall boundary remain unproved.
+reviewed = false
 proof_required = true
 # Native acceptance only; exact controller/kernel refinement remains pending.
-implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }]
-proofs = []
+implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }]
+proofs = [{ id = "linux-write-offset", requirement = "RESTORE-014", path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset", kind = "contract" }]
 tests = [
   { package = "duplicity-core", name = "restore_linux::tests::attempted_descendant_side_effect_errors_cleanup_but_outer_uncertainty_is_untouched" },
   { package = "duplicity-core", name = "restore_linux::tests::publication_side_effect_errors_never_run_modifying_cleanup" },
   { package = "duplicity-core", name = "restore_linux::tests::cancellation_rename_race_success_wins_and_wrapper_cleanup_warns" },
   { package = "duplicity-core", name = "restore_linux::tests::short_interrupted_zero_writes_and_forward_faults_keep_cleanup_reserved" },
+  { package = "duplicity-core", name = "restore_linux::tests::write_offset_transition_rejects_zero_and_out_of_range_progress" },
   { package = "duplicity-core", name = "restore_linux::tests::root_profiles_restrictive_descendants_and_preflight_mode_checks" },
   { package = "duplicity-core", name = "restore_linux::tests::inherited_acl_is_removed_before_widened_final_permissions" },
   { package = "duplicity-core", name = "restore_linux::tests::fractional_negative_time_is_exact_or_fails_before_publication" },
