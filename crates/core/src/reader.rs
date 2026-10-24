@@ -25,6 +25,7 @@ use crate::state::{SnapshotState, StateError, StateLimits};
 use crate::verified::catalog_accounting::{
     charge_catalog_object_metadata, initialize_catalog_metadata, CatalogObjectMetadata,
 };
+use crate::verified::evidence_accounting::charge_evidence_comparisons;
 use crate::verified::reader_volume_scan::{
     advance_volume_scan_cursor, charge_volume_object, record_volume_candidate, reserve_volume_scan,
     start_volume_scan_cursor, volume_scan_cursor_complete, VolumeScan, VolumeScanError,
@@ -328,10 +329,12 @@ fn record_evidence(
         .try_reserve_exact(decoded.certificates.len())
         .map_err(|_| ReaderError::Allocation)?;
     for certificate in &decoded.certificates {
-        *comparisons = comparisons
-            .checked_add(evidence.certificates.len())
-            .filter(|n| *n <= limits.max_comparisons)
-            .ok_or(ReaderError::Limit)?;
+        *comparisons = charge_evidence_comparisons(
+            *comparisons,
+            evidence.certificates.len(),
+            limits.max_comparisons,
+        )
+        .ok_or(ReaderError::Limit)?;
         if let Some(index) = evidence
             .certificates
             .iter()

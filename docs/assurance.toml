@@ -404,6 +404,32 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-evidence-comparison-charge"
+gate = false
+requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate pending review. The contract covers one exact comparison-count
+# charge immediately before a certificate-pool scan; matching equality,
+# allocation behavior, metadata/version admission, and the full evidence loop
+# remain outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/reader.rs", symbol = "record_evidence" },
+  { path = "crates/core/src/verified/evidence_accounting.rs", symbol = "charge_evidence_comparisons" }
+]
+proofs = [
+  { id = "reader-evidence-comparison-charge", requirement = "PARSE-ENV-022", path = "crates/core/src/verified/evidence_accounting.rs", symbol = "charge_evidence_comparisons", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::evidence_accounting::tests::evidence_comparison_charge_checks_exact_limit_and_overflow" },
+  { package = "duplicity-core", name = "reader::crypto_evidence_tests::evidence_comparison_budget_is_charged_before_certificate_lookup" }
+]
+
+[[milestone]]
 id = "reader-catalog-metadata-accounting"
 gate = false
 requirements = ["PARSE-GEN-005"]

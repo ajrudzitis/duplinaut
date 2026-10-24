@@ -178,3 +178,54 @@ fn evidence_limits_precede_retention_and_exact_certificate_versions_are_interned
         evidence.objects[2].certificate_versions
     );
 }
+
+#[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+//= docs/parsing-requirements.md#parse-env-022
+//= type=test
+//# Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
+fn evidence_comparison_budget_is_charged_before_certificate_lookup() {
+    let item = object("backup/compare.gpg");
+    let decoded = decoded();
+    let certificate = decoded.certificates[0].clone();
+
+    let mut accepted = AuthenticationEvidence::default();
+    accepted.certificates.push(certificate.clone());
+    let (mut bytes, mut comparisons) = (0, 0);
+    record_with(
+        &mut accepted,
+        &mut bytes,
+        &mut comparisons,
+        &item,
+        &decoded,
+        EvidenceLimits {
+            max_comparisons: 1,
+            ..limits()
+        },
+    )
+    .unwrap();
+    assert_eq!(comparisons, 1);
+    assert_eq!(accepted.objects[0].certificate_versions, [0]);
+
+    let mut rejected = AuthenticationEvidence::default();
+    rejected.certificates.push(certificate);
+    let (mut bytes, mut comparisons) = (0, 0);
+    assert!(matches!(
+        record_with(
+            &mut rejected,
+            &mut bytes,
+            &mut comparisons,
+            &item,
+            &decoded,
+            EvidenceLimits {
+                max_comparisons: 0,
+                ..limits()
+            },
+        ),
+        Err(ReaderError::Limit)
+    ));
+    assert_eq!(comparisons, 0);
+    assert!(rejected.objects.is_empty());
+}

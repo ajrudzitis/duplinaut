@@ -180,6 +180,29 @@ behavior, the provenance or accuracy of reported string capacities, and a
 total heap bound. Accordingly, the count is a conservative metadata accounting
 model rather than a proof of process-wide memory consumption.
 
+## Authentication evidence comparison charge proof candidate
+
+Before each certificate lookup in `record_evidence`, the reader now calls a
+verified transition with the current comparison count, the existing certificate
+pool length, and the configured comparison limit. The returned count is exactly
+the checked sum for the equality comparisons the following `.position` scan
+may perform. Overflow or an over-limit sum returns `None`; `record_evidence`
+maps that to `ReaderError::Limit` and does not update its comparison counter
+for that rejected scan. Exact-limit, over-limit, and overflow cases have direct
+helper tests. A reader unit test covers an exact successful pool comparison
+and confirms that a rejected scan leaves the counter and published object list
+unchanged.
+
+The evidence is linked to [PARSE-GEN-005](parsing-requirements.md#parse-gen-005)
+and [PARSE-ENV-022](parsing-requirements.md#parse-env-022). This candidate
+proves only the scalar comparison-budget transition and its placement before
+the corresponding certificate equality scan. It does not prove certificate
+equality semantics, duplicate detection, or the complete `record_evidence`
+operation. Metadata charging, temporary version-vector allocation, and
+certificate-version admission remain separate checks; allocator behavior and
+total evidence/process heap use are outside scope. The candidate is pending
+independent review and does not complete authentication-evidence accounting.
+
 ## Multipart metadata admission proof
 
 Before calling `Manifest::volumes()` or allocating the raw-occurrence vector,
