@@ -358,8 +358,8 @@ tested = true
 reviewed = true
 proof_required = true
 # Public Catalog/Source edge tests, authenticated top-off rejection, and
-# adversarial public-reader credential/manifest tests; this test slice awaits
-# independent review and exact-source full gate.
+# adversarial public-reader crypto tests have scoped exact-source acceptance;
+# broader algorithm profiles and controller proof remain separate work.
 implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_with_crypto" }]
 proofs = []
 tests = [
