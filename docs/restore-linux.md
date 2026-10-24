@@ -186,3 +186,16 @@ transition. It does not prove syscall results, chunk selection, retry/work
 accounting, filesystem contents or the Linux publication controller. The
 candidate is pending independent review; the Linux restoration milestone remains
 unproved.
+
+## Forward-work counter proof candidate
+
+`Forward::tick` preserves its cancellation-first check, then calls the verified
+`decrement_forward_work` before invoking hooks or a filesystem operation. The
+contract decrements every positive counter by exactly one and returns `None`
+when the counter is zero; production maps exhaustion to `Cause::Limit`. A unit
+test checks zero, one, ordinary, and machine-maximum inputs. This establishes
+the scalar counter transition only. It does not prove that every production
+operation is charged exactly once, that cancellation cannot race the check, or
+that work limits bound hook/syscall duration, cleanup work, or the full Linux
+restore controller. The candidate remains pending independent review; the
+Linux restoration milestone remains unproved.

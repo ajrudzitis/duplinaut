@@ -151,11 +151,15 @@ struct Forward<'a, H> {
     hooks: &'a mut H,
 }
 impl<H: Hooks> Forward<'_, H> {
+    //= docs/parsing-requirements.md#restore-012
+    //= type=implementation
+    //# The backend MUST enforce independent checked budgets for created entries, retained directory FDs, owned metadata, path/name/target bytes, total regular payload bytes, forward work, staging-name attempts, and cleanup work before the associated allocation or syscall.
     fn tick(&mut self) -> Result<(), Cause> {
         if self.cancel.is_cancelled() {
             return Err(Cause::Cancelled);
         }
-        self.left = self.left.checked_sub(1).ok_or(Cause::Limit)?;
+        self.left =
+            crate::verified::restore_work::decrement_forward_work(self.left).ok_or(Cause::Limit)?;
         Ok(())
     }
     fn create<T>(
@@ -1089,6 +1093,19 @@ mod tests {
         sync::atomic::{AtomicU64, Ordering},
     };
     static NEXT: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-012
+    //= type=test
+    //# The backend MUST enforce independent checked budgets for created entries, retained directory FDs, owned metadata, path/name/target bytes, total regular payload bytes, forward work, staging-name attempts, and cleanup work before the associated allocation or syscall.
+    fn forward_work_transition_decrements_once_or_fails_closed() {
+        use crate::verified::restore_work::decrement_forward_work;
+
+        assert_eq!(decrement_forward_work(0), None);
+        assert_eq!(decrement_forward_work(1), Some(0));
+        assert_eq!(decrement_forward_work(2), Some(1));
+        assert_eq!(decrement_forward_work(usize::MAX), Some(usize::MAX - 1));
+    }
 
     #[test]
     //= docs/parsing-requirements.md#restore-014
