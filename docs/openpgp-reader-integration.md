@@ -199,12 +199,13 @@ control explicit confirmation, staging, cancellation and uncertain publication.
       Independent review and the exact-source full assurance gate passed.
 - [ ] Test unsupported algorithms and additional reader-boundary crypto cases,
       yielding no completed snapshot.
-- [ ] On the public `Catalog::read_snapshot_with_crypto` boundary, use the official
+- [x] On the public `Catalog::read_snapshot_with_crypto` boundary, use the official
       signed 3.0.7 chain with its correct recipient secret, password and signer
       certificate but an unrelated permitted primary fingerprint. The reader
       returns native `SignerNotAllowed` (not a credential or MDC error), no
-      snapshot, and no secret in diagnostics. Independent review and full CI are
-      pending.
+      snapshot, and no secret in diagnostics. Independent review and the exact-source
+      full assurance gate passed for candidate `e96f689` (receipt in
+      [`docs/README.md`](README.md)).
 - [x] Exercise source identity change, truncation and excess through the public
       `Catalog::read_snapshot_with_crypto`/`ObjectSource` path; no snapshot is returned.
 - [x] Prove digest-first behavior by a negative object that would otherwise decrypt;
