@@ -112,6 +112,17 @@ Independent source review and independent execution accepted this native checkpo
 
 After adoption, the complete local `cargo xtask ci` gate passed at commit `fdce7c9`, source SHA-256 `834aeae159efd3ced91c980398c3ceb3e126aa334d8b01c11cf1ee3144f215f1`, including fresh strict core verification, generated-parser and Duvet gates, formatting, Clippy, and native tests. This accepts the existing tooling milestone and tested native checkpoint, not missing filesystem-controller contracts or untested filesystem families.
 
+The timestamp validator was independently accepted at `6d064b9` (candidate
+`cdb92257cb125aa83bb9e68758d9028adea24d27`, tree
+`381e7381846e4dc5256737c8f63fdc08cfa1fc51`) with exact-source SHA-256
+`156942ede31c5e1b914338cfaad24ffb918c190d3deab8427951bbf7a9e4c499`.
+The full elevated `cargo xtask ci` gate passed, including 2,047 vstd, 3,183
+Vest, and 1,038 core Verus obligations with zero errors, Duvet, Clippy, all
+workspace tests and doctests. Independent review confirmed that the production
+conversion uses the validator and that its tests and annotations match the
+scoped claim. This does not prove filesystem timestamp effects or the overall
+Linux restore controller.
+
 The scoped regular-file write-offset transition was independently accepted at
 `7d8b3e4` (tree `e125f42b7bb4795bcafdd3cc11899b77124a980f`) and passed the full
 exact-source `cargo xtask ci` gate with SHA-256

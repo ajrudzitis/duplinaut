@@ -297,7 +297,7 @@ the rename syscall's effects, complete controller ordering, or general
 filesystem cleanup safety. This scoped proof was independently accepted; the
 Linux restoration milestone remains unproved.
 
-## Restore timestamp validation proof candidate
+## Restore timestamp validation proof
 
 `validate_restore_time` is called by the production `times()` conversion during
 preflight and final metadata application. Its contract accepts only nanoseconds
@@ -306,5 +306,5 @@ native adapter constructs a `Timespec` with that mtime and `UTIME_OMIT` for
 atime. Boundary tests cover negative seconds, both signed-second extrema, the
 largest valid nanoseconds, and invalid nanosecond values. This proof does not
 cover filesystem timestamp support, rounding, the `futimens` effect, or
-read-back fidelity; the Linux restoration milestone remains unproved, and this
-checkpoint awaits independent review.
+read-back fidelity. This scoped proof was independently accepted; the Linux
+restoration milestone remains unproved.
