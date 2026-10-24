@@ -360,6 +360,25 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-volume-work-reservation"
+gate = false
+requirements = ["PARSE-GEN-005"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate cumulative work reservation pending review; iteration coverage and
+# object-identity/controller refinement remain outside the proof.
+implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "reserve_volume_scan" }]
+proofs = [{ id = "reader-volume-cumulative-work-reservation", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "reserve_volume_scan", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "verified::reader_volume_scan::tests::volume_scan_reservation_checks_exact_cumulative_work_and_overflow" },
+  { package = "duplicity-core", name = "reader_budget_edges_accept_exact_and_reject_one_less" }
+]
+
+[[milestone]]
 id = "local-source"
 gate = false
 requirements = ["PARSE-SOURCE-001"]

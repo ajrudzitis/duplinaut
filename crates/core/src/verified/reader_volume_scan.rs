@@ -22,6 +22,62 @@ pub struct ChargedVolumeObject {
     pub object_index: usize,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VolumeScanReservation {
+    pub initial_checks: usize,
+    pub planned_checks: usize,
+    pub final_checks: usize,
+}
+
+pub open spec fn reserve_volume_scan_model(
+    checked: usize,
+    volume_count: usize,
+    object_count: usize,
+    limit: usize,
+) -> Option<VolumeScanReservation> {
+    let planned = volume_count as int * object_count as int;
+    let final_checks = checked as int + planned;
+    if planned <= usize::MAX as int
+        && final_checks <= usize::MAX as int
+        && checked <= limit
+        && final_checks <= limit as int
+    {
+        Some(VolumeScanReservation {
+            initial_checks: checked,
+            planned_checks: planned as usize,
+            final_checks: final_checks as usize,
+        })
+    } else {
+        None
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub fn reserve_volume_scan(
+    checked: usize,
+    volume_count: usize,
+    object_count: usize,
+    limit: usize,
+) -> (result: Option<VolumeScanReservation>)
+    ensures result == reserve_volume_scan_model(checked, volume_count, object_count, limit),
+{
+    if checked > limit {
+        return None;
+    }
+    let planned_checks = volume_count.checked_mul(object_count)?;
+    let final_checks = checked.checked_add(planned_checks)?;
+    if final_checks > limit {
+        return None;
+    }
+    Some(VolumeScanReservation {
+        initial_checks: checked,
+        planned_checks,
+        final_checks,
+    })
+}
+
 pub open spec fn charge_volume_object_model(
     scan: VolumeScan,
     limit: usize,
@@ -114,7 +170,36 @@ pub fn record_volume_candidate(
 
 #[cfg(test)]
 mod tests {
-    use super::{charge_volume_object, record_volume_candidate, VolumeScan, VolumeScanError};
+    use super::{
+        charge_volume_object, record_volume_candidate, reserve_volume_scan, VolumeScan,
+        VolumeScanError, VolumeScanReservation,
+    };
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=test
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    fn volume_scan_reservation_checks_exact_cumulative_work_and_overflow() {
+        assert_eq!(
+            reserve_volume_scan(7, 3, 4, 19),
+            Some(VolumeScanReservation {
+                initial_checks: 7,
+                planned_checks: 12,
+                final_checks: 19,
+            })
+        );
+        assert_eq!(reserve_volume_scan(7, 3, 4, 18), None);
+        assert_eq!(reserve_volume_scan(usize::MAX, 1, 1, usize::MAX), None);
+        assert_eq!(reserve_volume_scan(0, usize::MAX, 2, usize::MAX), None);
+        assert_eq!(
+            reserve_volume_scan(2, 0, usize::MAX, 2),
+            Some(VolumeScanReservation {
+                initial_checks: 2,
+                planned_checks: 0,
+                final_checks: 2,
+            })
+        );
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-gen-005

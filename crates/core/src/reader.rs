@@ -23,7 +23,7 @@ use crate::source::{
 };
 use crate::state::{SnapshotState, StateError, StateLimits};
 use crate::verified::reader_volume_scan::{
-    charge_volume_object, record_volume_candidate, VolumeScan, VolumeScanError,
+    charge_volume_object, record_volume_candidate, reserve_volume_scan, VolumeScan, VolumeScanError,
 };
 pub use pgp::types::Password as OpenPgpPassword;
 use std::io::Read;
@@ -793,7 +793,15 @@ impl<'a> Catalog<'a> {
                 .checked_mul(2 * std::mem::size_of::<&crate::manifest::VolumeRecord>())
                 .filter(|n| *n <= self.limits.normalization_metadata_bytes)
                 .ok_or(ReaderError::Limit)?;
-            for record in manifest.volumes() {
+            let volumes = manifest.volumes();
+            let reservation = reserve_volume_scan(
+                checks,
+                volumes.len(),
+                self.objects.len(),
+                self.limits.max_object_checks,
+            )
+            .ok_or(ReaderError::Limit)?;
+            for record in &volumes {
                 if cancel.is_cancelled() {
                     return Err(ReaderError::Source(SourceError::Cancelled));
                 }
@@ -807,7 +815,7 @@ impl<'a> Catalog<'a> {
                     }
                     let charged = charge_volume_object(
                         scan,
-                        self.limits.max_object_checks,
+                        reservation.final_checks,
                         object_index,
                         self.objects.len(),
                     )
@@ -927,6 +935,9 @@ impl<'a> Catalog<'a> {
                         context.map(|x| x.evidence_limits),
                     )?;
                 }
+            }
+            if checks != reservation.final_checks {
+                return Err(ReaderError::Limit);
             }
             let archive = assembler.finish().map_err(ReaderError::Assembly)?;
             state = Some(

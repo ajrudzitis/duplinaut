@@ -101,3 +101,22 @@ orchestration remains unproved. Independent review accepted candidate
 `ba779ed291613a2fbf65f9f8a240221f45ad2e239fe72813ce40fa9d94d3b9e8`. Verus
 reported 2,047 vstd, 3,183 Vest, and 1,043 core obligations with zero errors;
 Duvet, Clippy, builds, workspace tests, integration tests, and doctests passed.
+
+## Cumulative volume-scan work reservation candidate
+
+After manifest normalization and its metadata bound, `reserve_volume_scan`
+checks `current_checks + normalized_volume_count * catalog_object_count` using
+checked multiplication and addition. The reader does this before entering any
+per-object identity scan, then passes the reservation's final count as the
+limit to each existing per-object charge transition. After the volume scans,
+the observed counter must equal the reservation end. Thus an insufficient
+budget rejects the entire manifest's matching work before the first volume
+candidate predicate runs; exact and overflow edges have direct tests, and the
+official reader budget test covers exact and one-short limits.
+
+The proof covers reservation arithmetic and the call-site ceiling only. It does
+not prove that Rust iteration covers each normalized volume and catalog object
+exactly once, that matching predicates are correct, cancellation timing, other
+resource dimensions, or total reader completeness. The separate
+`reader-volume-work-reservation` assurance milestone remains unproved and
+pending review.
