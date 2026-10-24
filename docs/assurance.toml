@@ -386,8 +386,9 @@ specified = true
 implemented = true
 proved = false
 tested = true
-# Scalar forward-work decrement and bounded regular-file write-offset refinements
-# are independently accepted; filesystem-controller/syscall refinement remains open.
+# Journal transitions/cleanup behavior, scalar forward-work decrement, and bounded
+# regular-file write-offset refinements are independently accepted;
+# filesystem-controller/syscall refinement remains open.
 reviewed = true
 proof_required = true
 # Native acceptance only; exact controller/kernel refinement remains pending.

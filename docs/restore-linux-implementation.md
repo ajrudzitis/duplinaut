@@ -132,3 +132,14 @@ Duvet matched 138 requirements and 522 references. Formatting, strict Clippy,
 workspace tests and doctests passed. The helper proves one-unit decrement for
 positive work and exhaustion at zero; complete call-site accounting, syscall
 duration, cancellation races and cleanup remain outside its claim.
+
+The creation-journal transition and possibly-created cleanup checkpoint were
+independently accepted at `0e1b62f` (tree
+`3f9f6cf2b877781245f22f5d698fbdf8754a5381`) and passed exact-source full
+`cargo xtask ci` with SHA-256
+`273ce0535c2427b152e1af95fdc3d416217d1113781df6d2a0663dcaf02a4e29`.
+Verus reported 2,047 vstd, 3,183 Vest and 1,024 core obligations with zero
+errors; Duvet, formatting, strict checks, all workspace tests and doctests passed.
+The before-create-hook test exercises cleanup after the conservative journal
+state is set but before the creation syscall. It does not prove cleanup syscall
+safety or the complete controller.
