@@ -434,7 +434,7 @@ impl<'a> Catalog<'a> {
         if listed.len() > limits.source.max_objects {
             return Err(ReaderError::Limit);
         }
-        // Charge listing overlap, exact-capacity catalog/descriptors/indexes and
+        // Charge listing overlap, requested catalog/descriptor/index slots and
         // temporary sorted indices before allocating. String capacities remain
         // owned by their original StoredObjects; no key/identity clone is made.
         let mut charged = initialize_catalog_metadata(
