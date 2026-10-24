@@ -247,6 +247,21 @@ behavior, or the complete restore preflight/controller. This scoped proof was
 independently accepted; the overall Linux restoration milestone remains
 unproved.
 
+## Streaming preflight summary proof candidate
+
+`advance_restore_preflight_summary` is called during `prepare`'s existing
+validation traversal. Each successful transition atomically updates component
+and target name/metadata charges, regular payload bytes, the directory count,
+and whether the plan contains a regular file. The resulting summary is passed
+directly to `restore_preflight` before the node and directory-FD vectors are
+reserved. Boundary tests cover exact and one-short name, metadata and payload
+limits, plus overflow in each accumulated counter and the C-string terminator.
+The proof covers one transition over caller-supplied current-entry facts; it
+does not prove that the traversal visits every plan entry exactly once or that
+the entry type/length facts are correctly derived. Those fact-provenance and
+whole-loop obligations remain open, as does the overall Linux restoration
+milestone.
+
 ## Cleanup-schedule reservation proof
 
 `cleanup_schedule_bound` models cleanup calls selected by the current prepared

@@ -8,8 +8,9 @@ use crate::{
     tar::{EntryType, TarTime},
     verified::{
         restore_budget::{
-            charge_name_metadata, cleanup_schedule_bound, restore_preflight, CleanupSchedule,
-            RestorePreflightLimits, RestorePreflightNeed,
+            advance_restore_preflight_summary, cleanup_schedule_bound, restore_preflight,
+            CleanupSchedule, RestorePreflightItem, RestorePreflightLimits, RestorePreflightNeed,
+            RestorePreflightSummary,
         },
         restore_publication::{
             decide_publication_cleanup, PublicationCleanup, PublicationDecision,
@@ -297,13 +298,6 @@ fn prepare<'a>(
     {
         return Err(Cause::InvalidPlan);
     }
-    let directory_count = entries
-        .iter()
-        .filter(|e| e.entry().entry_type() == EntryType::Directory)
-        .count();
-    let active_file = entries
-        .iter()
-        .any(|e| e.entry().entry_type() == EntryType::Regular);
     let mut names = (dest.len() + 1 + 128)
         .checked_add(parent_bytes)
         .ok_or(Cause::Limit)?;
@@ -326,7 +320,13 @@ fn prepare<'a>(
         std::mem::size_of::<Option<OwnedFd>>(),
         limits.metadata_bytes,
     )?;
-    let mut payload = 0u64;
+    let mut summary = RestorePreflightSummary {
+        name_bytes: names,
+        metadata_bytes: metadata,
+        payload_bytes: 0,
+        directory_count: 0,
+        active_file: false,
+    };
     // Validate everything and budget every CString before allocation/staging.
     for entry in entries {
         work.tick()?;
@@ -338,24 +338,20 @@ fn prepare<'a>(
             }
         }
         let parts = entry.path().components();
-        if let Some(name) = parts.last() {
-            let charge = charge_name_metadata(
-                names,
-                metadata,
-                name.len(),
-                limits.name_bytes,
-                limits.metadata_bytes,
-            )
-            .ok_or(Cause::Limit)?;
-            names = charge.name_bytes;
-            metadata = charge.metadata_bytes;
-        }
+        let mut item = RestorePreflightItem {
+            component_bytes: parts.last().map(|name| name.len()),
+            target_bytes: None,
+            is_directory: false,
+            is_regular: false,
+            payload_bytes: 0,
+        };
         match entry.entry().entry_type() {
-            EntryType::Directory => {}
+            EntryType::Directory => item.is_directory = true,
             EntryType::Regular => {
-                payload = payload
-                    .checked_add(entry.entry().content().ok_or(Cause::InvalidPlan)?.len() as u64)
-                    .ok_or(Cause::Limit)?;
+                item.is_regular = true;
+                item.payload_bytes =
+                    u64::try_from(entry.entry().content().ok_or(Cause::InvalidPlan)?.len())
+                        .map_err(|_| Cause::Limit)?;
             }
             EntryType::Symlink => {
                 let target = entry.entry().linkname();
@@ -366,19 +362,18 @@ fn prepare<'a>(
                 {
                     return Err(Cause::InvalidPlan);
                 }
-                let charge = charge_name_metadata(
-                    names,
-                    metadata,
-                    target.len(),
-                    limits.name_bytes,
-                    limits.metadata_bytes,
-                )
-                .ok_or(Cause::Limit)?;
-                names = charge.name_bytes;
-                metadata = charge.metadata_bytes;
+                item.target_bytes = Some(target.len());
             }
             _ => return Err(Cause::InvalidPlan),
         }
+        summary = advance_restore_preflight_summary(
+            summary,
+            item,
+            limits.name_bytes,
+            limits.metadata_bytes,
+            limits.payload_bytes,
+        )
+        .ok_or(Cause::Limit)?;
         if !parts.is_empty() {
             let parent = &parts[..parts.len() - 1];
             let mut found = false;
@@ -400,10 +395,10 @@ fn prepare<'a>(
         RestorePreflightNeed {
             entry_count: entries.len(),
             root_exists: root.is_some(),
-            directory_count,
-            active_file,
+            directory_count: summary.directory_count,
+            active_file: summary.active_file,
             wrapper: profile == Profile::ProtectedParentWrapper,
-            payload_bytes: payload,
+            payload_bytes: summary.payload_bytes,
         },
         RestorePreflightLimits {
             entry_count: limits.entries,
@@ -1135,6 +1130,142 @@ mod tests {
         sync::atomic::{AtomicU64, Ordering},
     };
     static NEXT: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-012
+    //= type=test
+    //# The backend MUST enforce independent checked budgets for created entries, retained directory FDs, owned metadata, path/name/target bytes, total regular payload bytes, forward work, staging-name attempts, and cleanup work before the associated allocation or syscall.
+    fn restore_preflight_summary_updates_all_charges_or_fails_closed() {
+        use crate::verified::restore_budget::{
+            advance_restore_preflight_summary, RestorePreflightItem, RestorePreflightSummary,
+        };
+
+        let empty = RestorePreflightSummary {
+            name_bytes: 0,
+            metadata_bytes: 0,
+            payload_bytes: 0,
+            directory_count: 0,
+            active_file: false,
+        };
+        let directory = RestorePreflightItem {
+            component_bytes: Some(2),
+            target_bytes: None,
+            is_directory: true,
+            is_regular: false,
+            payload_bytes: 0,
+        };
+        let after_directory = advance_restore_preflight_summary(empty, directory, 3, 3, 10)
+            .expect("exact name and metadata limits should fit");
+        assert_eq!(after_directory.name_bytes, 3);
+        assert_eq!(after_directory.metadata_bytes, 3);
+        assert_eq!(after_directory.directory_count, 1);
+        assert!(!after_directory.active_file);
+        assert_eq!(
+            advance_restore_preflight_summary(empty, directory, 2, 3, 10),
+            None
+        );
+        assert_eq!(
+            advance_restore_preflight_summary(empty, directory, 3, 2, 10),
+            None
+        );
+
+        let file = RestorePreflightItem {
+            component_bytes: Some(1),
+            target_bytes: None,
+            is_directory: false,
+            is_regular: true,
+            payload_bytes: 10,
+        };
+        let after_file = advance_restore_preflight_summary(after_directory, file, 5, 5, 10)
+            .expect("exact payload limit should fit");
+        assert_eq!(after_file.name_bytes, 5);
+        assert_eq!(after_file.metadata_bytes, 5);
+        assert_eq!(after_file.payload_bytes, 10);
+        assert_eq!(after_file.directory_count, 1);
+        assert!(after_file.active_file);
+        assert_eq!(
+            advance_restore_preflight_summary(after_directory, file, 5, 5, 9),
+            None
+        );
+
+        let symlink = RestorePreflightItem {
+            component_bytes: Some(0),
+            target_bytes: Some(2),
+            is_directory: false,
+            is_regular: false,
+            payload_bytes: 0,
+        };
+        let after_link = advance_restore_preflight_summary(empty, symlink, 5, 5, 0)
+            .expect("component and target terminators should both be charged");
+        assert_eq!(after_link.name_bytes, 4);
+        assert_eq!(after_link.metadata_bytes, 4);
+
+        assert_eq!(
+            advance_restore_preflight_summary(
+                RestorePreflightSummary {
+                    name_bytes: usize::MAX,
+                    ..empty
+                },
+                directory,
+                usize::MAX,
+                usize::MAX,
+                u64::MAX,
+            ),
+            None
+        );
+        assert_eq!(
+            advance_restore_preflight_summary(
+                RestorePreflightSummary {
+                    metadata_bytes: usize::MAX,
+                    ..empty
+                },
+                directory,
+                usize::MAX,
+                usize::MAX,
+                u64::MAX,
+            ),
+            None
+        );
+        assert_eq!(
+            advance_restore_preflight_summary(
+                RestorePreflightSummary {
+                    directory_count: usize::MAX,
+                    ..empty
+                },
+                directory,
+                usize::MAX,
+                usize::MAX,
+                u64::MAX,
+            ),
+            None
+        );
+        assert_eq!(
+            advance_restore_preflight_summary(
+                RestorePreflightSummary {
+                    payload_bytes: u64::MAX,
+                    ..empty
+                },
+                file,
+                usize::MAX,
+                usize::MAX,
+                u64::MAX,
+            ),
+            None
+        );
+        assert_eq!(
+            advance_restore_preflight_summary(
+                empty,
+                RestorePreflightItem {
+                    component_bytes: Some(usize::MAX),
+                    ..directory
+                },
+                usize::MAX,
+                usize::MAX,
+                u64::MAX,
+            ),
+            None
+        );
+    }
 
     #[test]
     //= docs/parsing-requirements.md#restore-012

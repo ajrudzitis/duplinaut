@@ -148,6 +148,127 @@ pub(crate) fn charge_name_metadata(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RestorePreflightSummary {
+    pub name_bytes: usize,
+    pub metadata_bytes: usize,
+    pub payload_bytes: u64,
+    pub directory_count: usize,
+    pub active_file: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RestorePreflightItem {
+    pub component_bytes: Option<usize>,
+    pub target_bytes: Option<usize>,
+    pub is_directory: bool,
+    pub is_regular: bool,
+    pub payload_bytes: u64,
+}
+
+pub open spec fn advance_restore_preflight_summary_model(
+    summary: RestorePreflightSummary,
+    item: RestorePreflightItem,
+    name_limit: usize,
+    metadata_limit: usize,
+    payload_limit: u64,
+) -> Option<RestorePreflightSummary> {
+    let component_charge = match item.component_bytes {
+        Some(bytes) => bytes as int + 1,
+        None => 0int,
+    };
+    let target_charge = match item.target_bytes {
+        Some(bytes) => bytes as int + 1,
+        None => 0int,
+    };
+    let name_after = summary.name_bytes as int + component_charge + target_charge;
+    let metadata_after = summary.metadata_bytes as int + component_charge + target_charge;
+    let directory_after = summary.directory_count as int
+        + (if item.is_directory { 1int } else { 0int });
+    let payload_after = summary.payload_bytes as int + item.payload_bytes as int;
+    if (item.is_regular || item.payload_bytes == 0)
+        && name_after <= usize::MAX as int
+        && metadata_after <= usize::MAX as int
+        && directory_after <= usize::MAX as int
+        && payload_after <= u64::MAX as int
+        && name_after <= name_limit as int
+        && metadata_after <= metadata_limit as int
+        && payload_after <= payload_limit as int
+    {
+        Some(RestorePreflightSummary {
+            name_bytes: name_after as usize,
+            metadata_bytes: metadata_after as usize,
+            payload_bytes: payload_after as u64,
+            directory_count: directory_after as usize,
+            active_file: summary.active_file || item.is_regular,
+        })
+    } else {
+        None
+    }
+}
+
+//= docs/parsing-requirements.md#restore-012
+//= type=implementation
+//# The backend MUST enforce independent checked budgets for created entries, retained directory FDs, owned metadata, path/name/target bytes, total regular payload bytes, forward work, staging-name attempts, and cleanup work before the associated allocation or syscall.
+pub(crate) fn advance_restore_preflight_summary(
+    summary: RestorePreflightSummary,
+    item: RestorePreflightItem,
+    name_limit: usize,
+    metadata_limit: usize,
+    payload_limit: u64,
+) -> (result: Option<RestorePreflightSummary>)
+    ensures
+        result == advance_restore_preflight_summary_model(
+            summary, item, name_limit, metadata_limit, payload_limit,
+        ),
+{
+    if !item.is_regular && item.payload_bytes != 0
+        || summary.name_bytes > name_limit
+        || summary.metadata_bytes > metadata_limit
+        || summary.payload_bytes > payload_limit
+    {
+        return None;
+    }
+    let mut names = summary.name_bytes;
+    let mut metadata = summary.metadata_bytes;
+    if let Some(component_bytes) = item.component_bytes {
+        let charge = charge_name_metadata(
+            names,
+            metadata,
+            component_bytes,
+            name_limit,
+            metadata_limit,
+        )?;
+        names = charge.name_bytes;
+        metadata = charge.metadata_bytes;
+    }
+    if let Some(target_bytes) = item.target_bytes {
+        let charge = charge_name_metadata(
+            names,
+            metadata,
+            target_bytes,
+            name_limit,
+            metadata_limit,
+        )?;
+        names = charge.name_bytes;
+        metadata = charge.metadata_bytes;
+    }
+    let directory_count = summary
+        .directory_count
+        .checked_add(if item.is_directory { 1 } else { 0 })?;
+    let payload_bytes = summary.payload_bytes.checked_add(item.payload_bytes)?;
+    if payload_bytes > payload_limit {
+        return None;
+    }
+    Some(RestorePreflightSummary {
+        name_bytes: names,
+        metadata_bytes: metadata,
+        payload_bytes,
+        directory_count,
+        active_file: summary.active_file || item.is_regular,
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CleanupSchedule {
     pub created_entries: usize,
     pub reserved_work: usize,
