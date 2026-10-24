@@ -345,10 +345,10 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate transition pending review; object enumeration, identity predicate,
-# cancellation/controller and global resource-accounting refinement remain open.
+# Scoped transitions independently accepted; object enumeration, identity
+# predicate, cancellation/controller and global resource-accounting refinement remain open.
 implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "charge_volume_object" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "record_volume_candidate" }]
 proofs = [
   { id = "reader-volume-scan-charge", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "charge_volume_object", kind = "contract" },

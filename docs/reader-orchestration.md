@@ -80,7 +80,7 @@ source SHA-256 `5c9428d96d7d8d0fa5548a9cbda82e8d79b4d7d27c849acd85a13cb532631087
 The README milestone stays unchecked because the surrounding controller and
 complete resource-accounting obligations remain open.
 
-## Volume candidate scan proof candidate
+## Volume candidate scan proof
 
 The required-volume matcher now calls `charge_volume_object` before reading the
 current object's name to evaluate the native identity predicate. That
@@ -95,5 +95,9 @@ These contracts prove the budget-before-predicate call and one-step candidate
 accumulation only. They do not prove that enumeration visits each object once
 or in order, that the native object-identity predicate is correct, cancellation
 timing, the entire nested matcher, or global resource accounting. The
-reader-volume-scan assurance milestone remains `proved=false` and awaits
-independent review; complete reader orchestration remains unproved.
+reader-volume-scan assurance milestone remains `proved=false`; complete reader
+orchestration remains unproved. Independent review accepted candidate
+`414bc04`, and exact-source `cargo xtask ci` passed with source SHA-256
+`ba779ed291613a2fbf65f9f8a240221f45ad2e239fe72813ce40fa9d94d3b9e8`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,043 core obligations with zero errors;
+Duvet, Clippy, builds, workspace tests, integration tests, and doctests passed.
