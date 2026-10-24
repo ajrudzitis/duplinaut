@@ -180,7 +180,7 @@ behavior, the provenance or accuracy of reported string capacities, and a
 total heap bound. Accordingly, the count is a conservative metadata accounting
 model rather than a proof of process-wide memory consumption.
 
-## Multipart metadata admission proof candidate
+## Multipart metadata admission proof
 
 Before calling `Manifest::volumes()` or allocating the raw-occurrence vector,
 `MultipartAssembler::new` now asks a verified checked-arithmetic transition to
@@ -196,8 +196,12 @@ Tests cover exact-limit acceptance, one-byte-short rejection, arithmetic
 overflow, and constructor rejection before ordinal validation; the source
 ordering puts the verified admission result before both allocation paths. The
 proof and tests are linked to [PARSE-GEN-005](parsing-requirements.md#parse-gen-005).
-This candidate is pending review and does not prove the overall multipart
-assembly milestone.
+This proof does not complete the overall multipart assembly milestone. The
+candidate `6be51ab` was independently accepted, and exact-source `cargo xtask
+ci` passed with source SHA-256
+`ecb088151af79575c09b50e21ec0c9171b2dde2b59fba2b488616b1a6a165c74`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,055 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
 The verified claim is the reservation arithmetic and the constructor's
 fail-closed use of its result. Manifest normalization semantics remain covered

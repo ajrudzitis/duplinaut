@@ -453,11 +453,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate pending independent review. It verifies the bounded admission
-# arithmetic and constructor call order only; normalization semantics and
-# allocator behavior/capacity provenance remain outside this checkpoint.
+# Independently accepted bounded admission arithmetic and constructor call
+# order only; normalization semantics and allocator behavior/capacity provenance
+# remain outside this checkpoint.
 # The PARSE-MULTI-003 test also exercises successful completion after exact
 # admission; that completion condition is not part of the arithmetic proof.
 implementations = [
