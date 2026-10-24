@@ -147,3 +147,29 @@ ci` passed with source SHA-256
 `e32ccd5939de104017c8fdfb7a83f9cf597166868b0d5d725000bb625a776c35`. Verus,
 Duvet, Clippy, builds, workspace tests, integrations, and doctests passed. Rust
 iterator semantics and the broader reader controller remain open.
+
+## Catalog discovery metadata charge proof candidate
+
+`Catalog::discover` now calls a verified initialization transition after the
+source listing is returned and before allocating the sorted order or catalog
+arrays. It charges the listed vector's reported capacity multiplied by the
+`StoredObject` entry size, plus the fixed `Catalog` shell. Before allocating
+those additional arrays, it also charges the per-object key, ETag, and version
+string capacities, one `CatalogObject`, one `SetDescriptor`, and the accounted
+index slots. Both transitions use checked arithmetic and return `None` on
+overflow or when the configured catalog metadata limit would be exceeded.
+Failure is mapped to `ReaderError::Limit`; no partially advanced charge is
+published by the per-object transition.
+
+Direct tests cover exact-limit acceptance, one-byte-short rejection,
+multiplication/addition overflow, and object-charge atomicity. A reader test
+exercises rejection before catalog construction. The Duvet links map these
+proofs and tests to [PARSE-GEN-005](parsing-requirements.md#parse-gen-005).
+This candidate remains pending independent review and does not complete the
+reader assurance milestone.
+
+The proof is limited to the checked charge transitions and their production
+call order. It excludes allocation internals of `source.list`, actual allocator
+behavior, the provenance or accuracy of reported string capacities, and a
+total heap bound. Accordingly, the count is a conservative metadata accounting
+model rather than a proof of process-wide memory consumption.

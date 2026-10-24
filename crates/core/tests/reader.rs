@@ -561,3 +561,24 @@ fn reader_budget_edges_accept_exact_and_reject_one_less() {
         ));
     }
 }
+
+#[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+fn catalog_metadata_budget_rejects_before_catalog_construction() {
+    let source = Source::official();
+    assert!(matches!(
+        Catalog::discover(
+            &source,
+            "backup/",
+            NameConfig::default(),
+            ReaderLimits {
+                catalog_metadata_bytes: 1,
+                ..ReaderLimits::default()
+            },
+            &Cancellation::default(),
+        ),
+        Err(ReaderError::Limit)
+    ));
+}

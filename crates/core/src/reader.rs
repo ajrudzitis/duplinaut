@@ -22,6 +22,9 @@ use crate::source::{
     Cancellation, CheckedReader, ObjectSource, SourceError, SourceLimits, StoredObject,
 };
 use crate::state::{SnapshotState, StateError, StateLimits};
+use crate::verified::catalog_accounting::{
+    charge_catalog_object_metadata, initialize_catalog_metadata, CatalogObjectMetadata,
+};
 use crate::verified::reader_volume_scan::{
     advance_volume_scan_cursor, charge_volume_object, record_volume_candidate, reserve_volume_scan,
     start_volume_scan_cursor, volume_scan_cursor_complete, VolumeScan, VolumeScanError,
@@ -434,10 +437,15 @@ impl<'a> Catalog<'a> {
         // Charge listing overlap, exact-capacity catalog/descriptors/indexes and
         // temporary sorted indices before allocating. String capacities remain
         // owned by their original StoredObjects; no key/identity clone is made.
-        let mut charged = listed
-            .capacity()
-            .checked_mul(std::mem::size_of::<StoredObject>())
-            .and_then(|n| n.checked_add(std::mem::size_of::<Self>()))
+        let mut charged = initialize_catalog_metadata(
+            listed.capacity(),
+            std::mem::size_of::<StoredObject>(),
+            std::mem::size_of::<Self>(),
+            limits.catalog_metadata_bytes,
+        )
+        .ok_or(ReaderError::Limit)?;
+        let index_metadata_bytes = std::mem::size_of::<usize>()
+            .checked_mul(4)
             .ok_or(ReaderError::Limit)?;
         for object in &listed {
             if cancel.is_cancelled() {
@@ -446,34 +454,25 @@ impl<'a> Catalog<'a> {
             if !object.key.starts_with(prefix) {
                 return Err(ReaderError::CollectionAmbiguous);
             }
-            let identities = object
+            let etag_capacity = object.identity.etag.as_ref().map_or(0, String::capacity);
+            let version_capacity = object
                 .identity
-                .etag
+                .version_id
                 .as_ref()
-                .map_or(0, String::capacity)
-                .checked_add(
-                    object
-                        .identity
-                        .version_id
-                        .as_ref()
-                        .map_or(0, String::capacity),
-                )
-                .ok_or(ReaderError::Limit)?;
-            charged = charged
-                .checked_add(object.key.capacity())
-                .and_then(|n| n.checked_add(identities))
-                .and_then(|n| {
-                    n.checked_add(
-                        std::mem::size_of::<CatalogObject>()
-                            + std::mem::size_of::<SetDescriptor>()
-                            + 4 * std::mem::size_of::<usize>(),
-                    )
-                })
-                .filter(|n| *n <= limits.catalog_metadata_bytes)
-                .ok_or(ReaderError::Limit)?;
-        }
-        if charged > limits.catalog_metadata_bytes {
-            return Err(ReaderError::Limit);
+                .map_or(0, String::capacity);
+            charged = charge_catalog_object_metadata(
+                charged,
+                CatalogObjectMetadata {
+                    key_capacity: object.key.capacity(),
+                    etag_capacity,
+                    version_capacity,
+                    catalog_object_bytes: std::mem::size_of::<CatalogObject>(),
+                    descriptor_bytes: std::mem::size_of::<SetDescriptor>(),
+                    index_bytes: index_metadata_bytes,
+                },
+                limits.catalog_metadata_bytes,
+            )
+            .ok_or(ReaderError::Limit)?;
         }
         let mut order: Vec<usize> = (0..listed.len()).collect();
         order.sort_unstable_by(|a, b| listed[*a].key.cmp(&listed[*b].key));

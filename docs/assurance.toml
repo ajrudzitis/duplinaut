@@ -404,6 +404,34 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-catalog-metadata-accounting"
+gate = false
+requirements = ["PARSE-GEN-005"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate pending independent review. The proof covers checked charge
+# transitions and their production call order, not source.list internals,
+# allocator behavior, string-capacity provenance, or total heap accounting.
+implementations = [
+  { path = "crates/core/src/reader.rs", symbol = "discover" },
+  { path = "crates/core/src/verified/catalog_accounting.rs", symbol = "initialize_catalog_metadata" },
+  { path = "crates/core/src/verified/catalog_accounting.rs", symbol = "charge_catalog_object_metadata" }
+]
+proofs = [
+  { id = "reader-catalog-metadata-initial-charge", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/catalog_accounting.rs", symbol = "initialize_catalog_metadata", kind = "contract" },
+  { id = "reader-catalog-metadata-object-charge", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/catalog_accounting.rs", symbol = "charge_catalog_object_metadata", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::catalog_accounting::tests::catalog_metadata_initial_charge_checks_exact_limit_and_overflow" },
+  { package = "duplicity-core", name = "verified::catalog_accounting::tests::catalog_metadata_object_charge_is_atomic_and_bounded" },
+  { package = "duplicity-core", name = "catalog_metadata_budget_rejects_before_catalog_construction" }
+]
+
+[[milestone]]
 id = "local-source"
 gate = false
 requirements = ["PARSE-SOURCE-001"]
