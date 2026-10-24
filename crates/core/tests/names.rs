@@ -74,6 +74,31 @@ fn month_lengths_follow_gregorian_leap_year_rules() {
     }
 }
 
+//= docs/parsing-requirements.md#parse-name-007
+//= type=test
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+
+#[test]
+fn explicit_zone_offset_boundaries_are_exact() {
+    let parse = |s: &[u8]| parse_long_timestamp(s, b':');
+    for valid in [
+        b"1970-01-01T23:59:00+23:59" as &[u8],
+        b"1969-12-31T00:01:00-23:59",
+        b"1970-01-01T00:00:00+00:00",
+        b"1970-01-01T00:00:00-00:00",
+    ] {
+        assert_eq!(parse(valid), Ok(Timestamp(0)), "{valid:?}");
+    }
+    for invalid in [
+        b"1970-01-01T00:00:00+24:00" as &[u8],
+        b"1970-01-01T00:00:00-24:00",
+        b"1970-01-01T00:00:00+00:60",
+        b"1970-01-01T00:00:00-00:60",
+    ] {
+        assert_eq!(parse(invalid), Err(NameError::Malformed), "{invalid:?}");
+    }
+}
+
 //= docs/parsing-requirements.md#parse-name-002
 //= type=test
 //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.

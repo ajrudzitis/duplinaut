@@ -129,6 +129,20 @@ pub fn month_length(year: u16, month: u8) -> (result: u8)
     }
 }
 
+pub open spec fn zone_offset_seconds_model(sign: int, hours: int, minutes: int) -> int {
+    sign * (hours * 3600 + minutes * 60)
+}
+
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+pub fn zone_offset_seconds(sign: i64, hours: i64, minutes: i64) -> (result: i64)
+    requires (sign == 1 || sign == -1), 0 <= hours <= 23, 0 <= minutes <= 59,
+    ensures result as int == zone_offset_seconds_model(sign as int, hours as int, minutes as int),
+{
+    sign * (hours * 3600 + minutes * 60)
+}
+
 impl ObjectName {
     /// A partial artifact cannot supply completed-set evidence.
     pub fn completed(self) -> (result: bool)
@@ -268,7 +282,7 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
             if zh > 23 || zm > 59 {
                 return Err(NameError::Malformed);
             }
-            (zh * 3600 + zm * 60) * if *sign == b'+' { 1 } else { -1 }
+            zone_offset_seconds(if *sign == b'+' { 1 } else { -1 }, zh, zm)
         }
         _ => return Err(NameError::Malformed),
     };
