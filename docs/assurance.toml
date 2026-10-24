@@ -357,12 +357,15 @@ proved = false
 tested = true
 reviewed = true
 proof_required = true
-# Public Catalog/Source edge tests and the new private multipart authenticated
-# top-off rejection test; independent review/full gate for the latter are pending.
+# Public Catalog/Source edge tests, authenticated top-off rejection, and
+# adversarial public-reader credential/manifest tests; this test slice awaits
+# independent review and exact-source full gate.
 implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_with_crypto" }]
 proofs = []
 tests = [
   { package = "duplicity-core", name = "crypto_reader_rejects_source_identity_change_and_inexact_manifest_bodies" },
+  { package = "duplicity-core", name = "public_crypto_reader_rejects_wrong_symmetric_credentials_without_snapshot_or_secret_disclosure" },
+  { package = "duplicity-core", name = "public_crypto_reader_rejects_authenticated_manifest_ciphertext_mutation" },
   { package = "duplicity-core", name = "signer_policy_rejects_plain_incremental_after_signed_encrypted_full" },
   { package = "duplicity-core", name = "crypto_decoded_and_each_receipt_bound_fail_through_catalog_reader" },
   { package = "duplicity-core", name = "multipart::openpgp_tests::authenticated_nonfinal_topoff_must_match_regenerated_ciphertext_prefix" },

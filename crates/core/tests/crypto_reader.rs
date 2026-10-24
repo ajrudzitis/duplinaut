@@ -416,6 +416,122 @@ fn corrupted_ciphertext_fails_declared_digest_before_missing_credentials() {
 }
 
 #[test]
+//= docs/parsing-requirements.md#parse-env-018
+//= type=test
+//# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+//= docs/parsing-requirements.md#parse-env-021
+//= type=test
+//# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+fn public_crypto_reader_rejects_wrong_symmetric_credentials_without_snapshot_or_secret_disclosure()
+{
+    let source = FixtureSource::new("symmetric", None);
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .unwrap()
+        .0;
+    let wrong_secret = "duplinaut-intentionally-wrong-fixture-password";
+    let password = OpenPgpPassword::from(wrong_secret);
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    let error = match catalog.read_snapshot_with_crypto(
+        anchor,
+        Timestamp(1700000000),
+        &Cancellation::default(),
+        &context,
+    ) {
+        Ok(_) => panic!("reader accepted a wrong symmetric credential"),
+        Err(ReaderError::Crypto(error)) => error,
+        Err(error) => panic!("wrong credential returned an unexpected error: {error:?}"),
+    };
+    assert!(matches!(
+        error,
+        duplicity_core::reader::OpenPgpError::WrongCredentials
+            | duplicity_core::reader::OpenPgpError::AuthenticationFailed
+    ));
+    assert!(!format!("{error:?}").contains(wrong_secret));
+    assert!(!error.to_string().contains(wrong_secret));
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-018
+//= type=test
+//# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+fn public_crypto_reader_rejects_authenticated_manifest_ciphertext_mutation() {
+    let manifest_name = "duplicity-full.20231114T221320Z.manifest.gpg";
+    // Mutate the stored OpenPGP MDC byte before discovery. This preserves the
+    // filename and object length, so catalog structure remains valid and there
+    // is no data-volume digest that could mask native message authentication.
+    let mut source = FixtureSource::new("symmetric", None);
+    let (_, bytes) = source
+        .values
+        .iter_mut()
+        .find(|(object, _)| object.key.ends_with(manifest_name))
+        .expect("official full manifest fixture");
+    *bytes.last_mut().expect("nonempty OpenPGP fixture") ^= 0x01;
+    let object = source
+        .values
+        .iter_mut()
+        .find(|(object, _)| object.key.ends_with(manifest_name))
+        .unwrap();
+    object.0.identity.etag = Some(format!("{:x}", Sha256::digest(&object.1)));
+
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .expect("same-size ciphertext mutation does not alter catalog listing");
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .expect("full manifest remains discoverable")
+        .0;
+    let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    assert!(matches!(
+        catalog.read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1700000000),
+            &Cancellation::default(),
+            &context,
+        ),
+        Err(ReaderError::Crypto(
+            duplicity_core::reader::OpenPgpError::AuthenticationFailed
+        ))
+    ));
+}
+
+#[test]
 //= docs/parsing-requirements.md#parse-env-024
 //= type=test
 //# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.

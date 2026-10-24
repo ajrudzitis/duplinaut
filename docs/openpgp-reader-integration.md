@@ -190,8 +190,15 @@ control explicit confirmation, staging, cancellation and uncertain publication.
 - [x] Read all three dates of each original symmetric/public-key/signed corpus through
       ObjectSource and compare file contents against independent source SHA256 oracles.
       Path/type/mode/mtime comparisons remain incomplete in this reader integration test.
-- [ ] Test wrong credentials/signers, tampered manifest, unsupported algorithms, and
-      post-crypto cancellation, yielding no completed snapshot.
+- [x] Test wrong symmetric credentials and a same-size authenticated-manifest
+      ciphertext mutation through public `Catalog::read_snapshot_with_crypto`
+      calls; both return typed native crypto errors and no snapshot. The mutated
+      manifest is altered before discovery and keeps its name/size, so no volume
+      digest or malformed listing can mask native MDC rejection. Credentials are
+      borrowed and the wrong test secret is absent from the formatted error.
+      Independent review and exact-source full gate for this slice remain pending.
+- [ ] Test wrong signer authorization, unsupported algorithms, and additional
+      reader-boundary crypto cases, yielding no completed snapshot.
 - [x] Exercise source identity change, truncation and excess through the public
       `Catalog::read_snapshot_with_crypto`/`ObjectSource` path; no snapshot is returned.
 - [x] Prove digest-first behavior by a negative object that would otherwise decrypt;
@@ -222,8 +229,6 @@ control explicit confirmation, staging, cancellation and uncertain publication.
 - [x] Exercise those same two internal checkpoints through public
       `Catalog::read_snapshot_with_crypto` calls using official symmetric fixture
       ciphertext. Both return the public `Source(Cancelled)` outcome and no snapshot.
-- [ ] Test wrong reader credentials/signers and tampered encrypted manifests at the
-      public reader boundary.
 - [x] Independently review the scoped lifecycle/evidence charging/dedup behavior; focused and complete gates pass on the adopted source.
 - [ ] Retain controller refinement, additional cipher/recipient/signing-subkey cases,
       native encrypted multipart producer coverage and broader historical encryption
