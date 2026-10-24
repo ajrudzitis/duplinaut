@@ -102,7 +102,7 @@ orchestration remains unproved. Independent review accepted candidate
 reported 2,047 vstd, 3,183 Vest, and 1,043 core obligations with zero errors;
 Duvet, Clippy, builds, workspace tests, integration tests, and doctests passed.
 
-## Cumulative volume-scan work reservation candidate
+## Cumulative volume-scan work reservation proof
 
 After manifest normalization and its metadata bound, `reserve_volume_scan`
 checks `current_checks + normalized_volume_count * catalog_object_count` using
@@ -118,5 +118,10 @@ The proof covers reservation arithmetic and the call-site ceiling only. It does
 not prove that Rust iteration covers each normalized volume and catalog object
 exactly once, that matching predicates are correct, cancellation timing, other
 resource dimensions, or total reader completeness. The separate
-`reader-volume-work-reservation` assurance milestone remains unproved and
-pending review.
+`reader-volume-work-reservation` assurance milestone remains unproved. The
+candidate `2eace33` was independently accepted, and exact-source `cargo xtask
+ci` passed with source SHA-256
+`64cd83ec25e34ac19737117a13e8cfd9f2b3047590dd900aa1c949019725b9a4`. Verus,
+Duvet, Clippy, builds, workspace tests, integrations, and doctests passed. The
+broader reader controller and complete resource-accounting obligations remain
+open.

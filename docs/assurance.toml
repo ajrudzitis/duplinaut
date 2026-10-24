@@ -367,9 +367,9 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate cumulative work reservation pending review; iteration coverage and
+# Scoped cumulative reservation independently accepted; iteration coverage and
 # object-identity/controller refinement remain outside the proof.
 implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "reserve_volume_scan" }]
 proofs = [{ id = "reader-volume-cumulative-work-reservation", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "reserve_volume_scan", kind = "contract" }]
