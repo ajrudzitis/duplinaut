@@ -456,6 +456,9 @@ struct Charges {
 }
 
 /// Compute all three accounting results before mutating the counters.
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
 pub(crate) fn subtract_charges(
     payload: usize,
     metadata: usize,
@@ -662,4 +665,17 @@ fn archive_charge(archive: &AssembledArchive) -> Result<(usize, usize), StateErr
             .ok_or(StateError::Limit)?;
     }
     Ok((payload, metadata))
+}
+
+#[cfg(test)]
+mod charge_subtraction_tests {
+    use super::subtract_charges;
+
+    #[test]
+    fn componentwise_subtraction_rejects_each_underflow() {
+        assert_eq!(subtract_charges(9, 7, 5, 4, 3, 2), Some((5, 4, 3)));
+        assert_eq!(subtract_charges(3, 7, 5, 4, 3, 2), None);
+        assert_eq!(subtract_charges(9, 2, 5, 4, 3, 2), None);
+        assert_eq!(subtract_charges(9, 7, 1, 4, 3, 2), None);
+    }
 }
