@@ -102,6 +102,33 @@ pub fn days_before_year(year: u16) -> (result: i64)
     days
 }
 
+pub open spec fn month_length_model(year: int, month: int) -> int {
+    if month == 2 {
+        if year_is_leap(year) { 29int } else { 28int }
+    } else if month == 4 || month == 6 || month == 9 || month == 11 {
+        30int
+    } else {
+        31int
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+pub fn month_length(year: u16, month: u8) -> (result: u8)
+    requires 1901 <= year <= 2099, 1 <= month <= 12,
+    ensures result as int == month_length_model(year as int, month as int),
+{
+    let leap_year = year.is_multiple_of(4)
+        && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+    match month {
+        2 if leap_year => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    }
+}
+
 impl ObjectName {
     /// A partial artifact cannot supply completed-set evidence.
     pub fn completed(self) -> (result: bool)
@@ -229,13 +256,7 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
     if !(1901..=2099).contains(&y) || !(1..=12).contains(&m) || h > 23 || min > 59 || sec > 59 {
         return Err(NameError::Malformed);
     }
-    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
-    let month_days = match m {
-        2 if leap => 29,
-        2 => 28,
-        4 | 6 | 9 | 11 => 30,
-        _ => 31,
-    };
+    let month_days = i64::from(month_length(y as u16, m as u8));
     if d < 1 || d > month_days {
         return Err(NameError::Malformed);
     }
@@ -253,12 +274,7 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
     };
     let mut days = days_before_year(y as u16);
     for previous in 1..m {
-        days += match previous {
-            2 if leap => 29,
-            2 => 28,
-            4 | 6 | 9 | 11 => 30,
-            _ => 31,
-        };
+        days += i64::from(month_length(y as u16, previous as u8));
     }
     // 1901-01-01 is exactly 25202 days before the Unix epoch.
     days += d - 1 - 25202;

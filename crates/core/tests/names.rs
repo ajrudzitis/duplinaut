@@ -51,6 +51,29 @@ fn gregorian_dates_and_zones_are_exact() {
     );
 }
 
+//= docs/parsing-requirements.md#parse-name-004
+//= type=test
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+
+#[test]
+fn month_lengths_follow_gregorian_leap_year_rules() {
+    let common_year = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let leap_year = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    for (year, lengths) in [(2001, common_year), (2000, leap_year)] {
+        for (index, last_day) in lengths.into_iter().enumerate() {
+            let month = index + 1;
+            let valid = format!("{year:04}{month:02}{last_day:02}T000000Z");
+            let invalid = format!("{year:04}{month:02}{:02}T000000Z", last_day + 1);
+            assert!(parse_long_timestamp(valid.as_bytes(), b':').is_ok());
+            assert_eq!(
+                parse_long_timestamp(invalid.as_bytes(), b':'),
+                Err(NameError::Malformed),
+                "year {year}, month {month}"
+            );
+        }
+    }
+}
+
 //= docs/parsing-requirements.md#parse-name-002
 //= type=test
 //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
