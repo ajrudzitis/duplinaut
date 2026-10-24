@@ -99,7 +99,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Build read-only terminal history and snapshot browsing; exercise an official chain in a real terminal.
 - [x] Add bounded restore previews, frozen confirmation and worker-owned publication; independently review the terminal lifecycle, run 22 tests and verify a real PTY restore.
 - [x] Accept delta, manifest-token, byte-path, signatures and manifest-record components with exact contracts, fresh full verification, official tests and independent review.
-- [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers. The bounded Gregorian days-before-year kernel is now independently verified; complete filename grammar/controller refinement and remaining parser obligations are open.
+- [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers. Bounded Gregorian year-offset and month-length kernels are independently verified; full filename grammar/controller refinement and remaining parser obligations are open.
 - [ ] Complete verified snapshot indexing and native Linux restoration.
 - [x] Independently review and adopt Linux staging/publication requirements before implementation, including indeterminate syscall outcomes.
 - [x] Implement and independently review native Linux restoration; pass official three-date and fault-injection tests, enforce Duvet requirement coverage.
