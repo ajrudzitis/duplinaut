@@ -196,7 +196,7 @@ control explicit confirmation, staging, cancellation and uncertain publication.
       manifest is altered before discovery and keeps its name/size, so no volume
       digest or malformed listing can mask native MDC rejection. Credentials are
       borrowed and the wrong test secret is absent from the formatted error.
-      Independent review and exact-source full gate for this slice remain pending.
+      Independent review and the exact-source full assurance gate passed.
 - [ ] Test wrong signer authorization, unsupported algorithms, and additional
       reader-boundary crypto cases, yielding no completed snapshot.
 - [x] Exercise source identity change, truncation and excess through the public
