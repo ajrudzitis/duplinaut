@@ -90,7 +90,9 @@ pub fn days_before_year(year: u16) -> (result: i64)
         decreases year - current,
     {
         proof { days_before_year_step(current as int); }
-        days += if current % 4 == 0 && (current % 100 != 0 || current % 400 == 0) {
+        days += if current.is_multiple_of(4)
+            && (!current.is_multiple_of(100) || current.is_multiple_of(400))
+        {
             366
         } else {
             365
