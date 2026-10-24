@@ -110,6 +110,6 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [ ] Complete the browsing/restoration TUI.
 - [ ] Automate full terminal event-loop resize, cancellation and output-fault coverage; finish frontend controller proofs and encrypted credential flow.
 - [ ] Pass the supported official-producer compatibility matrix.
-- [x] **Create GitHub Actions for builds and formal methods:** install pinned tools, check generated parsers, run Verus, enforce Duvet coverage/snapshot gates, and run native/official-fixture tests on pull requests and pushes; retain reports and verification evidence as artifacts. The first hosted assurance gate passed; GitHub Pages is enabled and the first successful publication is pending. See [workflow validation](docs/github-actions.md).
+- [x] **Create GitHub Actions for builds and formal methods:** install pinned tools, check generated parsers, run Verus, enforce Duvet coverage/snapshot gates, and run native/official-fixture tests on pull requests and pushes; retain reports and verification evidence as artifacts. The hosted assurance gate and first GitHub Pages publication both passed. See [workflow validation](docs/github-actions.md).
 - [x] Publish the Duvet HTML report from successful `main` runs through GitHub Pages, with its live URL in the deployment summary.
 - [ ] Publish the exact supported capabilities, verification claims, and trusted boundaries.

@@ -107,7 +107,7 @@ record. No concurrency rule cancels an older run automatically.
 - [x] Publish the Duvet HTML report to GitHub Pages after successful `main` CI runs and show the site URL in the Actions summary.
 - [x] First GitHub-hosted bootstrap and complete assurance run passed on `3f48aef` (run [39728994859](https://github.com/ajrudzitis/duplinaut/actions/runs/39728994859)); the assurance job passed and uploaded the Duvet report.
 - [x] Enable GitHub Pages for the repository with Actions as the deployment source.
-- [ ] Confirm the first successful hosted Pages deployment.
+- [x] Confirm the first successful hosted Pages deployment on run [40047389555](https://github.com/ajrudzitis/duplinaut/actions/runs/40047389555).
 
 Local actionlint validation used the official Linux amd64 archive with SHA-256
 `8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8`, matching
@@ -115,10 +115,10 @@ the upstream checksum manifest. ShellCheck was unavailable for that validation;
 `bash -n` checks shell syntax, not shell behavior. The first hosted assurance job
 passed its complete build/formal/test gate and retained reports. Its separate
 Pages deploy job returned 404 because Pages had not yet been enabled. Pages is
-now enabled with **GitHub Actions** as the source; a successful deployment
-remains to be confirmed. Any formal-gate failure, including proof resource
-exhaustion, deliberately remains a failed workflow rather than a reason to
-bypass verification.
+now enabled with **GitHub Actions** as the source, and run `40047389555`
+successfully deployed the report. Any formal-gate failure, including proof
+resource exhaustion, deliberately remains a failed workflow rather than a
+reason to bypass verification.
 
 To reproduce workflow linting with an available actionlint installation:
 
