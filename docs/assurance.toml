@@ -386,13 +386,13 @@ specified = true
 implemented = true
 proved = false
 tested = true
-# Streaming summary and prior scoped checkpoints are independently accepted;
-# traversal/fact provenance, parent-FD mapping, and broader controller/syscall
-# refinement remain open.
-reviewed = true
+# Prior scoped checkpoints are independently accepted; restore-time validation
+# is pending review, and traversal/fact provenance, parent-FD mapping and broader
+# controller/syscall refinement remain open.
+reviewed = false
 proof_required = true
 # Native acceptance only; exact controller/kernel refinement remains pending.
-implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "advance_restore_preflight_summary" }]
+implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "advance_restore_preflight_summary" }, { path = "crates/core/src/verified/restore_time.rs", symbol = "validate_restore_time" }]
 proofs = [
   { id = "linux-write-offset", requirement = "RESTORE-014", path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset", kind = "contract" },
   { id = "linux-forward-work", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work", kind = "contract" },
@@ -401,7 +401,8 @@ proofs = [
   { id = "linux-cleanup-reservation-bound", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound", kind = "contract" },
   { id = "linux-cleanup-journal-schedule", requirement = "RESTORE-022", path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound", kind = "contract" },
   { id = "linux-name-metadata-charge", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata", kind = "contract" },
-  { id = "linux-streaming-preflight-summary", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_budget.rs", symbol = "advance_restore_preflight_summary", kind = "contract" }
+  { id = "linux-streaming-preflight-summary", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_budget.rs", symbol = "advance_restore_preflight_summary", kind = "contract" },
+  { id = "linux-restore-time-validation", requirement = "RESTORE-011", path = "crates/core/src/verified/restore_time.rs", symbol = "validate_restore_time", kind = "contract" }
 ]
 tests = [
   { package = "duplicity-core", name = "restore_linux::tests::before_create_hook_failure_cleans_possibly_created_entry" },
@@ -416,6 +417,7 @@ tests = [
   { package = "duplicity-core", name = "restore_linux::tests::root_profiles_restrictive_descendants_and_preflight_mode_checks" },
   { package = "duplicity-core", name = "restore_linux::tests::inherited_acl_is_removed_before_widened_final_permissions" },
   { package = "duplicity-core", name = "restore_linux::tests::fractional_negative_time_is_exact_or_fails_before_publication" },
+  { package = "duplicity-core", name = "restore_linux::tests::restore_time_validation_preserves_signed_seconds_and_rejects_invalid_nanoseconds" },
   { package = "duplicity-core", name = "restore_linux::tests::exact_creation_fd_payload_cleanup_and_metadata_edges" },
   { package = "duplicity-core", name = "restore_linux::tests::cleanup_failures_count_and_continue_without_hiding_original_error" },
   { package = "duplicity-core", name = "restore_linux::tests::genuinely_empty_tree_has_explicit_policy_root_without_invented_mtime" },

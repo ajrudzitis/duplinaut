@@ -18,6 +18,8 @@ pub(crate) mod restore_budget;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_publication;
 #[cfg(target_os = "linux")]
+pub(crate) mod restore_time;
+#[cfg(target_os = "linux")]
 pub(crate) mod restore_work;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_write;

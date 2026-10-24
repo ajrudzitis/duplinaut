@@ -15,6 +15,7 @@ use crate::{
         restore_publication::{
             decide_publication_cleanup, PublicationCleanup, PublicationDecision,
         },
+        restore_time::validate_restore_time,
     },
 };
 use rustix::{
@@ -246,9 +247,7 @@ fn checked_add(sum: &mut usize, n: usize, max: usize) -> Result<(), Cause> {
     Ok(())
 }
 fn times(t: TarTime) -> Result<Timestamps, Cause> {
-    if t.nanoseconds >= 1_000_000_000 {
-        return Err(Cause::InvalidPlan);
-    }
+    let t = validate_restore_time(t.seconds, t.nanoseconds).ok_or(Cause::InvalidPlan)?;
     Ok(Timestamps {
         last_access: Timespec {
             tv_sec: 0,
@@ -1849,6 +1848,39 @@ mod tests {
                 }
                 other => panic!("{other:?}"),
             }
+        }
+    }
+    #[test]
+    //= docs/parsing-requirements.md#restore-011
+    //= type=test
+    //# The backend MUST validate the complete restore plan's destination names, supported metadata representations, and initial-profile restrictions before creating staging.
+    //= docs/parsing-requirements.md#restore-017
+    //= type=test
+    //# Before publication the backend MUST verify each created entry's supported type, ordinary permissions and exact mtime, and each regular file's complete size, against the restore plan.
+    fn restore_time_validation_preserves_signed_seconds_and_rejects_invalid_nanoseconds() {
+        for (seconds, nanoseconds) in [
+            (i64::MIN, 0),
+            (-1, 123_456_789),
+            (0, 999_999_999),
+            (i64::MAX, 999_999_999),
+        ] {
+            let timestamp = times(TarTime {
+                seconds,
+                nanoseconds,
+            })
+            .unwrap();
+            assert_eq!(timestamp.last_modification.tv_sec, seconds);
+            assert_eq!(timestamp.last_modification.tv_nsec, i64::from(nanoseconds));
+            assert_eq!(timestamp.last_access.tv_nsec, fs::UTIME_OMIT);
+        }
+        for nanoseconds in [1_000_000_000, u32::MAX] {
+            assert!(matches!(
+                times(TarTime {
+                    seconds: -1,
+                    nanoseconds,
+                }),
+                Err(Cause::InvalidPlan)
+            ));
         }
     }
     #[test]
