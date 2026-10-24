@@ -274,8 +274,9 @@ specified = true
 implemented = true
 proved = false
 tested = true
-# Componentwise charge subtraction is a scoped proof candidate pending independent review.
-reviewed = false
+# Native review and the scoped componentwise charge-subtraction proof are accepted;
+# formal state/resource refinement remains pending.
+reviewed = true
 proof_required = true
 # Native controller tests pass; formal state/resource refinement pending.
 implementations = [{ path = "crates/core/src/state.rs", symbol = "apply" }, { path = "crates/core/src/state.rs", symbol = "subtract_charges" }]

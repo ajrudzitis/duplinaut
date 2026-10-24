@@ -100,7 +100,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Add bounded restore previews, frozen confirmation and worker-owned publication; independently review the terminal lifecycle, run 22 tests and verify a real PTY restore.
 - [x] Accept delta, manifest-token, byte-path, signatures and manifest-record components with exact contracts, fresh full verification, official tests and independent review.
 - [ ] Complete filename, manifest, tar, signature, delta, and multipart parsers. Bounded Gregorian year-offset, month-length, and explicit-zone offset kernels are independently verified; full filename grammar/controller refinement and remaining parser obligations are open.
-- [ ] Complete verified snapshot indexing and native Linux restoration.
+- [ ] Complete verified snapshot indexing and native Linux restoration. A componentwise checked charge-subtraction transition is independently verified; ordered-map refinement, complete state/resource accounting, and filesystem-controller proofs remain open.
 - [x] Independently review and adopt Linux staging/publication requirements before implementation, including indeterminate syscall outcomes.
 - [x] Implement and independently review native Linux restoration; pass official three-date and fault-injection tests, enforce Duvet requirement coverage.
 - [x] Implement and independently review the private bounded OpenPGP adapter against all 27 official crypto objects and nine independent content oracles; document its trusted boundary.

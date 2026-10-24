@@ -96,6 +96,20 @@ tests continue to cover those behaviors. The pure budget predicate contributes
 to PARSE-GEN-003/005; it does not complete either whole-reader requirement or
 PARSE-STATE-001/002.
 
+The componentwise removal-charge transition is independently accepted at
+candidate `f9fad46` and passed exact-source full `cargo xtask ci` with source
+SHA-256 `688b27d37ca9e99310f1e517675cc906402442761f3a314593661271ddedc508`.
+Verus proves that the helper returns the exact three decremented counters only
+when payload, metadata and capacity can all be subtracted, and otherwise returns
+`None`. Production code computes all three results before assigning any counter.
+The unit test covers success and each individual underflow; the state integration
+test confirms subtree removal drops payload charge from 18 to 13 while the
+preceding state retains 18. Duvet matched 138 requirements and 515 references;
+Verus/Vest reported 2,047 vstd, 3,183 Vest and 1,017 core obligations with zero
+errors; formatting, strict Clippy, workspace tests and doctests passed. This
+checkpoint does not prove that counters equal retained allocations, BTreeMap
+subtree selection, ordered state transitions or global resource accounting.
+
 Infrastructure references used for this capacity/ownership review:
 [Arc ownership API](https://doc.rust-lang.org/std/sync/struct.Arc.html),
 [pinned Rust 1.98 byte-vector growth](https://raw.githubusercontent.com/rust-lang/rust/1.98.0/library/alloc/src/raw_vec/mod.rs),
