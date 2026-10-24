@@ -163,3 +163,13 @@ errors; Duvet, formatting, strict checks, workspace tests and doctests passed.
 The proof establishes acceptance/rejection of aggregate entry, directory-FD,
 cleanup-work, payload and staging-attempt charges. It does not establish that
 the caller derives complete charges for every resource.
+
+The cleanup-schedule reservation bound was independently accepted at `a8e2d94`
+(tree `9e58ecbed67b948e08ab31101d8d0a9c387a8304`) and passed exact-source full
+`cargo xtask ci` with SHA-256
+`087b9c13b012ae61daecc97fb4faba660ce21c435dbc2a525d7e70ef86a9c4e2`.
+Verus reported 2,047 vstd, 3,183 Vest and 1,031 core obligations with zero
+errors; Duvet, strict checks and all workspace tests passed, including the
+inherited-ACL integration test with the required host filesystem support. The
+proof bounds cleanup-call allowance by the pre-reserved `2*C` budget; syscall
+effects and the full cleanup controller remain outside its claim.

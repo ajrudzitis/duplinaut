@@ -231,7 +231,7 @@ prove that the input counts completely account for every allocation or syscall,
 nor the filesystem controller. This scoped proof was independently accepted;
 the Linux restoration milestone remains unproved.
 
-## Cleanup-schedule reservation proof candidate
+## Cleanup-schedule reservation proof
 
 `cleanup_schedule_bound` models cleanup calls selected by the current prepared
 restore: mode repairs for opened node/root/wrapper directories, removals for
@@ -246,8 +246,8 @@ under both profiles and assert the attempt count stays within `2*C` without
 budget exhaustion, alongside the exact-limit/no-staging test. This proves the
 arithmetic relationship and production allowance selection, not syscall
 effects, all journal/FD accounting interleavings, or the full cleanup
-controller. This candidate is pending independent review; the Linux
-restoration milestone remains unproved.
+controller. This scoped proof was independently accepted; the Linux restoration
+milestone remains unproved.
 
 ## Publication cleanup-authority proof
 

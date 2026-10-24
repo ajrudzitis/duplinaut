@@ -386,9 +386,9 @@ specified = true
 implemented = true
 proved = false
 tested = true
-# Existing checkpoints are accepted; cleanup-schedule bound candidate awaits
-# independent review. Broader controller and syscall refinement remains open.
-reviewed = false
+# Cleanup-schedule bound and prior scoped checkpoints are independently accepted;
+# broader controller and syscall refinement remains open.
+reviewed = true
 proof_required = true
 # Native acceptance only; exact controller/kernel refinement remains pending.
 implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound" }]
