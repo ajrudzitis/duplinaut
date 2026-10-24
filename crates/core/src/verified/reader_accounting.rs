@@ -4,9 +4,6 @@ use vstd::prelude::*;
 
 verus! {
 
-//= docs/parsing-requirements.md#parse-gen-003
-//= type=implementation
-//# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
 //= docs/parsing-requirements.md#parse-gen-005
 //= type=implementation
 //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
