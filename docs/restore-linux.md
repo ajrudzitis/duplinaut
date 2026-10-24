@@ -216,7 +216,7 @@ safety, staging ownership or the full Linux controller. This scoped proof and
 behavior test were independently accepted; the Linux restoration milestone
 remains unproved.
 
-## Multidimensional preflight-budget proof candidate
+## Multidimensional preflight-budget proof
 
 `restore_preflight` computes the planned creation count, retained directory-FD
 requirement, cleanup-work reservation, and total regular payload against their
@@ -228,7 +228,7 @@ integration cases cover the entry, directory-FD, payload, and cleanup limits;
 the no-staging test verifies these rejections leave the destination parent
 unchanged. This proves the aggregate arithmetic/decision only. It does not
 prove that the input counts completely account for every allocation or syscall,
-nor the filesystem controller. This candidate is pending independent review;
+nor the filesystem controller. This scoped proof was independently accepted;
 the Linux restoration milestone remains unproved.
 
 ## Publication cleanup-authority proof

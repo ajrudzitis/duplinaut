@@ -153,3 +153,13 @@ errors; Duvet queries/trace, formatting, strict checks, tests and doctests passe
 The contract limits post-attempt cleanup authority to removing an empty wrapper
 after reported success; it does not prove the rename's kernel effects or earlier
 controller ordering.
+
+The multidimensional restore preflight was independently accepted at `f70787c`
+(tree `4e8465171f0610efa40db0c3e1c1e742c3090a00`) and passed exact-source full
+`cargo xtask ci` with SHA-256
+`bb8e47f376314601adbf411a60eda13db7d70ee12fa95d9e7c1977a319bcc41e`.
+Verus reported 2,047 vstd, 3,183 Vest and 1,027 core obligations with zero
+errors; Duvet, formatting, strict checks, workspace tests and doctests passed.
+The proof establishes acceptance/rejection of aggregate entry, directory-FD,
+cleanup-work, payload and staging-attempt charges. It does not establish that
+the caller derives complete charges for every resource.
