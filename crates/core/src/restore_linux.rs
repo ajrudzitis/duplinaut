@@ -7,7 +7,10 @@ use crate::{
     state::SnapshotEntry,
     tar::{EntryType, TarTime},
     verified::{
-        restore_budget::{restore_preflight, RestorePreflightLimits, RestorePreflightNeed},
+        restore_budget::{
+            cleanup_schedule_bound, restore_preflight, CleanupSchedule, RestorePreflightLimits,
+            RestorePreflightNeed,
+        },
         restore_publication::{
             decide_publication_cleanup, PublicationCleanup, PublicationDecision,
         },
@@ -224,6 +227,7 @@ struct Prepared<'a> {
     destination: CString,
     staging: CString,
     profile: Profile,
+    cleanup_created_entries: usize,
     cleanup_required: usize,
 }
 fn component(bytes: &[u8]) -> bool {
@@ -376,7 +380,7 @@ fn prepare<'a>(
             }
         }
     }
-    let cleanup_required = restore_preflight(
+    let cleanup_charge = restore_preflight(
         RestorePreflightNeed {
             entry_count: entries.len(),
             root_exists: root.is_some(),
@@ -394,6 +398,8 @@ fn prepare<'a>(
         },
     )
     .ok_or(Cause::Limit)?;
+    let cleanup_created_entries = cleanup_charge.created_entries;
+    let cleanup_required = cleanup_charge.cleanup_work;
     let mut nodes: Vec<Node<'_>> = Vec::new();
     nodes
         .try_reserve_exact(entries.len())
@@ -445,6 +451,7 @@ fn prepare<'a>(
         destination: CString::new(dest).map_err(|_| Cause::InvalidDestination)?,
         staging: CString::new(vec![b'x'; 63]).map_err(|_| Cause::Allocation)?,
         profile,
+        cleanup_created_entries,
         cleanup_required,
     })
 }
@@ -705,7 +712,26 @@ fn cleanup<H: Hooks>(
     hooks: &mut H,
 ) -> Cleanup {
     let mut report = Cleanup::default();
-    let mut left = p.cleanup_required;
+    let opened_node_directories = p.dirs.iter().skip(1).filter(|dir| dir.is_some()).count();
+    let journaled_nodes = p
+        .nodes
+        .iter()
+        .filter(|node| node.journal != Journal::Unattempted)
+        .count();
+    let Some(mut left) = cleanup_schedule_bound(CleanupSchedule {
+        created_entries: p.cleanup_created_entries,
+        reserved_work: p.cleanup_required,
+        planned_nodes: p.nodes.len(),
+        opened_node_directories,
+        journaled_nodes,
+        root_opened: p.dirs.first().is_some_and(Option::is_some),
+        wrapper_opened: wrapper.is_some(),
+        protected_profile: p.profile == Profile::ProtectedParentWrapper,
+        root_attempted,
+    }) else {
+        report.budget_exhausted = true;
+        return report;
+    };
     // Parent-first mode repair before relative child unlink operations.
     if let Some(wrapper) = wrapper {
         cleanup_call(&mut report, &mut left, hooks, Op::CleanupMode, || {
@@ -1782,27 +1808,53 @@ mod tests {
         assert!(fault.seen.is_empty());
     }
     #[test]
+    //= docs/parsing-requirements.md#restore-012
+    //= type=test
+    //# The backend MUST enforce independent checked budgets for created entries, retained directory FDs, owned metadata, path/name/target bytes, total regular payload bytes, forward work, staging-name attempts, and cleanup work before the associated allocation or syscall.
+    //= docs/parsing-requirements.md#restore-022
+    //= type=test
+    //# On a handled failure or observed cancellation before any publication attempt, cleanup MUST attempt removal of journaled definitely-created or possibly-created entries inside exclusively owned staging using retained parent FDs and original component bytes, without following symlinks.
     fn cleanup_failures_count_and_continue_without_hiding_original_error() {
         let snapshot = state(0o700, 0o700, 0o777);
-        let temp = Temp::new(0o700);
-        let mut fault = Fault {
-            before: Some(Op::SetTime),
-            cleanup_error: true,
-            ..Fault::default()
-        };
-        let result = run(&snapshot, &temp, &mut fault, &Cancellation::default());
-        assert!(
-            matches!(result,RestoreOutcome::Unpublished(ref error)if error.cause==Cause::Syscall(Errno::IO)&&error.cleanup.failures>=3&&error.cleanup.diagnostics_truncated)
-        );
-        assert!(
-            fault
-                .seen
-                .iter()
-                .filter(|op| **op == Op::CleanupUnlink)
-                .count()
-                >= 3
-        );
-        assert!(!temp.0.join("dest").exists());
+        let plan = RestorePlan::all(&snapshot, RestorePlanLimits::default()).unwrap();
+        for mode in [0o700, 0o755] {
+            let overhead = if mode == 0o700 { 1 } else { 2 };
+            let temp = Temp::new(mode);
+            let mut fault = Fault {
+                before: Some(Op::SetTime),
+                cleanup_error: true,
+                ..Fault::default()
+            };
+            let result = restore_with(
+                &plan,
+                &temp.0,
+                b"dest",
+                &Cancellation::default(),
+                RestoreLimits {
+                    cleanup_work: (3 + overhead) * 2,
+                    ..RestoreLimits::default()
+                },
+                &mut fault,
+            );
+            assert!(matches!(
+                result,
+                RestoreOutcome::Unpublished(ref error)
+                    if error.cause == Cause::Syscall(Errno::IO)
+                        && error.cleanup.failures >= 3
+                        && error.cleanup.diagnostics_truncated
+                        && error.cleanup.attempted <= (3 + overhead) * 2
+                        && !error.cleanup.budget_exhausted
+            ));
+            assert!(
+                fault
+                    .seen
+                    .iter()
+                    .filter(|op| **op == Op::CleanupUnlink)
+                    .count()
+                    >= 3
+            );
+            assert!(!temp.0.join("dest").exists());
+        }
     }
     #[test]
     //= docs/parsing-requirements.md#restore-019

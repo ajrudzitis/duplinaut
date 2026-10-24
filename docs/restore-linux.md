@@ -231,6 +231,24 @@ prove that the input counts completely account for every allocation or syscall,
 nor the filesystem controller. This scoped proof was independently accepted;
 the Linux restoration milestone remains unproved.
 
+## Cleanup-schedule reservation proof candidate
+
+`cleanup_schedule_bound` models cleanup calls selected by the current prepared
+restore: mode repairs for opened node/root/wrapper directories, removals for
+journaled nodes, and profile-specific root/staging removals. If the created
+entry count is `C` and there are `N` planned nonroot nodes, preflight establishes
+`C = N + 1` for the private-parent profile or `C = N + 2` for the wrapper
+profile. Open node directories and journaled nodes are each bounded by `N`;
+the helper proves the modeled schedule is at most `2*C` and returns that bound.
+Production uses this result as the cleanup-call allowance, so each attempted
+cleanup operation consumes one reserved unit. Tests exercise handled failures
+under both profiles and assert the attempt count stays within `2*C` without
+budget exhaustion, alongside the exact-limit/no-staging test. This proves the
+arithmetic relationship and production allowance selection, not syscall
+effects, all journal/FD accounting interleavings, or the full cleanup
+controller. This candidate is pending independent review; the Linux
+restoration milestone remains unproved.
+
 ## Publication cleanup-authority proof
 
 `decide_publication_cleanup` is a Verus-verified decision helper called for
