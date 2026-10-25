@@ -186,6 +186,61 @@ fn evidence_limits_precede_retention_and_exact_certificate_versions_are_interned
 //= docs/parsing-requirements.md#parse-env-022
 //= type=test
 //# Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
+fn certificate_metadata_limit_is_checked_before_new_certificate_retention() {
+    let item = object("backup/certificate-limit.gpg");
+    let decoded = decoded();
+    let certificate = &decoded.certificates[0];
+    let source_charge = source_metadata_charge(&item).unwrap();
+    let version_index_charge = std::mem::size_of::<usize>();
+    let certificate_charge = std::mem::size_of::<crate::reader::OpenPgpCertificateMetadata>()
+        + certificate.signatures.capacity()
+            * std::mem::size_of::<crate::openpgp::CertificateSignatureMetadata>();
+    let exact = source_charge + version_index_charge + certificate_charge;
+
+    let mut evidence = AuthenticationEvidence::default();
+    let (mut used, mut comparisons) = (0, 0);
+    assert!(matches!(
+        record_with(
+            &mut evidence,
+            &mut used,
+            &mut comparisons,
+            &item,
+            &decoded,
+            EvidenceLimits {
+                max_metadata_bytes: exact - 1,
+                ..limits()
+            },
+        ),
+        Err(ReaderError::Limit)
+    ));
+    assert!(evidence.certificates.is_empty());
+    assert!(evidence.objects.is_empty());
+
+    let mut accepted = AuthenticationEvidence::default();
+    let (mut accepted_used, mut accepted_comparisons) = (0, 0);
+    record_with(
+        &mut accepted,
+        &mut accepted_used,
+        &mut accepted_comparisons,
+        &item,
+        &decoded,
+        EvidenceLimits {
+            max_metadata_bytes: exact,
+            ..limits()
+        },
+    )
+    .unwrap();
+    assert_eq!(accepted.certificates.len(), 1);
+    assert_eq!(accepted_used, exact);
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+//= docs/parsing-requirements.md#parse-env-022
+//= type=test
+//# Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
 fn evidence_comparison_budget_is_charged_before_certificate_lookup() {
     let item = object("backup/compare.gpg");
     let decoded = decoded();

@@ -26,7 +26,7 @@ use crate::verified::catalog_accounting::{
     charge_catalog_object_metadata, initialize_catalog_metadata, CatalogObjectMetadata,
 };
 use crate::verified::evidence_accounting::charge_evidence_comparisons;
-use crate::verified::evidence_metadata::reserve_evidence_record;
+use crate::verified::evidence_metadata::{admit_certificate_version, reserve_evidence_record};
 use crate::verified::reader_volume_scan::{
     advance_volume_scan_cursor, charge_volume_object, record_volume_candidate, reserve_volume_scan,
     start_volume_scan_cursor, volume_scan_cursor_complete, VolumeScan, VolumeScanError,
@@ -342,9 +342,6 @@ fn record_evidence(
         {
             versions.push(index);
         } else {
-            if evidence.certificates.len() >= limits.max_certificate_versions {
-                return Err(ReaderError::Limit);
-            }
             let cert_charge = std::mem::size_of::<OpenPgpCertificateMetadata>()
                 .checked_add(
                     certificate
@@ -356,16 +353,22 @@ fn record_evidence(
                         .ok_or(ReaderError::Limit)?,
                 )
                 .ok_or(ReaderError::Limit)?;
-            *used = used
-                .checked_add(cert_charge)
-                .filter(|n| *n <= limits.max_metadata_bytes)
-                .ok_or(ReaderError::Limit)?;
+            let admission = admit_certificate_version(
+                evidence.certificates.len(),
+                limits.max_certificate_versions,
+                *used,
+                cert_charge,
+                limits.max_metadata_bytes,
+            )
+            .ok_or(ReaderError::Limit)?;
             evidence
                 .certificates
                 .try_reserve_exact(1)
                 .map_err(|_| ReaderError::Allocation)?;
-            let index = evidence.certificates.len();
+            let index = admission.version_count - 1;
             evidence.certificates.push(certificate.clone());
+            debug_assert_eq!(evidence.certificates.len(), admission.version_count);
+            *used = admission.bytes;
             versions.push(index);
         }
     }

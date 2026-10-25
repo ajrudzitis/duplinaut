@@ -210,6 +210,32 @@ corrected exact-source `cargo xtask ci` passed with SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,056 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
+## Authentication certificate-version admission proof candidate
+
+When `record_evidence` does not find a matching certificate in its existing
+pool, it now asks a verified transition to admit one new version before
+`try_reserve_exact(1)` or `push`. The transition requires the current version
+count to be below `max_certificate_versions`, then checks the next count and
+the sum of current retained metadata bytes plus the supplied certificate
+metadata charge against `max_metadata_bytes`. It returns those exact next
+values or rejects on count exhaustion, arithmetic overflow, or a byte-limit
+excess. Production uses the returned next count to select the retained
+certificate's index and publishes the returned byte total after push succeeds.
+
+Tests cover exact and one-short byte budgets, count exhaustion, arithmetic
+overflow, and a record-path rejection that leaves the new certificate and
+object unretained. The candidate links to
+[PARSE-GEN-005](parsing-requirements.md#parse-gen-005) and
+[PARSE-ENV-022](parsing-requirements.md#parse-env-022).
+
+This transition is called only on the existing `.position` no-match branch.
+The proof does not establish certificate equality, whether a match is the
+correct deduplication decision, or behavior of the match path. The certificate
+metadata charge is supplied as a fact; its provenance, allocator behavior,
+clone capacity, and the complete evidence-record loop remain outside. The new
+milestone is pending independent review and does not complete evidence
+accounting.
+
 ## Multipart metadata admission proof
 
 Before calling `Manifest::volumes()` or allocating the raw-occurrence vector,

@@ -455,6 +455,29 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-certificate-version-admission"
+gate = false
+requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate pending review. Proves count and metadata-byte admission for one
+# unseen certificate before reserve/push; charge provenance, pool equality,
+# allocation behavior, and the full evidence loop remain outside.
+implementations = [
+  { path = "crates/core/src/reader.rs", symbol = "record_evidence" },
+  { path = "crates/core/src/verified/evidence_metadata.rs", symbol = "admit_certificate_version" }
+]
+proofs = [{ id = "reader-certificate-version-admission", requirement = "PARSE-ENV-022", path = "crates/core/src/verified/evidence_metadata.rs", symbol = "admit_certificate_version", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "verified::evidence_metadata::tests::certificate_version_admission_checks_exact_limits_and_overflow" },
+  { package = "duplicity-core", name = "reader::crypto_evidence_tests::certificate_metadata_limit_is_checked_before_new_certificate_retention" }
+]
+
+[[milestone]]
 id = "reader-catalog-metadata-accounting"
 gate = false
 requirements = ["PARSE-GEN-005"]
