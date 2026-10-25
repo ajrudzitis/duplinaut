@@ -210,6 +210,30 @@ corrected exact-source `cargo xtask ci` passed with SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,056 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
+## Authentication policy summary admission proof candidate
+
+Before allocating the permitted-fingerprint vector, `policy_summary` now calls
+a verified admission transition. It checks that the configured permitted
+signer count does not exceed the OpenPGP certificate limit, then computes the
+requested summary shell plus one 20-byte fingerprint slot per signer using
+checked multiplication and addition. The requested total must fit within the
+evidence metadata limit. Rejection happens before `try_reserve_exact`; the
+public reader test confirms a one-byte-short policy-summary budget returns no
+snapshot.
+
+The helper tests exact and one-short limits, signer-count rejection, and both
+multiplication and addition overflow. The candidate links to
+[PARSE-GEN-005](parsing-requirements.md#parse-gen-005) and
+[PARSE-ENV-022](parsing-requirements.md#parse-env-022).
+
+The size values and permitted-signer slice length are supplied facts. After
+the preallocation decision, `policy_summary` still checks the actual vector
+capacity using native Rust operations; that post-allocation capacity check is
+not formally verified. This proof does not establish signer-slice validity or
+provenance, actual capacity or allocator behavior, or the full crypto pipeline.
+The milestone remains pending review and does not complete evidence
+accounting.
+
 ## Authentication certificate-version admission proof candidate
 
 When `record_evidence` does not find a matching certificate in its existing

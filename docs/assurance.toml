@@ -478,6 +478,29 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-policy-summary-admission"
+gate = false
+requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate pending review. Proves signer-count and requested summary-byte
+# admission before fingerprint Vec reservation; slice provenance and actual
+# Vec capacity/allocator behavior remain outside.
+implementations = [
+  { path = "crates/core/src/reader.rs", symbol = "policy_summary" },
+  { path = "crates/core/src/verified/policy_metadata.rs", symbol = "reserve_policy_summary" }
+]
+proofs = [{ id = "reader-policy-summary-admission", requirement = "PARSE-ENV-022", path = "crates/core/src/verified/policy_metadata.rs", symbol = "reserve_policy_summary", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "verified::policy_metadata::tests::policy_summary_reservation_checks_exact_limits_and_overflow" },
+  { package = "duplicity-core", name = "public_reader_rejects_oversized_policy_summary_before_snapshot_publication" }
+]
+
+[[milestone]]
 id = "reader-catalog-metadata-accounting"
 gate = false
 requirements = ["PARSE-GEN-005"]

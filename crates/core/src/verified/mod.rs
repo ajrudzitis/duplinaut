@@ -16,6 +16,7 @@ pub(crate) mod evidence_accounting;
 pub(crate) mod evidence_metadata;
 pub(crate) mod multipart_metadata;
 pub(crate) mod openpgp_admission;
+pub(crate) mod policy_metadata;
 pub(crate) mod reader_accounting;
 pub(crate) mod reader_volume_scan;
 #[cfg(target_os = "linux")]

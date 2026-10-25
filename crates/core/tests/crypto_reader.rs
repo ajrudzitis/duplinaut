@@ -902,6 +902,57 @@ fn public_reader_rejects_evidence_record_metadata_before_snapshot_publication() 
 }
 
 #[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+//= docs/parsing-requirements.md#parse-env-022
+//= type=test
+//# Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
+fn public_reader_rejects_oversized_policy_summary_before_snapshot_publication() {
+    let source = FixtureSource::new("plain", None);
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .unwrap()
+        .0;
+    let signers = [[0x5a; 20]];
+    let base_bytes = std::mem::size_of::<AuthenticationPolicySummary>();
+    let fingerprint_bytes = std::mem::size_of::<[u8; 20]>();
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            permitted_signers: &signers,
+            require_signature: true,
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits {
+            certificates: 1,
+            ..OpenPgpLimits::default()
+        },
+        evidence_limits: EvidenceLimits {
+            max_metadata_bytes: base_bytes + fingerprint_bytes - 1,
+            ..EvidenceLimits::default()
+        },
+    };
+    assert!(matches!(
+        catalog.read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1700000000),
+            &Cancellation::default(),
+            &context,
+        ),
+        Err(ReaderError::Limit)
+    ));
+}
+
+#[test]
 fn ciphertext_limit_is_checked_before_object_open() {
     let source = FixtureSource::new("symmetric", None);
     let catalog = Catalog::discover(

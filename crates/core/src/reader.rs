@@ -27,6 +27,7 @@ use crate::verified::catalog_accounting::{
 };
 use crate::verified::evidence_accounting::charge_evidence_comparisons;
 use crate::verified::evidence_metadata::{admit_certificate_version, reserve_evidence_record};
+use crate::verified::policy_metadata::reserve_policy_summary;
 use crate::verified::reader_volume_scan::{
     advance_volume_scan_cursor, charge_volume_object, record_volume_candidate, reserve_volume_scan,
     start_volume_scan_cursor, volume_scan_cursor_complete, VolumeScan, VolumeScanError,
@@ -126,20 +127,14 @@ fn policy_summary(
     let Some(context) = context else {
         return Ok((None, 0));
     };
-    if context.credentials.permitted_signers.len() > context.crypto_limits.certificates {
-        return Err(ReaderError::Limit);
-    }
-    let minimum_bytes = std::mem::size_of::<AuthenticationPolicySummary>()
-        .checked_add(
-            context
-                .credentials
-                .permitted_signers
-                .len()
-                .checked_mul(std::mem::size_of::<[u8; 20]>())
-                .ok_or(ReaderError::Limit)?,
-        )
-        .filter(|n| *n <= context.evidence_limits.max_metadata_bytes)
-        .ok_or(ReaderError::Limit)?;
+    let reservation = reserve_policy_summary(
+        context.credentials.permitted_signers.len(),
+        context.crypto_limits.certificates,
+        std::mem::size_of::<AuthenticationPolicySummary>(),
+        std::mem::size_of::<[u8; 20]>(),
+        context.evidence_limits.max_metadata_bytes,
+    )
+    .ok_or(ReaderError::Limit)?;
     let mut permitted = Vec::new();
     permitted
         .try_reserve_exact(context.credentials.permitted_signers.len())
@@ -152,7 +147,7 @@ fn policy_summary(
                 .checked_mul(std::mem::size_of::<[u8; 20]>())
                 .ok_or(ReaderError::Limit)?,
         )
-        .filter(|n| *n >= minimum_bytes && *n <= context.evidence_limits.max_metadata_bytes)
+        .filter(|n| *n >= reservation.bytes && *n <= context.evidence_limits.max_metadata_bytes)
         .ok_or(ReaderError::Limit)?;
     Ok((
         Some(AuthenticationPolicySummary {
