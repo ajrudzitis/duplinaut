@@ -27,6 +27,8 @@ pub(crate) mod restore_budget;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_cleanup;
 #[cfg(target_os = "linux")]
+pub(crate) mod restore_file_size;
+#[cfg(target_os = "linux")]
 pub(crate) mod restore_finalize;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_publication;

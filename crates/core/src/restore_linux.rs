@@ -13,6 +13,7 @@ use crate::{
             RestorePreflightSummary,
         },
         restore_cleanup::admit_cleanup_attempt,
+        restore_file_size::file_size_matches,
         restore_finalize::{
             advance_finalization_cursor, start_finalization, FinalizationCursor, FinalizationEvent,
         },
@@ -529,10 +530,14 @@ fn verify(stat: &Stat, entry: &SnapshotEntry) -> Result<(), Cause> {
     {
         return Err(Cause::Fidelity);
     }
-    if entry.entry_type() == EntryType::Regular
-        && u64::try_from(stat.st_size).ok() != entry.content().map(|v| v.len() as u64)
-    {
-        return Err(Cause::Fidelity);
+    if entry.entry_type() == EntryType::Regular {
+        let expected = entry
+            .content()
+            .and_then(|content| u64::try_from(content.len()).ok());
+        let observed = u64::try_from(stat.st_size).ok();
+        if !matches!(expected, Some(size) if file_size_matches(size, observed)) {
+            return Err(Cause::Fidelity);
+        }
     }
     Ok(())
 }

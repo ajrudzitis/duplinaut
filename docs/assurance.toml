@@ -787,14 +787,15 @@ specified = true
 implemented = true
 proved = false
 tested = true
-# All listed Linux scoped checkpoints are independently accepted.
-# Traversal/fact provenance, parent-FD mapping and broader controller/syscall
-# refinement remain open.
-reviewed = true
+# Existing Linux scoped checkpoints are independently accepted; regular-file
+# size comparison is a new candidate pending review. Traversal/fact provenance,
+# parent-FD mapping and broader controller/syscall refinement remain open.
+reviewed = false
 proof_required = true
 # Native acceptance only; exact controller/kernel refinement remains pending.
-implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_staging.rs", symbol = "decide_outer_stage" }, { path = "crates/core/src/restore_linux.rs", symbol = "cleanup_call" }, { path = "crates/core/src/verified/restore_cleanup.rs", symbol = "admit_cleanup_attempt" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "next_write_chunk_end" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "commit_write_chunk" }, { path = "crates/core/src/verified/restore_finalize.rs", symbol = "advance_finalization_cursor" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "advance_restore_preflight_summary" }, { path = "crates/core/src/verified/restore_time.rs", symbol = "validate_restore_time" }]
+implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_staging.rs", symbol = "decide_outer_stage" }, { path = "crates/core/src/restore_linux.rs", symbol = "cleanup_call" }, { path = "crates/core/src/verified/restore_cleanup.rs", symbol = "admit_cleanup_attempt" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "next_write_chunk_end" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "commit_write_chunk" }, { path = "crates/core/src/verified/restore_finalize.rs", symbol = "advance_finalization_cursor" }, { path = "crates/core/src/verified/restore_file_size.rs", symbol = "file_size_matches" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "advance_restore_preflight_summary" }, { path = "crates/core/src/verified/restore_time.rs", symbol = "validate_restore_time" }]
 proofs = [
+  { id = "linux-regular-file-size-check", requirement = "RESTORE-017", path = "crates/core/src/verified/restore_file_size.rs", symbol = "file_size_matches", kind = "contract" },
   { id = "linux-finalization-order", requirement = "RESTORE-018", path = "crates/core/src/verified/restore_finalize.rs", symbol = "advance_finalization_cursor", kind = "contract" },
   { id = "linux-write-step-commit", requirement = "RESTORE-014", path = "crates/core/src/verified/restore_write.rs", symbol = "commit_write_chunk", kind = "contract" },
   { id = "linux-write-offset", requirement = "RESTORE-014", path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset", kind = "contract" },
@@ -811,6 +812,7 @@ proofs = [
   { id = "linux-restore-time-validation", requirement = "RESTORE-011", path = "crates/core/src/verified/restore_time.rs", symbol = "validate_restore_time", kind = "contract" }
 ]
 tests = [
+  { package = "duplicity-core", name = "verified::restore_file_size::tests::file_size_comparison_requires_exact_nonnegative_observation" },
   { package = "duplicity-core", name = "restore_linux::tests::before_create_hook_failure_cleans_possibly_created_entry" },
   { package = "duplicity-core", name = "restore_linux::tests::attempted_descendant_side_effect_errors_cleanup_but_outer_uncertainty_is_untouched" },
   { package = "duplicity-core", name = "restore_linux::tests::outer_stage_decision_separates_owned_retry_and_uncertain_results" },

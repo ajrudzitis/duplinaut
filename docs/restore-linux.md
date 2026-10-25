@@ -435,3 +435,19 @@ remain open. Independent review accepted candidate `e08e4b0`; exact-source
 reported 2,047 vstd, 3,183 Vest, and 1,092 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
 restoration remains unproved.
+
+## Regular-file size comparison proof
+
+`file_size_matches` is used by the production `verify()` path for regular files.
+The caller converts `Stat::st_size` and the plan content length to `Option<u64>`
+with checked conversions, and rejects missing conversions or unequal values as a
+fidelity error. The Verus contract proves that an observed value is accepted
+exactly when it is present and equals the supplied expected `u64`. Tests cover
+exact zero and maximum values, both mismatch directions, missing observation,
+and rejected negative/overflowing width conversions.
+
+The proof covers only this normalized `Option<u64>` equality decision. It does
+not prove the `Stat` or content facts, the native conversion provenance, entry
+type classification, other metadata comparisons, syscalls, or publication.
+This candidate is pending independent review; Linux restoration remains
+unproved.
