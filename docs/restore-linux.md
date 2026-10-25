@@ -429,5 +429,9 @@ the cursor gate around successful `finish_fd` return. It does not prove that
 plan position order corresponds to ancestry, that the entry type facts or
 `finish_fd` effects are correct, or that syscalls succeed or truthfully report
 success. Parent-FD mapping and the complete RESTORE-018/controller contract
-remain open. This candidate is pending independent review; Linux restoration
-remains unproved.
+remain open. Independent review accepted candidate `e08e4b0`; exact-source
+`cargo xtask ci` passed with source SHA-256
+`77024178e18a9fb9be23bc5eeab75fa348b6ac08b55e09cad95d1b6558305a3c`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,092 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
+restoration remains unproved.
