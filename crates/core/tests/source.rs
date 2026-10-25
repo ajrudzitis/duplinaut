@@ -45,6 +45,9 @@ fn checked_reader_windows_never_exceed_buffer_or_remaining_size() {
 }
 
 #[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
 fn cancellation_and_size_limits_fail_before_delivery() {
     let cancel = Cancellation::default();
     assert!(CheckedReader::new(Cursor::new(b"abcd"), 4, 3, cancel.clone()).is_err());

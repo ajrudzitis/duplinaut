@@ -545,3 +545,18 @@ source refinement. Independent review accepted candidate `254619c`; exact-source
 reported 2,047 vstd, 3,183 Vest, and 1,081 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. The
 checked-stream assurance milestone remains unproved.
+
+## Checked-stream initial-size admission proof candidate
+
+`CheckedReader::new` now initializes `remaining` only from
+`verified::checked_read::admit_checked_size`. The helper returns the exact
+expected size when it is at or below the configured maximum, and rejects an
+oversized expectation. Constructor order remains size admission first, then the
+existing cancellation observation, then state construction.
+
+Tests cover zero, exact-limit, one-over-limit, and `u64::MAX` cases, alongside
+the public constructor's limit and cancellation behavior. This proves only the
+initial expected-size admission and `remaining` seed. It does not prove size
+provenance from a source, cancellation observation semantics, backend behavior,
+allocations, or whole-reader refinement. This candidate awaits independent
+review; checked-stream assurance remains unproved.

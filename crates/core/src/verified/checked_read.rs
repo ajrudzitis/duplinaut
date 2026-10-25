@@ -3,6 +3,31 @@ use vstd::prelude::*;
 
 verus! {
 
+pub open spec fn checked_size_admission_model(expected: u64, maximum: u64) -> Option<u64> {
+    if expected <= maximum {
+        Some(expected)
+    } else {
+        None
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub(crate) fn admit_checked_size(expected: u64, maximum: u64) -> (remaining: Option<u64>)
+    ensures
+        remaining == checked_size_admission_model(expected, maximum),
+        match remaining {
+            Some(remaining) => remaining == expected && remaining <= maximum,
+            None => expected > maximum,
+        },
+{
+    if expected > maximum {
+        return None;
+    }
+    Some(expected)
+}
+
 pub open spec fn checked_read_window_model(remaining: u64, buffer_len: u64) -> Option<u64> {
     if remaining > 0 && buffer_len > 0 {
         if remaining <= buffer_len {
@@ -151,9 +176,21 @@ pub(crate) fn decide_checked_eof_probe(remaining: u64, count: usize) -> (eof: Op
 #[cfg(test)]
 mod tests {
     use super::{
-        advance_checked_read, choose_checked_read_window, commit_checked_read_window,
-        decide_checked_eof_probe,
+        admit_checked_size, advance_checked_read, choose_checked_read_window,
+        commit_checked_read_window, decide_checked_eof_probe,
     };
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=test
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    fn checked_size_admission_preserves_exact_bounded_initial_remaining() {
+        assert_eq!(admit_checked_size(0, 0), Some(0));
+        assert_eq!(admit_checked_size(7, 7), Some(7));
+        assert_eq!(admit_checked_size(8, 7), None);
+        assert_eq!(admit_checked_size(u64::MAX, u64::MAX), Some(u64::MAX));
+        assert_eq!(admit_checked_size(u64::MAX, u64::MAX - 1), None);
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-gen-005

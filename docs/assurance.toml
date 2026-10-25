@@ -676,24 +676,30 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = true
+reviewed = false
 proof_required = true
-# All four checked-reader scoped checkpoints are independently accepted.
-# Source backend behavior and whole-reader refinement remain open.
+# The four checked-reader progress/window/EOF checkpoints are accepted. Initial
+# size admission below is a new candidate pending review; source backend
+# behavior and whole-reader refinement remain open.
 implementations = [
+  { path = "crates/core/src/source.rs", symbol = "CheckedReader::new" },
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::read" },
+  { path = "crates/core/src/verified/checked_read.rs", symbol = "admit_checked_size" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "choose_checked_read_window" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "commit_checked_read_window" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "decide_checked_eof_probe" }
 ]
 proofs = [
+  { id = "checked-stream-size-admission", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "admit_checked_size", kind = "contract" },
   { id = "checked-stream-byte-progress", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read", kind = "contract" },
   { id = "checked-stream-window", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "choose_checked_read_window", kind = "contract" },
   { id = "checked-stream-composed-step", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "commit_checked_read_window", kind = "contract" },
   { id = "checked-stream-eof-probe", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "decide_checked_eof_probe", kind = "contract" }
 ]
 tests = [
+  { package = "duplicity-core", name = "verified::checked_read::tests::checked_size_admission_preserves_exact_bounded_initial_remaining" },
+  { package = "duplicity-core", name = "cancellation_and_size_limits_fail_before_delivery" },
   { package = "duplicity-core", name = "verified::checked_read::tests::checked_read_progress_bounds_and_subtracts_only_valid_counts" },
   { package = "duplicity-core", name = "verified::checked_read::tests::checked_read_window_is_exact_min_and_bounded_by_both_inputs" },
   { package = "duplicity-core", name = "verified::checked_read::tests::checked_read_step_requires_the_selected_window_and_valid_progress" },

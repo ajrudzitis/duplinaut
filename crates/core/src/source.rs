@@ -1,7 +1,8 @@
 //! Contracts for read-only storage adapters. I/O and identity checks are trusted
 //! integration boundaries; parser correctness does not prove backend behavior.
 use crate::verified::checked_read::{
-    choose_checked_read_window, commit_checked_read_window, decide_checked_eof_probe,
+    admit_checked_size, choose_checked_read_window, commit_checked_read_window,
+    decide_checked_eof_probe,
 };
 use std::{
     io::{self, Read},
@@ -119,21 +120,22 @@ pub struct CheckedReader<R> {
     failure: Option<(io::ErrorKind, String)>,
 }
 impl<R: Read> CheckedReader<R> {
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=implementation
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
     pub fn new(
         inner: R,
         expected: u64,
         maximum: u64,
         cancel: Cancellation,
     ) -> Result<Self, SourceError> {
-        if expected > maximum {
-            return Err(SourceError::Limit);
-        }
+        let remaining = admit_checked_size(expected, maximum).ok_or(SourceError::Limit)?;
         if cancel.is_cancelled() {
             return Err(SourceError::Cancelled);
         }
         Ok(Self {
             inner,
-            remaining: expected,
+            remaining,
             cancel,
             failure: None,
         })
