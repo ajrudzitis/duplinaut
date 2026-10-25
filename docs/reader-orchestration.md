@@ -232,9 +232,12 @@ This transition is called only on the existing `.position` no-match branch.
 The proof does not establish certificate equality, whether a match is the
 correct deduplication decision, or behavior of the match path. The certificate
 metadata charge is supplied as a fact; its provenance, allocator behavior,
-clone capacity, and the complete evidence-record loop remain outside. The new
-milestone is pending independent review and does not complete evidence
-accounting.
+clone capacity, and the complete evidence-record loop remain outside. This proof
+does not complete evidence accounting. Candidate `81a1ddc` was independently
+accepted, and exact-source `cargo xtask ci` passed with source SHA-256
+`32ca212d926b01a52be3cddfe05adc74034dbf03f72826531ce9efc623fb83e2`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,060 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
 ## Multipart metadata admission proof
 

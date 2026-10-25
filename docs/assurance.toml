@@ -462,11 +462,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate pending review. Proves count and metadata-byte admission for one
-# unseen certificate before reserve/push; charge provenance, pool equality,
-# allocation behavior, and the full evidence loop remain outside.
+# Independently accepted count and metadata-byte admission for one unseen
+# certificate before reserve/push; charge provenance, pool equality, allocation
+# behavior, and the full evidence loop remain outside.
 implementations = [
   { path = "crates/core/src/reader.rs", symbol = "record_evidence" },
   { path = "crates/core/src/verified/evidence_metadata.rs", symbol = "admit_certificate_version" }
