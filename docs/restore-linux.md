@@ -186,7 +186,7 @@ transition. It does not prove syscall results, chunk selection, retry/work
 accounting, filesystem contents or the Linux publication controller. The proof
 was independently accepted; the Linux restoration milestone remains unproved.
 
-## Next-write-chunk boundary proof candidate
+## Next-write-chunk boundary proof
 
 `next_write_chunk_end(offset, content_len)` now computes the slice end used by
 the production regular-file loop before each write attempt. For a remaining
@@ -199,8 +199,12 @@ chunk with a short tail, and machine-word edge cases.
 This proves the chunk-end arithmetic only. It does not establish the content
 length or slice validity, the bytes passed to the syscall, syscall progress,
 retry/work accounting, final file contents, or the full RESTORE-014/controller
-contract. The candidate awaits independent review; Linux restoration remains
-unproved.
+contract. Independent review accepted candidate `0ac7ece`; the Linux
+restoration milestone remains unproved. Exact-source
+`cargo xtask ci` passed with source SHA-256
+`8a8e0cd9bc7bea756c0eacbb7690a520b50d689c924ab735224db76eb10164ad`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,077 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
 ## Forward-work counter proof
 
