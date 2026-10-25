@@ -411,9 +411,9 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate pending review: selected-set progress advances in exact plan order
+# Independently accepted: selected-set progress advances in exact plan order
 # only after a successful state transition, and gates snapshot publication.
 # ChainPlan selection/iterator semantics, scan correctness, cancellation races,
 # and whole-reader refinement remain outside.

@@ -355,7 +355,7 @@ and exact-source `cargo xtask ci` passed with source SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,058 core obligations with zero errors;
 Duvet, Clippy, formatting, workspace tests, integrations, and doctests passed.
 
-## Selected-set completion cursor proof candidate
+## Selected-set completion cursor proof
 
 `read_snapshot_inner` now initializes a completion cursor from the selected
 `ChainPlan` length. The outer plan loop supplies each enumerated position to a
@@ -376,7 +376,11 @@ links to [PARSE-GEN-005](parsing-requirements.md#parse-gen-005) and
 This is a bounded publication-progress contract. It does not prove ChainPlan
 selection or Rust iterator semantics, per-object volume matching correctness,
 cancellation races/timing, or complete reader-controller refinement. The
-candidate milestone is pending review and does not complete the reader proof.
+This checkpoint does not complete the reader proof. Candidate `66c777f` was
+independently accepted, and exact-source `cargo xtask ci` passed with SHA-256
+`f645b1e4b04efe51b22ab08f6645c9e9981893ee2d578151972b0cc26fc38b3e`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,068 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
 ## Authentication source metadata charge proof
 
