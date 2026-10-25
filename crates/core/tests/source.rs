@@ -31,6 +31,9 @@ fn cancellation_and_size_limits_fail_before_delivery() {
 }
 
 #[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
 fn terminal_failure_cannot_be_hidden_by_another_eof_probe() {
     let mut reader =
         CheckedReader::new(Cursor::new(b"abcd"), 3, 3, Cancellation::default()).unwrap();

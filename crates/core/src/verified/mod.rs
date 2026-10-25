@@ -12,6 +12,7 @@ pub(crate) mod tar_pax;
 pub(crate) mod tar_time;
 
 pub(crate) mod catalog_accounting;
+pub(crate) mod checked_read;
 pub(crate) mod evidence_accounting;
 pub(crate) mod evidence_metadata;
 pub(crate) mod multipart_metadata;

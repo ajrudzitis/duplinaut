@@ -1,5 +1,6 @@
 //! Contracts for read-only storage adapters. I/O and identity checks are trusted
 //! integration boundaries; parser correctness does not prove backend behavior.
+use crate::verified::checked_read::advance_checked_read;
 use std::{
     io::{self, Read},
     sync::{
@@ -145,6 +146,9 @@ impl<R: Read> CheckedReader<R> {
     }
 }
 impl<R: Read> Read for CheckedReader<R> {
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=implementation
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
         if buffer.is_empty() {
             return Ok(0);
@@ -186,7 +190,26 @@ impl<R: Read> Read for CheckedReader<R> {
                 "source returned an invalid byte count",
             )));
         }
-        self.remaining -= count as u64;
+        let requested_u64 = u64::try_from(requested).map_err(|_| {
+            self.latch(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "source request length exceeds accounting range",
+            ))
+        })?;
+        let count_u64 = u64::try_from(count).map_err(|_| {
+            self.latch(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "source byte count exceeds accounting range",
+            ))
+        })?;
+        let Some(next_remaining) = advance_checked_read(self.remaining, requested_u64, count_u64)
+        else {
+            return Err(self.latch(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "source returned an invalid byte count",
+            )));
+        };
+        self.remaining = next_remaining;
         Ok(count)
     }
 }

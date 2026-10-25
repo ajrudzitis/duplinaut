@@ -669,6 +669,28 @@ proofs = []
 tests = [{ package = "duplicity-core", name = "flat_regular_listing_and_anchored_repeated_reads" }, { package = "duplicity-core", name = "changes_replacements_and_eof_are_terminal" }, { package = "duplicity-core", name = "cancellation_limits_and_untrusted_descriptors" }, { package = "duplicity-core", name = "original_official_directory_reconstructs_three_dates" }, { package = "duplicity-core", name = "interrupted_post_read_validation_retries_without_losing_bytes" }]
 
 [[milestone]]
+id = "checked-stream-byte-accounting"
+gate = false
+requirements = ["PARSE-GEN-005"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate proves only the shared checked-reader remaining-byte transition;
+# source backend behavior, EOF probing and whole-reader refinement remain open.
+implementations = [
+  { path = "crates/core/src/source.rs", symbol = "CheckedReader::read" },
+  { path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read" }
+]
+proofs = [{ id = "checked-stream-byte-progress", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "verified::checked_read::tests::checked_read_progress_bounds_and_subtracts_only_valid_counts" },
+  { package = "duplicity-core", name = "terminal_failure_cannot_be_hidden_by_another_eof_probe" }
+]
+
+[[milestone]]
 id = "multipart-metadata-admission"
 gate = false
 requirements = ["PARSE-GEN-005", "PARSE-MULTI-003"]

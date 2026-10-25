@@ -460,3 +460,21 @@ accepted, and exact-source `cargo xtask ci` passed with SHA-256
 `f0b665f0210e76fd0c30b5bf91cc23cc33f51531caefd16390d0898e0e6ce1a9`. Verus
 reported 2,047 vstd, 3,183 Vest, and 1,064 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed.
+
+## Checked-stream byte accounting proof candidate
+
+The shared `CheckedReader` calls `verified::checked_read::advance_checked_read`
+for each successful nonempty read. The helper accepts only a positive count no
+greater than the requested size or the remaining discovered size, and returns
+the exact remaining-byte count after subtraction. `CheckedReader` explicitly
+converts the native `usize` request and result to `u64` before calling the
+transition; conversion failure is terminal. The existing caller keeps zero and
+over-requested results as distinct read errors.
+
+Boundary tests cover exact and partial progress, zero values, over-requested
+and over-remaining counts, and `u64` maximum arithmetic. This proves only the
+remaining-byte state transition and its call placement. It does not prove the
+`Read` implementation's result is truthful, the request-window calculation,
+EOF probing, cancellation or failure-latching behavior, the bytes delivered, or
+complete local/S3 reader refinement. This candidate awaits independent review;
+the source/reader milestones remain unproved.
