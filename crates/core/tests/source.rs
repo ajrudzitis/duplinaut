@@ -2,6 +2,9 @@ use duplicity_core::source::{Cancellation, CheckedReader};
 use std::io::{Cursor, Read};
 
 #[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
 fn checked_stream_requires_exact_size_and_real_eof() {
     for (bytes, expected, succeeds) in [
         (b"abc".as_slice(), 3, true),

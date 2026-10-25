@@ -525,3 +525,19 @@ refinement. Independent review accepted candidate `ab0944a`; exact-source
 reported 2,047 vstd, 3,183 Vest, and 1,080 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. The
 checked-stream assurance milestone remains unproved.
+
+## Checked-stream EOF-probe proof candidate
+
+After the existing one-byte read probe, `CheckedReader::read` calls
+`verified::checked_read::decide_checked_eof_probe`. The transition accepts only
+zero remaining bytes and a probe count of zero or one; it reports confirmed EOF
+only for zero, and excess data for one. Invalid remaining state or a count above
+one fails closed as an invalid body. Production retains the existing cancellation,
+error, and probe ordering.
+
+Tests cover valid EOF, one extra byte, invalid probe counts/state, and public
+exact-size versus oversized bodies. This proves only the interpretation of the
+supplied probe result. It does not prove the backend's `Read` result truthful,
+probe-buffer behavior, identity checks, cancellation/error-latching, or complete
+source refinement. This candidate awaits independent review; checked-stream
+assurance remains unproved.

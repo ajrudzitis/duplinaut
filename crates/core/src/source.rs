@@ -1,6 +1,8 @@
 //! Contracts for read-only storage adapters. I/O and identity checks are trusted
 //! integration boundaries; parser correctness does not prove backend behavior.
-use crate::verified::checked_read::{choose_checked_read_window, commit_checked_read_window};
+use crate::verified::checked_read::{
+    choose_checked_read_window, commit_checked_read_window, decide_checked_eof_probe,
+};
 use std::{
     io::{self, Read},
     sync::{
@@ -165,13 +167,15 @@ impl<R: Read> Read for CheckedReader<R> {
                 Ok(count) => count,
                 Err(error) => return Err(self.latch(error)),
             };
-            if count == 0 {
-                return Ok(0);
+            match decide_checked_eof_probe(self.remaining, count) {
+                Some(true) => return Ok(0),
+                Some(false) | None => {
+                    return Err(self.latch(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "object body exceeds discovered size",
+                    )))
+                }
             }
-            return Err(self.latch(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "object body exceeds discovered size",
-            )));
         }
         let buffer_len_u64 = u64::try_from(buffer.len()).map_err(|_| {
             self.latch(io::Error::new(

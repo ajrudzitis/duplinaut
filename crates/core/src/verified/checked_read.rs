@@ -120,11 +120,40 @@ pub(crate) fn commit_checked_read_window(
     advance_checked_read(remaining, requested, count)
 }
 
+pub open spec fn checked_eof_probe_model(remaining: u64, count: usize) -> Option<bool> {
+    if remaining == 0 && count <= 1 {
+        Some(count == 0)
+    } else {
+        None
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub(crate) fn decide_checked_eof_probe(remaining: u64, count: usize) -> (eof: Option<bool>)
+    ensures
+        eof == checked_eof_probe_model(remaining, count),
+        match eof {
+            Some(true) => remaining == 0 && count == 0,
+            Some(false) => remaining == 0 && count == 1,
+            None => remaining != 0 || count > 1,
+        },
+{
+    if remaining != 0 || count > 1 {
+        return None;
+    }
+    Some(count == 0)
+}
+
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{advance_checked_read, choose_checked_read_window, commit_checked_read_window};
+    use super::{
+        advance_checked_read, choose_checked_read_window, commit_checked_read_window,
+        decide_checked_eof_probe,
+    };
 
     #[test]
     //= docs/parsing-requirements.md#parse-gen-005
@@ -179,5 +208,17 @@ mod tests {
             advance_checked_read(u64::MAX, u64::MAX, 1),
             Some(u64::MAX - 1)
         );
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=test
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    fn checked_eof_probe_requires_zero_remaining_and_a_one_byte_result() {
+        assert_eq!(decide_checked_eof_probe(0, 0), Some(true));
+        assert_eq!(decide_checked_eof_probe(0, 1), Some(false));
+        assert_eq!(decide_checked_eof_probe(0, 2), None);
+        assert_eq!(decide_checked_eof_probe(1, 0), None);
+        assert_eq!(decide_checked_eof_probe(u64::MAX, usize::MAX), None);
     }
 }
