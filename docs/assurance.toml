@@ -676,11 +676,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# The two shared checked-reader arithmetic checkpoints are accepted. Their
-# production composition is a new candidate pending review; source backend
-# behavior, EOF probing and whole-reader refinement remain open.
+# All three shared checked-reader arithmetic checkpoints are independently
+# accepted. Source backend behavior, EOF probing and whole-reader refinement
+# remain open.
 implementations = [
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::read" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read" },

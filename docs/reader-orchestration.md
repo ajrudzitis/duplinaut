@@ -505,7 +505,7 @@ reported 2,047 vstd, 3,183 Vest, and 1,079 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. The
 checked-stream assurance milestone remains unproved.
 
-## Checked-stream composed-step proof candidate
+## Checked-stream composed-step proof
 
 The pre-read `requested_u64` from `choose_checked_read_window` is passed
 unchanged to `commit_checked_read_window` after the underlying read returns. The
@@ -519,5 +519,9 @@ window, zero and over-window counts, empty remaining work, and the maximum
 `u64` case. This proves the composition of the two arithmetic kernels and the
 production value flow only. It does not prove `Read` truthfulness, I/O ordering,
 contents, EOF/cancellation behavior, failure latching, or whole-source
-refinement. This composition candidate awaits independent review; the source
-reader remains unproved.
+refinement. Independent review accepted candidate `ab0944a`; exact-source
+`cargo xtask ci` passed with source SHA-256
+`04674d30adc1f779c2abba7d358ffb22f797d831ad8feae9f522c9e09fd9abfd`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,080 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. The
+checked-stream assurance milestone remains unproved.
