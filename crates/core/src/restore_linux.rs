@@ -628,8 +628,11 @@ fn populate(p: &mut Prepared<'_>, w: &mut Forward<'_, impl Hooks>) -> Result<(),
                             .ok_or(Cause::Fidelity)?;
                     match w.write(file.as_fd(), &content[offset..end]) {
                         Ok(n) => {
-                            offset = crate::verified::restore_write::advance_write_offset(
-                                offset, n, end,
+                            offset = crate::verified::restore_write::commit_write_chunk(
+                                offset,
+                                content.len(),
+                                end,
+                                n,
                             )
                             .ok_or(Cause::Fidelity)?;
                         }
@@ -1439,6 +1442,30 @@ mod tests {
         assert_eq!(
             next_write_chunk_end(usize::MAX - 1, usize::MAX),
             Some(usize::MAX)
+        );
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-014
+    //= type=test
+    //# Regular files MUST be created exclusively with `CREATE | EXCL | NOFOLLOW | CLOEXEC | WRONLY`, initial creation mode `0600`, and written with the exact immutable content in chunks no larger than 65536 bytes.
+    fn write_chunk_commit_binds_progress_to_exact_selected_slice() {
+        use crate::verified::restore_write::commit_write_chunk;
+
+        assert_eq!(commit_write_chunk(0, 65_537, 65_536, 4), Some(4));
+        assert_eq!(commit_write_chunk(4, 65_537, 65_537, 65_532), Some(65_536));
+        assert_eq!(commit_write_chunk(65_536, 65_537, 65_537, 1), Some(65_537));
+        assert_eq!(commit_write_chunk(0, 65_537, 65_537, 1), None);
+        assert_eq!(commit_write_chunk(0, 3, 3, 0), None);
+        assert_eq!(commit_write_chunk(0, 3, 3, 4), None);
+        assert_eq!(commit_write_chunk(3, 3, 3, 1), None);
+        assert_eq!(
+            commit_write_chunk(usize::MAX - 65_537, usize::MAX, usize::MAX - 1, 1),
+            Some(usize::MAX - 65_536)
+        );
+        assert_eq!(
+            commit_write_chunk(usize::MAX - 65_536, usize::MAX, usize::MAX, 1),
+            Some(usize::MAX - 65_535)
         );
     }
 

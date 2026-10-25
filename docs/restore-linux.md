@@ -351,6 +351,22 @@ reported 2,047 vstd, 3,183 Vest, and 1,073 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
 restoration remains unproved.
 
+## Write-chunk commit composition candidate
+
+`commit_write_chunk` composes the accepted chunk selector and write-offset
+transition at the production `write` call site. It requires the `requested_end`
+passed to the write slice to equal the chunk selected for the current offset;
+then it advances only by a positive count within that exact slice. A partial
+write commits its returned count against the current slice end, and the loop
+selects a fresh end at the resulting offset before retrying. The candidate
+remains pending independent review; Linux restoration remains unproved.
+
+Tests cover partial and exact progress, a short final tail, mismatched selected
+ends, zero and over-range counts, and machine-word boundaries. This proves the
+selection/progress composition only. It does not prove write syscall results,
+content provenance, work/cancellation accounting, file contents, or the full
+RESTORE-014 controller.
+
 ## Outer staging creation decision proof
 
 `decide_outer_stage` is called on the combined `Forward::call` result for each

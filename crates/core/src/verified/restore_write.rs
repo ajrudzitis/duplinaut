@@ -57,4 +57,47 @@ pub(crate) fn next_write_chunk_end(offset: usize, content_len: usize) -> (end: O
     Some(content_len.min(offset.saturating_add(65_536)))
 }
 
+pub open spec fn commit_write_chunk_model(
+    offset: usize,
+    content_len: usize,
+    requested_end: usize,
+    written: usize,
+) -> Option<usize> {
+    match write_chunk_end_model(offset, content_len) {
+        Some(selected_end) => {
+            if requested_end == selected_end {
+                write_advance_model(offset, written, selected_end)
+            } else {
+                None
+            }
+        },
+        None => None,
+    }
+}
+
+//= docs/parsing-requirements.md#restore-014
+//= type=implementation
+//# Regular files MUST be created exclusively with `CREATE | EXCL | NOFOLLOW | CLOEXEC | WRONLY`, initial creation mode `0600`, and written with the exact immutable content in chunks no larger than 65536 bytes.
+pub(crate) fn commit_write_chunk(
+    offset: usize,
+    content_len: usize,
+    requested_end: usize,
+    written: usize,
+) -> (next_offset: Option<usize>)
+    ensures
+        next_offset == commit_write_chunk_model(offset, content_len, requested_end, written),
+        match next_offset {
+            Some(next) => offset < next && next <= requested_end && next <= content_len
+                && requested_end - offset <= 65_536
+                && next == offset + written,
+            None => true,
+        },
+{
+    let selected_end = next_write_chunk_end(offset, content_len)?;
+    if requested_end != selected_end {
+        return None;
+    }
+    advance_write_offset(offset, written, requested_end)
+}
+
 }
