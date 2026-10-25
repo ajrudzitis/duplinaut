@@ -505,7 +505,7 @@ reported 2,047 vstd, 3,183 Vest, and 1,079 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. The
 checked-stream assurance milestone remains unproved.
 
-## Checked-stream failure-latch transition candidate
+## Checked-stream failure-latch transition
 
 `CheckedReader::latch` now calls the verified `read_failure_transition` before
 changing its failure state. A clear state plus `Interrupted` stays clear; a
@@ -518,8 +518,12 @@ retry, and preservation/replay of the first terminal failure. The proof covers
 the abstract latch-state transition and its production decision point only. It
 does not prove native error classification or payload fidelity, reachability or
 call ordering, backend `Read` behavior, cancellation timing, or whole-reader
-refinement. This candidate awaits independent review; checked-stream assurance
-remains unproved.
+refinement. Independent review accepted candidate `0386e05`; exact-source
+`cargo xtask ci` passed with source SHA-256
+`9f457bbb17509d55e7e901ff10bb1d1938e83ee83608eb862861a73cd23fa648`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,084 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. The
+checked-stream assurance milestone remains unproved.
 
 ## Checked-stream composed-step proof
 

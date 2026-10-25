@@ -676,10 +676,10 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Five checked-reader kernels are accepted; the latch transition is a new
-# candidate pending review. Backend behavior and whole-reader refinement remain open.
+# All six checked-reader scoped kernels are independently accepted. Backend
+# behavior and whole-reader refinement remain open.
 implementations = [
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::new" },
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::read" },
