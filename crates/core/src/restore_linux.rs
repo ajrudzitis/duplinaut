@@ -16,6 +16,7 @@ use crate::{
         restore_publication::{
             decide_publication_cleanup, PublicationCleanup, PublicationDecision,
         },
+        restore_staging::{decide_outer_stage, OuterStageDecision, OuterStageObservation},
         restore_time::validate_restore_time,
     },
 };
@@ -940,20 +941,29 @@ fn restore_with<H: Hooks>(
         if p.staging.to_bytes() == dest {
             continue;
         }
-        match w.call(Op::CreateOuter, || {
+        let creation = w.call(Op::CreateOuter, || {
             fs::mkdirat(&parent, p.staging.as_c_str(), Mode::from_raw_mode(0o700))
-        }) {
-            Ok(()) => {
+        });
+        let observation = match &creation {
+            Ok(()) => OuterStageObservation::Created,
+            Err(Cause::Syscall(Errno::EXIST)) => OuterStageObservation::ExistingCollision,
+            Err(_) => OuterStageObservation::OtherError,
+        };
+        match decide_outer_stage(observation) {
+            OuterStageDecision::OwnedNamespace => {
                 outer_owned = true;
                 break;
             }
-            Err(Cause::Syscall(Errno::EXIST)) => continue,
-            Err(cause) => {
+            OuterStageDecision::RetryCandidate => continue,
+            OuterStageDecision::UncertainCandidate => {
+                let Err(cause) = creation else {
+                    return failed(Cause::InvalidPlan);
+                };
                 return RestoreOutcome::Unpublished(Unpublished {
                     cause,
                     cleanup: Cleanup::default(),
                     uncertain_outer: Some(p.staging),
-                })
+                });
             }
         }
     }
@@ -1607,6 +1617,29 @@ mod tests {
         assert_eq!(stdfs::read_dir(&temp.0).unwrap().count(), 1);
         assert!(!fault.seen.contains(&Op::CleanupMode));
         assert!(!fault.seen.contains(&Op::CleanupUnlink));
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-027
+    //= type=test
+    //# If creation of the first outer staging leaf returns an error other than a definite existing-entry collision, the backend MUST report its candidate as uncertain and leave that candidate untouched because exclusive ownership was not established.
+    fn outer_stage_decision_separates_owned_retry_and_uncertain_results() {
+        use crate::verified::restore_staging::{
+            decide_outer_stage, OuterStageDecision, OuterStageObservation,
+        };
+
+        assert_eq!(
+            decide_outer_stage(OuterStageObservation::Created),
+            OuterStageDecision::OwnedNamespace
+        );
+        assert_eq!(
+            decide_outer_stage(OuterStageObservation::ExistingCollision),
+            OuterStageDecision::RetryCandidate
+        );
+        assert_eq!(
+            decide_outer_stage(OuterStageObservation::OtherError),
+            OuterStageDecision::UncertainCandidate
+        );
     }
 
     #[test]

@@ -27,6 +27,8 @@ pub(crate) mod restore_cleanup;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_publication;
 #[cfg(target_os = "linux")]
+pub(crate) mod restore_staging;
+#[cfg(target_os = "linux")]
 pub(crate) mod restore_time;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_work;

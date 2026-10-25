@@ -330,3 +330,23 @@ and exact-source `cargo xtask ci` passed with source SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,073 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
 restoration remains unproved.
+
+## Outer staging creation decision proof candidate
+
+`decide_outer_stage` is called on the combined `Forward::call` result for each
+first outer staging-directory creation (before-hook, `mkdirat`, and
+after-hook). Production labels the result `ExistingCollision` only for the
+`Errno::EXIST` branch. The helper grants `OwnedNamespace` only for observed
+success, permits a retry only for that collision observation, and classifies
+every other propagated error as `UncertainCandidate`. The production branch
+retains the original error and candidate name for that uncertain result and
+returns without entering modifying cleanup. Tests cover all three model
+outcomes; the existing fault-injected restore test covers a non-collision
+create-call error returning an uncertain candidate without cleanup.
+
+This proof covers only the pure result-to-authority decision and its
+production branch. It does not prove that `Errno::EXIST` classification is
+correct for a particular syscall/filesystem, randomness or name uniqueness,
+collision retry exhaustion, that observed success establishes the claimed
+filesystem boundary, or the full restore controller. The candidate awaits
+independent review; Linux restoration remains unproved.
