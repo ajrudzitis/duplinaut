@@ -210,7 +210,7 @@ corrected exact-source `cargo xtask ci` passed with SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,056 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
-## Authentication policy summary admission proof candidate
+## Authentication policy summary admission proof
 
 Before allocating the permitted-fingerprint vector, `policy_summary` now calls
 a verified admission transition. It checks that the configured permitted
@@ -231,8 +231,11 @@ the preallocation decision, `policy_summary` still checks the actual vector
 capacity using native Rust operations; that post-allocation capacity check is
 not formally verified. This proof does not establish signer-slice validity or
 provenance, actual capacity or allocator behavior, or the full crypto pipeline.
-The milestone remains pending review and does not complete evidence
-accounting.
+It does not complete evidence accounting. Candidate `e6b765f` was independently
+accepted, and exact-source `cargo xtask ci` passed with source SHA-256
+`1759d2348181cef1d981f5e011afbe01c9d60714f62c15b63755aab5643c603b`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,062 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
 ## Authentication certificate-version admission proof candidate
 

@@ -485,11 +485,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate pending review. Proves signer-count and requested summary-byte
-# admission before fingerprint Vec reservation; slice provenance and actual
-# Vec capacity/allocator behavior remain outside.
+# Independently accepted signer-count and requested summary-byte admission
+# before fingerprint Vec reservation; slice provenance and actual Vec
+# capacity/allocator behavior remain outside.
 implementations = [
   { path = "crates/core/src/reader.rs", symbol = "policy_summary" },
   { path = "crates/core/src/verified/policy_metadata.rs", symbol = "reserve_policy_summary" }
