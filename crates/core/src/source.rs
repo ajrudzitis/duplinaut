@@ -1,6 +1,6 @@
 //! Contracts for read-only storage adapters. I/O and identity checks are trusted
 //! integration boundaries; parser correctness does not prove backend behavior.
-use crate::verified::checked_read::{advance_checked_read, choose_checked_read_window};
+use crate::verified::checked_read::{choose_checked_read_window, commit_checked_read_window};
 use std::{
     io::{self, Read},
     sync::{
@@ -214,7 +214,8 @@ impl<R: Read> Read for CheckedReader<R> {
                 "source byte count exceeds accounting range",
             ))
         })?;
-        let Some(next_remaining) = advance_checked_read(self.remaining, requested_u64, count_u64)
+        let Some(next_remaining) =
+            commit_checked_read_window(self.remaining, buffer_len_u64, requested_u64, count_u64)
         else {
             return Err(self.latch(io::Error::new(
                 io::ErrorKind::InvalidData,

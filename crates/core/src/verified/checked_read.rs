@@ -77,11 +77,54 @@ pub(crate) fn advance_checked_read(
     Some(remaining - count)
 }
 
+pub open spec fn commit_checked_read_window_model(
+    remaining: u64,
+    buffer_len: u64,
+    requested: u64,
+    count: u64,
+) -> Option<u64> {
+    match checked_read_window_model(remaining, buffer_len) {
+        Some(window) => {
+            if requested == window {
+                checked_read_progress_model(remaining, window, count)
+            } else {
+                None
+            }
+        },
+        None => None,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub(crate) fn commit_checked_read_window(
+    remaining: u64,
+    buffer_len: u64,
+    requested: u64,
+    count: u64,
+) -> (next: Option<u64>)
+    ensures
+        next == commit_checked_read_window_model(remaining, buffer_len, requested, count),
+        match next {
+            Some(next) => requested > 0 && requested <= remaining
+                && requested <= buffer_len && count > 0 && count <= requested
+                && next < remaining && next + count == remaining,
+            None => true,
+        },
+{
+    let window = choose_checked_read_window(remaining, buffer_len)?;
+    if requested != window {
+        return None;
+    }
+    advance_checked_read(remaining, requested, count)
+}
+
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{advance_checked_read, choose_checked_read_window};
+    use super::{advance_checked_read, choose_checked_read_window, commit_checked_read_window};
 
     #[test]
     //= docs/parsing-requirements.md#parse-gen-005
@@ -98,6 +141,24 @@ mod tests {
             Some(u64::MAX)
         );
         assert_eq!(choose_checked_read_window(u64::MAX, 1), Some(1));
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=test
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    fn checked_read_step_requires_the_selected_window_and_valid_progress() {
+        assert_eq!(commit_checked_read_window(8, 4, 4, 3), Some(5));
+        assert_eq!(commit_checked_read_window(4, 8, 4, 4), Some(0));
+        assert_eq!(commit_checked_read_window(8, 4, 3, 2), None);
+        assert_eq!(commit_checked_read_window(8, 4, 5, 2), None);
+        assert_eq!(commit_checked_read_window(8, 4, 4, 0), None);
+        assert_eq!(commit_checked_read_window(8, 4, 4, 5), None);
+        assert_eq!(commit_checked_read_window(0, 4, 0, 0), None);
+        assert_eq!(
+            commit_checked_read_window(u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+            Some(0)
+        );
     }
 
     #[test]

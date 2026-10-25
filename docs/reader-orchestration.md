@@ -504,3 +504,20 @@ source SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,079 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. The
 checked-stream assurance milestone remains unproved.
+
+## Checked-stream composed-step proof candidate
+
+The pre-read `requested_u64` from `choose_checked_read_window` is passed
+unchanged to `commit_checked_read_window` after the underlying read returns. The
+composed helper reuses the accepted window-selection and remaining-byte
+transitions: it requires the requested value to equal the selected positive
+minimum, then delegates progress validation to `advance_checked_read`. The
+production counter is assigned only from this successful result.
+
+Boundary tests cover valid exact and partial progress, a too-small or too-large
+window, zero and over-window counts, empty remaining work, and the maximum
+`u64` case. This proves the composition of the two arithmetic kernels and the
+production value flow only. It does not prove `Read` truthfulness, I/O ordering,
+contents, EOF/cancellation behavior, failure latching, or whole-source
+refinement. This composition candidate awaits independent review; the source
+reader remains unproved.

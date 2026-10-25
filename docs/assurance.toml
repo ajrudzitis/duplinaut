@@ -676,23 +676,26 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = true
+reviewed = false
 proof_required = true
-# Both shared checked-reader arithmetic checkpoints are independently
-# accepted. Source backend behavior, EOF probing and whole-reader refinement
-# remain open.
+# The two shared checked-reader arithmetic checkpoints are accepted. Their
+# production composition is a new candidate pending review; source backend
+# behavior, EOF probing and whole-reader refinement remain open.
 implementations = [
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::read" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read" },
-  { path = "crates/core/src/verified/checked_read.rs", symbol = "choose_checked_read_window" }
+  { path = "crates/core/src/verified/checked_read.rs", symbol = "choose_checked_read_window" },
+  { path = "crates/core/src/verified/checked_read.rs", symbol = "commit_checked_read_window" }
 ]
 proofs = [
   { id = "checked-stream-byte-progress", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read", kind = "contract" },
-  { id = "checked-stream-window", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "choose_checked_read_window", kind = "contract" }
+  { id = "checked-stream-window", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "choose_checked_read_window", kind = "contract" },
+  { id = "checked-stream-composed-step", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "commit_checked_read_window", kind = "contract" }
 ]
 tests = [
   { package = "duplicity-core", name = "verified::checked_read::tests::checked_read_progress_bounds_and_subtracts_only_valid_counts" },
   { package = "duplicity-core", name = "verified::checked_read::tests::checked_read_window_is_exact_min_and_bounded_by_both_inputs" },
+  { package = "duplicity-core", name = "verified::checked_read::tests::checked_read_step_requires_the_selected_window_and_valid_progress" },
   { package = "duplicity-core", name = "checked_reader_windows_never_exceed_buffer_or_remaining_size" },
   { package = "duplicity-core", name = "terminal_failure_cannot_be_hidden_by_another_eof_probe" }
 ]
