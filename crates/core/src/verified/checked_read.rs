@@ -3,6 +3,44 @@ use vstd::prelude::*;
 
 verus! {
 
+pub open spec fn checked_read_window_model(remaining: u64, buffer_len: u64) -> Option<u64> {
+    if remaining > 0 && buffer_len > 0 {
+        if remaining <= buffer_len {
+            Some(remaining)
+        } else {
+            Some(buffer_len)
+        }
+    } else {
+        None
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub(crate) fn choose_checked_read_window(remaining: u64, buffer_len: u64) -> (window: Option<u64>)
+    ensures
+        window == checked_read_window_model(remaining, buffer_len),
+        match window {
+            Some(window) => window > 0 && window <= remaining && window <= buffer_len
+                && if remaining <= buffer_len {
+                    window == remaining
+                } else {
+                    window == buffer_len
+                },
+            None => remaining == 0 || buffer_len == 0,
+        },
+{
+    if remaining == 0 || buffer_len == 0 {
+        return None;
+    }
+    if remaining <= buffer_len {
+        Some(remaining)
+    } else {
+        Some(buffer_len)
+    }
+}
+
 pub open spec fn checked_read_progress_model(
     remaining: u64,
     requested: u64,
@@ -43,7 +81,24 @@ pub(crate) fn advance_checked_read(
 
 #[cfg(test)]
 mod tests {
-    use super::advance_checked_read;
+    use super::{advance_checked_read, choose_checked_read_window};
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=test
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    fn checked_read_window_is_exact_min_and_bounded_by_both_inputs() {
+        assert_eq!(choose_checked_read_window(0, 3), None);
+        assert_eq!(choose_checked_read_window(3, 0), None);
+        assert_eq!(choose_checked_read_window(4, 10), Some(4));
+        assert_eq!(choose_checked_read_window(10, 4), Some(4));
+        assert_eq!(choose_checked_read_window(4, 4), Some(4));
+        assert_eq!(
+            choose_checked_read_window(u64::MAX, u64::MAX),
+            Some(u64::MAX)
+        );
+        assert_eq!(choose_checked_read_window(u64::MAX, 1), Some(1));
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-gen-005

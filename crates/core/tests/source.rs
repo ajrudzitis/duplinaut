@@ -19,6 +19,29 @@ fn checked_stream_requires_exact_size_and_real_eof() {
 }
 
 #[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+fn checked_reader_windows_never_exceed_buffer_or_remaining_size() {
+    let mut reader =
+        CheckedReader::new(Cursor::new(b"abcde"), 5, 5, Cancellation::default()).unwrap();
+    let mut large = [0; 10];
+    assert_eq!(reader.read(&mut large).unwrap(), 5);
+    assert_eq!(&large[..5], b"abcde");
+    assert_eq!(reader.read(&mut large).unwrap(), 0);
+
+    let mut reader =
+        CheckedReader::new(Cursor::new(b"abcdefgh"), 8, 8, Cancellation::default()).unwrap();
+    let mut small = [0; 3];
+    assert_eq!(reader.read(&mut small).unwrap(), 3);
+    assert_eq!(&small, b"abc");
+    assert_eq!(reader.read(&mut small).unwrap(), 3);
+    assert_eq!(&small, b"def");
+    assert_eq!(reader.read(&mut small).unwrap(), 2);
+    assert_eq!(&small[..2], b"gh");
+}
+
+#[test]
 fn cancellation_and_size_limits_fail_before_delivery() {
     let cancel = Cancellation::default();
     assert!(CheckedReader::new(Cursor::new(b"abcd"), 4, 3, cancel.clone()).is_err());

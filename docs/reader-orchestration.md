@@ -482,3 +482,20 @@ complete local/S3 reader refinement. Independent review accepted candidate
 reported 2,047 vstd, 3,183 Vest, and 1,078 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. The
 source/reader milestones remain unproved.
+
+## Checked-stream read-window proof candidate
+
+`CheckedReader::read` now calls `verified::checked_read::choose_checked_read_window`
+after its existing empty-buffer, failure, cancellation and EOF-probe branches.
+The helper returns the exact minimum of remaining object bytes and the supplied
+buffer length, or `None` if either is zero. The production boundary converts
+both the slice length and result back with checked conversions before forming
+`buffer[..requested]`; conversion failure becomes a latched read error.
+
+Tests cover both choices of the minimum, equal bounds, zero inputs, and the
+`u64::MAX` boundary, plus public reads with buffers both larger and smaller than
+the remaining body. This proves the arithmetic window and its placement only.
+The accepted progress transition remains separately recorded above. This
+candidate does not prove `Read` results, the byte contents, EOF behavior,
+cancellation/error latching, or complete source refinement. It awaits
+independent review; checked-stream assurance remains unproved.

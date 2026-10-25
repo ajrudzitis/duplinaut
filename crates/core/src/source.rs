@@ -1,6 +1,6 @@
 //! Contracts for read-only storage adapters. I/O and identity checks are trusted
 //! integration boundaries; parser correctness does not prove backend behavior.
-use crate::verified::checked_read::advance_checked_read;
+use crate::verified::checked_read::{advance_checked_read, choose_checked_read_window};
 use std::{
     io::{self, Read},
     sync::{
@@ -173,7 +173,25 @@ impl<R: Read> Read for CheckedReader<R> {
                 "object body exceeds discovered size",
             )));
         }
-        let requested = self.remaining.min(buffer.len() as u64) as usize;
+        let buffer_len_u64 = u64::try_from(buffer.len()).map_err(|_| {
+            self.latch(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "source buffer length exceeds accounting range",
+            ))
+        })?;
+        let requested_u64 =
+            choose_checked_read_window(self.remaining, buffer_len_u64).ok_or_else(|| {
+                self.latch(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "source read window is empty",
+                ))
+            })?;
+        let requested = usize::try_from(requested_u64).map_err(|_| {
+            self.latch(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "source read window exceeds slice range",
+            ))
+        })?;
         let count = match self.inner.read(&mut buffer[..requested]) {
             Ok(count) => count,
             Err(error) => return Err(self.latch(error)),
@@ -190,12 +208,6 @@ impl<R: Read> Read for CheckedReader<R> {
                 "source returned an invalid byte count",
             )));
         }
-        let requested_u64 = u64::try_from(requested).map_err(|_| {
-            self.latch(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "source request length exceeds accounting range",
-            ))
-        })?;
         let count_u64 = u64::try_from(count).map_err(|_| {
             self.latch(io::Error::new(
                 io::ErrorKind::InvalidData,
