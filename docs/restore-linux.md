@@ -491,5 +491,9 @@ requirement, duplicate events, and a default-ACL event on a regular file.
 This proof establishes only the state transition and success gate for the
 supplied absence evidence. It does not establish xattr-call results, attribute
 name/loop correspondence, kernel/filesystem ACL semantics, concurrent ACL
-changes, chmod effects, or the full RESTORE-016 controller. This candidate is
-pending independent review; Linux restoration remains unproved.
+changes, chmod effects, or the full RESTORE-016 controller. Independent review
+accepted candidate `9a021bb`; the exact-source CI receipt records source SHA-256
+`5d51a9359d0dedf87494a76d2c80527c0eb2704a254f19566c212c42f0957150`, with
+2,047 vstd, 3,183 Vest, and 1,101 core obligations passing with zero errors;
+Duvet, Clippy, all 81 core tests, integrations, and doctests passed. Linux
+restoration remains unproved.
