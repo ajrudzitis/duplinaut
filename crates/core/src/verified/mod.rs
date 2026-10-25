@@ -15,6 +15,7 @@ pub(crate) mod catalog_accounting;
 pub(crate) mod checked_read;
 pub(crate) mod evidence_accounting;
 pub(crate) mod evidence_metadata;
+pub(crate) mod local_read;
 pub(crate) mod multipart_metadata;
 pub(crate) mod openpgp_admission;
 pub(crate) mod policy_metadata;

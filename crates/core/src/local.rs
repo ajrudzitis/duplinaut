@@ -4,6 +4,7 @@ use crate::source::{
     Cancellation, CheckedReader, ObjectIdentity, ObjectSource, SourceError, SourceLimits,
     StoredObject,
 };
+use crate::verified::local_read::{advance_local_read_phase, LocalReadEvent, LocalReadPhase};
 use rustix::fs::{self, AtFlags, FileType, Mode, OFlags, Stat};
 use std::{
     fs::File,
@@ -209,19 +210,41 @@ struct LocalReader {
 }
 // Commit the logical offset only after both identity observations succeed.
 // A retryable Interrupted after the positional read re-reads the same bytes.
+//= docs/parsing-requirements.md#parse-source-001
+//= type=implementation
+//# The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
 fn read_validated(
     file: &File,
     offset: u64,
     buffer: &mut [u8],
     mut validate: impl FnMut() -> io::Result<()>,
 ) -> io::Result<(usize, u64)> {
+    let mut phase = LocalReadPhase::Start { offset };
     validate()?;
+    phase = advance_local_read_phase(phase, LocalReadEvent::PrevalidationSucceeded)
+        .ok_or_else(|| io::Error::other("invalid local read prevalidation transition"))?;
+    let requested = u64::try_from(buffer.len())
+        .map_err(|_| io::Error::other("local read buffer length exceeds accounting range"))?;
     let count = file.read_at(buffer, offset)?;
+    let count_u64 = u64::try_from(count)
+        .map_err(|_| io::Error::other("local read count exceeds accounting range"))?;
+    phase = advance_local_read_phase(
+        phase,
+        LocalReadEvent::ReadSucceeded {
+            requested,
+            count: count_u64,
+        },
+    )
+    .ok_or_else(|| io::Error::other("invalid local read count"))?;
     validate()?;
-    let next = offset
-        .checked_add(count as u64)
-        .ok_or_else(|| io::Error::other("local read offset overflow"))?;
-    Ok((count, next))
+    phase = advance_local_read_phase(phase, LocalReadEvent::PostvalidationSucceeded)
+        .ok_or_else(|| io::Error::other("invalid local read postvalidation transition"))?;
+    let Some(LocalReadPhase::Committed { next_offset, .. }) =
+        advance_local_read_phase(phase, LocalReadEvent::Commit)
+    else {
+        return Err(io::Error::other("local read offset overflow"));
+    };
+    Ok((count, next_offset))
 }
 impl LocalReader {
     fn validate(&self) -> io::Result<()> {
@@ -267,6 +290,9 @@ mod tests {
     use super::*;
 
     #[test]
+    //= docs/parsing-requirements.md#parse-source-001
+    //= type=test
+    //# The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
     fn interrupted_post_read_validation_retries_without_losing_bytes() {
         let file = File::open(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
             "../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.manifest",
@@ -291,5 +317,34 @@ mod tests {
         assert_eq!(count, 4);
         assert_eq!(next, 8);
         assert_eq!(&buffer, b"name");
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-source-001
+    //= type=test
+    //# The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
+    fn failed_pre_or_post_validation_returns_no_read_commit() {
+        let file = File::open(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.manifest",
+        ))
+        .unwrap();
+        for fail_at in [1, 2] {
+            let mut buffer = [0u8; 4];
+            let mut validations = 0;
+            let result = read_validated(&file, 0, &mut buffer, || {
+                validations += 1;
+                if validations == fail_at {
+                    Err(io::Error::other("identity changed"))
+                } else {
+                    Ok(())
+                }
+            });
+            assert!(result.is_err());
+
+            let (count, next) = read_validated(&file, 0, &mut buffer, || Ok(())).unwrap();
+            assert_eq!(count, 4);
+            assert_eq!(next, 4);
+            assert_eq!(&buffer, b"Host");
+        }
     }
 }

@@ -505,6 +505,25 @@ reported 2,047 vstd, 3,183 Vest, and 1,079 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. The
 checked-stream assurance milestone remains unproved.
 
+## Local identity-validated read commit phase candidate
+
+`read_validated` now advances a verifier-visible phase from its starting offset,
+through successful pre-read validation and read-result capture, then through
+successful post-read validation to a committed next offset. Invalid ordering,
+counts larger than the requested window, or offset overflow cannot produce a
+committed phase. The production offset is returned only from the final committed
+phase; pre/post validation errors and read errors return before that point.
+
+Tests reject skipped and reordered transitions, invalid read counts, and offset
+overflow. Behavior tests inject failures at both identity-validation points and
+confirm no read result/offset commit is returned; the Interrupted post-read
+validation test confirms a retry starts at the same offset. This proves only
+the abstract phase sequencing and checked offset commit. It does not prove the
+validation facts from `fstat`/`statat`, identity-token construction or equality,
+`read_at` contents/count truthfulness, syscall or filesystem effects,
+cancellation races, or complete source refinement. The candidate awaits
+independent review; local-source assurance remains unproved.
+
 ## Checked-stream failure-latch transition
 
 `CheckedReader::latch` now calls the verified `read_failure_transition` before
