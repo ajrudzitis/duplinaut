@@ -1,10 +1,11 @@
 # Development tools
 
-Pinned tool identities and native archive checksums live in [toolchain.toml](toolchain.toml). The initial bootstrap supports Linux x86_64.
+Pinned tool identities and native archive checksums live in [toolchain.toml](toolchain.toml). The bootstrap supports Linux x86_64 and Apple Silicon macOS using platform-specific archives at identical Verus, Z3, Vest, and Duvet versions.
 
 ```sh
-nix-shell tools/shell.nix --run 'bash tools/bootstrap.sh'
+nix-shell tools/shell.nix
 source tools/env.sh
+bash tools/bootstrap.sh
 cargo xtask doctor
 ```
 

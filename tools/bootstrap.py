@@ -24,16 +24,30 @@ def download(url, digest, destination):
         raise RuntimeError(f"checksum mismatch for {url}: {actual}")
 
 
+def select_host(pins):
+    host = (platform.system(), platform.machine())
+    supported = {
+        ("Linux", "x86_64"): "linux_x86_64",
+        ("Darwin", "arm64"): "macos_arm64",
+    }
+    key = supported.get(host)
+    if key is None:
+        raise RuntimeError(
+            f"No pinned native tools for {host[0]} {host[1]}; "
+            "supported hosts are Linux x86_64 and macOS arm64"
+        )
+    return key, pins[key]
+
+
 def main():
     pins = tomllib.loads(Path(sys.argv[1]).read_text())
     root = Path(sys.argv[2]).resolve()
-    if platform.system() != "Linux" or platform.machine() != "x86_64":
-        raise RuntimeError("The initial native-tool bootstrap supports Linux x86_64 only")
+    host_key, host = select_host(pins)
     root.mkdir(parents=True, exist_ok=True)
-    run("rustup", "toolchain", "install", pins["rust"], "--profile", "minimal", "--component", "rustfmt", "--component", "clippy")
-    host = pins["linux_x86_64"]
+    rust_toolchain = host.get("rust_toolchain", pins["rust"])
+    run("rustup", "toolchain", "install", rust_toolchain, "--profile", "minimal", "--component", "rustfmt", "--component", "clippy")
     for name in ("verus", "z3"):
-        archive = root / f"{name}.zip"
+        archive = root / f"{name}-{host_key}.zip"
         download(host[f"{name}_url"], host[f"{name}_sha256"], archive)
         with zipfile.ZipFile(archive) as contents:
             # Native release archives are checksum-pinned. Preserve executable modes.
@@ -44,7 +58,7 @@ def main():
                     (root / entry.filename).chmod(mode)
     shutil.copy2(root / host["z3_directory"] / "bin" / "z3", root / host["verus_directory"] / "z3")
     for package in ("vest", "duvet"):
-        run("cargo", f"+{pins['rust']}", "install", package, "--version", pins[package], "--locked", "--root", str(root))
+        run("rustup", "run", rust_toolchain, "cargo", "install", package, "--version", pins[package], "--locked", "--root", str(root))
     run(str(root / host["verus_directory"] / "verus"), "--version")
     run(str(root / host["verus_directory"] / "z3"), "--version")
 

@@ -48,8 +48,10 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Config>,
         }
         _ => return Err("invalid source mode; use --help"),
     };
-    let mut parent = None;
-    let mut name: Option<Vec<u8>> = None;
+    #[cfg(target_os = "linux")]
+    let (mut parent, mut name): (Option<PathBuf>, Option<Vec<u8>>) = (None, None);
+    #[cfg(not(target_os = "linux"))]
+    let (parent, name): (Option<PathBuf>, Option<Vec<u8>>) = (None, None);
     while let Some(option) = args.next() {
         let option = option.to_str().ok_or("option token requires UTF-8")?;
         if option == "--path-style" {
@@ -68,31 +70,37 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Config>,
         let value = args.next().ok_or("missing option value")?;
         match option {
             "--restore-parent" => {
-                #[cfg(not(target_os = "linux"))]
-                return Err("native restoration unsupported on this OS");
-                if parent.is_some() {
-                    return Err("duplicate restore-parent");
-                }
-                #[cfg(unix)]
-                {
-                    use std::os::unix::ffi::OsStrExt;
-                    if value.as_os_str().as_bytes().is_empty()
-                        || value.as_os_str().as_bytes().contains(&0)
-                    {
-                        return Err("restore parent must be nonempty without NUL");
-                    }
-                    if value.as_os_str().as_bytes().len() > 65536 {
-                        return Err("restore parent exceeds byte limit");
-                    }
-                }
-                parent = Some(PathBuf::from(value));
-            }
-            "--restore-name" => {
-                if name.is_some() {
-                    return Err("duplicate restore-name");
-                }
                 #[cfg(target_os = "linux")]
                 {
+                    if parent.is_some() {
+                        return Err("duplicate restore-parent");
+                    }
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::ffi::OsStrExt;
+                        if value.as_os_str().as_bytes().is_empty()
+                            || value.as_os_str().as_bytes().contains(&0)
+                        {
+                            return Err("restore parent must be nonempty without NUL");
+                        }
+                        if value.as_os_str().as_bytes().len() > 65536 {
+                            return Err("restore parent exceeds byte limit");
+                        }
+                    }
+                    parent = Some(PathBuf::from(value));
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let _ = value;
+                    return Err("native restoration unsupported on this OS");
+                }
+            }
+            "--restore-name" => {
+                #[cfg(target_os = "linux")]
+                {
+                    if name.is_some() {
+                        return Err("duplicate restore-name");
+                    }
                     use std::os::unix::ffi::OsStringExt;
                     let bytes = value.into_vec();
                     if bytes.len() > 4096
@@ -141,6 +149,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Config>,
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os = "linux")]
     #[test]
     fn pairs_duplicates_and_values_beginning_with_flags() {
         let parsed = parse(
@@ -175,6 +184,19 @@ mod tests {
             assert!(parse(args.into_iter().map(OsString::from)).is_err());
         }
     }
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn native_restore_options_are_rejected_on_unsupported_os() {
+        assert!(matches!(
+            parse(["local", "source", "--restore-parent", "parent"].map(OsString::from)),
+            Err("native restoration unsupported on this OS")
+        ));
+        assert!(matches!(
+            parse(["local", "source", "--restore-name", "name"].map(OsString::from)),
+            Err("native restoration unsupported on this OS")
+        ));
+    }
+    #[cfg(target_os = "linux")]
     #[test]
     //= docs/parsing-requirements.md#restore-ui-001
     //= type=test
@@ -206,6 +228,7 @@ mod tests {
             .is_err());
         }
     }
+    #[cfg(target_os = "linux")]
     #[cfg(target_os = "linux")]
     #[test]
     //= docs/parsing-requirements.md#restore-ui-001

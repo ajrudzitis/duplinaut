@@ -20,3 +20,12 @@ verus_directory = "verus-x86-linux"
 z3_url = "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-glibc-2.39.zip"
 z3_sha256 = "7288c49a5bd6dbafd7b0b0d1f65956b91672da24b08f09242919af159be3418e"
 z3_directory = "z3-4.16.0-x64-glibc-2.39"
+
+[macos_arm64]
+rust_toolchain = "1.98.0-aarch64-apple-darwin"
+verus_url = "https://github.com/verus-lang/verus/releases/download/release/0.2026.09.06.8dea4a2/verus-0.2026.09.06.8dea4a2-arm64-macos.zip"
+verus_sha256 = "23be2e8113b50bc91729377d8ac032f658cc5187e389a319d8458f9c37b07b4a"
+verus_directory = "verus-arm64-macos"
+z3_url = "https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-arm64-osx-15.7.3.zip"
+z3_sha256 = "41828fa07d5cb77bfaee326e8e6dac074f26329c09c633f9e66012bb917cf8ae"
+z3_directory = "z3-4.16.0-arm64-osx-15.7.3"
