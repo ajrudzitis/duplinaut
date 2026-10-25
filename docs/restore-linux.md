@@ -186,6 +186,22 @@ transition. It does not prove syscall results, chunk selection, retry/work
 accounting, filesystem contents or the Linux publication controller. The proof
 was independently accepted; the Linux restoration milestone remains unproved.
 
+## Next-write-chunk boundary proof candidate
+
+`next_write_chunk_end(offset, content_len)` now computes the slice end used by
+the production regular-file loop before each write attempt. For a remaining
+range, its contract returns an end strictly after `offset`, no greater than
+`content_len`, and at most 65,536 bytes ahead. It returns `None` when no bytes
+remain. Its saturating addition is preserved, including near-`usize::MAX`
+inputs. Boundary tests cover empty input, short and exact chunks, a second
+chunk with a short tail, and machine-word edge cases.
+
+This proves the chunk-end arithmetic only. It does not establish the content
+length or slice validity, the bytes passed to the syscall, syscall progress,
+retry/work accounting, final file contents, or the full RESTORE-014/controller
+contract. The candidate awaits independent review; Linux restoration remains
+unproved.
+
 ## Forward-work counter proof
 
 `Forward::tick` preserves its cancellation-first check, then calls the verified

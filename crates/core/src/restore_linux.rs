@@ -623,7 +623,9 @@ fn populate(p: &mut Prepared<'_>, w: &mut Forward<'_, impl Hooks>) -> Result<(),
                 let content = node.entry.content().ok_or(Cause::InvalidPlan)?;
                 let mut offset = 0;
                 while offset < content.len() {
-                    let end = content.len().min(offset.saturating_add(65536));
+                    let end =
+                        crate::verified::restore_write::next_write_chunk_end(offset, content.len())
+                            .ok_or(Cause::Fidelity)?;
                     match w.write(file.as_fd(), &content[offset..end]) {
                         Ok(n) => {
                             offset = crate::verified::restore_write::advance_write_offset(
@@ -1411,6 +1413,33 @@ mod tests {
         assert_eq!(advance_write_offset(4, 2, 5), None);
         assert_eq!(advance_write_offset(1, 4, 4), None);
         assert_eq!(advance_write_offset(5, 1, 5), None);
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-014
+    //= type=test
+    //# Regular files MUST be created exclusively with `CREATE | EXCL | NOFOLLOW | CLOEXEC | WRONLY`, initial creation mode `0600`, and written with the exact immutable content in chunks no larger than 65536 bytes.
+    fn write_chunk_boundary_never_exceeds_remaining_bytes_or_chunk_limit() {
+        use crate::verified::restore_write::next_write_chunk_end;
+
+        assert_eq!(next_write_chunk_end(0, 0), None);
+        assert_eq!(next_write_chunk_end(0, 1), Some(1));
+        assert_eq!(next_write_chunk_end(0, 65_536), Some(65_536));
+        assert_eq!(next_write_chunk_end(0, 65_537), Some(65_536));
+        assert_eq!(next_write_chunk_end(65_536, 65_537), Some(65_537));
+        assert_eq!(next_write_chunk_end(65_537, 65_537), None);
+        assert_eq!(
+            next_write_chunk_end(usize::MAX - 65_537, usize::MAX),
+            Some(usize::MAX - 1)
+        );
+        assert_eq!(
+            next_write_chunk_end(usize::MAX - 65_536, usize::MAX),
+            Some(usize::MAX)
+        );
+        assert_eq!(
+            next_write_chunk_end(usize::MAX - 1, usize::MAX),
+            Some(usize::MAX)
+        );
     }
 
     struct Temp(PathBuf);
