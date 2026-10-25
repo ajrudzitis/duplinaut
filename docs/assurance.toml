@@ -727,12 +727,13 @@ specified = true
 implemented = true
 proved = false
 tested = true
-# All listed scoped checkpoints are independently accepted; traversal/fact
-# provenance, parent-FD mapping and broader controller/syscall refinement remain open.
-reviewed = true
+# Prior scoped checkpoints are accepted; cleanup-call admission is this
+# candidate and awaits independent review. Traversal/fact provenance,
+# parent-FD mapping and broader controller/syscall refinement remain open.
+reviewed = false
 proof_required = true
 # Native acceptance only; exact controller/kernel refinement remains pending.
-implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "advance_restore_preflight_summary" }, { path = "crates/core/src/verified/restore_time.rs", symbol = "validate_restore_time" }]
+implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/restore_linux.rs", symbol = "cleanup_call" }, { path = "crates/core/src/verified/restore_cleanup.rs", symbol = "admit_cleanup_attempt" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "advance_restore_preflight_summary" }, { path = "crates/core/src/verified/restore_time.rs", symbol = "validate_restore_time" }]
 proofs = [
   { id = "linux-write-offset", requirement = "RESTORE-014", path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset", kind = "contract" },
   { id = "linux-forward-work", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work", kind = "contract" },
@@ -740,6 +741,7 @@ proofs = [
   { id = "linux-multidimensional-preflight", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight", kind = "contract" },
   { id = "linux-cleanup-reservation-bound", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound", kind = "contract" },
   { id = "linux-cleanup-journal-schedule", requirement = "RESTORE-022", path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound", kind = "contract" },
+  { id = "linux-cleanup-attempt-admission", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_cleanup.rs", symbol = "admit_cleanup_attempt", kind = "contract" },
   { id = "linux-name-metadata-charge", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata", kind = "contract" },
   { id = "linux-streaming-preflight-summary", requirement = "RESTORE-012", path = "crates/core/src/verified/restore_budget.rs", symbol = "advance_restore_preflight_summary", kind = "contract" },
   { id = "linux-restore-time-validation", requirement = "RESTORE-011", path = "crates/core/src/verified/restore_time.rs", symbol = "validate_restore_time", kind = "contract" }
@@ -752,6 +754,7 @@ tests = [
   { package = "duplicity-core", name = "restore_linux::tests::short_interrupted_zero_writes_and_forward_faults_keep_cleanup_reserved" },
   { package = "duplicity-core", name = "restore_linux::tests::write_offset_transition_rejects_zero_and_out_of_range_progress" },
   { package = "duplicity-core", name = "restore_linux::tests::forward_work_transition_decrements_once_or_fails_closed" },
+  { package = "duplicity-core", name = "restore_linux::tests::cleanup_admission_is_atomic_and_precedes_hooks_and_operation" },
   { package = "duplicity-core", name = "restore_linux::tests::name_metadata_charge_checks_both_limits_and_overflow_atomically" },
   { package = "duplicity-core", name = "restore_linux::tests::restore_preflight_summary_updates_all_charges_or_fails_closed" },
   { package = "duplicity-core", name = "restore_linux::tests::root_profiles_restrictive_descendants_and_preflight_mode_checks" },

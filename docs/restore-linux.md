@@ -308,3 +308,21 @@ largest valid nanoseconds, and invalid nanosecond values. This proof does not
 cover filesystem timestamp support, rounding, the `futimens` effect, or
 read-back fidelity. This scoped proof was independently accepted; the Linux
 restoration milestone remains unproved.
+
+## Cleanup-attempt admission proof candidate
+
+`cleanup_call` now obtains the next remaining-work and attempted-diagnostic
+counters from `admit_cleanup_attempt` before it invokes a hook or operation.
+The helper returns both next values only when one reserved unit is available
+and the attempted counter can be incremented; exhausted budget or counter
+overflow returns `None` without advancing either value. Production treats that
+rejection as budget exhaustion and returns before the callback or syscall.
+Tests cover exact one-unit admission, both rejection cases, the maximum
+representable successful counter transition, and the production no-hook/no-
+operation rejection path.
+
+This proves the atomic admission of one cleanup attempt before its effect. It
+does not prove that the schedule enumerates every necessary operation, the
+journal/FD selection or order, syscall behavior, failure-diagnostic updates, or
+whole cleanup correctness. The candidate is pending independent review; Linux
+restoration remains unproved.

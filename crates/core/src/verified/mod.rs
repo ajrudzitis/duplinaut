@@ -23,6 +23,8 @@ pub(crate) mod reader_volume_scan;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_budget;
 #[cfg(target_os = "linux")]
+pub(crate) mod restore_cleanup;
+#[cfg(target_os = "linux")]
 pub(crate) mod restore_publication;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_time;

@@ -12,6 +12,7 @@ use crate::{
             CleanupSchedule, RestorePreflightItem, RestorePreflightLimits, RestorePreflightNeed,
             RestorePreflightSummary,
         },
+        restore_cleanup::admit_cleanup_attempt,
         restore_publication::{
             decide_publication_cleanup, PublicationCleanup, PublicationDecision,
         },
@@ -688,12 +689,12 @@ fn cleanup_call<H: Hooks>(
     op: Op,
     f: impl FnOnce() -> Result<(), Errno>,
 ) {
-    if *left == 0 {
+    let Some(admitted) = admit_cleanup_attempt(*left, report.attempted) else {
         report.budget_exhausted = true;
         return;
-    }
-    *left -= 1;
-    report.attempted += 1;
+    };
+    *left = admitted.remaining;
+    report.attempted = admitted.attempted;
     let result = hooks
         .before(op)
         .and_then(|()| f())
@@ -1307,6 +1308,79 @@ mod tests {
         assert_eq!(decrement_forward_work(1), Some(0));
         assert_eq!(decrement_forward_work(2), Some(1));
         assert_eq!(decrement_forward_work(usize::MAX), Some(usize::MAX - 1));
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-012
+    //= type=test
+    //# The backend MUST enforce independent checked budgets for created entries, retained directory FDs, owned metadata, path/name/target bytes, total regular payload bytes, forward work, staging-name attempts, and cleanup work before the associated allocation or syscall.
+    //= docs/parsing-requirements.md#restore-022
+    //= type=test
+    //# On a handled failure or observed cancellation before any publication attempt, cleanup MUST attempt removal of journaled definitely-created or possibly-created entries inside exclusively owned staging using retained parent FDs and original component bytes, without following symlinks.
+    fn cleanup_admission_is_atomic_and_precedes_hooks_and_operation() {
+        use crate::verified::restore_cleanup::admit_cleanup_attempt;
+
+        assert_eq!(
+            admit_cleanup_attempt(1, 0),
+            Some(crate::verified::restore_cleanup::CleanupAttemptState {
+                remaining: 0,
+                attempted: 1,
+            })
+        );
+        assert_eq!(
+            admit_cleanup_attempt(usize::MAX, usize::MAX - 1),
+            Some(crate::verified::restore_cleanup::CleanupAttemptState {
+                remaining: usize::MAX - 1,
+                attempted: usize::MAX,
+            })
+        );
+        assert_eq!(admit_cleanup_attempt(0, 0), None);
+        assert_eq!(admit_cleanup_attempt(1, usize::MAX), None);
+
+        for (initial_left, initial_attempted) in [(0, 0), (1, usize::MAX)] {
+            let mut report = Cleanup {
+                attempted: initial_attempted,
+                ..Cleanup::default()
+            };
+            let mut left = initial_left;
+            let mut hooks = Fault::default();
+            let mut operation_called = false;
+            cleanup_call(
+                &mut report,
+                &mut left,
+                &mut hooks,
+                Op::CleanupUnlink,
+                || {
+                    operation_called = true;
+                    Ok(())
+                },
+            );
+            assert_eq!(left, initial_left);
+            assert_eq!(report.attempted, initial_attempted);
+            assert!(report.budget_exhausted);
+            assert!(hooks.seen.is_empty());
+            assert!(!operation_called);
+        }
+
+        let mut report = Cleanup::default();
+        let mut left = 1;
+        let mut hooks = Fault::default();
+        let mut operation_called = false;
+        cleanup_call(
+            &mut report,
+            &mut left,
+            &mut hooks,
+            Op::CleanupUnlink,
+            || {
+                operation_called = true;
+                Ok(())
+            },
+        );
+        assert_eq!(left, 0);
+        assert_eq!(report.attempted, 1);
+        assert_eq!(report.failures, 0);
+        assert_eq!(hooks.seen, [Op::CleanupUnlink]);
+        assert!(operation_called);
     }
 
     #[test]
