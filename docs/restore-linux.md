@@ -449,5 +449,9 @@ and rejected negative/overflowing width conversions.
 The proof covers only this normalized `Option<u64>` equality decision. It does
 not prove the `Stat` or content facts, the native conversion provenance, entry
 type classification, other metadata comparisons, syscalls, or publication.
-This candidate is pending independent review; Linux restoration remains
-unproved.
+Independent review accepted candidate `6288768`; exact-source
+`cargo xtask ci` passed with source SHA-256
+`9a2cb1728fd1fbbddffa25ddb945bad5439f0ce62d3beca2b12a2beca3d8296f`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,093 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
+restoration remains unproved.
