@@ -180,7 +180,7 @@ behavior, the provenance or accuracy of reported string capacities, and a
 total heap bound. Accordingly, the count is a conservative metadata accounting
 model rather than a proof of process-wide memory consumption.
 
-## Authentication evidence comparison charge proof candidate
+## Authentication evidence comparison charge proof
 
 Before each certificate lookup in `record_evidence`, the reader now calls a
 verified transition with the current comparison count, the existing certificate
@@ -202,8 +202,13 @@ the corresponding certificate equality scan. It does not prove certificate
 equality semantics, duplicate detection, or the complete `record_evidence`
 operation. Metadata charging, temporary version-vector allocation, and
 certificate-version admission remain separate checks; allocator behavior and
-total evidence/process heap use are outside scope. The candidate is pending
-independent review and does not complete authentication-evidence accounting.
+total evidence/process heap use are outside scope. The proof does not complete
+authentication-evidence accounting. Candidate `ac146e6` was independently
+accepted after clarifying that the pool length is a worst-case bound. The
+corrected exact-source `cargo xtask ci` passed with SHA-256
+`ac0b5bd838b09ed2e08bc05fcbbb8164ef88850ab6195cd5cd6a507ebdd38d9e`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,056 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
 ## Multipart metadata admission proof
 

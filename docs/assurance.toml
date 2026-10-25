@@ -411,12 +411,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate pending review. The contract charges the entire pool length as a
-# worst-case upper bound before a certificate-pool scan; matching equality,
-# allocation behavior, metadata/version admission, and the full evidence loop
-# remain outside this checkpoint.
+# Independently accepted: charge the entire pool length as a worst-case upper
+# bound before a certificate-pool scan; matching equality, allocation behavior,
+# metadata/version admission, and the full evidence loop remain outside.
 implementations = [
   { path = "crates/core/src/reader.rs", symbol = "record_evidence" },
   { path = "crates/core/src/verified/evidence_accounting.rs", symbol = "charge_evidence_comparisons" }
