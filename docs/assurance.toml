@@ -676,13 +676,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Independently accepted scoped proof for the shared checked-reader
-# remaining-byte transition. The read-window helper below is a new candidate
-# pending review; source backend behavior, EOF probing and whole-reader
-# refinement remain open. The previously accepted progress transition remains
-# part of this milestone; review will assess both records together.
+# Both shared checked-reader arithmetic checkpoints are independently
+# accepted. Source backend behavior, EOF probing and whole-reader refinement
+# remain open.
 implementations = [
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::read" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read" },

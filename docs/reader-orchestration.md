@@ -483,7 +483,7 @@ reported 2,047 vstd, 3,183 Vest, and 1,078 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. The
 source/reader milestones remain unproved.
 
-## Checked-stream read-window proof candidate
+## Checked-stream read-window proof
 
 `CheckedReader::read` now calls `verified::checked_read::choose_checked_read_window`
 after its existing empty-buffer, failure, cancellation and EOF-probe branches.
@@ -497,5 +497,10 @@ Tests cover both choices of the minimum, equal bounds, zero inputs, and the
 the remaining body. This proves the arithmetic window and its placement only.
 The accepted progress transition remains separately recorded above. This
 candidate does not prove `Read` results, the byte contents, EOF behavior,
-cancellation/error latching, or complete source refinement. It awaits
-independent review; checked-stream assurance remains unproved.
+cancellation/error latching, or complete source refinement. Independent
+review accepted candidate `5b0dbac`; exact-source `cargo xtask ci` passed with
+source SHA-256
+`49e0e3b96740a5665a947cc7ffcbccf845872e7dbb4cdbec3be9489016ded2c0`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,079 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. The
+checked-stream assurance milestone remains unproved.
