@@ -241,7 +241,7 @@ whether allocation succeeds, or total process heap usage. The slot count is a
 conservative accounting model from the raw input count, not a refinement of
 `Vec`'s concrete capacity.
 
-## Authentication evidence record metadata reservation proof candidate
+## Authentication evidence record metadata reservation proof
 
 Both `record_plain` and `record_evidence` now call a verified admission
 transition before the evidence-object reserve/append. The transition checks
@@ -267,4 +267,8 @@ string capacities, clone capacity behavior, allocator growth or allocation
 success, certificate-metadata charging later in `record_evidence`, policy
 summary allocation, or whole-operation atomicity. It covers this reservation
 transition and its production use only; overall authentication-evidence
-accounting remains incomplete pending review.
+accounting remains incomplete. Candidate `41bf000` was independently accepted,
+and exact-source `cargo xtask ci` passed with source SHA-256
+`5bf46a2bb0a6fd153917d3f88ad0e7f1d433db8dcb942169573867e9ab4fd5d9`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,058 core obligations with zero errors;
+Duvet, Clippy, formatting, workspace tests, integrations, and doctests passed.

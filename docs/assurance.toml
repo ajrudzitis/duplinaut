@@ -411,12 +411,12 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate pending review. It proves an object-count plus aggregate metadata
-# reservation from supplied source-charge and version-slot facts before the
-# record paths allocate or append. Capacity provenance, allocator behavior,
-# certificate metadata growth, and full evidence-loop atomicity are separate.
+# Independently accepted count/byte reservation from supplied source-charge
+# and version-slot facts before allocation/append. Capacity provenance,
+# allocator behavior, later certificate metadata growth, and full evidence-loop
+# atomicity remain outside the proof.
 implementations = [
   { path = "crates/core/src/reader.rs", symbol = "record_plain" },
   { path = "crates/core/src/reader.rs", symbol = "record_evidence" },
