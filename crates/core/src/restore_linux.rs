@@ -13,6 +13,9 @@ use crate::{
             RestorePreflightSummary,
         },
         restore_cleanup::admit_cleanup_attempt,
+        restore_finalize::{
+            advance_finalization_cursor, start_finalization, FinalizationCursor, FinalizationEvent,
+        },
         restore_publication::{
             decide_publication_cleanup, PublicationCleanup, PublicationDecision,
         },
@@ -668,13 +671,32 @@ fn populate(p: &mut Prepared<'_>, w: &mut Forward<'_, impl Hooks>) -> Result<(),
             _ => return Err(Cause::InvalidPlan),
         }
     }
-    // Child directories before parents; cached FDs survive restrictive modes.
+    // The cursor enforces reverse plan-position order; cached FDs survive restrictive modes.
+    let mut finalization = start_finalization(p.nodes.len());
     for i in (0..p.nodes.len()).rev() {
         w.tick()?;
         if p.nodes[i].entry.entry_type() == EntryType::Directory {
+            finalization = advance_finalization_cursor(
+                finalization,
+                FinalizationEvent::BeginDirectory { index: i },
+            )
+            .ok_or(Cause::Fidelity)?;
             finish_fd(fd(&p.dirs, i + 1)?, p.nodes[i].entry, w)?;
+            finalization = advance_finalization_cursor(
+                finalization,
+                FinalizationEvent::CommitDirectory { index: i },
+            )
+            .ok_or(Cause::Fidelity)?;
+        } else {
+            finalization = advance_finalization_cursor(
+                finalization,
+                FinalizationEvent::SkipNonDirectory { index: i },
+            )
+            .ok_or(Cause::Fidelity)?;
         }
     }
+    finalization = advance_finalization_cursor(finalization, FinalizationEvent::BeginRoot)
+        .ok_or(Cause::Fidelity)?;
     if let Some(root) = p.root {
         finish_fd(fd(&p.dirs, 0)?, root, w)?;
     } else {
@@ -685,6 +707,11 @@ fn populate(p: &mut Prepared<'_>, w: &mut Forward<'_, impl Hooks>) -> Result<(),
         if s.st_mode & 0o777 != 0o700 || FileType::from_raw_mode(s.st_mode) != FileType::Directory {
             return Err(Cause::Fidelity);
         }
+    }
+    if advance_finalization_cursor(finalization, FinalizationEvent::CommitRoot)
+        != Some(FinalizationCursor::Complete)
+    {
+        return Err(Cause::Fidelity);
     }
     Ok(())
 }

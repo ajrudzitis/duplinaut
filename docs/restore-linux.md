@@ -411,3 +411,23 @@ exact-source `cargo xtask ci` passed with source SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,076 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
 restoration remains unproved.
+
+## Reverse finalization cursor proof
+
+`advance_finalization_cursor` is called from the reverse `Prepared.nodes` loop.
+For each directory, production begins its cursor transition before calling
+`finish_fd` and commits the position only after `finish_fd` succeeds. For
+non-directories it performs an explicit skip transition. Root finalization is
+admitted only after all node positions have been consumed, and the cursor is
+committed only after root finalization succeeds. Invalid, duplicated, skipped,
+or out-of-order cursor events fail closed as a fidelity error. The unit test
+covers reverse positions, pending directory commit, non-directory skip, and
+root-last completion.
+
+The proof establishes only reverse `Prepared.nodes` position sequencing and
+the cursor gate around successful `finish_fd` return. It does not prove that
+plan position order corresponds to ancestry, that the entry type facts or
+`finish_fd` effects are correct, or that syscalls succeed or truthfully report
+success. Parent-FD mapping and the complete RESTORE-018/controller contract
+remain open. This candidate is pending independent review; Linux restoration
+remains unproved.
