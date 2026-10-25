@@ -477,3 +477,19 @@ Independent review accepted candidate `a3c53a0`; exact-source
 reported 2,047 vstd, 3,183 Vest, and 1,096 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
 restoration remains unproved.
+
+## ACL absence evidence gate
+
+`clear_acl` records access-ACL absence only after its readback branch accepts
+absence, and records default-ACL absence the same way for directories. Its
+success result is gated on access evidence and, for directories, default evidence;
+`init_dir` and `finish_fd` continue to chmod only after `clear_acl` succeeds.
+The verified state rejects duplicate and inapplicable attribute evidence. Tests
+cover the one-attribute regular-file requirement, the two-attribute directory
+requirement, duplicate events, and a default-ACL event on a regular file.
+
+This proof establishes only the state transition and success gate for the
+supplied absence evidence. It does not establish xattr-call results, attribute
+name/loop correspondence, kernel/filesystem ACL semantics, concurrent ACL
+changes, chmod effects, or the full RESTORE-016 controller. This candidate is
+pending independent review; Linux restoration remains unproved.

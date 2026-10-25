@@ -23,6 +23,8 @@ pub(crate) mod reader_accounting;
 pub(crate) mod reader_completion;
 pub(crate) mod reader_volume_scan;
 #[cfg(target_os = "linux")]
+pub(crate) mod restore_acl;
+#[cfg(target_os = "linux")]
 pub(crate) mod restore_budget;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_cleanup;

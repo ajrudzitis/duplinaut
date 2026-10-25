@@ -7,6 +7,9 @@ use crate::{
     state::SnapshotEntry,
     tar::{EntryType, TarTime},
     verified::{
+        restore_acl::{
+            acl_clear_complete, initial_acl_clear_evidence, record_acl_absence, AclAttribute,
+        },
         restore_budget::{
             advance_restore_preflight_summary, cleanup_schedule_bound, restore_preflight,
             CleanupSchedule, RestorePreflightItem, RestorePreflightLimits, RestorePreflightNeed,
@@ -489,9 +492,13 @@ fn clear_acl(
     directory: bool,
     w: &mut Forward<'_, impl Hooks>,
 ) -> Result<(), Cause> {
-    for name in [c"system.posix_acl_access", c"system.posix_acl_default"]
-        .into_iter()
-        .take(if directory { 2 } else { 1 })
+    let mut evidence = initial_acl_clear_evidence(directory);
+    for (attribute, name) in [
+        (AclAttribute::Access, c"system.posix_acl_access"),
+        (AclAttribute::Default, c"system.posix_acl_default"),
+    ]
+    .into_iter()
+    .take(if directory { 2 } else { 1 })
     {
         let removal = w.call(Op::AclRemove, || fs::fremovexattr(fd, name));
         match removal {
@@ -504,6 +511,10 @@ fn clear_acl(
             Ok(_) => return Err(Cause::Fidelity),
             Err(e) => return Err(e),
         }
+        evidence = record_acl_absence(evidence, attribute).ok_or(Cause::Fidelity)?;
+    }
+    if !acl_clear_complete(evidence) {
+        return Err(Cause::Fidelity);
     }
     Ok(())
 }
