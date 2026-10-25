@@ -210,7 +210,7 @@ corrected exact-source `cargo xtask ci` passed with SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,056 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
-## Final snapshot publication readiness proof candidate
+## Final snapshot publication readiness proof
 
 At the final return boundary, `read_snapshot_inner` first requires the selected-
 set completion cursor to be complete, then takes the existing final
@@ -232,7 +232,11 @@ reader behavior. The candidate links to
 The proof treats the final `AtomicBool` observation as a supplied Boolean; it
 does not establish cancellation timing or races after observation. It does not
 prove cursor iterator provenance or complete reader-controller refinement.
-The milestone remains pending review and the full reader proof remains open.
+The full reader proof remains open. Candidate `e71baef` was independently
+accepted, and exact-source `cargo xtask ci` passed with source SHA-256
+`f3488b89143e1169c78e628445142ac344221d8c5160473824f7a1291be670f3`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,070 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
 ## Authentication policy summary admission proof
 

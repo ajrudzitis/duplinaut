@@ -443,9 +443,9 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate pending review. Final publication requires a complete selected-set
+# Independently accepted: final publication requires a complete selected-set
 # cursor, present state, and false final cancellation observation. AtomicBool
 # timing/races and whole-reader refinement remain outside.
 implementations = [
