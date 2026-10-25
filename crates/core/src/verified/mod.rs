@@ -13,6 +13,7 @@ pub(crate) mod tar_time;
 
 pub(crate) mod catalog_accounting;
 pub(crate) mod evidence_accounting;
+pub(crate) mod evidence_metadata;
 pub(crate) mod multipart_metadata;
 pub(crate) mod openpgp_admission;
 pub(crate) mod reader_accounting;

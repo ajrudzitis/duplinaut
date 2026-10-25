@@ -1,8 +1,9 @@
 use duplicity_core::{
     names::{NameConfig, Timestamp},
     reader::{
-        Catalog, CryptoCredentials, CryptoReadContext, DiscoveryStatus, EvidenceLimits,
-        OpenPgpLimits, OpenPgpPassword, ReaderError, ReaderLimits, SecretExport,
+        AuthenticationPolicySummary, Catalog, CryptoCredentials, CryptoReadContext,
+        DiscoveryStatus, EvidenceLimits, OpenPgpLimits, OpenPgpPassword, ReaderError, ReaderLimits,
+        SecretExport,
     },
     source::{Cancellation, ObjectIdentity, ObjectSource, SourceError, SourceLimits, StoredObject},
 };
@@ -816,6 +817,85 @@ fn global_signature_policy_and_evidence_limits_fail_closed() {
             Timestamp(1700000000),
             &Cancellation::default(),
             &limited
+        ),
+        Err(ReaderError::Limit)
+    ));
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+//= docs/parsing-requirements.md#parse-env-022
+//= type=test
+//# Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
+fn public_reader_rejects_evidence_record_metadata_before_snapshot_publication() {
+    let metadata_limit = std::mem::size_of::<AuthenticationPolicySummary>();
+    let source = FixtureSource::new("plain", None);
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .unwrap()
+        .0;
+    let plain_context = CryptoReadContext {
+        credentials: CryptoCredentials::default(),
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits {
+            max_metadata_bytes: metadata_limit,
+            ..EvidenceLimits::default()
+        },
+    };
+    assert!(matches!(
+        catalog.read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1700000000),
+            &Cancellation::default(),
+            &plain_context,
+        ),
+        Err(ReaderError::Limit)
+    ));
+
+    let source = FixtureSource::new("symmetric", None);
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .unwrap()
+        .0;
+    let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+    let passwords = [password];
+    let encrypted_context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords: &passwords,
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits {
+            max_metadata_bytes: metadata_limit,
+            ..EvidenceLimits::default()
+        },
+    };
+    assert!(matches!(
+        catalog.read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1700000000),
+            &Cancellation::default(),
+            &encrypted_context,
         ),
         Err(ReaderError::Limit)
     ));

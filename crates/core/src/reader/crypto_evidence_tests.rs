@@ -229,3 +229,103 @@ fn evidence_comparison_budget_is_charged_before_certificate_lookup() {
     assert_eq!(comparisons, 0);
     assert!(rejected.objects.is_empty());
 }
+
+#[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+//= docs/parsing-requirements.md#parse-env-022
+//= type=test
+//# Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
+fn evidence_record_metadata_reservation_precedes_plain_and_crypto_retention() {
+    let item = object("backup/metadata.gpg");
+    let source_bytes = source_metadata_charge(&item).unwrap();
+
+    let mut plain = AuthenticationEvidence::default();
+    let mut plain_used = 0;
+    record_plain(
+        &mut plain,
+        &mut plain_used,
+        &item,
+        Timestamp(1),
+        Timestamp(2),
+        false,
+        1,
+        Envelope::Plain,
+        Some(EvidenceLimits {
+            max_metadata_bytes: source_bytes,
+            ..limits()
+        }),
+    )
+    .unwrap();
+    assert_eq!(plain_used, source_bytes);
+    assert_eq!(plain.objects.len(), 1);
+
+    let mut rejected_plain = AuthenticationEvidence::default();
+    let mut rejected_plain_used = 0;
+    assert!(matches!(
+        record_plain(
+            &mut rejected_plain,
+            &mut rejected_plain_used,
+            &item,
+            Timestamp(1),
+            Timestamp(2),
+            false,
+            1,
+            Envelope::Plain,
+            Some(EvidenceLimits {
+                max_metadata_bytes: source_bytes - 1,
+                ..limits()
+            }),
+        ),
+        Err(ReaderError::Limit)
+    ));
+    assert_eq!(rejected_plain_used, 0);
+    assert!(rejected_plain.objects.is_empty());
+
+    let decoded = decoded();
+    let index_bytes = decoded.certificates.len() * std::mem::size_of::<usize>();
+    let record_bytes = source_bytes + index_bytes;
+    let mut crypto = AuthenticationEvidence {
+        certificates: decoded.certificates.clone(),
+        ..AuthenticationEvidence::default()
+    };
+    let (mut crypto_used, mut comparisons) = (0, 0);
+    record_with(
+        &mut crypto,
+        &mut crypto_used,
+        &mut comparisons,
+        &item,
+        &decoded,
+        EvidenceLimits {
+            max_metadata_bytes: record_bytes,
+            ..limits()
+        },
+    )
+    .unwrap();
+    assert_eq!(crypto_used, record_bytes);
+    assert_eq!(crypto.objects.len(), 1);
+
+    let mut rejected_crypto = AuthenticationEvidence {
+        certificates: decoded.certificates.clone(),
+        ..AuthenticationEvidence::default()
+    };
+    let (mut rejected_crypto_used, mut rejected_comparisons) = (0, 0);
+    assert!(matches!(
+        record_with(
+            &mut rejected_crypto,
+            &mut rejected_crypto_used,
+            &mut rejected_comparisons,
+            &item,
+            &decoded,
+            EvidenceLimits {
+                max_metadata_bytes: record_bytes - 1,
+                ..limits()
+            },
+        ),
+        Err(ReaderError::Limit)
+    ));
+    assert_eq!(rejected_crypto_used, 0);
+    assert_eq!(rejected_comparisons, 0);
+    assert!(rejected_crypto.objects.is_empty());
+}

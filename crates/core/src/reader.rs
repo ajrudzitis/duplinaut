@@ -26,6 +26,7 @@ use crate::verified::catalog_accounting::{
     charge_catalog_object_metadata, initialize_catalog_metadata, CatalogObjectMetadata,
 };
 use crate::verified::evidence_accounting::charge_evidence_comparisons;
+use crate::verified::evidence_metadata::reserve_evidence_record;
 use crate::verified::reader_volume_scan::{
     advance_volume_scan_cursor, charge_volume_object, record_volume_candidate, reserve_volume_scan,
     start_volume_scan_cursor, volume_scan_cursor_complete, VolumeScan, VolumeScanError,
@@ -267,14 +268,17 @@ fn record_plain(
     limits: Option<EvidenceLimits>,
 ) -> Result<(), ReaderError> {
     let Some(limits) = limits else { return Ok(()) };
-    if evidence.objects.len() >= limits.max_objects {
-        return Err(ReaderError::Limit);
-    }
     let charge = source_metadata_charge(object).ok_or(ReaderError::Limit)?;
-    *used = used
-        .checked_add(charge)
-        .filter(|n| *n <= limits.max_metadata_bytes)
-        .ok_or(ReaderError::Limit)?;
+    let reservation = reserve_evidence_record(
+        evidence.objects.len(),
+        limits.max_objects,
+        *used,
+        charge,
+        0,
+        std::mem::size_of::<usize>(),
+        limits.max_metadata_bytes,
+    )
+    .ok_or(ReaderError::Limit)?;
     evidence
         .objects
         .try_reserve_exact(1)
@@ -291,6 +295,7 @@ fn record_plain(
         authorized_signer: None,
         certificate_versions: Vec::new(),
     });
+    *used = reservation.bytes;
     Ok(())
 }
 #[allow(clippy::too_many_arguments)] // Evidence record fields map directly to the source declaration.
@@ -307,23 +312,18 @@ fn record_evidence(
     decoded: &openpgp::DecodedObject,
     limits: EvidenceLimits,
 ) -> Result<(), ReaderError> {
-    if evidence.objects.len() >= limits.max_objects {
-        return Err(ReaderError::Limit);
-    }
-    let mut charge = source_metadata_charge(object).ok_or(ReaderError::Limit)?;
-    charge = charge
-        .checked_add(
-            decoded
-                .certificates
-                .len()
-                .checked_mul(std::mem::size_of::<usize>())
-                .ok_or(ReaderError::Limit)?,
-        )
-        .ok_or(ReaderError::Limit)?;
-    *used = used
-        .checked_add(charge)
-        .filter(|n| *n <= limits.max_metadata_bytes)
-        .ok_or(ReaderError::Limit)?;
+    let charge = source_metadata_charge(object).ok_or(ReaderError::Limit)?;
+    let reservation = reserve_evidence_record(
+        evidence.objects.len(),
+        limits.max_objects,
+        *used,
+        charge,
+        decoded.certificates.len(),
+        std::mem::size_of::<usize>(),
+        limits.max_metadata_bytes,
+    )
+    .ok_or(ReaderError::Limit)?;
+    *used = reservation.bytes;
     let mut versions = Vec::new();
     versions
         .try_reserve_exact(decoded.certificates.len())

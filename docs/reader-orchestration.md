@@ -240,3 +240,31 @@ growth behavior or capacity provenance, allocations inside normalization,
 whether allocation succeeds, or total process heap usage. The slot count is a
 conservative accounting model from the raw input count, not a refinement of
 `Vec`'s concrete capacity.
+
+## Authentication evidence record metadata reservation proof candidate
+
+Both `record_plain` and `record_evidence` now call a verified admission
+transition before the evidence-object reserve/append. The transition checks
+that the current object count is below its configured limit and computes the
+bounded sum of current evidence bytes, the supplied source-metadata charge,
+and the version-index slot count multiplied by `size_of::<usize>()`. Plain
+records pass zero version slots; OpenPGP records pass the decoded certificate
+count. Checked overflow, a full object count, or a byte-limit excess returns
+`None`, so those record paths fail with `ReaderError::Limit` before their
+object/version-vector allocation and object append.
+
+Direct tests cover the exact aggregate byte boundary, one-byte-short rejection,
+count-limit rejection, and arithmetic overflow. Internal record-path tests
+cover exact and short limits for plain and OpenPGP records; public-reader tests
+confirm both envelope paths return a limit error without publishing a
+snapshot. The candidate is linked to
+[PARSE-GEN-005](parsing-requirements.md#parse-gen-005) and
+[PARSE-ENV-022](parsing-requirements.md#parse-env-022).
+
+The proof treats source-metadata bytes, certificate count, and version-index
+element size as supplied facts. It does not prove the accuracy/provenance of
+string capacities, clone capacity behavior, allocator growth or allocation
+success, certificate-metadata charging later in `record_evidence`, policy
+summary allocation, or whole-operation atomicity. It covers this reservation
+transition and its production use only; overall authentication-evidence
+accounting remains incomplete pending review.

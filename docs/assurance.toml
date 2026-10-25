@@ -404,6 +404,32 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-evidence-metadata-reservation"
+gate = false
+requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate pending review. It proves an object-count plus aggregate metadata
+# reservation from supplied source-charge and version-slot facts before the
+# record paths allocate or append. Capacity provenance, allocator behavior,
+# certificate metadata growth, and full evidence-loop atomicity are separate.
+implementations = [
+  { path = "crates/core/src/reader.rs", symbol = "record_plain" },
+  { path = "crates/core/src/reader.rs", symbol = "record_evidence" },
+  { path = "crates/core/src/verified/evidence_metadata.rs", symbol = "reserve_evidence_record" }
+]
+proofs = [{ id = "reader-evidence-metadata-reservation", requirement = "PARSE-ENV-022", path = "crates/core/src/verified/evidence_metadata.rs", symbol = "reserve_evidence_record", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "verified::evidence_metadata::tests::evidence_record_reservation_checks_exact_limits_and_overflow" },
+  { package = "duplicity-core", name = "reader::crypto_evidence_tests::evidence_record_metadata_reservation_precedes_plain_and_crypto_retention" },
+  { package = "duplicity-core", name = "public_reader_rejects_evidence_record_metadata_before_snapshot_publication" }
+]
+
+[[milestone]]
 id = "reader-evidence-comparison-charge"
 gate = false
 requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]
