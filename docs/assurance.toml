@@ -413,8 +413,8 @@ proved = false
 tested = true
 reviewed = false
 proof_required = true
-# Candidate pending review. The contract covers one exact comparison-count
-# charge immediately before a certificate-pool scan; matching equality,
+# Candidate pending review. The contract charges the entire pool length as a
+# worst-case upper bound before a certificate-pool scan; matching equality,
 # allocation behavior, metadata/version admission, and the full evidence loop
 # remain outside this checkpoint.
 implementations = [

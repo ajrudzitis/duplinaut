@@ -184,9 +184,11 @@ model rather than a proof of process-wide memory consumption.
 
 Before each certificate lookup in `record_evidence`, the reader now calls a
 verified transition with the current comparison count, the existing certificate
-pool length, and the configured comparison limit. The returned count is exactly
-the checked sum for the equality comparisons the following `.position` scan
-may perform. Overflow or an over-limit sum returns `None`; `record_evidence`
+pool length, and the configured comparison limit. The transition adds the full
+pool length as a worst-case upper bound for the following `.position` scan.
+The scan may short-circuit after a match, so the reserved work can exceed
+comparisons actually performed; charging the full pool avoids undercharging.
+Overflow or an over-limit sum returns `None`; `record_evidence`
 maps that to `ReaderError::Limit` and does not update its comparison counter
 for that rejected scan. Exact-limit, over-limit, and overflow cases have direct
 helper tests. A reader unit test covers an exact successful pool comparison
