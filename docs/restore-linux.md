@@ -331,7 +331,7 @@ reported 2,047 vstd, 3,183 Vest, and 1,073 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
 restoration remains unproved.
 
-## Outer staging creation decision proof candidate
+## Outer staging creation decision proof
 
 `decide_outer_stage` is called on the combined `Forward::call` result for each
 first outer staging-directory creation (before-hook, `mkdirat`, and
@@ -348,5 +348,12 @@ This proof covers only the pure result-to-authority decision and its
 production branch. It does not prove that `Errno::EXIST` classification is
 correct for a particular syscall/filesystem, randomness or name uniqueness,
 collision retry exhaustion, that observed success establishes the claimed
-filesystem boundary, or the full restore controller. The candidate awaits
-independent review; Linux restoration remains unproved.
+filesystem boundary, or the full restore controller. The observation comes
+from the combined call boundary; production uses no-op native hooks, while
+fault-injection hooks can deliberately return synthetic errors after a
+simulated side effect. Independent review accepted candidate `8336ad2` and
+exact-source `cargo xtask ci` passed with source SHA-256
+`a7ca05a43c4647285a9a07d0faa5cb23607088bc10774d0fa3a69cd66a228e05`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,076 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
+restoration remains unproved.
