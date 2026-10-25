@@ -32,7 +32,8 @@ use crate::verified::evidence_metadata::{
 };
 use crate::verified::policy_metadata::reserve_policy_summary;
 use crate::verified::reader_completion::{
-    advance_set_completion, set_completion_complete, start_set_completion,
+    advance_set_completion, set_completion_complete, snapshot_publication_readiness,
+    start_set_completion,
 };
 use crate::verified::reader_volume_scan::{
     advance_volume_scan_cursor, charge_volume_object, record_volume_candidate, reserve_volume_scan,
@@ -959,9 +960,16 @@ impl<'a> Catalog<'a> {
         if !set_completion_complete(set_completion) {
             return Err(ReaderError::Limit);
         }
-        if cancel.is_cancelled() {
-            return Err(ReaderError::Source(SourceError::Cancelled));
-        }
+        let final_cancelled = cancel.is_cancelled();
+        let _publication_ready =
+            snapshot_publication_readiness(set_completion, state.is_some(), final_cancelled)
+                .ok_or({
+                    if final_cancelled {
+                        ReaderError::Source(SourceError::Cancelled)
+                    } else {
+                        ReaderError::Chain(ChainError::Missing)
+                    }
+                })?;
         Ok(ValidatedSnapshot {
             target,
             state: state.ok_or(ReaderError::Chain(ChainError::Missing))?,

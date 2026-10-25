@@ -9,6 +9,9 @@ pub struct SetCompletion {
     pub completed: usize,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SnapshotPublicationReady;
+
 pub open spec fn advance_set_completion_model(
     current: SetCompletion,
     position: usize,
@@ -25,6 +28,18 @@ pub open spec fn advance_set_completion_model(
             planned: current.planned,
             completed: next as usize,
         })
+    } else {
+        None
+    }
+}
+
+pub open spec fn snapshot_publication_readiness_model(
+    completion: SetCompletion,
+    state_exists: bool,
+    cancelled: bool,
+) -> Option<SnapshotPublicationReady> {
+    if completion.completed == completion.planned && state_exists && !cancelled {
+        Some(SnapshotPublicationReady)
     } else {
         None
     }
@@ -84,11 +99,56 @@ pub fn set_completion_complete(current: SetCompletion) -> (result: bool)
     current.completed == current.planned
 }
 
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=implementation
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+//= docs/parsing-requirements.md#parse-env-024
+//= type=implementation
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+pub fn snapshot_publication_readiness(
+    completion: SetCompletion,
+    state_exists: bool,
+    cancelled: bool,
+) -> (result: Option<SnapshotPublicationReady>)
+    ensures result == snapshot_publication_readiness_model(completion, state_exists, cancelled),
+{
+    if completion.completed != completion.planned || !state_exists || cancelled {
+        return None;
+    }
+    Some(SnapshotPublicationReady)
+}
+
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{advance_set_completion, set_completion_complete, start_set_completion};
+    use super::{
+        advance_set_completion, set_completion_complete, snapshot_publication_readiness,
+        start_set_completion,
+    };
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=test
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    //= docs/parsing-requirements.md#parse-chain-002
+    //= type=test
+    //# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+    //= docs/parsing-requirements.md#parse-env-024
+    //= type=test
+    //# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+    fn publication_readiness_requires_completion_state_and_clear_cancellation() {
+        let complete = advance_set_completion(start_set_completion(1), 0, true).unwrap();
+        assert!(snapshot_publication_readiness(complete, true, false).is_some());
+        assert!(snapshot_publication_readiness(complete, false, false).is_none());
+        assert!(snapshot_publication_readiness(complete, true, true).is_none());
+
+        let incomplete = start_set_completion(1);
+        assert!(snapshot_publication_readiness(incomplete, true, false).is_none());
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-gen-005

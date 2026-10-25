@@ -210,6 +210,30 @@ corrected exact-source `cargo xtask ci` passed with SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,056 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
+## Final snapshot publication readiness proof candidate
+
+At the final return boundary, `read_snapshot_inner` first requires the selected-
+set completion cursor to be complete, then takes the existing final
+cancellation observation. A verified readiness transition receives that cursor,
+whether reconstructed state exists, and the observed cancellation value. It
+returns a publication-ready token only when all three conditions permit
+success. An incomplete cursor, absent state, or observed cancellation rejects
+before `ValidatedSnapshot` construction. Error precedence preserves the prior
+boundary order: incomplete cursor returns `Limit`; otherwise cancellation
+returns `Cancelled`; absent state returns `ChainError::Missing`.
+
+Direct tests accept the exact ready case and separately reject each readiness
+condition. Existing official-chain and cancellation/no-snapshot tests preserve
+reader behavior. The candidate links to
+[PARSE-GEN-005](parsing-requirements.md#parse-gen-005),
+[PARSE-CHAIN-002](parsing-requirements.md#parse-chain-002), and
+[PARSE-ENV-024](parsing-requirements.md#parse-env-024).
+
+The proof treats the final `AtomicBool` observation as a supplied Boolean; it
+does not establish cancellation timing or races after observation. It does not
+prove cursor iterator provenance or complete reader-controller refinement.
+The milestone remains pending review and the full reader proof remains open.
+
 ## Authentication policy summary admission proof
 
 Before allocating the permitted-fingerprint vector, `policy_summary` now calls

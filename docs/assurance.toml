@@ -436,6 +436,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-publication-readiness"
+gate = false
+requirements = ["PARSE-GEN-005", "PARSE-CHAIN-002", "PARSE-ENV-024"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate pending review. Final publication requires a complete selected-set
+# cursor, present state, and false final cancellation observation. AtomicBool
+# timing/races and whole-reader refinement remain outside.
+implementations = [
+  { path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" },
+  { path = "crates/core/src/verified/reader_completion.rs", symbol = "snapshot_publication_readiness" }
+]
+proofs = [{ id = "reader-publication-readiness", requirement = "PARSE-ENV-024", path = "crates/core/src/verified/reader_completion.rs", symbol = "snapshot_publication_readiness", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "verified::reader_completion::tests::publication_readiness_requires_completion_state_and_clear_cancellation" },
+  { package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" },
+  { package = "duplicity-core", name = "identity_cancellation_and_exact_body_failures_publish_no_snapshot" }
+]
+
+[[milestone]]
 id = "reader-evidence-metadata-reservation"
 gate = false
 requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]
