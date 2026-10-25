@@ -14,7 +14,7 @@
 
 **Duplinaut** is a native Rust reader for browsing duplicity backups and restoring selected files from local archives and S3. It runs without duplicity, GnuPG, or librsync executables; the official application supplies independent test fixtures.
 
-[Requirements](docs/parsing-requirements.md) | [Assurance progress](docs/README.md) | [Tool setup](tools/README.md) | [Official fixtures](tests/fixtures/README.md)
+[Capabilities and trust boundaries](docs/capabilities.md) | [Requirements](docs/parsing-requirements.md) | [Assurance progress](docs/README.md) | [Tool setup](tools/README.md) | [Official fixtures](tests/fixtures/README.md)
 
 ## Where things stand
 
@@ -114,4 +114,4 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [ ] Pass the supported official-producer compatibility matrix.
 - [x] **Create GitHub Actions for builds and formal methods:** install pinned tools, check generated parsers, run Verus, enforce Duvet coverage/snapshot gates, and run native/official-fixture tests on pull requests and pushes; retain reports and verification evidence as artifacts. The hosted assurance gate and first GitHub Pages publication both passed. See [workflow validation](docs/github-actions.md).
 - [x] Publish the Duvet HTML report from successful `main` runs through GitHub Pages, with its live URL in the deployment summary.
-- [ ] Publish the exact supported capabilities, verification claims, and trusted boundaries.
+- [x] Publish the exact supported capabilities, verification claims, and trusted boundaries in [the capability guide](docs/capabilities.md); remaining project-wide assurance gaps are stated explicitly.
