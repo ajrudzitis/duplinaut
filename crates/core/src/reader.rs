@@ -32,7 +32,7 @@ use crate::verified::evidence_metadata::{
 };
 use crate::verified::policy_metadata::reserve_policy_summary;
 use crate::verified::reader_completion::{
-    advance_set_completion, set_completion_complete, snapshot_publication_readiness,
+    commit_set_completion, set_completion_complete, snapshot_publication_readiness,
     start_set_completion,
 };
 use crate::verified::reader_volume_scan::{
@@ -955,8 +955,13 @@ impl<'a> Catalog<'a> {
                 }
                 .map_err(ReaderError::State)?,
             );
-            set_completion = advance_set_completion(set_completion, set_position, true)
-                .ok_or(ReaderError::Limit)?;
+            let cancelled = cancel.is_cancelled();
+            set_completion = commit_set_completion(set_completion, set_position, true, cancelled)
+                .ok_or(if cancelled {
+                ReaderError::Source(SourceError::Cancelled)
+            } else {
+                ReaderError::Limit
+            })?;
         }
         if !set_completion_complete(set_completion) {
             return Err(ReaderError::Limit);

@@ -484,6 +484,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-set-completion-cancellation-gate"
+gate = false
+requirements = ["PARSE-ENV-024"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# A clear cancellation observation after successful reconstruction is required
+# to advance the ordered completion cursor. AtomicBool timing/races, snapshot
+# state rollback and whole-reader refinement remain outside this transition.
+implementations = [
+  { path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" },
+  { path = "crates/core/src/verified/reader_completion.rs", symbol = "commit_set_completion" }
+]
+proofs = [{ id = "reader-set-completion-cancellation-gate", requirement = "PARSE-ENV-024", path = "crates/core/src/verified/reader_completion.rs", symbol = "commit_set_completion", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "verified::reader_completion::tests::set_completion_commit_requires_clear_post_transition_cancellation_observation" },
+  { package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" },
+  { package = "duplicity-core", name = "identity_cancellation_and_exact_body_failures_publish_no_snapshot" }
+]
+
+[[milestone]]
 id = "reader-evidence-metadata-reservation"
 gate = false
 requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]
