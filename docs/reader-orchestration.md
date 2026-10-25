@@ -355,7 +355,7 @@ and exact-source `cargo xtask ci` passed with source SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,058 core obligations with zero errors;
 Duvet, Clippy, formatting, workspace tests, integrations, and doctests passed.
 
-## Authentication source metadata charge proof candidate
+## Authentication source metadata charge proof
 
 `source_metadata_charge` now calls a verified arithmetic helper with the
 supplied key, ETag, and version-ID capacities plus
@@ -372,5 +372,9 @@ the exact budget. The candidate links to
 
 The proof treats capacities and fixed metadata size as supplied facts. It does
 not prove capacity accuracy or provenance, clone-capacity behavior, allocator
-behavior, or full evidence-loop accounting. The candidate milestone is
-pending review and does not complete authentication-evidence accounting.
+behavior, or full evidence-loop accounting. It does not complete
+authentication-evidence accounting. Candidate `e90da20` was independently
+accepted, and exact-source `cargo xtask ci` passed with SHA-256
+`f0b665f0210e76fd0c30b5bf91cc23cc33f51531caefd16390d0898e0e6ce1a9`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,064 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed.
