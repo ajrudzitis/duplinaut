@@ -410,7 +410,7 @@ independently accepted, and exact-source `cargo xtask ci` passed with SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,068 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
-## Selected chain-plan descriptor accessor proof candidate
+## Selected chain-plan descriptor accessor proof
 
 `ChainPlan::selected_set_at(position)` now resolves an in-range selected plan
 position to the exact stored descriptor index and copied descriptor value. Its
@@ -429,8 +429,13 @@ preserves reconstruction behavior. The candidate links to
 This proof relies on the existing bounded-index invariant. It does not verify
 how `ChainPlan::new` selects the path, standard slice iteration semantics,
 `manifest_objects` correspondence, or the complete reader controller. The
-candidate milestone is pending review and does not complete chain planning or
-reader verification.
+candidate milestone does not complete chain planning or reader verification.
+Candidate `d8e05e4` was independently accepted, and exact-source `cargo xtask
+ci` passed with SHA-256
+`45208192736c1f72bd9aa94f6825db95cf6dfe23af2b3e5b96e699355b2b6fa6`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,071 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. The host
+ACL-access run was required for the existing inherited-ACL test.
 
 ## Authentication source metadata charge proof
 
