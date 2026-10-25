@@ -2,7 +2,7 @@
 //! integration boundaries; parser correctness does not prove backend behavior.
 use crate::verified::checked_read::{
     admit_checked_size, choose_checked_read_window, commit_checked_read_window,
-    decide_checked_eof_probe,
+    decide_checked_eof_probe, read_failure_transition, ReadFailureTransition,
 };
 use std::{
     io::{self, Read},
@@ -143,8 +143,15 @@ impl<R: Read> CheckedReader<R> {
     fn latch(&mut self, error: io::Error) -> io::Error {
         // Interrupted is the standard retryable Read error. All other failures
         // are terminal so a second EOF probe cannot conceal an invalid body.
-        if error.kind() != io::ErrorKind::Interrupted {
-            self.failure = Some((error.kind(), error.to_string()));
+        match read_failure_transition(
+            self.failure.is_some(),
+            error.kind() == io::ErrorKind::Interrupted,
+        ) {
+            ReadFailureTransition::RetryWithoutLatch
+            | ReadFailureTransition::PreservePriorLatch => {}
+            ReadFailureTransition::StoreTerminal => {
+                self.failure = Some((error.kind(), error.to_string()));
+            }
         }
         error
     }
@@ -230,5 +237,32 @@ impl<R: Read> Read for CheckedReader<R> {
         };
         self.remaining = next_remaining;
         Ok(count)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Cancellation, CheckedReader};
+    use std::io::{self, Cursor, Read};
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=test
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    fn first_latched_terminal_error_is_preserved_for_replay() {
+        let mut reader =
+            CheckedReader::new(Cursor::new(b""), 0, 0, Cancellation::default()).unwrap();
+        let returned = reader.latch(io::Error::new(io::ErrorKind::InvalidData, "first failure"));
+        assert_eq!(returned.kind(), io::ErrorKind::InvalidData);
+
+        let returned = reader.latch(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "later failure",
+        ));
+        assert_eq!(returned.kind(), io::ErrorKind::UnexpectedEof);
+
+        let replay = reader.read(&mut [0]).unwrap_err();
+        assert_eq!(replay.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(replay.to_string(), "first failure");
     }
 }

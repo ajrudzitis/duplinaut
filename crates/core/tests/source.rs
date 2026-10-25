@@ -1,5 +1,5 @@
 use duplicity_core::source::{Cancellation, CheckedReader};
-use std::io::{Cursor, Read};
+use std::io::{self, Cursor, Read};
 
 #[test]
 //= docs/parsing-requirements.md#parse-gen-005
@@ -81,4 +81,37 @@ fn terminal_failure_cannot_be_hidden_by_another_eof_probe() {
     let mut reader = CheckedReader::new(BadCount, 3, 3, Cancellation::default()).unwrap();
     assert!(reader.read(&mut [0]).is_err());
     assert!(reader.read(&mut [0]).is_err());
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+fn interrupted_source_read_does_not_latch_and_can_be_retried() {
+    struct InterruptOnce {
+        first: bool,
+        bytes: Cursor<&'static [u8]>,
+    }
+    impl Read for InterruptOnce {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            if self.first {
+                self.first = false;
+                return Err(io::Error::from(io::ErrorKind::Interrupted));
+            }
+            self.bytes.read(buffer)
+        }
+    }
+
+    let source = InterruptOnce {
+        first: true,
+        bytes: Cursor::new(b"abc"),
+    };
+    let mut reader = CheckedReader::new(source, 3, 3, Cancellation::default()).unwrap();
+    let mut output = [0; 3];
+    assert_eq!(
+        reader.read(&mut output).unwrap_err().kind(),
+        io::ErrorKind::Interrupted
+    );
+    assert_eq!(reader.read(&mut output).unwrap(), 3);
+    assert_eq!(&output, b"abc");
 }

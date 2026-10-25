@@ -505,6 +505,22 @@ reported 2,047 vstd, 3,183 Vest, and 1,079 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. The
 checked-stream assurance milestone remains unproved.
 
+## Checked-stream failure-latch transition candidate
+
+`CheckedReader::latch` now calls the verified `read_failure_transition` before
+changing its failure state. A clear state plus `Interrupted` stays clear; a
+clear state plus another error becomes latched; an already latched state is
+preserved. When preserving a prior latch, production leaves its original kind
+and message unchanged while returning the current error to the caller.
+
+Tests cover all transition inputs, an interrupted read followed by successful
+retry, and preservation/replay of the first terminal failure. The proof covers
+the abstract latch-state transition and its production decision point only. It
+does not prove native error classification or payload fidelity, reachability or
+call ordering, backend `Read` behavior, cancellation timing, or whole-reader
+refinement. This candidate awaits independent review; checked-stream assurance
+remains unproved.
+
 ## Checked-stream composed-step proof
 
 The pre-read `requested_u64` from `choose_checked_read_window` is passed

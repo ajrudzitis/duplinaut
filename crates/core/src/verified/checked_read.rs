@@ -3,6 +3,44 @@ use vstd::prelude::*;
 
 verus! {
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReadFailureTransition {
+    RetryWithoutLatch,
+    StoreTerminal,
+    PreservePriorLatch,
+}
+
+pub open spec fn read_failure_transition_model(
+    has_failure: bool,
+    interrupted: bool,
+) -> ReadFailureTransition {
+    if has_failure {
+        ReadFailureTransition::PreservePriorLatch
+    } else if interrupted {
+        ReadFailureTransition::RetryWithoutLatch
+    } else {
+        ReadFailureTransition::StoreTerminal
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub(crate) fn read_failure_transition(
+    has_failure: bool,
+    interrupted: bool,
+) -> (transition: ReadFailureTransition)
+    ensures transition == read_failure_transition_model(has_failure, interrupted),
+{
+    if has_failure {
+        ReadFailureTransition::PreservePriorLatch
+    } else if interrupted {
+        ReadFailureTransition::RetryWithoutLatch
+    } else {
+        ReadFailureTransition::StoreTerminal
+    }
+}
+
 pub open spec fn checked_size_admission_model(expected: u64, maximum: u64) -> Option<u64> {
     if expected <= maximum {
         Some(expected)
@@ -177,8 +215,32 @@ pub(crate) fn decide_checked_eof_probe(remaining: u64, count: usize) -> (eof: Op
 mod tests {
     use super::{
         admit_checked_size, advance_checked_read, choose_checked_read_window,
-        commit_checked_read_window, decide_checked_eof_probe,
+        commit_checked_read_window, decide_checked_eof_probe, read_failure_transition,
+        ReadFailureTransition,
     };
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=test
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    fn read_failure_transition_retries_interrupts_and_preserves_first_terminal_error() {
+        assert_eq!(
+            read_failure_transition(false, true),
+            ReadFailureTransition::RetryWithoutLatch
+        );
+        assert_eq!(
+            read_failure_transition(false, false),
+            ReadFailureTransition::StoreTerminal
+        );
+        assert_eq!(
+            read_failure_transition(true, true),
+            ReadFailureTransition::PreservePriorLatch
+        );
+        assert_eq!(
+            read_failure_transition(true, false),
+            ReadFailureTransition::PreservePriorLatch
+        );
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-gen-005

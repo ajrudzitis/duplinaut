@@ -676,13 +676,15 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = true
+reviewed = false
 proof_required = true
-# All five checked-reader scoped checkpoints are independently accepted.
-# Source backend behavior and whole-reader refinement remain open.
+# Five checked-reader kernels are accepted; the latch transition is a new
+# candidate pending review. Backend behavior and whole-reader refinement remain open.
 implementations = [
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::new" },
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::read" },
+  { path = "crates/core/src/source.rs", symbol = "CheckedReader::latch" },
+  { path = "crates/core/src/verified/checked_read.rs", symbol = "read_failure_transition" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "admit_checked_size" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "choose_checked_read_window" },
@@ -690,6 +692,7 @@ implementations = [
   { path = "crates/core/src/verified/checked_read.rs", symbol = "decide_checked_eof_probe" }
 ]
 proofs = [
+  { id = "checked-stream-failure-latch", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "read_failure_transition", kind = "contract" },
   { id = "checked-stream-size-admission", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "admit_checked_size", kind = "contract" },
   { id = "checked-stream-byte-progress", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read", kind = "contract" },
   { id = "checked-stream-window", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "choose_checked_read_window", kind = "contract" },
@@ -697,6 +700,9 @@ proofs = [
   { id = "checked-stream-eof-probe", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/checked_read.rs", symbol = "decide_checked_eof_probe", kind = "contract" }
 ]
 tests = [
+  { package = "duplicity-core", name = "verified::checked_read::tests::read_failure_transition_retries_interrupts_and_preserves_first_terminal_error" },
+  { package = "duplicity-core", name = "source::tests::first_latched_terminal_error_is_preserved_for_replay" },
+  { package = "duplicity-core", name = "interrupted_source_read_does_not_latch_and_can_be_retried" },
   { package = "duplicity-core", name = "verified::checked_read::tests::checked_size_admission_preserves_exact_bounded_initial_remaining" },
   { package = "duplicity-core", name = "cancellation_and_size_limits_fail_before_delivery" },
   { package = "duplicity-core", name = "verified::checked_read::tests::checked_read_progress_bounds_and_subtracts_only_valid_counts" },
