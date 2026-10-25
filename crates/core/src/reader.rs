@@ -28,6 +28,7 @@ use crate::verified::catalog_accounting::{
 use crate::verified::evidence_accounting::charge_evidence_comparisons;
 use crate::verified::evidence_metadata::{
     admit_certificate_version, certificate_metadata_charge, reserve_evidence_record,
+    source_metadata_charge as verified_source_metadata_charge,
 };
 use crate::verified::policy_metadata::reserve_policy_summary;
 use crate::verified::reader_volume_scan::{
@@ -239,18 +240,16 @@ fn credentials<'a>(context: &CryptoReadContext<'a>) -> Credentials<'a> {
     }
 }
 fn source_metadata_charge(object: &StoredObject) -> Option<usize> {
-    object
-        .key
-        .capacity()
-        .checked_add(object.identity.etag.as_ref().map_or(0, String::capacity))?
-        .checked_add(
-            object
-                .identity
-                .version_id
-                .as_ref()
-                .map_or(0, String::capacity),
-        )?
-        .checked_add(std::mem::size_of::<ObjectAuthentication>())
+    verified_source_metadata_charge(
+        object.key.capacity(),
+        object.identity.etag.as_ref().map_or(0, String::capacity),
+        object
+            .identity
+            .version_id
+            .as_ref()
+            .map_or(0, String::capacity),
+        std::mem::size_of::<ObjectAuthentication>(),
+    )
 }
 #[allow(clippy::too_many_arguments)] // Evidence record fields map directly to the source declaration.
 fn record_plain(

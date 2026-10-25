@@ -77,6 +77,23 @@ pub open spec fn certificate_metadata_charge_model(
     }
 }
 
+pub open spec fn source_metadata_charge_model(
+    key_capacity: usize,
+    etag_capacity: usize,
+    version_id_capacity: usize,
+    object_metadata_bytes: usize,
+) -> Option<usize> {
+    let total = key_capacity as int
+        + etag_capacity as int
+        + version_id_capacity as int
+        + object_metadata_bytes as int;
+    if total <= usize::MAX as int {
+        Some(total as usize)
+    } else {
+        None
+    }
+}
+
 //= docs/parsing-requirements.md#parse-gen-005
 //= type=implementation
 //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
@@ -171,13 +188,38 @@ pub fn certificate_metadata_charge(
     Some(total)
 }
 
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+//= docs/parsing-requirements.md#parse-env-022
+//= type=implementation
+//# Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
+pub fn source_metadata_charge(
+    key_capacity: usize,
+    etag_capacity: usize,
+    version_id_capacity: usize,
+    object_metadata_bytes: usize,
+) -> (result: Option<usize>)
+    ensures result == source_metadata_charge_model(
+        key_capacity,
+        etag_capacity,
+        version_id_capacity,
+        object_metadata_bytes,
+    ),
+{
+    let with_etag = key_capacity.checked_add(etag_capacity)?;
+    let with_version = with_etag.checked_add(version_id_capacity)?;
+    let total = with_version.checked_add(object_metadata_bytes)?;
+    Some(total)
+}
+
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
         admit_certificate_version, certificate_metadata_charge, reserve_evidence_record,
-        CertificateVersionAdmission, EvidenceMetadataReservation,
+        source_metadata_charge, CertificateVersionAdmission, EvidenceMetadataReservation,
     };
 
     #[test]
@@ -222,6 +264,24 @@ mod tests {
             Some(usize::MAX)
         );
         assert_eq!(certificate_metadata_charge(usize::MAX, 1, 1), None);
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=test
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    //= docs/parsing-requirements.md#parse-env-022
+    //= type=test
+    //# Snapshot authentication evidence MUST have explicit per-read object-count, retained-metadata, certificate-version and comparison-work limits, checked before its allocation or retention.
+    fn source_metadata_charge_checks_exact_formula_and_overflow() {
+        assert_eq!(source_metadata_charge(2, 3, 4, 5), Some(14));
+        assert_eq!(source_metadata_charge(usize::MAX, 1, 0, 0), None);
+        assert_eq!(source_metadata_charge(1, 2, usize::MAX, 0), None);
+        assert_eq!(source_metadata_charge(usize::MAX - 1, 1, 0, 1), None);
+        assert_eq!(
+            source_metadata_charge(0, 0, 0, usize::MAX),
+            Some(usize::MAX)
+        );
     }
 
     #[test]

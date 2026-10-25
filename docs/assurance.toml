@@ -430,6 +430,29 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-source-metadata-charge"
+gate = false
+requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate pending review. Proves checked summation from supplied key, ETag,
+# version-ID capacities and object metadata size before record admission.
+# Capacity accuracy/provenance and clone/allocator behavior remain outside.
+implementations = [
+  { path = "crates/core/src/reader.rs", symbol = "source_metadata_charge" },
+  { path = "crates/core/src/verified/evidence_metadata.rs", symbol = "source_metadata_charge" }
+]
+proofs = [{ id = "reader-source-metadata-charge", requirement = "PARSE-ENV-022", path = "crates/core/src/verified/evidence_metadata.rs", symbol = "source_metadata_charge", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "verified::evidence_metadata::tests::source_metadata_charge_checks_exact_formula_and_overflow" },
+  { package = "duplicity-core", name = "reader::crypto_evidence_tests::evidence_record_metadata_reservation_precedes_plain_and_crypto_retention" }
+]
+
+[[milestone]]
 id = "reader-evidence-comparison-charge"
 gate = false
 requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]

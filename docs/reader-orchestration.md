@@ -354,3 +354,23 @@ and exact-source `cargo xtask ci` passed with source SHA-256
 `5bf46a2bb0a6fd153917d3f88ad0e7f1d433db8dcb942169573867e9ab4fd5d9`. Verus
 reported 2,047 vstd, 3,183 Vest, and 1,058 core obligations with zero errors;
 Duvet, Clippy, formatting, workspace tests, integrations, and doctests passed.
+
+## Authentication source metadata charge proof candidate
+
+`source_metadata_charge` now calls a verified arithmetic helper with the
+supplied key, ETag, and version-ID capacities plus
+`size_of::<ObjectAuthentication>()`. The helper returns their exact sum or
+`None` if any checked addition overflows. Both `record_plain` and
+`record_evidence` use this result before requesting the record-level metadata
+reservation.
+
+Direct tests cover the exact formula and overflow at each addition stage. The
+existing record-path test still covers plain and OpenPGP evidence retention at
+the exact budget. The candidate links to
+[PARSE-GEN-005](parsing-requirements.md#parse-gen-005) and
+[PARSE-ENV-022](parsing-requirements.md#parse-env-022).
+
+The proof treats capacities and fixed metadata size as supplied facts. It does
+not prove capacity accuracy or provenance, clone-capacity behavior, allocator
+behavior, or full evidence-loop accounting. The candidate milestone is
+pending review and does not complete authentication-evidence accounting.
