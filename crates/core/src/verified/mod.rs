@@ -18,6 +18,7 @@ pub(crate) mod multipart_metadata;
 pub(crate) mod openpgp_admission;
 pub(crate) mod policy_metadata;
 pub(crate) mod reader_accounting;
+pub(crate) mod reader_completion;
 pub(crate) mod reader_volume_scan;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_budget;

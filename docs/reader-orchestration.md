@@ -355,6 +355,29 @@ and exact-source `cargo xtask ci` passed with source SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,058 core obligations with zero errors;
 Duvet, Clippy, formatting, workspace tests, integrations, and doctests passed.
 
+## Selected-set completion cursor proof candidate
+
+`read_snapshot_inner` now initializes a completion cursor from the selected
+`ChainPlan` length. The outer plan loop supplies each enumerated position to a
+verified transition only after the current set's volume-scan completion check,
+`assembler.finish()`, and full/incremental `SnapshotState` transition all
+succeed. The cursor advances only at the next expected position and rejects
+failed transitions, skips, reordering, and extra positions. Before constructing
+`ValidatedSnapshot`, the reader requires that every planned position was
+completed, then retains the existing final cancellation check.
+
+Direct Verus-backed tests cover exact ordered completion, incomplete scans,
+skipped/reordered/extra positions, and failed-transition rejection. Existing
+official multi-date reader tests preserve success behavior; cancellation and
+read failures continue to assert no snapshot publication. This checkpoint
+links to [PARSE-GEN-005](parsing-requirements.md#parse-gen-005) and
+[PARSE-CHAIN-002](parsing-requirements.md#parse-chain-002).
+
+This is a bounded publication-progress contract. It does not prove ChainPlan
+selection or Rust iterator semantics, per-object volume matching correctness,
+cancellation races/timing, or complete reader-controller refinement. The
+candidate milestone is pending review and does not complete the reader proof.
+
 ## Authentication source metadata charge proof
 
 `source_metadata_charge` now calls a verified arithmetic helper with the

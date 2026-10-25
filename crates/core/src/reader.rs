@@ -31,6 +31,9 @@ use crate::verified::evidence_metadata::{
     source_metadata_charge as verified_source_metadata_charge,
 };
 use crate::verified::policy_metadata::reserve_policy_summary;
+use crate::verified::reader_completion::{
+    advance_set_completion, set_completion_complete, start_set_completion,
+};
 use crate::verified::reader_volume_scan::{
     advance_volume_scan_cursor, charge_volume_object, record_volume_candidate, reserve_volume_scan,
     start_volume_scan_cursor, volume_scan_cursor_complete, VolumeScan, VolumeScanError,
@@ -686,6 +689,7 @@ impl<'a> Catalog<'a> {
         }
         let plan = ChainPlan::new(&self.descriptors, full_anchor, target, self.limits.chain)
             .map_err(ReaderError::Chain)?;
+        let mut set_completion = start_set_completion(plan.indices().len());
         let mut state: Option<SnapshotState> = None;
         let mut checks = 0usize;
         let (policy, policy_bytes) = policy_summary(context)?;
@@ -699,7 +703,7 @@ impl<'a> Catalog<'a> {
             context.credentials.require_signature
                 || !context.credentials.permitted_signers.is_empty()
         });
-        for &index in plan.indices() {
+        for (set_position, &index) in plan.indices().iter().enumerate() {
             if cancel.is_cancelled() {
                 return Err(ReaderError::Source(SourceError::Cancelled));
             }
@@ -949,6 +953,11 @@ impl<'a> Catalog<'a> {
                 }
                 .map_err(ReaderError::State)?,
             );
+            set_completion = advance_set_completion(set_completion, set_position, true)
+                .ok_or(ReaderError::Limit)?;
+        }
+        if !set_completion_complete(set_completion) {
+            return Err(ReaderError::Limit);
         }
         if cancel.is_cancelled() {
             return Err(ReaderError::Source(SourceError::Cancelled));

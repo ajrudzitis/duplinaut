@@ -404,6 +404,38 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-set-completion-cursor"
+gate = false
+requirements = ["PARSE-GEN-005", "PARSE-CHAIN-002"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate pending review: selected-set progress advances in exact plan order
+# only after a successful state transition, and gates snapshot publication.
+# ChainPlan selection/iterator semantics, scan correctness, cancellation races,
+# and whole-reader refinement remain outside.
+implementations = [
+  { path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" },
+  { path = "crates/core/src/verified/reader_completion.rs", symbol = "start_set_completion" },
+  { path = "crates/core/src/verified/reader_completion.rs", symbol = "advance_set_completion" },
+  { path = "crates/core/src/verified/reader_completion.rs", symbol = "set_completion_complete" }
+]
+proofs = [
+  { id = "reader-set-completion-start", requirement = "PARSE-CHAIN-002", path = "crates/core/src/verified/reader_completion.rs", symbol = "start_set_completion", kind = "contract" },
+  { id = "reader-set-completion-advance", requirement = "PARSE-CHAIN-002", path = "crates/core/src/verified/reader_completion.rs", symbol = "advance_set_completion", kind = "contract" },
+  { id = "reader-set-completion-finish", requirement = "PARSE-CHAIN-002", path = "crates/core/src/verified/reader_completion.rs", symbol = "set_completion_complete", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::reader_completion::tests::set_completion_cursor_requires_every_successful_ordered_transition" },
+  { package = "duplicity-core", name = "verified::reader_completion::tests::set_completion_cursor_rejects_skips_reordering_and_failed_transition" },
+  { package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" },
+  { package = "duplicity-core", name = "identity_cancellation_and_exact_body_failures_publish_no_snapshot" }
+]
+
+[[milestone]]
 id = "reader-evidence-metadata-reservation"
 gate = false
 requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]
