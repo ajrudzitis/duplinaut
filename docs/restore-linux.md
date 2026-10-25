@@ -471,5 +471,9 @@ This proves only one-shot phase authorization and terminal transition logic. It
 does not prove that the hooks/syscall ran exactly once beyond this production
 call site, the meaning of rename results, `NOREPLACE` or kernel behavior,
 cancellation races, cleanup effects, or the complete RESTORE-020 controller.
-This candidate is pending independent review; Linux restoration remains
-unproved.
+Independent review accepted candidate `a3c53a0`; exact-source
+`cargo xtask ci` passed with source SHA-256
+`8d6b86441f07bb6a8a6a7778aaef1034ea8199918cec44b2d9950544e082118b`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,096 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
+restoration remains unproved.

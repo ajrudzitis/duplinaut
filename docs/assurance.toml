@@ -787,10 +787,10 @@ specified = true
 implemented = true
 proved = false
 tested = true
-# Existing Linux scoped checkpoints are independently accepted; one-shot
-# publication authority is a new candidate pending review. Traversal/fact
-# provenance, parent-FD mapping and broader controller/syscall refinement remain open.
-reviewed = false
+# All listed Linux scoped checkpoints are independently accepted.
+# Traversal/fact provenance, parent-FD mapping and broader controller/syscall
+# refinement remain open.
+reviewed = true
 proof_required = true
 # Native acceptance only; exact controller/kernel refinement remains pending.
 implementations = [{ path = "crates/core/src/restore_linux.rs", symbol = "restore_with" }, { path = "crates/core/src/verified/restore_staging.rs", symbol = "decide_outer_stage" }, { path = "crates/core/src/restore_linux.rs", symbol = "cleanup_call" }, { path = "crates/core/src/verified/restore_cleanup.rs", symbol = "admit_cleanup_attempt" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "advance_write_offset" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "next_write_chunk_end" }, { path = "crates/core/src/verified/restore_write.rs", symbol = "commit_write_chunk" }, { path = "crates/core/src/verified/restore_finalize.rs", symbol = "advance_finalization_cursor" }, { path = "crates/core/src/verified/restore_file_size.rs", symbol = "file_size_matches" }, { path = "crates/core/src/verified/restore_work.rs", symbol = "decrement_forward_work" }, { path = "crates/core/src/verified/restore_publication.rs", symbol = "decide_publication_cleanup" }, { path = "crates/core/src/verified/restore_publication_attempt.rs", symbol = "advance_publication_attempt" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "restore_preflight" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "cleanup_schedule_bound" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "charge_name_metadata" }, { path = "crates/core/src/verified/restore_budget.rs", symbol = "advance_restore_preflight_summary" }, { path = "crates/core/src/verified/restore_time.rs", symbol = "validate_restore_time" }]
