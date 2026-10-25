@@ -206,6 +206,24 @@ restoration milestone remains unproved. Exact-source
 reported 2,047 vstd, 3,183 Vest, and 1,077 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
+## Write-step composition proof
+
+`commit_write_chunk` composes the exact chunk end selected for the current
+offset with the bounded offset-advance transition. Production passes the same
+`end` used to form `content[offset..end]` and the write result; a mismatched
+end, zero progress, overrun, or overflow returns no new offset. After a partial
+write the loop selects a fresh end from the updated offset.
+
+This proves only the arithmetic composition and production value flow. It does
+not prove the syscall result is truthful, content provenance, work/cancellation
+accounting, final file contents, or the complete restore controller.
+Independent review accepted candidate `66051f7`; exact-source
+`cargo xtask ci` passed with source SHA-256
+`fe429a0a151a31a1ce1a9643e0e23f68f2095747f892b62e89931c3957d697fb`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,088 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
+restoration remains unproved.
+
 ## Forward-work counter proof
 
 `Forward::tick` preserves its cancellation-first check, then calls the verified
