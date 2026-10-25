@@ -478,6 +478,29 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-certificate-metadata-charge"
+gate = false
+requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate pending review. Proves checked size arithmetic from supplied base,
+# signature-count, and element-size facts before version admission/reserve/push.
+# Capacity provenance and nested allocation semantics remain outside.
+implementations = [
+  { path = "crates/core/src/reader.rs", symbol = "record_evidence" },
+  { path = "crates/core/src/verified/evidence_metadata.rs", symbol = "certificate_metadata_charge" }
+]
+proofs = [{ id = "reader-certificate-metadata-charge", requirement = "PARSE-ENV-022", path = "crates/core/src/verified/evidence_metadata.rs", symbol = "certificate_metadata_charge", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "verified::evidence_metadata::tests::certificate_metadata_charge_checks_exact_formula_and_overflow" },
+  { package = "duplicity-core", name = "reader::crypto_evidence_tests::certificate_metadata_limit_is_checked_before_new_certificate_retention" }
+]
+
+[[milestone]]
 id = "reader-policy-summary-admission"
 gate = false
 requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]

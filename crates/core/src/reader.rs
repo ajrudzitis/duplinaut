@@ -26,7 +26,9 @@ use crate::verified::catalog_accounting::{
     charge_catalog_object_metadata, initialize_catalog_metadata, CatalogObjectMetadata,
 };
 use crate::verified::evidence_accounting::charge_evidence_comparisons;
-use crate::verified::evidence_metadata::{admit_certificate_version, reserve_evidence_record};
+use crate::verified::evidence_metadata::{
+    admit_certificate_version, certificate_metadata_charge, reserve_evidence_record,
+};
 use crate::verified::policy_metadata::reserve_policy_summary;
 use crate::verified::reader_volume_scan::{
     advance_volume_scan_cursor, charge_volume_object, record_volume_candidate, reserve_volume_scan,
@@ -337,17 +339,12 @@ fn record_evidence(
         {
             versions.push(index);
         } else {
-            let cert_charge = std::mem::size_of::<OpenPgpCertificateMetadata>()
-                .checked_add(
-                    certificate
-                        .signatures
-                        .capacity()
-                        .checked_mul(std::mem::size_of::<
-                            crate::openpgp::CertificateSignatureMetadata,
-                        >())
-                        .ok_or(ReaderError::Limit)?,
-                )
-                .ok_or(ReaderError::Limit)?;
+            let cert_charge = certificate_metadata_charge(
+                std::mem::size_of::<OpenPgpCertificateMetadata>(),
+                certificate.signatures.capacity(),
+                std::mem::size_of::<crate::openpgp::CertificateSignatureMetadata>(),
+            )
+            .ok_or(ReaderError::Limit)?;
             let admission = admit_certificate_version(
                 evidence.certificates.len(),
                 limits.max_certificate_versions,
