@@ -359,6 +359,30 @@ impl<'a> ChainPlan<'a> {
     {
         &self.indices
     }
+    //= docs/parsing-requirements.md#parse-chain-002
+    //= type=implementation
+    //# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+    /// Resolve one stored plan position to its exact descriptor slice index and value.
+    pub fn selected_set_at(
+        &self,
+        position: usize,
+    ) -> (result: Option<(usize, SetDescriptor)>)
+        requires self.bounded_indices(),
+        ensures match result {
+            Some((index, descriptor)) => position < self.index_values().len()
+                && index == self.index_values()[position as int]
+                && index < self.original_sets().len()
+                && descriptor == self.original_sets()[index as int],
+            None => position >= self.index_values().len(),
+        },
+    {
+        if position >= self.indices.len() {
+            return None;
+        }
+        let index = *self.indices.get(position)?;
+        let descriptor = *self.sets.get(index)?;
+        Some((index, descriptor))
+    }
     pub fn target(&self) -> (result: Timestamp)
         ensures result == self.target_value(),
     {

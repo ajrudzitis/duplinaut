@@ -308,6 +308,29 @@ proofs = [{ id = "chain-descriptor", requirement = "PARSE-CHAIN-001", path = "cr
 tests = [{ package = "duplicity-core", name = "descriptors_revalidate_completed_manifest_structure" }, { package = "duplicity-core", name = "explicit_anchor_exact_target_and_borrowed_order" }, { package = "duplicity-core", name = "gaps_duplicate_intervals_and_dead_end_branches_fail_explicitly" }, { package = "duplicity-core", name = "metadata_record_and_candidate_budgets_are_independent" }, { package = "duplicity-core", name = "official_manifest_names_plan_all_plain_producer_profiles" }]
 
 [[milestone]]
+id = "reader-chain-plan-selected-accessor"
+gate = false
+requirements = ["PARSE-CHAIN-002"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate pending review. Resolves a selected plan position to the exact
+# stored index and descriptor using ChainPlan's bounded_indices invariant.
+# Plan selection and slice iterator semantics remain outside.
+implementations = [
+  { path = "crates/core/src/chain.rs", symbol = "selected_set_at" },
+  { path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" }
+]
+proofs = [{ id = "reader-chain-plan-selected-accessor", requirement = "PARSE-CHAIN-002", path = "crates/core/src/chain.rs", symbol = "selected_set_at", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "selected_plan_accessor_maps_each_position_to_its_stored_descriptor" },
+  { package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" }
+]
+
+[[milestone]]
 id = "restore-selection"
 gate = false
 requirements = ["RESTORE-001", "RESTORE-005"]

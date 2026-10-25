@@ -105,6 +105,20 @@ fn explicit_anchor_exact_target_and_borrowed_order() {
     );
 }
 
+#[test]
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=test
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+fn selected_plan_accessor_maps_each_position_to_its_stored_descriptor() {
+    let sets = [inc(20, 30), full(10), inc(10, 20)];
+    let plan = ChainPlan::new(&sets, 1, Timestamp(20), ChainLimits::default()).unwrap();
+
+    assert_eq!(plan.selected_set_at(0), Some((1, sets[1])));
+    assert_eq!(plan.selected_set_at(1), Some((2, sets[2])));
+    assert_eq!(plan.selected_set_at(2), None);
+    assert_eq!(plan.selected_set_at(usize::MAX), None);
+}
+
 //= docs/parsing-requirements.md#parse-chain-002
 //= type=test
 //# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.

@@ -2,7 +2,7 @@
 //! metadata-only; successful reads retain explicit envelope/authentication
 //! observations but do not prove external signer validity or publish files.
 //! Whole-reader controller refinement is pending.
-use crate::chain::{ChainError, ChainLimits, ChainPlan, DescriptorError, SetDescriptor};
+use crate::chain::{ChainError, ChainLimits, ChainPlan, DescriptorError, SetDescriptor, SetKind};
 use crate::envelope::{decode_metadata, EnvelopeError, EnvelopeLimits};
 use crate::manifest::{Manifest, ManifestError, ManifestLimits};
 use crate::multipart::{AssemblyError, AssemblyLimits, MultipartAssembler};
@@ -704,11 +704,15 @@ impl<'a> Catalog<'a> {
             context.credentials.require_signature
                 || !context.credentials.permitted_signers.is_empty()
         });
-        for (set_position, &index) in plan.indices().iter().enumerate() {
+        for set_position in 0..plan.indices().len() {
+            let (index, descriptor) = plan
+                .selected_set_at(set_position)
+                .ok_or(ReaderError::Limit)?;
             if cancel.is_cancelled() {
                 return Err(ReaderError::Source(SourceError::Cancelled));
             }
-            let object = &self.objects[self.manifest_objects[index]];
+            let object_index = *self.manifest_objects.get(index).ok_or(ReaderError::Limit)?;
+            let object = self.objects.get(object_index).ok_or(ReaderError::Limit)?;
             let name = object.name.unwrap();
             if name.envelope == Envelope::OpenPgp && context.is_none() {
                 return Err(ReaderError::Envelope(EnvelopeError::UnsupportedEnvelope));
@@ -750,8 +754,8 @@ impl<'a> Catalog<'a> {
                     &mut evidence_bytes,
                     &mut comparisons,
                     &object.object,
-                    name.start,
-                    name.end,
+                    descriptor.start(),
+                    descriptor.end(),
                     true,
                     0,
                     name.envelope,
@@ -771,8 +775,8 @@ impl<'a> Catalog<'a> {
                     &mut evidence,
                     &mut evidence_bytes,
                     &object.object,
-                    name.start,
-                    name.end,
+                    descriptor.start(),
+                    descriptor.end(),
                     true,
                     0,
                     name.envelope,
@@ -832,16 +836,13 @@ impl<'a> Catalog<'a> {
                     })?;
                     let matches = object.name.is_some_and(|volume| {
                         volume.completed()
-                            && volume.start == name.start
-                            && volume.end == name.end
+                            && volume.start == descriptor.start()
+                            && volume.end == descriptor.end()
                             && volume.volume == Some(record.number)
                             && matches!(
-                                (name.kind, volume.kind),
-                                (ObjectKind::FullManifest, ObjectKind::FullVolume)
-                                    | (
-                                        ObjectKind::IncrementalManifest,
-                                        ObjectKind::IncrementalVolume
-                                    )
+                                (descriptor.kind(), volume.kind),
+                                (SetKind::Full, ObjectKind::FullVolume)
+                                    | (SetKind::Incremental, ObjectKind::IncrementalVolume)
                             )
                     });
                     scan =
@@ -915,8 +916,8 @@ impl<'a> Catalog<'a> {
                         &mut evidence_bytes,
                         &mut comparisons,
                         &object.object,
-                        name.start,
-                        name.end,
+                        descriptor.start(),
+                        descriptor.end(),
                         false,
                         record.number,
                         envelope,
@@ -934,8 +935,8 @@ impl<'a> Catalog<'a> {
                         &mut evidence,
                         &mut evidence_bytes,
                         &object.object,
-                        name.start,
-                        name.end,
+                        descriptor.start(),
+                        descriptor.end(),
                         false,
                         record.number,
                         envelope,

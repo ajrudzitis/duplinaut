@@ -410,6 +410,28 @@ independently accepted, and exact-source `cargo xtask ci` passed with SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,068 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
+## Selected chain-plan descriptor accessor proof candidate
+
+`ChainPlan::selected_set_at(position)` now resolves an in-range selected plan
+position to the exact stored descriptor index and copied descriptor value. Its
+contract inherits `ChainPlan::bounded_indices`: a successful result reports
+the exact stored index, proves that index is inside the borrowed descriptor
+slice, and returns the descriptor at that slice position; an out-of-range plan
+position returns `None`. `read_snapshot_inner` uses this accessor instead of
+iterating the raw `indices()` slice directly. It uses the returned descriptor
+for manifest interval and set-kind checks and evidence dates.
+
+Direct tests cover selected descriptor/index pairs and both the first
+out-of-range position and `usize::MAX`. The official multi-date reader test
+preserves reconstruction behavior. The candidate links to
+[PARSE-CHAIN-002](parsing-requirements.md#parse-chain-002).
+
+This proof relies on the existing bounded-index invariant. It does not verify
+how `ChainPlan::new` selects the path, standard slice iteration semantics,
+`manifest_objects` correspondence, or the complete reader controller. The
+candidate milestone is pending review and does not complete chain planning or
+reader verification.
+
 ## Authentication source metadata charge proof
 
 `source_metadata_charge` now calls a verified arithmetic helper with the
