@@ -266,7 +266,7 @@ accepted, and exact-source `cargo xtask ci` passed with source SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,060 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
-## Authentication certificate metadata charge proof candidate
+## Authentication certificate metadata charge proof
 
 On the unseen-certificate branch, `record_evidence` now obtains the
 certificate's metadata charge from a verified checked-arithmetic helper before
@@ -285,8 +285,12 @@ before a new certificate or object is retained. The proof and tests link to
 The helper proves only the arithmetic over the supplied base-size,
 signature-capacity, and element-size values. It does not prove capacity
 provenance or accuracy, nested allocation semantics, allocator behavior, or
-the full crypto pipeline. The candidate milestone is pending review and does
-not complete evidence accounting.
+the full crypto pipeline. It does not complete evidence accounting. Candidate
+`4184706` was independently accepted, and exact-source `cargo xtask ci` passed
+with source SHA-256
+`00d29f790f7838a3803dc6cc98ae9c458e09a19b7ca3dbd0f94766b99610d148`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,063 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
 ## Multipart metadata admission proof
 
