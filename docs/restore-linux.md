@@ -309,7 +309,7 @@ cover filesystem timestamp support, rounding, the `futimens` effect, or
 read-back fidelity. This scoped proof was independently accepted; the Linux
 restoration milestone remains unproved.
 
-## Cleanup-attempt admission proof candidate
+## Cleanup-attempt admission proof
 
 `cleanup_call` now obtains the next remaining-work and attempted-diagnostic
 counters from `admit_cleanup_attempt` before it invokes a hook or operation.
@@ -324,5 +324,9 @@ operation rejection path.
 This proves the atomic admission of one cleanup attempt before its effect. It
 does not prove that the schedule enumerates every necessary operation, the
 journal/FD selection or order, syscall behavior, failure-diagnostic updates, or
-whole cleanup correctness. The candidate is pending independent review; Linux
+whole cleanup correctness. Candidate `46e369e` was independently accepted,
+and exact-source `cargo xtask ci` passed with source SHA-256
+`dc4fde23aa08871943a5c8aef3bd56cab361b2f2961611cd4efb221ba0bfeb1c`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,073 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
 restoration remains unproved.
