@@ -20,6 +20,9 @@ use crate::{
         restore_publication::{
             decide_publication_cleanup, PublicationCleanup, PublicationDecision,
         },
+        restore_publication_attempt::{
+            advance_publication_attempt, PublicationAttemptEvent, PublicationAttemptPhase,
+        },
         restore_staging::{decide_outer_stage, OuterStageDecision, OuterStageObservation},
         restore_time::validate_restore_time,
     },
@@ -1101,6 +1104,26 @@ fn restore_with<H: Hooks>(
             uncertain_outer: None,
         });
     }
+    let publication_attempt = match advance_publication_attempt(
+        PublicationAttemptPhase::Ready,
+        PublicationAttemptEvent::Begin,
+    ) {
+        Some(phase) => phase,
+        None => {
+            let cleanup = cleanup(
+                &p,
+                parent.as_fd(),
+                wrapper.as_ref(),
+                root_journal != Journal::Unattempted,
+                w.hooks,
+            );
+            return RestoreOutcome::Unpublished(Unpublished {
+                cause: Cause::Fidelity,
+                cleanup,
+                uncertain_outer: None,
+            });
+        }
+    };
     let mut receipt = Receipt {
         destination: p.destination,
         staging: p.staging,
@@ -1135,13 +1158,26 @@ fn restore_with<H: Hooks>(
             }
         })
         .and_then(|()| w.hooks.after(Op::Publish));
+    let publication_terminal = advance_publication_attempt(
+        publication_attempt,
+        if renamed.is_ok() {
+            PublicationAttemptEvent::FinishSuccess
+        } else {
+            PublicationAttemptEvent::FinishError
+        },
+    )
+    .unwrap_or(PublicationAttemptPhase::Indeterminate);
     let decision =
         decide_publication_cleanup(renamed.is_ok(), cancel.is_cancelled(), wrapper.is_some());
-    match (renamed, decision) {
-        (Err(error), _) => {
+    match (renamed, publication_terminal, decision) {
+        (Err(error), _, _) => {
             RestoreOutcome::PublicationIndeterminate(Indeterminate { error, receipt })
         }
-        (Ok(()), PublicationDecision::Published(PublicationCleanup::EmptyWrapper)) => {
+        (
+            Ok(()),
+            PublicationAttemptPhase::Published,
+            PublicationDecision::Published(PublicationCleanup::EmptyWrapper),
+        ) => {
             if wrapper.is_some() {
                 let mut left = 1;
                 cleanup_call(
@@ -1154,8 +1190,16 @@ fn restore_with<H: Hooks>(
             }
             RestoreOutcome::Published(receipt)
         }
-        (Ok(()), PublicationDecision::Published(PublicationCleanup::None))
-        | (Ok(()), PublicationDecision::Indeterminate) => RestoreOutcome::Published(receipt),
+        (
+            Ok(()),
+            PublicationAttemptPhase::Published,
+            PublicationDecision::Published(PublicationCleanup::None),
+        )
+        | (Ok(()), PublicationAttemptPhase::Published, PublicationDecision::Indeterminate)
+        | (Ok(()), PublicationAttemptPhase::Indeterminate, _) => RestoreOutcome::Published(receipt),
+        (Ok(()), PublicationAttemptPhase::Ready | PublicationAttemptPhase::Attempted, _) => {
+            RestoreOutcome::Published(receipt)
+        }
     }
 }
 

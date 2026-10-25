@@ -455,3 +455,21 @@ Independent review accepted candidate `6288768`; exact-source
 reported 2,047 vstd, 3,183 Vest, and 1,093 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. Linux
 restoration remains unproved.
+
+## One-shot publication-attempt proof
+
+`advance_publication_attempt` is used at the publication boundary in
+`restore_with`. The `Ready -> Attempted` transition is consumed before publish
+hooks or the rename can run. The combined before-hook/rename/after-hook result
+then commits `Attempted -> Published` on success or `Attempted -> Indeterminate`
+on error. The transition rejects duplicate begins and every retry after either
+terminal result. The production result and cleanup mapping remains governed by
+the existing publication decision; success and error handling order is
+unchanged.
+
+This proves only one-shot phase authorization and terminal transition logic. It
+does not prove that the hooks/syscall ran exactly once beyond this production
+call site, the meaning of rename results, `NOREPLACE` or kernel behavior,
+cancellation races, cleanup effects, or the complete RESTORE-020 controller.
+This candidate is pending independent review; Linux restoration remains
+unproved.

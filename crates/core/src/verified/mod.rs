@@ -33,6 +33,8 @@ pub(crate) mod restore_finalize;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_publication;
 #[cfg(target_os = "linux")]
+pub(crate) mod restore_publication_attempt;
+#[cfg(target_os = "linux")]
 pub(crate) mod restore_staging;
 #[cfg(target_os = "linux")]
 pub(crate) mod restore_time;
