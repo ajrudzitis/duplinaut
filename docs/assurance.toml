@@ -676,10 +676,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate proves only the shared checked-reader remaining-byte transition;
-# source backend behavior, EOF probing and whole-reader refinement remain open.
+# Independently accepted scoped proof for the shared checked-reader
+# remaining-byte transition; source backend behavior, EOF probing and
+# whole-reader refinement remain open.
 implementations = [
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::read" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read" }

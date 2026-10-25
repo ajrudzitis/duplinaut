@@ -461,7 +461,7 @@ accepted, and exact-source `cargo xtask ci` passed with SHA-256
 reported 2,047 vstd, 3,183 Vest, and 1,064 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed.
 
-## Checked-stream byte accounting proof candidate
+## Checked-stream byte accounting proof
 
 The shared `CheckedReader` calls `verified::checked_read::advance_checked_read`
 for each successful nonempty read. The helper accepts only a positive count no
@@ -476,5 +476,9 @@ and over-remaining counts, and `u64` maximum arithmetic. This proves only the
 remaining-byte state transition and its call placement. It does not prove the
 `Read` implementation's result is truthful, the request-window calculation,
 EOF probing, cancellation or failure-latching behavior, the bytes delivered, or
-complete local/S3 reader refinement. This candidate awaits independent review;
-the source/reader milestones remain unproved.
+complete local/S3 reader refinement. Independent review accepted candidate
+`c1700d7`; exact-source `cargo xtask ci` passed with source SHA-256
+`9881e3cef1c1e02ac17f105331cf84729309e7232770aa0d1f2969d86523cf75`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,078 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. The
+source/reader milestones remain unproved.
