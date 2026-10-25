@@ -526,7 +526,7 @@ reported 2,047 vstd, 3,183 Vest, and 1,080 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. The
 checked-stream assurance milestone remains unproved.
 
-## Checked-stream EOF-probe proof candidate
+## Checked-stream EOF-probe proof
 
 After the existing one-byte read probe, `CheckedReader::read` calls
 `verified::checked_read::decide_checked_eof_probe`. The transition accepts only
@@ -539,5 +539,9 @@ Tests cover valid EOF, one extra byte, invalid probe counts/state, and public
 exact-size versus oversized bodies. This proves only the interpretation of the
 supplied probe result. It does not prove the backend's `Read` result truthful,
 probe-buffer behavior, identity checks, cancellation/error-latching, or complete
-source refinement. This candidate awaits independent review; checked-stream
-assurance remains unproved.
+source refinement. Independent review accepted candidate `254619c`; exact-source
+`cargo xtask ci` passed with source SHA-256
+`fee9920276e65e8d30c648f6bc92e1aae91db9d912a4b5f39803b6594ca2aac8`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,081 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. The
+checked-stream assurance milestone remains unproved.

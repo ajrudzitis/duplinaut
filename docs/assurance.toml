@@ -676,11 +676,10 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# The three checked-reader arithmetic checkpoints are accepted. The EOF-probe
-# transition below is a new candidate pending review; source backend behavior
-# and whole-reader refinement remain open.
+# All four checked-reader scoped checkpoints are independently accepted.
+# Source backend behavior and whole-reader refinement remain open.
 implementations = [
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::read" },
   { path = "crates/core/src/verified/checked_read.rs", symbol = "advance_checked_read" },
