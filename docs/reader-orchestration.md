@@ -546,7 +546,7 @@ reported 2,047 vstd, 3,183 Vest, and 1,081 core obligations with zero errors;
 Duvet, Clippy, workspace tests, integrations, and doctests passed. The
 checked-stream assurance milestone remains unproved.
 
-## Checked-stream initial-size admission proof candidate
+## Checked-stream initial-size admission proof
 
 `CheckedReader::new` now initializes `remaining` only from
 `verified::checked_read::admit_checked_size`. The helper returns the exact
@@ -558,5 +558,9 @@ Tests cover zero, exact-limit, one-over-limit, and `u64::MAX` cases, alongside
 the public constructor's limit and cancellation behavior. This proves only the
 initial expected-size admission and `remaining` seed. It does not prove size
 provenance from a source, cancellation observation semantics, backend behavior,
-allocations, or whole-reader refinement. This candidate awaits independent
-review; checked-stream assurance remains unproved.
+allocations, or whole-reader refinement. Independent review accepted
+candidate `7efa203`; exact-source `cargo xtask ci` passed with source SHA-256
+`6cbb45133b3c88b2f69dd08e1c47fd188a77d86e1b0407ea410b32308ad38d07`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,082 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. The
+checked-stream assurance milestone remains unproved.

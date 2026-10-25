@@ -676,11 +676,10 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# The four checked-reader progress/window/EOF checkpoints are accepted. Initial
-# size admission below is a new candidate pending review; source backend
-# behavior and whole-reader refinement remain open.
+# All five checked-reader scoped checkpoints are independently accepted.
+# Source backend behavior and whole-reader refinement remain open.
 implementations = [
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::new" },
   { path = "crates/core/src/source.rs", symbol = "CheckedReader::read" },
