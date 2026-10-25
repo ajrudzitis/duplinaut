@@ -48,3 +48,25 @@ and limits. The fourth reconstructs all three original official backup dates
 through this adapter. Whole-backend formal verification is pending.
 Independent follow-up review accepted positional interruption handling, the
 root-spelling policy, and explicit allocation/diagnostic budget boundaries.
+
+## Validated-read offset commit proof
+
+The `LocalReadPhase` transition model permits offset commitment only after a
+successful supplied prevalidation, a read count bounded by the requested
+buffer size, and a successful supplied postvalidation, in that order. The
+production `read_validated` path advances through those phases immediately
+after each corresponding operation succeeds and uses a checked offset addition
+for the final commit. A validation or read error returns before producing a
+committed offset, so an interrupted post-read validation leaves the caller's
+offset unchanged and permits rereading the same bytes.
+
+This proof covers the abstract phase sequence and checked offset transition.
+It does not prove `fstat`/`statat` results, identity-token construction or
+comparison, `read_at` content/count truthfulness, kernel/filesystem effects,
+cancellation races, or the complete source controller. Independent review
+accepted candidate `bce68fb`; exact-source `cargo xtask ci` passed with
+source SHA-256
+`2655360ea05e629948c406caf183a94b89087c58575cff08220667740c93eaaf`. Verus
+reported 2,047 vstd, 3,183 Vest, and 1,087 core obligations with zero errors;
+Duvet, Clippy, workspace tests, integrations, and doctests passed. Whole-backend
+formal verification remains incomplete.

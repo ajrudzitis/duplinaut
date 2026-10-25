@@ -661,10 +661,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Prior local-source behavior is accepted; the validation/read/commit phase
-# transition is a new scoped candidate pending review.
+# The validation/read/commit phase transition is independently accepted as a
+# scoped proof. Identity fact provenance and whole-backend refinement remain
+# open.
 implementations = [
   { path = "crates/core/src/local.rs", symbol = "open" },
   { path = "crates/core/src/local.rs", symbol = "read_validated" },
