@@ -152,7 +152,7 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # The checked decoder refines nonempty base36 values through u64, rejecting
 # invalid digits and overflow. Decimal date-field decoding, zero-volume policy,
