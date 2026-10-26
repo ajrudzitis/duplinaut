@@ -1718,17 +1718,17 @@ tests = [
 
 [[milestone]]
 id = "name-long-incremental-manifest-body"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-006", "PARSE-NAME-007"]
 specified = true
 implemented = true
-proved = false
-tested = false
-reviewed = false
+proved = true
+tested = true
+reviewed = true
 proof_required = true
 # Long IncrementalManifest body composition only: exact long interval marker,
 # strictly increasing timestamps, and incremental manifest suffixes produce
-# ObjectName with no volume. Independent review and full CI remain pending.
+# ObjectName with no volume. Independent review and full CI passed.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "body" },
   { path = "crates/core/src/names.rs", symbol = "long_incremental_manifest_body_fields" }
