@@ -1717,6 +1717,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-incremental-manifest-body"
+gate = false
+requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-006", "PARSE-NAME-007"]
+specified = true
+implemented = true
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+# Long IncrementalManifest body composition only: exact long interval marker,
+# strictly increasing timestamps, and incremental manifest suffixes produce
+# ObjectName with no volume. Independent review and full CI remain pending.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "long_incremental_manifest_body_fields" }
+]
+proofs = [
+  { id = "name-long-incremental-manifest-body", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "long_incremental_manifest_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "long_incremental_manifest_body_composes_fields_and_rejects_malformed_fields" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
