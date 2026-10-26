@@ -255,6 +255,21 @@ fn near_miss_object_stems_remain_unrecognized() {
     }
 }
 
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+#[test]
+fn successful_name_survives_a_malformed_overlapping_kind_stem() {
+    let parsed = parse_name(
+        b"duplicity-full.20231114T221320Z.vol1.difftar",
+        NameConfig::default(),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(parsed.kind, ObjectKind::FullVolume);
+    assert_eq!(parsed.volume, Some(1));
+}
+
 //= docs/parsing-requirements.md#parse-name-003
 //= type=test
 //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.

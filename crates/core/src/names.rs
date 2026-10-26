@@ -501,6 +501,159 @@ pub enum NameError {
     Ambiguous,
 }
 
+pub closed spec fn object_kind_equal_model(left: ObjectKind, right: ObjectKind) -> bool {
+    match (left, right) {
+        (ObjectKind::FullVolume, ObjectKind::FullVolume)
+        | (ObjectKind::IncrementalVolume, ObjectKind::IncrementalVolume)
+        | (ObjectKind::FullManifest, ObjectKind::FullManifest)
+        | (ObjectKind::IncrementalManifest, ObjectKind::IncrementalManifest)
+        | (ObjectKind::FullSignatures, ObjectKind::FullSignatures)
+        | (ObjectKind::IncrementalSignatures, ObjectKind::IncrementalSignatures) => true,
+        _ => false,
+    }
+}
+
+pub closed spec fn envelope_equal_model(left: Envelope, right: Envelope) -> bool {
+    match (left, right) {
+        (Envelope::Plain, Envelope::Plain)
+        | (Envelope::Gzip, Envelope::Gzip)
+        | (Envelope::OpenPgp, Envelope::OpenPgp)
+        | (Envelope::Pkcs7, Envelope::Pkcs7) => true,
+        _ => false,
+    }
+}
+
+pub closed spec fn optional_volume_equal_model(left: Option<u64>, right: Option<u64>) -> bool {
+    match (left, right) {
+        (None, None) => true,
+        (Some(a), Some(b)) => a == b,
+        _ => false,
+    }
+}
+
+pub closed spec fn object_name_equal_model(left: ObjectName, right: ObjectName) -> bool {
+    object_kind_equal_model(left.kind, right.kind)
+        && left.start.0 == right.start.0
+        && left.end.0 == right.end.0
+        && optional_volume_equal_model(left.volume, right.volume)
+        && envelope_equal_model(left.envelope, right.envelope)
+        && left.partial == right.partial
+        && left.short == right.short
+}
+
+#[allow(clippy::match_like_matches_macro)]
+fn object_kind_equal(left: ObjectKind, right: ObjectKind) -> (result: bool)
+    ensures result == object_kind_equal_model(left, right),
+{
+    match (left, right) {
+        (ObjectKind::FullVolume, ObjectKind::FullVolume)
+        | (ObjectKind::IncrementalVolume, ObjectKind::IncrementalVolume)
+        | (ObjectKind::FullManifest, ObjectKind::FullManifest)
+        | (ObjectKind::IncrementalManifest, ObjectKind::IncrementalManifest)
+        | (ObjectKind::FullSignatures, ObjectKind::FullSignatures)
+        | (ObjectKind::IncrementalSignatures, ObjectKind::IncrementalSignatures) => true,
+        _ => false,
+    }
+}
+
+#[allow(clippy::match_like_matches_macro)]
+fn envelope_equal(left: Envelope, right: Envelope) -> (result: bool)
+    ensures result == envelope_equal_model(left, right),
+{
+    match (left, right) {
+        (Envelope::Plain, Envelope::Plain)
+        | (Envelope::Gzip, Envelope::Gzip)
+        | (Envelope::OpenPgp, Envelope::OpenPgp)
+        | (Envelope::Pkcs7, Envelope::Pkcs7) => true,
+        _ => false,
+    }
+}
+
+fn optional_volume_equal(left: Option<u64>, right: Option<u64>) -> (result: bool)
+    ensures result == optional_volume_equal_model(left, right),
+{
+    match (left, right) {
+        (None, None) => true,
+        (Some(a), Some(b)) => a == b,
+        _ => false,
+    }
+}
+
+fn object_name_equal(left: ObjectName, right: ObjectName) -> (result: bool)
+    ensures result == object_name_equal_model(left, right),
+{
+    object_kind_equal(left.kind, right.kind)
+        && left.start.0 == right.start.0
+        && left.end.0 == right.end.0
+        && optional_volume_equal(left.volume, right.volume)
+        && envelope_equal(left.envelope, right.envelope)
+        && left.partial == right.partial
+        && left.short == right.short
+}
+
+pub closed spec fn name_candidate_merge_model(
+    current: Option<ObjectName>,
+    candidate: Option<ObjectName>,
+) -> Result<Option<ObjectName>, NameError> {
+    match candidate {
+        None => Ok(current),
+        Some(parsed) => match current {
+            None => Ok(Some(parsed)),
+            Some(previous) if object_name_equal_model(previous, parsed) => Ok(Some(previous)),
+            Some(_) => Err(NameError::Ambiguous),
+        },
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+fn merge_name_candidate(
+    current: Option<ObjectName>,
+    candidate: Option<ObjectName>,
+) -> (result: Result<Option<ObjectName>, NameError>)
+    ensures result == name_candidate_merge_model(current, candidate),
+{
+    proof {
+        reveal(name_candidate_merge_model);
+    }
+    match candidate {
+        None => {
+            proof {
+                reveal(name_candidate_merge_model);
+                assert(name_candidate_merge_model(current, candidate) == Ok(current));
+            }
+            Ok(current)
+        }
+        Some(parsed) => match current {
+            None => {
+                proof {
+                    reveal(name_candidate_merge_model);
+                    assert(candidate == Some(parsed));
+                    assert(name_candidate_merge_model(current, candidate) == Ok(Some(parsed)));
+                }
+                Ok(Some(parsed))
+            }
+            Some(previous) if object_name_equal(previous, parsed) => {
+                proof {
+                    reveal(name_candidate_merge_model);
+                    assert(candidate == Some(parsed));
+                    assert(name_candidate_merge_model(current, candidate) == Ok(Some(previous)));
+                }
+                Ok(Some(previous))
+            }
+            Some(_) => {
+                proof {
+                    reveal(name_candidate_merge_model);
+                    assert(candidate == Some(parsed));
+                    assert(name_candidate_merge_model(current, candidate) == Err(NameError::Ambiguous));
+                }
+                Err(NameError::Ambiguous)
+            }
+        },
+    }
+}
+
 pub open spec fn base36_digit_model(byte: u8) -> Option<int> {
     if b'0' <= byte && byte <= b'9' {
         Some((byte - b'0') as int)
@@ -2640,10 +2793,10 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
             if let Some(rest) = rest.strip_prefix(stem(kind, short)) {
                 recognized = true;
                 if let Ok(parsed) = body(rest, kind, short, config.time_separator) {
-                    if result.is_some_and(|previous| previous != parsed) {
-                        return Err(NameError::Ambiguous);
-                    }
-                    result = Some(parsed);
+                    //= docs/parsing-requirements.md#parse-name-001
+                    //= type=implementation
+                    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+                    result = merge_name_candidate(result, Some(parsed))?;
                 }
             }
         }
@@ -2664,9 +2817,74 @@ mod tests {
         decode_long_trailer_suffix, decode_long_volume_number, decode_short_interval,
         decode_short_timestamp, decode_short_trailer, decode_short_volume_number,
         decode_zone_offset_token, long_timestamp_field_bounds, long_timestamp_framing_valid,
-        parse_long_timestamp, stem, time_separator_valid, Envelope, LongTimestampField, NameError,
-        ObjectKind, Timestamp,
+        merge_name_candidate, parse_long_timestamp, stem, time_separator_valid, Envelope,
+        LongTimestampField, NameError, ObjectKind, ObjectName, Timestamp,
     };
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn name_candidate_accumulator_preserves_none_and_equal_results_and_rejects_conflicts() {
+        let original = ObjectName {
+            kind: ObjectKind::FullVolume,
+            start: Timestamp(10),
+            end: Timestamp(10),
+            volume: Some(1),
+            envelope: Envelope::Plain,
+            partial: false,
+            short: false,
+        };
+        assert_eq!(merge_name_candidate(None, None), Ok(None));
+        assert_eq!(
+            merge_name_candidate(Some(original), None),
+            Ok(Some(original))
+        );
+        assert_eq!(
+            merge_name_candidate(None, Some(original)),
+            Ok(Some(original))
+        );
+        assert_eq!(
+            merge_name_candidate(Some(original), Some(original)),
+            Ok(Some(original))
+        );
+        for different in [
+            ObjectName {
+                kind: ObjectKind::IncrementalVolume,
+                ..original
+            },
+            ObjectName {
+                start: Timestamp(11),
+                ..original
+            },
+            ObjectName {
+                end: Timestamp(11),
+                ..original
+            },
+            ObjectName {
+                volume: Some(2),
+                ..original
+            },
+            ObjectName {
+                envelope: Envelope::Gzip,
+                ..original
+            },
+            ObjectName {
+                partial: true,
+                ..original
+            },
+            ObjectName {
+                short: true,
+                ..original
+            },
+        ] {
+            assert_eq!(
+                merge_name_candidate(Some(original), Some(different)),
+                Err(NameError::Ambiguous),
+                "must distinguish {different:?} from {original:?}"
+            );
+        }
+    }
 
     //= docs/parsing-requirements.md#parse-name-001
     //= type=test

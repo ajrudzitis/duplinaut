@@ -475,6 +475,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-candidate-accumulation"
+gate = false
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Candidate merge/equality/ambiguity policy only. Ambiguity is tested at the
+# helper boundary as a future-regression guard; the current fixed grammar may
+# not admit two distinct successful candidates. Body parsing, prefix/stem
+# search, and complete parser refinement remain separate obligations.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "merge_name_candidate" },
+  { path = "crates/core/src/names.rs", symbol = "parse_name" }
+]
+proofs = [{ id = "name-candidate-accumulation", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "merge_name_candidate", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::name_candidate_accumulator_preserves_none_and_equal_results_and_rejects_conflicts" },
+  { package = "duplicity-core", name = "successful_name_survives_a_malformed_overlapping_kind_stem" }
+]
+
+[[milestone]]
 id = "name-stem-selection"
 gate = true
 requirements = ["PARSE-NAME-001"]
