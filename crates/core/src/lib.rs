@@ -23,8 +23,8 @@ pub mod path;
 pub mod source;
 
 pub mod manifest;
-pub mod names;
 mod name_dispatch;
+pub mod names;
 pub mod signature;
 mod verified;
 
