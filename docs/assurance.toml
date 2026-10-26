@@ -1645,6 +1645,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-full-volume-body"
+gate = false
+requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-007", "PARSE-GEN-003"]
+specified = true
+implemented = true
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+# Long FullVolume body composition only: one long timestamp, positive decimal
+# volume, and the FullVolume trailer/suffix profiles produce the exact object
+# fields. Independent review and full CI remain pending.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "long_full_volume_body_fields" }
+]
+proofs = [
+  { id = "name-long-full-volume-body", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "long_full_volume_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "long_full_volume_body_composes_fields_and_rejects_malformed_fields" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
