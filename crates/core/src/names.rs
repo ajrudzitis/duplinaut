@@ -2337,7 +2337,23 @@ const KINDS: [ObjectKind; 6] = [
     ObjectKind::IncrementalSignatures,
 ];
 
-fn stem(kind: ObjectKind, short: bool) -> &'static [u8] {
+verus! {
+pub open spec fn stem_model(kind: ObjectKind, short: bool) -> Seq<u8> {
+    match (kind, short) {
+        (ObjectKind::FullVolume | ObjectKind::FullManifest, false) => b"duplicity-full."@,
+        (ObjectKind::IncrementalVolume | ObjectKind::IncrementalManifest, false) => b"duplicity-inc."@,
+        (ObjectKind::FullSignatures, false) => b"duplicity-full-signatures."@,
+        (ObjectKind::IncrementalSignatures, false) => b"duplicity-new-signatures."@,
+        (ObjectKind::FullVolume | ObjectKind::FullManifest, true) => b"df."@,
+        (ObjectKind::IncrementalVolume | ObjectKind::IncrementalManifest, true) => b"di."@,
+        (ObjectKind::FullSignatures, true) => b"dfs."@,
+        (ObjectKind::IncrementalSignatures, true) => b"dns."@,
+    }
+}
+
+pub fn stem(kind: ObjectKind, short: bool) -> (result: &'static [u8])
+    ensures result@ == stem_model(kind, short),
+{
     match (kind, short) {
         (ObjectKind::FullVolume | ObjectKind::FullManifest, false) => b"duplicity-full.",
         (ObjectKind::IncrementalVolume | ObjectKind::IncrementalManifest, false) => {
@@ -2350,6 +2366,7 @@ fn stem(kind: ObjectKind, short: bool) -> &'static [u8] {
         (ObjectKind::FullSignatures, true) => b"dfs.",
         (ObjectKind::IncrementalSignatures, true) => b"dns.",
     }
+}
 }
 
 //= docs/parsing-requirements.md#parse-name-006
@@ -2647,9 +2664,40 @@ mod tests {
         decode_long_trailer_suffix, decode_long_volume_number, decode_short_interval,
         decode_short_timestamp, decode_short_trailer, decode_short_volume_number,
         decode_zone_offset_token, long_timestamp_field_bounds, long_timestamp_framing_valid,
-        parse_long_timestamp, time_separator_valid, Envelope, LongTimestampField, NameError,
+        parse_long_timestamp, stem, time_separator_valid, Envelope, LongTimestampField, NameError,
         ObjectKind, Timestamp,
     };
+
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    #[test]
+    fn object_kind_stems_match_the_exact_long_and_short_tables() {
+        for (kind, short, expected) in [
+            (ObjectKind::FullVolume, false, b"duplicity-full." as &[u8]),
+            (ObjectKind::IncrementalVolume, false, b"duplicity-inc."),
+            (ObjectKind::FullManifest, false, b"duplicity-full."),
+            (ObjectKind::IncrementalManifest, false, b"duplicity-inc."),
+            (
+                ObjectKind::FullSignatures,
+                false,
+                b"duplicity-full-signatures.",
+            ),
+            (
+                ObjectKind::IncrementalSignatures,
+                false,
+                b"duplicity-new-signatures.",
+            ),
+            (ObjectKind::FullVolume, true, b"df."),
+            (ObjectKind::IncrementalVolume, true, b"di."),
+            (ObjectKind::FullManifest, true, b"df."),
+            (ObjectKind::IncrementalManifest, true, b"di."),
+            (ObjectKind::FullSignatures, true, b"dfs."),
+            (ObjectKind::IncrementalSignatures, true, b"dns."),
+        ] {
+            assert_eq!(stem(kind, short), expected, "{kind:?} short={short}");
+        }
+    }
 
     //= docs/parsing-requirements.md#parse-name-002
     //= type=test

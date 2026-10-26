@@ -236,6 +236,25 @@ fn configured_name_prefixes_are_consumed_global_then_kind_specific() {
     );
 }
 
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+#[test]
+fn near_miss_object_stems_remain_unrecognized() {
+    let config = NameConfig::default();
+    for near_miss in [
+        b"duplicity-fullx.20231114T221320Z.vol1.difftar" as &[u8],
+        b"duplicity-incx.20231114T221320Z.to.20231115T221320Z.vol1.difftar",
+        b"duplicity-full-signaturesx.20231114T221320Z.sigtar",
+        b"dfx.1.1.dt",
+        b"dix.1.2.1.dt",
+        b"dfsx.1.st",
+        b"dnsx.1.2.st",
+    ] {
+        assert_eq!(parse_name(near_miss, config), Ok(None), "{near_miss:?}");
+    }
+}
+
 //= docs/parsing-requirements.md#parse-name-003
 //= type=test
 //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.

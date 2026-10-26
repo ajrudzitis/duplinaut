@@ -475,6 +475,28 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-stem-selection"
+gate = false
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Exact kind/profile-to-stem table only. This does not claim full name
+# recognition or body parsing.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "stem" },
+  { path = "crates/core/src/names.rs", symbol = "parse_name" }
+]
+proofs = [{ id = "name-stem-selection", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "stem", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::object_kind_stems_match_the_exact_long_and_short_tables" },
+  { package = "duplicity-core", name = "near_miss_object_stems_remain_unrecognized" }
+]
+
+[[milestone]]
 id = "name-short-trailer"
 gate = true
 requirements = ["PARSE-NAME-001"]
