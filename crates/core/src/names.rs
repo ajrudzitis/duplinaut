@@ -46,6 +46,42 @@ pub struct ObjectName {
     pub short: bool,
 }
 
+/// The explicit reader policy for a configured separator in legacy timestamps.
+pub open spec fn time_separator_valid_model(byte: u8) -> bool {
+    0x21 <= byte && byte <= 0x7e
+        && !(b'0' <= byte && byte <= b'9')
+        && byte != b'/'
+        && byte != b'.'
+        && byte != b'+'
+        && byte != b'-'
+        && byte != b'T'
+        && byte != b't'
+        && byte != b'Z'
+        && byte != b'z'
+}
+
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+#[allow(
+    clippy::manual_is_ascii_check,
+    reason = "Keep the explicit digit range in Verus-supported syntax; the ASCII helper is unsupported by Verus."
+)]
+pub(crate) fn time_separator_valid(byte: u8) -> (result: bool)
+    ensures result == time_separator_valid_model(byte),
+{
+    matches!(byte, 0x21..=0x7e)
+        && !matches!(byte, b'0'..=b'9')
+        && byte != b'/'
+        && byte != b'.'
+        && byte != b'+'
+        && byte != b'-'
+        && byte != b'T'
+        && byte != b't'
+        && byte != b'Z'
+        && byte != b'z'
+}
+
 /// Gregorian days between 1901-01-01 and January 1 of `year`.
 ///
 /// This is the bounded calendar arithmetic kernel used by the native long-name
@@ -185,12 +221,6 @@ pub enum NameError {
     Ambiguous,
 }
 
-fn separator_valid(byte: u8) -> bool {
-    (0x21..=0x7e).contains(&byte)
-        && !byte.is_ascii_digit()
-        && !matches!(byte, b'/' | b'.' | b'+' | b'-' | b'T' | b't' | b'Z' | b'z')
-}
-
 fn numeral(input: &[u8], radix: u64) -> Result<u64, NameError> {
     if input.is_empty() {
         return Err(NameError::Malformed);
@@ -221,7 +251,7 @@ fn numeral(input: &[u8], radix: u64) -> Result<u64, NameError> {
 
 /// Parse an exact canonical or legacy explicitly zoned Gregorian timestamp.
 pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, NameError> {
-    if !separator_valid(separator) {
+    if !time_separator_valid(separator) {
         return Err(NameError::Configuration);
     }
     if input.len() == 16 {
@@ -428,7 +458,7 @@ fn body(
 /// Conflicting prefix configurations producing distinct successful classifications
 /// return `Ambiguous`; malformed recognized stems are errors rather than ignored.
 pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectName>, NameError> {
-    if !separator_valid(config.time_separator)
+    if !time_separator_valid(config.time_separator)
         || [
             config.global_prefix,
             config.archive_prefix,
@@ -476,5 +506,38 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
         Err(NameError::Malformed)
     } else {
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_long_timestamp, time_separator_valid, NameError};
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    fn time_separator_predicate_matches_the_policy_for_every_byte() {
+        for value in 0..=u8::MAX {
+            let expected = (0x21..=0x7e).contains(&value)
+                && !value.is_ascii_digit()
+                && !matches!(value, b'/' | b'.' | b'+' | b'-' | b'T' | b't' | b'Z' | b'z');
+            assert_eq!(time_separator_valid(value), expected, "byte {value:#04x}");
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    fn invalid_time_separator_is_a_configuration_error() {
+        for separator in [
+            0, b' ', b'/', b'.', b'+', b'-', b'0', b'T', b't', b'Z', b'z', 0x7f,
+        ] {
+            assert_eq!(
+                parse_long_timestamp(b"2024-01-01T12:34:56Z", separator),
+                Err(NameError::Configuration)
+            );
+        }
     }
 }
