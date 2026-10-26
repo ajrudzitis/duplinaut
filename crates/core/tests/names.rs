@@ -831,6 +831,60 @@ fn short_incremental_volume_body_composes_fields_and_rejects_malformed_fields() 
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-name-003
+//= type=test
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+//= docs/parsing-requirements.md#parse-name-006
+//= type=test
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+#[test]
+fn short_incremental_manifest_body_composes_fields_and_rejects_malformed_fields() {
+    let config = NameConfig::default();
+    let profiles: [(&[u8], Envelope, bool); 6] = [
+        (b"di.1.2.m", Envelope::Plain, false),
+        (b"di.1.2.m.p", Envelope::Plain, true),
+        (b"di.1.2.m.z", Envelope::Gzip, false),
+        (b"di.1.2.m.g", Envelope::OpenPgp, false),
+        (b"di.1.2.m.p.z", Envelope::Gzip, true),
+        (b"di.1.2.m.p.g", Envelope::OpenPgp, true),
+    ];
+    for (bytes, envelope, partial) in profiles {
+        let name = parse_name(bytes, config).unwrap().unwrap();
+        assert_eq!(name.kind, ObjectKind::IncrementalManifest, "{bytes:?}");
+        assert_eq!(name.start, Timestamp(1), "{bytes:?}");
+        assert_eq!(name.end, Timestamp(2), "{bytes:?}");
+        assert_eq!(name.volume, None, "{bytes:?}");
+        assert_eq!(
+            (name.envelope, name.partial),
+            (envelope, partial),
+            "{bytes:?}"
+        );
+        assert!(name.short, "{bytes:?}");
+    }
+
+    for malformed in [
+        b"di.1.1.m" as &[u8],
+        b"di.2.1.m",
+        b"di.Invalid.2.m",
+        b"di.1.Invalid.m",
+        b"di.1.2.bad",
+        b"di.1.2.m.x",
+        b"di.1.2.m.z.p",
+        b"di.1.2.m.p.p",
+        b"di.1.2.m.p.g.extra",
+        b"di.1.2.m.",
+    ] {
+        assert_eq!(
+            parse_name(malformed, config),
+            Err(NameError::Malformed),
+            "{malformed:?}"
+        );
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 #[test]
 fn long_trailer_suffixes_classify_every_kind_and_reject_extra_fields() {
     let config = NameConfig::default();

@@ -2105,6 +2105,34 @@ closed spec fn short_full_manifest_fields_model(
     }
 }
 
+closed spec fn short_incremental_manifest_fields_model(
+    start_field: Seq<u8>,
+    end_field: Seq<u8>,
+    trailer: Seq<u8>,
+    first: Option<Seq<u8>>,
+    second: Option<Seq<u8>>,
+) -> Option<(int, int, Envelope, bool)> {
+    match (
+        short_interval_model(
+            ObjectKind::IncrementalManifest,
+            start_field,
+            Some(end_field),
+        ),
+        short_trailer_model(
+            ObjectKind::IncrementalManifest,
+            trailer,
+            first,
+            second,
+            None,
+        ),
+    ) {
+        (Some((start, end)), Some((envelope, partial))) => {
+            Some((start, end, envelope, partial))
+        }
+        _ => None,
+    }
+}
+
 closed spec fn short_incremental_volume_fields_model(
     start_field: Seq<u8>,
     end_field: Seq<u8>,
@@ -2851,6 +2879,90 @@ fn short_full_manifest_body_fields(
 //= type=implementation
 //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
 verus! {
+fn short_incremental_manifest_body_fields(
+    start_field: &[u8],
+    end_field: &[u8],
+    trailer: &[u8],
+    first: Option<&[u8]>,
+    second: Option<&[u8]>,
+) -> (result: Result<ObjectName, NameError>)
+    ensures match result {
+        Err(_) => short_incremental_manifest_fields_model(
+            start_field@,
+            end_field@,
+            trailer@,
+            optional_short_token(first),
+            optional_short_token(second),
+        ).is_none(),
+        Ok(name) => match short_incremental_manifest_fields_model(
+            start_field@,
+            end_field@,
+            trailer@,
+            optional_short_token(first),
+            optional_short_token(second),
+        ) {
+            Some((start, end, envelope, partial)) =>
+                name.kind == ObjectKind::IncrementalManifest
+                    && name.start.0 as int == start
+                    && name.end.0 as int == end
+                    && name.volume.is_none()
+                    && name.envelope == envelope
+                    && name.partial == partial
+                    && name.short,
+            None => false,
+        },
+    },
+{
+    let (start, end) = decode_short_interval(
+        ObjectKind::IncrementalManifest,
+        start_field,
+        Some(end_field),
+    ).ok_or(NameError::Malformed)?;
+    let (envelope, partial) = decode_short_trailer(
+        ObjectKind::IncrementalManifest,
+        trailer,
+        first,
+        second,
+        None,
+    ).ok_or(NameError::Malformed)?;
+    let result = ObjectName {
+        kind: ObjectKind::IncrementalManifest,
+        start,
+        end,
+        volume: None,
+        envelope,
+        partial,
+        short: true,
+    };
+    proof {
+        reveal(short_incremental_manifest_fields_model);
+        assert(short_interval_model(
+            ObjectKind::IncrementalManifest,
+            start_field@,
+            Some(end_field@),
+        ) == Some((start.0 as int, end.0 as int)));
+        assert(short_trailer_model(
+            ObjectKind::IncrementalManifest,
+            trailer@,
+            optional_short_token(first),
+            optional_short_token(second),
+            None,
+        ) == Some((envelope, partial)));
+    }
+    Ok(result)
+}
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-name-003
+//= type=implementation
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+//= docs/parsing-requirements.md#parse-name-006
+//= type=implementation
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+verus! {
 fn short_incremental_volume_body_fields(
     start_field: &[u8],
     end_field: &[u8],
@@ -2940,6 +3052,25 @@ fn body(
     short: bool,
     separator: u8,
 ) -> Result<ObjectName, NameError> {
+    if kind == ObjectKind::IncrementalManifest && short {
+        let mut fields = Some(input);
+        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+        let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+        let first = take_dot_field(&mut fields);
+        let second = take_dot_field(&mut fields);
+        let third = take_dot_field(&mut fields);
+        if third.is_some() || fields.is_some() {
+            return Err(NameError::Malformed);
+        }
+        return short_incremental_manifest_body_fields(
+            start_field,
+            end_field,
+            trailer,
+            first,
+            second,
+        );
+    }
     if kind == ObjectKind::FullManifest && short {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
