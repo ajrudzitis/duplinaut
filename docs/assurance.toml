@@ -239,10 +239,10 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Independently verifies that validated decoded calendar/clock fields and a
-# bounded explicit-zone offset compose to exact UTC seconds. parse_long_timestamp
+# Independently reviewed composition of validated decoded calendar/clock fields
+# and a bounded explicit-zone offset into exact UTC seconds. parse_long_timestamp
 # calls this helper; framing, field decoding and full filename grammar remain
 # separate obligations.
 implementations = [
