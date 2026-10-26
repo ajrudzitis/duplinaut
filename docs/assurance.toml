@@ -1524,13 +1524,13 @@ tests = [
 
 [[milestone]]
 id = "name-short-incremental-volume-body"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-003", "PARSE-NAME-006"]
 specified = true
 implemented = true
-proved = false
-tested = false
-reviewed = false
+proved = true
+tested = true
+reviewed = true
 proof_required = true
 # Short IncrementalVolume body composition only: verified dot-field extraction
 # feeds the strictly increasing short interval, positive base36 volume, and
