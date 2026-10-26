@@ -356,13 +356,13 @@ tests = [
 
 [[milestone]]
 id = "name-short-interval"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-003", "PARSE-NAME-006"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Short timestamp decoding plus full/incremental kind shape and strict interval
 # ordering only; complete body and long-name parsing remain separate.
