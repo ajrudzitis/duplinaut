@@ -116,7 +116,7 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Proves the hour/minute/second range predicate and traces its use in long
 # timestamp parsing. Numeric decoding, framing, calendar validation and UTC
