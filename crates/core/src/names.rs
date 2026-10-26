@@ -378,6 +378,144 @@ pub fn long_timestamp_framing_valid(input: &[u8], separator: u8) -> (result: boo
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LongTimestampField {
+    Year,
+    Month,
+    Day,
+    Hour,
+    Minute,
+    Second,
+}
+
+/// Byte bounds for a numeric field in an already framed long timestamp.
+pub open spec fn long_timestamp_field_bounds_model(
+    input: Seq<u8>,
+    separator: u8,
+    field: LongTimestampField,
+) -> Option<(int, int)> {
+    if !long_timestamp_framing_model(input, separator) {
+        None
+    } else if input.len() == 16 {
+        match field {
+            LongTimestampField::Year => Some((0, 4)),
+            LongTimestampField::Month => Some((4, 6)),
+            LongTimestampField::Day => Some((6, 8)),
+            LongTimestampField::Hour => Some((9, 11)),
+            LongTimestampField::Minute => Some((11, 13)),
+            LongTimestampField::Second => Some((13, 15)),
+        }
+    } else {
+        match field {
+            LongTimestampField::Year => Some((0, 4)),
+            LongTimestampField::Month => Some((5, 7)),
+            LongTimestampField::Day => Some((8, 10)),
+            LongTimestampField::Hour => Some((11, 13)),
+            LongTimestampField::Minute => Some((14, 16)),
+            LongTimestampField::Second => Some((17, 19)),
+        }
+    }
+}
+
+pub open spec fn long_timestamp_numeric_field_model(
+    input: Seq<u8>,
+    separator: u8,
+    field: LongTimestampField,
+) -> Option<int> {
+    match long_timestamp_field_bounds_model(input, separator, field) {
+        Some((start, end)) => decimal_value_model(input.subrange(start, end), end - start),
+        None => None,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+pub fn long_timestamp_field_bounds(
+    input: &[u8],
+    separator: u8,
+    field: LongTimestampField,
+) -> (result: Option<(usize, usize)>)
+    ensures match long_timestamp_field_bounds_model(input@, separator, field) {
+        Some((start, end)) => result matches Some(bounds)
+            && bounds.0 as int == start && bounds.1 as int == end,
+        None => result.is_none(),
+    },
+{
+    if !long_timestamp_framing_valid(input, separator) {
+        proof {
+            assert(!long_timestamp_framing_model(input@, separator));
+            reveal(long_timestamp_field_bounds_model);
+            assert(long_timestamp_field_bounds_model(input@, separator, field).is_none());
+        }
+        return None;
+    }
+    let result = if input.len() == 16 {
+        match field {
+            LongTimestampField::Year => (0, 4),
+            LongTimestampField::Month => (4, 6),
+            LongTimestampField::Day => (6, 8),
+            LongTimestampField::Hour => (9, 11),
+            LongTimestampField::Minute => (11, 13),
+            LongTimestampField::Second => (13, 15),
+        }
+    } else {
+        match field {
+            LongTimestampField::Year => (0, 4),
+            LongTimestampField::Month => (5, 7),
+            LongTimestampField::Day => (8, 10),
+            LongTimestampField::Hour => (11, 13),
+            LongTimestampField::Minute => (14, 16),
+            LongTimestampField::Second => (17, 19),
+        }
+    };
+    proof {
+        reveal(long_timestamp_field_bounds_model);
+        assert(long_timestamp_field_bounds_model(input@, separator, field)
+            == Some((result.0 as int, result.1 as int)));
+    }
+    Some(result)
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+pub fn decode_long_timestamp_numeric_field(
+    input: &[u8],
+    separator: u8,
+    field: LongTimestampField,
+) -> (result: Option<u64>)
+    requires long_timestamp_framing_model(input@, separator),
+    ensures match long_timestamp_numeric_field_model(input@, separator, field) {
+        Some(value) => result matches Some(actual) && actual as int == value,
+        None => result.is_none(),
+    },
+{
+    let (start, end) = match long_timestamp_field_bounds(input, separator, field) {
+        Some(bounds) => bounds,
+        None => {
+            proof {
+                assert(long_timestamp_field_bounds_model(input@, separator, field).is_none());
+                reveal(long_timestamp_numeric_field_model);
+            }
+            return None;
+        }
+    };
+    let bytes = &input[start..end];
+    proof {
+        assert(bytes@ == input@.subrange(start as int, end as int));
+        reveal(long_timestamp_numeric_field_model);
+        reveal(long_timestamp_field_bounds_model);
+    }
+    decode_decimal(bytes)
+}
+
 /// Gregorian days between 1901-01-01 and January 1 of `year`.
 ///
 /// This is the bounded calendar arithmetic kernel used by the native long-name
@@ -858,41 +996,23 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
             return Err(NameError::Malformed);
         }
     }
-    let (year, month, day, hour, minute, second, zone) = match input.len() {
-        16 if matches!(input[8], b'T' | b't') && matches!(input[15], b'Z' | b'z') => (
-            &input[0..4],
-            &input[4..6],
-            &input[6..8],
-            &input[9..11],
-            &input[11..13],
-            &input[13..15],
-            &input[15..16],
-        ),
-        20 | 25
-            if input[4] == b'-'
-                && input[7] == b'-'
-                && matches!(input[10], b'T' | b't')
-                && input[13] == separator
-                && input[16] == separator =>
-        {
-            (
-                &input[0..4],
-                &input[5..7],
-                &input[8..10],
-                &input[11..13],
-                &input[14..16],
-                &input[17..19],
-                &input[19..],
-            )
-        }
+    let zone = match input.len() {
+        16 => &input[15..16],
+        20 | 25 => &input[19..],
         _ => return Err(NameError::Malformed),
     };
-    let y = numeral(year, 10)? as i64;
-    let m = numeral(month, 10)? as i64;
-    let d = numeral(day, 10)? as i64;
-    let h = numeral(hour, 10)? as i64;
-    let min = numeral(minute, 10)? as i64;
-    let sec = numeral(second, 10)? as i64;
+    let y = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Year)
+        .ok_or(NameError::Malformed)? as i64;
+    let m = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Month)
+        .ok_or(NameError::Malformed)? as i64;
+    let d = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Day)
+        .ok_or(NameError::Malformed)? as i64;
+    let h = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Hour)
+        .ok_or(NameError::Malformed)? as i64;
+    let min = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Minute)
+        .ok_or(NameError::Malformed)? as i64;
+    let sec = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Second)
+        .ok_or(NameError::Malformed)? as i64;
     if !calendar_date_valid(y, m, d) || !clock_fields_valid(h, min, sec) {
         return Err(NameError::Malformed);
     }
@@ -1090,9 +1210,9 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 mod tests {
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
-        clock_fields_valid, decode_base36, decode_decimal, decode_zone_offset_token,
-        long_timestamp_framing_valid, parse_long_timestamp, time_separator_valid, NameError,
-        Timestamp,
+        clock_fields_valid, decode_base36, decode_decimal, decode_long_timestamp_numeric_field,
+        decode_zone_offset_token, long_timestamp_field_bounds, long_timestamp_framing_valid,
+        parse_long_timestamp, time_separator_valid, LongTimestampField, NameError, Timestamp,
     };
 
     #[test]
@@ -1512,6 +1632,118 @@ mod tests {
         for length in 0..=32 {
             if !matches!(length, 16 | 20 | 25) {
                 assert!(!long_timestamp_framing_valid(&vec![b'0'; length], b':'));
+            }
+        }
+    }
+
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    #[test]
+    fn timestamp_numeric_fields_use_exact_format_slices() {
+        type FieldCase = (LongTimestampField, usize, usize, u64);
+        let samples: [(&[u8], u8, [FieldCase; 6]); 3] = [
+            (
+                b"19700101T123456Z",
+                b':',
+                [
+                    (LongTimestampField::Year, 0, 4, 1970),
+                    (LongTimestampField::Month, 4, 6, 1),
+                    (LongTimestampField::Day, 6, 8, 1),
+                    (LongTimestampField::Hour, 9, 11, 12),
+                    (LongTimestampField::Minute, 11, 13, 34),
+                    (LongTimestampField::Second, 13, 15, 56),
+                ],
+            ),
+            (
+                b"1970-01-01T12:34:56Z",
+                b':',
+                [
+                    (LongTimestampField::Year, 0, 4, 1970),
+                    (LongTimestampField::Month, 5, 7, 1),
+                    (LongTimestampField::Day, 8, 10, 1),
+                    (LongTimestampField::Hour, 11, 13, 12),
+                    (LongTimestampField::Minute, 14, 16, 34),
+                    (LongTimestampField::Second, 17, 19, 56),
+                ],
+            ),
+            (
+                b"1970-01-01t12_34_56-23_59",
+                b'_',
+                [
+                    (LongTimestampField::Year, 0, 4, 1970),
+                    (LongTimestampField::Month, 5, 7, 1),
+                    (LongTimestampField::Day, 8, 10, 1),
+                    (LongTimestampField::Hour, 11, 13, 12),
+                    (LongTimestampField::Minute, 14, 16, 34),
+                    (LongTimestampField::Second, 17, 19, 56),
+                ],
+            ),
+        ];
+        for (sample, separator, fields) in samples {
+            for (field, start, end, expected) in fields {
+                assert_eq!(
+                    long_timestamp_field_bounds(sample, separator, field),
+                    Some((start, end)),
+                    "{field:?} in {sample:?}"
+                );
+                assert_eq!(
+                    decode_long_timestamp_numeric_field(sample, separator, field),
+                    Some(expected),
+                    "{field:?} in {sample:?}"
+                );
+                for position in start..end {
+                    for byte in 0u8..=u8::MAX {
+                        let mut mutated = sample.to_vec();
+                        mutated[position] = byte;
+                        let expected = if byte.is_ascii_digit() {
+                            let value = sample[start..end]
+                                .iter()
+                                .enumerate()
+                                .map(|(index, current)| {
+                                    if start + index == position {
+                                        byte
+                                    } else {
+                                        *current
+                                    }
+                                })
+                                .fold(0u64, |value, digit| value * 10 + u64::from(digit - b'0'));
+                            Some(value)
+                        } else {
+                            None
+                        };
+                        assert_eq!(
+                            decode_long_timestamp_numeric_field(&mutated, separator, field),
+                            expected,
+                            "{field:?} in {sample:?}, byte {byte:#04x} at {position}"
+                        );
+                    }
+                }
+            }
+        }
+        let malformed = [
+            (&b"1970_01-01t12_34_56Z"[..], b'_'),
+            (&b"1970-01-01t12:34_56Z"[..], b'_'),
+            (&b"1970-01-01t12_34_56"[..], b'_'),
+            (&b"19700101T123456"[..], b':'),
+        ];
+        for (input, separator) in malformed {
+            for field in [
+                LongTimestampField::Year,
+                LongTimestampField::Month,
+                LongTimestampField::Day,
+                LongTimestampField::Hour,
+                LongTimestampField::Minute,
+                LongTimestampField::Second,
+            ] {
+                assert_eq!(
+                    long_timestamp_field_bounds(input, separator, field),
+                    None,
+                    "{field:?} in malformed timestamp {input:?}"
+                );
             }
         }
     }

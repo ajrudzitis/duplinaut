@@ -202,6 +202,36 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-timestamp-field-slices"
+gate = false
+requirements = ["PARSE-NAME-004", "PARSE-NAME-007"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Relates each timestamp field to its exact canonical or legacy byte slice and
+# proves decimal decoding of that slice. Overall timestamp and filename grammar
+# refinement remains a separate open obligation.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "long_timestamp_field_bounds" },
+  { path = "crates/core/src/names.rs", symbol = "decode_long_timestamp_numeric_field" },
+  { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
+]
+proofs = [
+  { id = "name-timestamp-field-slice-bounds-canonical", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "long_timestamp_field_bounds", kind = "contract" },
+  { id = "name-timestamp-field-slice-bounds-legacy", requirement = "PARSE-NAME-007", path = "crates/core/src/names.rs", symbol = "long_timestamp_field_bounds", kind = "contract" },
+  { id = "name-timestamp-field-decoder-canonical", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "decode_long_timestamp_numeric_field", kind = "contract" },
+  { id = "name-timestamp-field-decoder-legacy", requirement = "PARSE-NAME-007", path = "crates/core/src/names.rs", symbol = "decode_long_timestamp_numeric_field", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::timestamp_numeric_fields_use_exact_format_slices" },
+  { package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" },
+  { package = "duplicity-core", name = "explicit_zone_offset_uses_the_configured_separator" }
+]
+
+[[milestone]]
 id = "name-zone-token-decoder"
 gate = false
 requirements = ["PARSE-NAME-007"]
