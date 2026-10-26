@@ -427,6 +427,19 @@ pub fn calendar_day_valid(year: u16, month: u8, day: u8) -> (result: bool)
     day >= 1 && day <= month_length(year, month)
 }
 
+pub open spec fn clock_fields_valid_model(hour: int, minute: int, second: int) -> bool {
+    0 <= hour && hour <= 23 && 0 <= minute && minute <= 59 && 0 <= second && second <= 59
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+pub fn clock_fields_valid(hour: i64, minute: i64, second: i64) -> (result: bool)
+    ensures result == clock_fields_valid_model(hour as int, minute as int, second as int),
+{
+    matches!(hour, 0..=23) && matches!(minute, 0..=59) && matches!(second, 0..=59)
+}
+
 pub open spec fn zone_offset_seconds_model(sign: int, hours: int, minutes: int) -> int {
     sign * (hours * 3600 + minutes * 60)
 }
@@ -590,7 +603,7 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
     let h = numeral(hour, 10)? as i64;
     let min = numeral(minute, 10)? as i64;
     let sec = numeral(second, 10)? as i64;
-    if !(1901..=2099).contains(&y) || !(1..=12).contains(&m) || h > 23 || min > 59 || sec > 59 {
+    if !(1901..=2099).contains(&y) || !(1..=12).contains(&m) || !clock_fields_valid(h, min, sec) {
         return Err(NameError::Malformed);
     }
     if !calendar_day_valid(y as u16, m as u8, d as u8) {
@@ -806,9 +819,34 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 #[cfg(test)]
 mod tests {
     use super::{
-        calendar_day_valid, decode_base36, decode_decimal, parse_long_timestamp,
-        time_separator_valid, NameError,
+        calendar_day_valid, clock_fields_valid, decode_base36, decode_decimal,
+        parse_long_timestamp, time_separator_valid, NameError,
     };
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    fn clock_field_policy_matches_every_byte_and_boundary() {
+        for byte in 0..=u8::MAX {
+            let value = i64::from(byte);
+            assert_eq!(clock_fields_valid(value, 12, 30), byte <= 23);
+            assert_eq!(clock_fields_valid(12, value, 30), byte <= 59);
+            assert_eq!(clock_fields_valid(12, 30, value), byte <= 59);
+        }
+        for (hour, minute, second, valid) in [
+            (0, 0, 0, true),
+            (23, 59, 59, true),
+            (24, 0, 0, false),
+            (0, 60, 0, false),
+            (0, 0, 60, false),
+            (-1, 0, 0, false),
+            (0, -1, 0, false),
+            (0, 0, -1, false),
+        ] {
+            assert_eq!(clock_fields_valid(hour, minute, second), valid);
+        }
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-name-004

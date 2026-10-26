@@ -109,6 +109,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-clock-field-policy"
+gate = false
+requirements = ["PARSE-NAME-004"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Proves the hour/minute/second range predicate and traces its use in long
+# timestamp parsing. Numeric decoding, framing, calendar validation and UTC
+# composition remain separate obligations.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "clock_fields_valid" },
+  { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
+]
+proofs = [{ id = "name-clock-field-policy", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "clock_fields_valid", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::clock_field_policy_matches_every_byte_and_boundary" },
+  { package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" },
+  { package = "duplicity-core", name = "explicit_zone_offset_boundaries_are_exact" }
+]
+
+[[milestone]]
 id = "names"
 gate = false
 requirements = ["PARSE-NAME-001", "PARSE-NAME-002", "PARSE-NAME-003", "PARSE-NAME-004", "PARSE-NAME-005", "PARSE-NAME-006", "PARSE-NAME-007"]
