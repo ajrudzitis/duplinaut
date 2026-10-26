@@ -4663,6 +4663,18 @@ mod tests {
         );
         assert_eq!(remaining, None);
 
+        let mut remaining = Some(&b"part.gz.extra."[..]);
+        assert_eq!(
+            take_body_suffix_fields(&mut remaining),
+            (
+                Some(&b"part"[..]),
+                Some(&b"gz"[..]),
+                Some(&b"extra"[..]),
+                Some(&b""[..]),
+            )
+        );
+        assert_eq!(remaining, None);
+
         let mut remaining = Some(&b"part.gz.extra.trailing"[..]);
         assert_eq!(
             take_body_suffix_fields(&mut remaining),
