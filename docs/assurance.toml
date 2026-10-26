@@ -1766,17 +1766,17 @@ tests = [
 
 [[milestone]]
 id = "name-long-incremental-signatures-body"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-006", "PARSE-NAME-007"]
 specified = true
 implemented = true
-proved = false
-tested = false
-reviewed = false
+proved = true
+tested = true
+reviewed = true
 proof_required = true
 # Long IncrementalSignatures body composition only: exact long interval marker,
 # strictly increasing timestamps, and incremental signature suffixes produce
-# ObjectName with no volume. Acceptance awaits independent review and full CI.
+# ObjectName with no volume. Independent review and full CI passed.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "body" },
   { path = "crates/core/src/names.rs", symbol = "long_incremental_signatures_body_fields" }
