@@ -1523,6 +1523,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-short-incremental-volume-body"
+gate = false
+requirements = ["PARSE-NAME-001", "PARSE-NAME-003", "PARSE-NAME-006"]
+specified = true
+implemented = true
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+# Short IncrementalVolume body composition only: verified dot-field extraction
+# feeds the strictly increasing short interval, positive base36 volume, and
+# trailer/suffix models to build ObjectName. Other short kinds and all long-name
+# body profiles remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body_fields" }
+]
+proofs = [
+  { id = "name-short-incremental-volume-body", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "short_incremental_volume_body_composes_fields_and_rejects_malformed_fields" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
