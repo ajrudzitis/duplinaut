@@ -223,7 +223,7 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Proves the ObjectName completion predicate: partial and unsupported PKCS#7
 # artifacts are not completed evidence. Reader-level set selection and restore
