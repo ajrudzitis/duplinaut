@@ -413,6 +413,20 @@ pub fn month_length(year: u16, month: u8) -> (result: u8)
     }
 }
 
+pub open spec fn calendar_day_valid_model(year: int, month: int, day: int) -> bool {
+    1 <= day && day <= month_length_model(year, month)
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+pub fn calendar_day_valid(year: u16, month: u8, day: u8) -> (result: bool)
+    requires 1901 <= year <= 2099, 1 <= month <= 12,
+    ensures result == calendar_day_valid_model(year as int, month as int, day as int),
+{
+    day >= 1 && day <= month_length(year, month)
+}
+
 pub open spec fn zone_offset_seconds_model(sign: int, hours: int, minutes: int) -> int {
     sign * (hours * 3600 + minutes * 60)
 }
@@ -522,6 +536,7 @@ fn numeral(input: &[u8], radix: u64) -> Result<u64, NameError> {
 }
 
 //= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
 //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
 
 //= docs/parsing-requirements.md#parse-name-007
@@ -578,8 +593,7 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
     if !(1901..=2099).contains(&y) || !(1..=12).contains(&m) || h > 23 || min > 59 || sec > 59 {
         return Err(NameError::Malformed);
     }
-    let month_days = i64::from(month_length(y as u16, m as u8));
-    if d < 1 || d > month_days {
+    if !calendar_day_valid(y as u16, m as u8, d as u8) {
         return Err(NameError::Malformed);
     }
     let offset = match zone {
@@ -792,8 +806,33 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 #[cfg(test)]
 mod tests {
     use super::{
-        decode_base36, decode_decimal, parse_long_timestamp, time_separator_valid, NameError,
+        calendar_day_valid, decode_base36, decode_decimal, parse_long_timestamp,
+        time_separator_valid, NameError,
     };
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    fn calendar_day_predicate_matches_gregorian_month_boundaries() {
+        for year in 1901..=2099u16 {
+            for month in 1..=12u8 {
+                let days = match month {
+                    2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
+                    2 => 28,
+                    4 | 6 | 9 | 11 => 30,
+                    _ => 31,
+                };
+                for day in 0..=31u8 {
+                    assert_eq!(
+                        calendar_day_valid(year, month, day),
+                        (1..=days).contains(&day),
+                        "{year:04}-{month:02}-{day:02}"
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-name-005

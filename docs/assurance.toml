@@ -193,6 +193,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-calendar-day-policy"
+gate = false
+requirements = ["PARSE-NAME-004"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Proves the Gregorian day-of-month bound for supported years and months and
+# traces its use in long timestamp parsing. Timestamp framing and composition
+# remain outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "calendar_day_valid" },
+  { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
+]
+proofs = [{ id = "name-calendar-day-policy", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "calendar_day_valid", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::calendar_day_predicate_matches_gregorian_month_boundaries" },
+  { package = "duplicity-core", name = "every_supported_calendar_day_is_contiguous" },
+  { package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" }
+]
+
+[[milestone]]
 id = "name-incremental-interval-policy"
 gate = false
 requirements = ["PARSE-NAME-006"]
