@@ -24,6 +24,7 @@ pub mod source;
 
 pub mod manifest;
 pub mod names;
+mod name_dispatch;
 pub mod signature;
 mod verified;
 

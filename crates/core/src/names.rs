@@ -4224,7 +4224,7 @@ fn body(
             third,
         );
     }
-    if kind == ObjectKind::FullSignatures && short {
+    if crate::name_dispatch::short_full_signatures_route(kind, short) {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4585,6 +4585,30 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 #[cfg(test)]
 mod tests {
     use super::{split_dot_field, take_body_suffix_fields, take_dot_field};
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn short_full_signatures_dispatch_selects_only_its_profile() {
+        let kinds = [
+            super::ObjectKind::FullVolume,
+            super::ObjectKind::IncrementalVolume,
+            super::ObjectKind::FullManifest,
+            super::ObjectKind::IncrementalManifest,
+            super::ObjectKind::FullSignatures,
+            super::ObjectKind::IncrementalSignatures,
+        ];
+        for kind in kinds {
+            assert_eq!(
+                crate::name_dispatch::short_full_signatures_route(kind, true),
+                kind == super::ObjectKind::FullSignatures
+            );
+            assert!(!crate::name_dispatch::short_full_signatures_route(
+                kind, false
+            ));
+        }
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-name-001
