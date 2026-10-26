@@ -1472,6 +1472,33 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-body-dot-fields"
+gate = false
+requirements = ["PARSE-NAME-001", "PARSE-GEN-002"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Exact first-dot boundary and borrowed field/remainder slices only. The full
+# name loop and body-to-ObjectName refinement remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "dot_field_boundary" },
+  { path = "crates/core/src/names.rs", symbol = "split_dot_field" },
+  { path = "crates/core/src/names.rs", symbol = "take_dot_field" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-body-dot-boundary", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "dot_field_boundary", kind = "contract" },
+  { id = "name-body-dot-slices", requirement = "PARSE-GEN-002", path = "crates/core/src/names.rs", symbol = "split_dot_field", kind = "contract" },
+  { id = "name-body-dot-consume", requirement = "PARSE-GEN-002", path = "crates/core/src/names.rs", symbol = "take_dot_field", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::dot_field_splitting_preserves_empty_fields_and_exact_ranges" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

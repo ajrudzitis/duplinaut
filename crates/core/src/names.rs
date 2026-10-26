@@ -15,6 +15,89 @@ use vest_lib::core::spec::SpecParser;
 use vstd::prelude::*;
 
 verus! {
+closed spec fn dot_field_boundary_model(input: Seq<u8>, boundary: nat) -> bool {
+    boundary <= input.len()
+        && forall|index: int| 0 <= index < boundary ==> input[index] != b'.'
+        && (boundary == input.len() || input[boundary as int] == b'.')
+}
+
+/// Return the first dot offset, or the input length if no dot occurs.
+fn dot_field_boundary(input: &[u8]) -> (boundary: usize)
+    ensures dot_field_boundary_model(input@, boundary as nat),
+{
+    let mut boundary = 0usize;
+    while boundary < input.len() && input[boundary] != b'.'
+        invariant boundary <= input.len(),
+            forall|index: int| 0 <= index < boundary as int ==> input@[index] != b'.',
+        decreases input.len() - boundary,
+    {
+        boundary += 1;
+    }
+    proof {
+        reveal(dot_field_boundary_model);
+        assert(boundary <= input.len());
+        assert(forall|index: int| 0 <= index < boundary as int ==> input@[index] != b'.');
+        if boundary < input.len() { assert(input@[boundary as int] == b'.'); }
+    }
+    boundary
+}
+
+/// Return one exact dot-delimited field and the exact bytes after its dot.
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-gen-002
+//= type=implementation
+//# A successful parser MUST report a consumed input range wholly contained within the supplied input.
+fn split_dot_field(input: &[u8]) -> (result: (&[u8], Option<&[u8]>))
+    ensures dot_field_boundary_model(input@, result.0.len() as nat),
+        result.0@ == input@.subrange(0, result.0.len() as int),
+        match result.1 {
+            Some(rest) => result.0.len() < input.len()
+                && rest@ == input@.subrange(result.0.len() as int + 1, input@.len() as int),
+            None => result.0.len() == input.len()
+                && result.0@ == input@,
+        },
+{
+    let boundary = dot_field_boundary(input);
+    if boundary < input.len() {
+        let field = &input[..boundary];
+        let rest = &input[boundary + 1..];
+        proof {
+            assert(field@ == input@.subrange(0, boundary as int));
+            assert(rest@ == input@.subrange(boundary as int + 1, input@.len() as int));
+        }
+        (field, Some(rest))
+    } else {
+        (input, None)
+    }
+}
+
+fn take_dot_field<'a>(remaining: &mut Option<&'a [u8]>) -> (field: Option<&'a [u8]>)
+    ensures match *old(remaining) {
+        Some(input) => match field {
+            Some(value) => dot_field_boundary_model(input@, value.len() as nat)
+                && value@ == input@.subrange(0, value.len() as int)
+                && match *final(remaining) {
+                    Some(rest) => value.len() < input.len()
+                        && rest@ == input@.subrange(value.len() as int + 1, input@.len() as int),
+                    None => value.len() == input.len() && value@ == input@,
+                },
+            None => false,
+        },
+        None => field.is_none() && *final(remaining) == None,
+    },
+{
+    match remaining.take() {
+        Some(input) => {
+            let (field, rest) = split_dot_field(input);
+            *remaining = rest;
+            Some(field)
+        }
+        None => None,
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObjectKind {
     FullVolume,
@@ -2561,8 +2644,8 @@ fn body(
     short: bool,
     separator: u8,
 ) -> Result<ObjectName, NameError> {
-    let mut fields = input.split(|byte| *byte == b'.');
-    let start_field = fields.next().ok_or(NameError::Malformed)?;
+    let mut fields = Some(input);
+    let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
     let incremental = matches!(
         kind,
         ObjectKind::IncrementalVolume
@@ -2571,7 +2654,7 @@ fn body(
     );
     let (start, end) = if short {
         let end_field = if incremental {
-            Some(fields.next().ok_or(NameError::Malformed)?)
+            Some(take_dot_field(&mut fields).ok_or(NameError::Malformed)?)
         } else {
             None
         };
@@ -2583,9 +2666,13 @@ fn body(
         //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
         decode_short_interval(kind, start_field, end_field).ok_or(NameError::Malformed)?
     } else {
-        let marker = if incremental { fields.next() } else { None };
+        let marker = if incremental {
+            take_dot_field(&mut fields)
+        } else {
+            None
+        };
         let end_field = if marker.is_some() {
-            fields.next()
+            take_dot_field(&mut fields)
         } else {
             None
         };
@@ -2602,7 +2689,7 @@ fn body(
             .ok_or(NameError::Malformed)?
     };
     let volume = if matches!(kind, ObjectKind::FullVolume | ObjectKind::IncrementalVolume) {
-        let field = fields.next().ok_or(NameError::Malformed)?;
+        let field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         //= docs/parsing-requirements.md#parse-name-003
         //= type=implementation
         //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
@@ -2625,11 +2712,11 @@ fn body(
         //= docs/parsing-requirements.md#parse-name-001
         //= type=implementation
         //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-        let trailer = fields.next().ok_or(NameError::Malformed)?;
-        let first = fields.next();
-        let second = fields.next();
-        let third = fields.next();
-        if fields.next().is_some() {
+        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+        let first = take_dot_field(&mut fields);
+        let second = take_dot_field(&mut fields);
+        let third = take_dot_field(&mut fields);
+        if take_dot_field(&mut fields).is_some() {
             return Err(NameError::Malformed);
         }
         decode_short_trailer(kind, trailer, first, second, third).ok_or(NameError::Malformed)?
@@ -2637,11 +2724,11 @@ fn body(
         //= docs/parsing-requirements.md#parse-name-001
         //= type=implementation
         //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-        let trailer = fields.next().ok_or(NameError::Malformed)?;
-        let first = fields.next();
-        let second = fields.next();
-        let third = fields.next();
-        if fields.next().is_some() {
+        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+        let first = take_dot_field(&mut fields);
+        let second = take_dot_field(&mut fields);
+        let third = take_dot_field(&mut fields);
+        if take_dot_field(&mut fields).is_some() {
             return Err(NameError::Malformed);
         }
         decode_long_trailer_suffix(kind, trailer, first, second, third)
@@ -2839,6 +2926,39 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 
 #[cfg(test)]
 mod tests {
+    use super::{split_dot_field, take_dot_field};
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-gen-002
+    //= type=test
+    //# A successful parser MUST report a consumed input range wholly contained within the supplied input.
+    fn dot_field_splitting_preserves_empty_fields_and_exact_ranges() {
+        let cases: &[(&[u8], &[&[u8]])] = &[
+            (b"", &[b""]),
+            (b"start.end.volume", &[b"start", b"end", b"volume"]),
+            (b".partial..gzip.", &[b"", b"partial", b"", b"gzip", b""]),
+        ];
+        for (input, expected) in cases {
+            let mut remaining = Some(*input);
+            let mut actual = Vec::new();
+            while let Some(field) = take_dot_field(&mut remaining) {
+                actual.push(field);
+            }
+            assert_eq!(actual, *expected);
+            assert_eq!(remaining, None);
+        }
+
+        let (field, rest) = split_dot_field(b"first.second");
+        assert_eq!(field, b"first");
+        assert_eq!(rest, Some(&b"second"[..]));
+        let (field, rest) = split_dot_field(b"last");
+        assert_eq!(field, b"last");
+        assert_eq!(rest, None);
+    }
+
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
         clock_fields_valid, compose_timestamp_fields, configured_prefix_remainder, decode_base36,
