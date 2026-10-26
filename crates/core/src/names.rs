@@ -513,7 +513,7 @@ pub closed spec fn object_kind_equal_model(left: ObjectKind, right: ObjectKind) 
     }
 }
 
-pub closed spec fn envelope_equal_model(left: Envelope, right: Envelope) -> bool {
+closed spec fn envelope_equal_model(left: Envelope, right: Envelope) -> bool {
     match (left, right) {
         (Envelope::Plain, Envelope::Plain)
         | (Envelope::Gzip, Envelope::Gzip)
@@ -523,7 +523,7 @@ pub closed spec fn envelope_equal_model(left: Envelope, right: Envelope) -> bool
     }
 }
 
-pub closed spec fn optional_volume_equal_model(left: Option<u64>, right: Option<u64>) -> bool {
+closed spec fn optional_volume_equal_model(left: Option<u64>, right: Option<u64>) -> bool {
     match (left, right) {
         (None, None) => true,
         (Some(a), Some(b)) => a == b,
@@ -531,7 +531,7 @@ pub closed spec fn optional_volume_equal_model(left: Option<u64>, right: Option<
     }
 }
 
-pub closed spec fn object_name_equal_model(left: ObjectName, right: ObjectName) -> bool {
+closed spec fn object_name_equal_model(left: ObjectName, right: ObjectName) -> bool {
     object_kind_equal_model(left.kind, right.kind)
         && left.start.0 == right.start.0
         && left.end.0 == right.end.0
