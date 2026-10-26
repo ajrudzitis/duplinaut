@@ -170,6 +170,130 @@ pub fn decode_base36(input: &[u8]) -> (result: Option<u64>)
     Some(result)
 }
 
+pub open spec fn decimal_digit_model(byte: u8) -> Option<int> {
+    if b'0' <= byte && byte <= b'9' {
+        Some((byte - b'0') as int)
+    } else {
+        None
+    }
+}
+
+/// Fold a decimal digit prefix, rejecting invalid bytes and values above u64.
+pub open spec fn decimal_value_model(bytes: Seq<u8>, prefix_len: int) -> Option<int>
+    recommends 0 <= prefix_len <= bytes.len(),
+    decreases prefix_len,
+{
+    if prefix_len <= 0 {
+        Some(0)
+    } else {
+        match (decimal_value_model(bytes, prefix_len - 1),
+            decimal_digit_model(bytes[prefix_len - 1])) {
+            (Some(previous), Some(digit))
+                if previous * 10 + digit <= u64::MAX as int =>
+            {
+                Some(previous * 10 + digit)
+            }
+            _ => None,
+        }
+    }
+}
+
+pub proof fn decimal_model_failure_is_sticky(bytes: Seq<u8>, prefix_len: int)
+    requires 0 <= prefix_len <= bytes.len(),
+        decimal_value_model(bytes, prefix_len).is_none(),
+    ensures decimal_value_model(bytes, bytes.len() as int).is_none(),
+    decreases bytes.len() - prefix_len,
+{
+    if prefix_len < bytes.len() {
+        reveal(decimal_value_model);
+        assert(decimal_value_model(bytes, prefix_len + 1).is_none());
+        decimal_model_failure_is_sticky(bytes, prefix_len + 1);
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+#[allow(
+    clippy::manual_is_ascii_check,
+    reason = "Keep the explicit digit range in Verus-supported syntax; the ASCII helper is unsupported by Verus."
+)]
+pub fn decode_decimal(input: &[u8]) -> (result: Option<u64>)
+    ensures if input@.len() == 0 {
+        result.is_none()
+    } else {
+        match decimal_value_model(input@, input@.len() as int) {
+            Some(value) => result matches Some(actual) && actual as int == value,
+            None => result.is_none(),
+        }
+    },
+{
+    if input.is_empty() {
+        return None;
+    }
+    let ghost bytes = input@;
+    let mut result = 0u64;
+    let mut index = 0usize;
+    while index < input.len()
+        invariant index <= input.len(),
+            input@ == bytes,
+            decimal_value_model(bytes, index as int) == Some(result as int),
+        decreases input.len() - index,
+    {
+        let byte = input[index];
+        let digit = match byte {
+            b'0'..=b'9' => (byte - b'0') as u64,
+            _ => {
+                proof {
+                    reveal(decimal_value_model);
+                    assert(decimal_digit_model(byte).is_none());
+                    assert(decimal_value_model(bytes, index as int + 1).is_none());
+                    decimal_model_failure_is_sticky(bytes, index as int + 1);
+                }
+                return None;
+            }
+        };
+        let product = result.checked_mul(10);
+        let product = match product {
+            Some(product) => product,
+            None => {
+                proof {
+                    assert(result as int * 10 > u64::MAX as int);
+                    reveal(decimal_value_model);
+                    assert(decimal_digit_model(byte) == Some(digit as int));
+                    assert(decimal_value_model(bytes, index as int + 1).is_none());
+                    decimal_model_failure_is_sticky(bytes, index as int + 1);
+                }
+                return None;
+            }
+        };
+        let next = product.checked_add(digit);
+        let next = match next {
+            Some(next) => next,
+            None => {
+                proof {
+                    assert(product as int + digit as int > u64::MAX as int);
+                    reveal(decimal_value_model);
+                    assert(decimal_digit_model(byte) == Some(digit as int));
+                    assert((result as int) * 10 == product as int);
+                    assert(decimal_value_model(bytes, index as int + 1).is_none());
+                    decimal_model_failure_is_sticky(bytes, index as int + 1);
+                }
+                return None;
+            }
+        };
+        proof {
+            reveal(decimal_value_model);
+            assert(decimal_digit_model(byte) == Some(digit as int));
+            assert((result as int) * 10 == product as int);
+            assert(product as int + digit as int == next as int);
+        }
+        result = next;
+        index += 1;
+    }
+    Some(result)
+}
+
 /// The explicit reader policy for a configured separator in legacy timestamps.
 pub open spec fn time_separator_valid_model(byte: u8) -> bool {
     0x21 <= byte && byte <= 0x7e
@@ -348,6 +472,9 @@ pub enum NameError {
 fn numeral(input: &[u8], radix: u64) -> Result<u64, NameError> {
     if input.is_empty() {
         return Err(NameError::Malformed);
+    }
+    if radix == 10 {
+        return decode_decimal(input).ok_or(NameError::Malformed);
     }
     if radix == 36 {
         return decode_base36(input).ok_or(NameError::Malformed);
@@ -638,7 +765,48 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_base36, parse_long_timestamp, time_separator_valid, NameError};
+    use super::{
+        decode_base36, decode_decimal, parse_long_timestamp, time_separator_valid, NameError,
+    };
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    fn decimal_decoder_matches_all_single_and_double_digit_values() {
+        for byte in 0..=u8::MAX {
+            let expected = match byte {
+                b'0'..=b'9' => Some(u64::from(byte - b'0')),
+                _ => None,
+            };
+            assert_eq!(decode_decimal(&[byte]), expected);
+        }
+        for high in 0..=9u8 {
+            for low in 0..=9u8 {
+                assert_eq!(
+                    decode_decimal(&[b'0' + high, b'0' + low]),
+                    Some(u64::from(high) * 10 + u64::from(low))
+                );
+            }
+        }
+        for value in [0, 1, 9, 10, 99, 100, u32::MAX as u64, u64::MAX] {
+            let encoded = value.to_string();
+            assert_eq!(decode_decimal(encoded.as_bytes()), Some(value));
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    fn decimal_decoder_rejects_empty_invalid_and_overflowing_inputs() {
+        assert_eq!(decode_decimal(b""), None);
+        for invalid in [b"a" as &[u8], b"-", b"_", b"12a", &[0xff]] {
+            assert_eq!(decode_decimal(invalid), None, "{invalid:?}");
+        }
+        let overflow = (u64::MAX as u128 + 1).to_string();
+        assert_eq!(decode_decimal(overflow.as_bytes()), None);
+    }
 
     fn encode_base36(mut value: u128) -> Vec<u8> {
         if value == 0 {

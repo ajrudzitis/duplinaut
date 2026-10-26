@@ -169,6 +169,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-decimal-decoder"
+gate = false
+requirements = ["PARSE-NAME-004"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Proves nonempty decimal byte decoding to an exact u64 value, rejecting
+# invalid digits and overflow. Calendar validity, timestamp framing, and the
+# complete long-name parser remain outside this scalar decoder proof.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "decode_decimal" },
+  { path = "crates/core/src/names.rs", symbol = "numeral" }
+]
+proofs = [{ id = "name-decimal-decoder", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "decode_decimal", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::decimal_decoder_matches_all_single_and_double_digit_values" },
+  { package = "duplicity-core", name = "names::tests::decimal_decoder_rejects_empty_invalid_and_overflowing_inputs" },
+  { package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" }
+]
+
+[[milestone]]
 id = "signatures"
 gate = true
 requirements = ["PARSE-SIG-001", "PARSE-SIG-002", "PARSE-SIG-003"]
