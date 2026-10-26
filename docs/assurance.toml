@@ -181,11 +181,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Proves exact supported long-timestamp lengths and punctuation for canonical
-# UTC and legacy explicit-zone forms. Field digits, calendar values, zone
-# decoding, and the complete filename grammar remain separate obligations.
+# Independently reviewed exact supported long-timestamp lengths and punctuation
+# for canonical UTC and legacy explicit-zone forms. Field digits, calendar
+# values, zone decoding, and complete filename grammar remain separate.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "long_timestamp_framing_valid" },
   { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
