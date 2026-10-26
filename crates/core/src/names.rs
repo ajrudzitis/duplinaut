@@ -46,6 +46,130 @@ pub struct ObjectName {
     pub short: bool,
 }
 
+pub open spec fn base36_digit_model(byte: u8) -> Option<int> {
+    if b'0' <= byte && byte <= b'9' {
+        Some((byte - b'0') as int)
+    } else if b'a' <= byte && byte <= b'z' {
+        Some((byte - b'a') as int + 10)
+    } else {
+        None
+    }
+}
+
+/// Fold a prefix from left to right, returning None for an invalid digit or
+/// the first value that cannot fit in an unsigned 64-bit integer.
+pub open spec fn base36_value_model(bytes: Seq<u8>, prefix_len: int) -> Option<int>
+    recommends 0 <= prefix_len <= bytes.len(),
+    decreases prefix_len,
+{
+    if prefix_len <= 0 {
+        Some(0)
+    } else {
+        match (base36_value_model(bytes, prefix_len - 1),
+            base36_digit_model(bytes[prefix_len - 1])) {
+            (Some(previous), Some(digit))
+                if previous * 36 + digit <= u64::MAX as int =>
+            {
+                Some(previous * 36 + digit)
+            }
+            _ => None,
+        }
+    }
+}
+
+pub proof fn base36_model_failure_is_sticky(bytes: Seq<u8>, prefix_len: int)
+    requires 0 <= prefix_len <= bytes.len(),
+        base36_value_model(bytes, prefix_len).is_none(),
+    ensures base36_value_model(bytes, bytes.len() as int).is_none(),
+    decreases bytes.len() - prefix_len,
+{
+    if prefix_len < bytes.len() {
+        reveal(base36_value_model);
+        assert(base36_value_model(bytes, prefix_len + 1).is_none());
+        base36_model_failure_is_sticky(bytes, prefix_len + 1);
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-003
+//= type=implementation
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+pub fn decode_base36(input: &[u8]) -> (result: Option<u64>)
+    ensures if input@.len() == 0 {
+        result.is_none()
+    } else {
+        match base36_value_model(input@, input@.len() as int) {
+            Some(value) => result matches Some(actual) && actual as int == value,
+            None => result.is_none(),
+        }
+    },
+{
+    if input.is_empty() {
+        return None;
+    }
+    let ghost bytes = input@;
+    let mut result = 0u64;
+    let mut index = 0usize;
+    while index < input.len()
+        invariant index <= input.len(),
+            input@ == bytes,
+            base36_value_model(bytes, index as int) == Some(result as int),
+        decreases input.len() - index,
+    {
+        let byte = input[index];
+        let digit = match byte {
+            b'0'..=b'9' => (byte - b'0') as u64,
+            b'a'..=b'z' => (byte - b'a') as u64 + 10,
+            _ => {
+                proof {
+                    reveal(base36_value_model);
+                    assert(base36_digit_model(byte).is_none());
+                    assert(base36_value_model(bytes, index as int + 1).is_none());
+                    base36_model_failure_is_sticky(bytes, index as int + 1);
+                }
+                return None;
+            }
+        };
+        let product = result.checked_mul(36);
+        let product = match product {
+            Some(product) => product,
+            None => {
+                proof {
+                    assert(result as int * 36 > u64::MAX as int);
+                    reveal(base36_value_model);
+                    assert(base36_digit_model(byte) == Some(digit as int));
+                    assert(base36_value_model(bytes, index as int + 1).is_none());
+                    base36_model_failure_is_sticky(bytes, index as int + 1);
+                }
+                return None;
+            }
+        };
+        let next = product.checked_add(digit);
+        let next = match next {
+            Some(next) => next,
+            None => {
+                proof {
+                    assert(product as int + digit as int > u64::MAX as int);
+                    reveal(base36_value_model);
+                    assert(base36_digit_model(byte) == Some(digit as int));
+                    assert((result as int) * 36 == product as int);
+                    assert(base36_value_model(bytes, index as int + 1).is_none());
+                    base36_model_failure_is_sticky(bytes, index as int + 1);
+                }
+                return None;
+            }
+        };
+        proof {
+            reveal(base36_value_model);
+            assert(base36_digit_model(byte) == Some(digit as int));
+            assert((result as int) * 36 == product as int);
+            assert(product as int + digit as int == next as int);
+        }
+        result = next;
+        index += 1;
+    }
+    Some(result)
+}
+
 /// The explicit reader policy for a configured separator in legacy timestamps.
 pub open spec fn time_separator_valid_model(byte: u8) -> bool {
     0x21 <= byte && byte <= 0x7e
@@ -224,6 +348,9 @@ pub enum NameError {
 fn numeral(input: &[u8], radix: u64) -> Result<u64, NameError> {
     if input.is_empty() {
         return Err(NameError::Malformed);
+    }
+    if radix == 36 {
+        return decode_base36(input).ok_or(NameError::Malformed);
     }
     let mut result = 0u64;
     for &byte in input {
@@ -511,7 +638,71 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_long_timestamp, time_separator_valid, NameError};
+    use super::{decode_base36, parse_long_timestamp, time_separator_valid, NameError};
+
+    fn encode_base36(mut value: u128) -> Vec<u8> {
+        if value == 0 {
+            return vec![b'0'];
+        }
+        let mut result = Vec::new();
+        while value != 0 {
+            let digit = (value % 36) as u8;
+            result.push(if digit < 10 {
+                b'0' + digit
+            } else {
+                b'a' + digit - 10
+            });
+            value /= 36;
+        }
+        result.reverse();
+        result
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-003
+    //= type=test
+    //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    fn base36_decoder_matches_single_and_double_digit_values() {
+        for first in 0..=u8::MAX {
+            let first_value = match first {
+                b'0'..=b'9' => Some(u64::from(first - b'0')),
+                b'a'..=b'z' => Some(u64::from(first - b'a') + 10),
+                _ => None,
+            };
+            assert_eq!(decode_base36(&[first]), first_value);
+        }
+        for high in 0..36u8 {
+            for low in 0..36u8 {
+                let digit = |value: u8| {
+                    if value < 10 {
+                        b'0' + value
+                    } else {
+                        b'a' + value - 10
+                    }
+                };
+                assert_eq!(
+                    decode_base36(&[digit(high), digit(low)]),
+                    Some(u64::from(high) * 36 + u64::from(low))
+                );
+            }
+        }
+        for value in [0, 1, 35, 36, 1295, u32::MAX as u128, u64::MAX as u128] {
+            let encoded = encode_base36(value);
+            assert_eq!(decode_base36(&encoded), Some(value as u64));
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-003
+    //= type=test
+    //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    fn base36_decoder_rejects_empty_invalid_and_overflowing_inputs() {
+        assert_eq!(decode_base36(b""), None);
+        for invalid in [b"A" as &[u8], b"-", b"_", b"0A", b"a_"] {
+            assert_eq!(decode_base36(invalid), None, "{invalid:?}");
+        }
+        assert_eq!(decode_base36(&encode_base36(u64::MAX as u128 + 1)), None);
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-name-007

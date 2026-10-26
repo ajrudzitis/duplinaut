@@ -145,6 +145,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-base36-decoder"
+gate = false
+requirements = ["PARSE-NAME-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# The checked decoder refines nonempty base36 values through u64, rejecting
+# invalid digits and overflow. Decimal date-field decoding, zero-volume policy,
+# and complete short-name grammar remain outside this scalar decoder proof.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "decode_base36" },
+  { path = "crates/core/src/names.rs", symbol = "numeral" }
+]
+proofs = [{ id = "name-base36-decoder", requirement = "PARSE-NAME-003", path = "crates/core/src/names.rs", symbol = "decode_base36", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::base36_decoder_matches_single_and_double_digit_values" },
+  { package = "duplicity-core", name = "names::tests::base36_decoder_rejects_empty_invalid_and_overflowing_inputs" },
+  { package = "duplicity-core", name = "base36_overflow_and_increment_order" }
+]
+
+[[milestone]]
 id = "signatures"
 gate = true
 requirements = ["PARSE-SIG-001", "PARSE-SIG-002", "PARSE-SIG-003"]
