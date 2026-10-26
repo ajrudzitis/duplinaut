@@ -6,7 +6,11 @@
 //! can become active. No regular expressions, locale, host timezone, or allocation.
 
 use crate::generated::names::CanonicalTimestampFmt;
+#[cfg(verus_keep_ghost)]
+use vest_lib::core::exec::parser::parse_matches_spec;
 use vest_lib::core::exec::parser::Parser;
+#[cfg(verus_keep_ghost)]
+use vest_lib::core::spec::SpecParser;
 
 use vstd::prelude::*;
 
@@ -44,6 +48,14 @@ pub struct ObjectName {
     pub envelope: Envelope,
     pub partial: bool,
     pub short: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NameError {
+    Configuration,
+    Limit,
+    Malformed,
+    Ambiguous,
 }
 
 pub open spec fn base36_digit_model(byte: u8) -> Option<int> {
@@ -194,6 +206,57 @@ pub open spec fn decimal_value_model(bytes: Seq<u8>, prefix_len: int) -> Option<
                 Some(previous * 10 + digit)
             }
             _ => None,
+        }
+    }
+}
+
+pub open spec fn decimal_max_value(width: int) -> int
+    recommends width >= 0,
+    decreases width,
+{
+    if width <= 0 { 0 } else { 10 * decimal_max_value(width - 1) + 9 }
+}
+
+pub proof fn decimal_max_two()
+    ensures decimal_max_value(2) == 99,
+{
+    reveal_with_fuel(decimal_max_value, 3);
+    assert(decimal_max_value(2) == 99);
+}
+
+pub proof fn decimal_max_four()
+    ensures decimal_max_value(4) == 9999,
+{
+    reveal_with_fuel(decimal_max_value, 5);
+    assert(decimal_max_value(4) == 9999);
+}
+
+pub proof fn decimal_value_is_bounded(bytes: Seq<u8>, prefix_len: int)
+    requires 0 <= prefix_len <= bytes.len(),
+        decimal_value_model(bytes, prefix_len).is_some(),
+    ensures match decimal_value_model(bytes, prefix_len) {
+        Some(value) => value <= decimal_max_value(prefix_len),
+        None => true,
+    },
+    decreases prefix_len,
+{
+    if prefix_len > 0 {
+        reveal(decimal_value_model);
+        match decimal_value_model(bytes, prefix_len - 1) {
+            Some(previous) => {
+                decimal_value_is_bounded(bytes, prefix_len - 1);
+                reveal(decimal_digit_model);
+                assert(decimal_digit_model(bytes[prefix_len - 1]).is_some());
+                let digit = match decimal_digit_model(bytes[prefix_len - 1]) {
+                    Some(value) => value,
+                    None => 0,
+                };
+                assert(digit <= 9);
+                assert(previous * 10 + digit
+                    <= decimal_max_value(prefix_len - 1) * 10 + 9);
+                reveal(decimal_max_value);
+            },
+            None => {},
         }
     }
 }
@@ -388,6 +451,86 @@ pub enum LongTimestampField {
     Second,
 }
 
+/// Exact UTC seconds denoted by a valid canonical or legacy long timestamp.
+/// Invalid separators are kept distinct by the parser as configuration errors.
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+pub closed spec fn long_timestamp_numeric_components_model(
+    input: Seq<u8>, separator: u8,
+) -> Option<(int, int, int, int, int, int)> {
+    match (
+        long_timestamp_numeric_field_model(input, separator, LongTimestampField::Year),
+        long_timestamp_numeric_field_model(input, separator, LongTimestampField::Month),
+        long_timestamp_numeric_field_model(input, separator, LongTimestampField::Day),
+        long_timestamp_numeric_field_model(input, separator, LongTimestampField::Hour),
+        long_timestamp_numeric_field_model(input, separator, LongTimestampField::Minute),
+        long_timestamp_numeric_field_model(input, separator, LongTimestampField::Second),
+    ) {
+        (Some(y), Some(mo), Some(d), Some(h), Some(mi), Some(s)) => Some((y, mo, d, h, mi, s)),
+        _ => None,
+    }
+}
+
+pub closed spec fn canonical_timestamp_components_model(
+    input: Seq<u8>, separator: u8,
+) -> Option<(int, int, int, int, int, int, int)> {
+    if input.len() != 16 || !long_timestamp_framing_model(input, separator) {
+        None
+    } else {
+        match CanonicalTimestampFmt.spec_parse(input) {
+            Some((consumed, _parsed)) if consumed == input.len() =>
+                match (long_timestamp_numeric_components_model(input, separator),
+                    zone_offset_token_model(input.subrange(15, 16), separator)) {
+                    (Some((y, mo, d, h, mi, s)), Some(offset)) => Some((y, mo, d, h, mi, s, offset)),
+                    _ => None,
+                },
+            _ => None,
+        }
+    }
+}
+
+pub closed spec fn legacy_timestamp_components_model(
+    input: Seq<u8>, separator: u8,
+) -> Option<(int, int, int, int, int, int, int)> {
+    if (input.len() != 20 && input.len() != 25) || !long_timestamp_framing_model(input, separator) {
+        None
+    } else {
+        match (long_timestamp_numeric_components_model(input, separator),
+            zone_offset_token_model(input.subrange(19, input.len() as int), separator)) {
+            (Some((y, mo, d, h, mi, s)), Some(offset)) => Some((y, mo, d, h, mi, s, offset)),
+            _ => None,
+        }
+    }
+}
+
+pub closed spec fn long_timestamp_components_model(
+    input: Seq<u8>, separator: u8,
+) -> Option<(int, int, int, int, int, int, int)> {
+    if input.len() == 16 {
+        canonical_timestamp_components_model(input, separator)
+    } else {
+        legacy_timestamp_components_model(input, separator)
+    }
+}
+
+/// Exact UTC seconds denoted by a valid canonical or legacy long timestamp.
+/// Invalid separators are kept distinct by the parser as configuration errors.
+pub closed spec fn long_timestamp_result_model(input: Seq<u8>, separator: u8) -> Option<int> {
+    if !time_separator_valid_model(separator) {
+        None
+    } else {
+        match long_timestamp_components_model(input, separator) {
+            Some((year, month, day, hour, minute, second, offset)) =>
+                compose_timestamp_fields_model(year, month, day, hour, minute, second, offset),
+            None => None,
+        }
+    }
+}
+
 /// Byte bounds for a numeric field in an already framed long timestamp.
 pub open spec fn long_timestamp_field_bounds_model(
     input: Seq<u8>,
@@ -425,6 +568,37 @@ pub open spec fn long_timestamp_numeric_field_model(
     match long_timestamp_field_bounds_model(input, separator, field) {
         Some((start, end)) => decimal_value_model(input.subrange(start, end), end - start),
         None => None,
+    }
+}
+
+pub proof fn long_timestamp_numeric_field_is_bounded(
+    input: Seq<u8>, separator: u8, field: LongTimestampField,
+)
+    requires long_timestamp_numeric_field_model(input, separator, field).is_some(),
+    ensures match long_timestamp_numeric_field_model(input, separator, field) {
+        Some(value) => if field == LongTimestampField::Year { value <= 9999 } else { value <= 99 },
+        None => false,
+    },
+{
+    reveal(long_timestamp_numeric_field_model);
+    reveal(long_timestamp_field_bounds_model);
+    match long_timestamp_field_bounds_model(input, separator, field) {
+        Some((start, end)) => {
+            decimal_value_is_bounded(input.subrange(start, end), end - start);
+            match field {
+                LongTimestampField::Year => {
+                    assert(end - start == 4);
+                    decimal_max_four();
+                    assert(decimal_max_value(end - start) == 9999);
+                },
+                _ => {
+                    assert(end - start == 2);
+                    decimal_max_two();
+                    assert(decimal_max_value(end - start) == 99);
+                },
+            }
+        },
+        None => {},
     }
 }
 
@@ -1014,6 +1188,132 @@ pub fn valid_set_interval(
     !incremental || end.0 > start.0
 }
 
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+pub fn parse_long_timestamp(input: &[u8], separator: u8) -> (result: Result<Timestamp, NameError>)
+    ensures if !time_separator_valid_model(separator) {
+        result == Err(NameError::Configuration)
+    } else {
+        match long_timestamp_result_model(input@, separator) {
+            Some(seconds) => result == Ok(Timestamp(seconds as i128)),
+            None => result == Err(NameError::Malformed),
+        }
+    },
+{
+    if !time_separator_valid(separator) {
+        return Err(NameError::Configuration);
+    }
+    if !long_timestamp_framing_valid(input, separator) {
+        return Err(NameError::Malformed);
+    }
+    if input.len() == 16 {
+        let vest_result = CanonicalTimestampFmt.parse(&input);
+        proof {
+            assert(parse_matches_spec(
+                vest_result,
+                CanonicalTimestampFmt.spec_parse(input@),
+            ));
+        }
+        let (consumed, _parsed) = match vest_result {
+            Ok(parsed) => parsed,
+            Err(_error) => return Err(NameError::Malformed),
+        };
+        if consumed != input.len() {
+            return Err(NameError::Malformed);
+        }
+    }
+    let zone = match input.len() {
+        16 => &input[15..16],
+        20 | 25 => &input[19..],
+        _ => return Err(NameError::Malformed),
+    };
+    let year_raw = match decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Year) {
+        Some(value) => value,
+        None => return Err(NameError::Malformed),
+    };
+    proof {
+        assert(long_timestamp_numeric_field_model(input@, separator, LongTimestampField::Year) == Some(year_raw as int));
+        long_timestamp_numeric_field_is_bounded(input@, separator, LongTimestampField::Year);
+        assert(year_raw as int <= 9999);
+    }
+    let year = year_raw as i64;
+    let month_raw = match decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Month) {
+        Some(value) => value,
+        None => return Err(NameError::Malformed),
+    };
+    proof {
+        assert(long_timestamp_numeric_field_model(input@, separator, LongTimestampField::Month) == Some(month_raw as int));
+        long_timestamp_numeric_field_is_bounded(input@, separator, LongTimestampField::Month);
+        assert(month_raw as int <= 99);
+    }
+    let month = month_raw as i64;
+    let day_raw = match decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Day) {
+        Some(value) => value,
+        None => return Err(NameError::Malformed),
+    };
+    proof {
+        assert(long_timestamp_numeric_field_model(input@, separator, LongTimestampField::Day) == Some(day_raw as int));
+        long_timestamp_numeric_field_is_bounded(input@, separator, LongTimestampField::Day);
+        assert(day_raw as int <= 99);
+    }
+    let day = day_raw as i64;
+    let hour_raw = match decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Hour) {
+        Some(value) => value,
+        None => return Err(NameError::Malformed),
+    };
+    proof {
+        assert(long_timestamp_numeric_field_model(input@, separator, LongTimestampField::Hour) == Some(hour_raw as int));
+        long_timestamp_numeric_field_is_bounded(input@, separator, LongTimestampField::Hour);
+        assert(hour_raw as int <= 99);
+    }
+    let hour = hour_raw as i64;
+    let minute_raw = match decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Minute) {
+        Some(value) => value,
+        None => return Err(NameError::Malformed),
+    };
+    proof {
+        assert(long_timestamp_numeric_field_model(input@, separator, LongTimestampField::Minute) == Some(minute_raw as int));
+        long_timestamp_numeric_field_is_bounded(input@, separator, LongTimestampField::Minute);
+        assert(minute_raw as int <= 99);
+    }
+    let minute = minute_raw as i64;
+    let second_raw = match decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Second) {
+        Some(value) => value,
+        None => return Err(NameError::Malformed),
+    };
+    proof {
+        assert(long_timestamp_numeric_field_model(input@, separator, LongTimestampField::Second) == Some(second_raw as int));
+        long_timestamp_numeric_field_is_bounded(input@, separator, LongTimestampField::Second);
+        assert(second_raw as int <= 99);
+    }
+    let second = second_raw as i64;
+    let offset = decode_zone_offset_token(zone, separator).ok_or(NameError::Malformed)?;
+    let composed = compose_timestamp_fields(year, month, day, hour, minute, second, offset);
+    proof {
+        reveal(long_timestamp_result_model);
+        reveal(long_timestamp_components_model);
+        if input.len() == 16 {
+            reveal(canonical_timestamp_components_model);
+        } else {
+            reveal(legacy_timestamp_components_model);
+        }
+        reveal(long_timestamp_numeric_components_model);
+        assert(long_timestamp_numeric_components_model(input@, separator)
+            == Some((year as int, month as int, day as int, hour as int, minute as int, second as int)));
+        reveal(zone_offset_token_model);
+        assert(zone_offset_token_model(zone@, separator) == Some(offset as int));
+        reveal(compose_timestamp_fields_model);
+        assert(long_timestamp_result_model(input@, separator)
+            == compose_timestamp_fields_model(year as int, month as int, day as int,
+                hour as int, minute as int, second as int, offset as int));
+    }
+    composed.ok_or(NameError::Malformed)
+}
+
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1037,14 +1337,6 @@ impl Default for NameConfig<'_> {
             max_name_bytes: 4096,
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum NameError {
-    Configuration,
-    Limit,
-    Malformed,
-    Ambiguous,
 }
 
 fn numeral(input: &[u8], radix: u64) -> Result<u64, NameError> {
@@ -1073,50 +1365,6 @@ fn numeral(input: &[u8], radix: u64) -> Result<u64, NameError> {
             .ok_or(NameError::Malformed)?;
     }
     Ok(result)
-}
-
-//= docs/parsing-requirements.md#parse-name-004
-//= type=implementation
-//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
-
-//= docs/parsing-requirements.md#parse-name-007
-//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
-
-/// Parse an exact canonical or legacy explicitly zoned Gregorian timestamp.
-pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, NameError> {
-    if !time_separator_valid(separator) {
-        return Err(NameError::Configuration);
-    }
-    if !long_timestamp_framing_valid(input, separator) {
-        return Err(NameError::Malformed);
-    }
-    if input.len() == 16 {
-        let (consumed, _) = CanonicalTimestampFmt
-            .parse(&input)
-            .map_err(|_| NameError::Malformed)?;
-        if consumed != input.len() {
-            return Err(NameError::Malformed);
-        }
-    }
-    let zone = match input.len() {
-        16 => &input[15..16],
-        20 | 25 => &input[19..],
-        _ => return Err(NameError::Malformed),
-    };
-    let y = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Year)
-        .ok_or(NameError::Malformed)? as i64;
-    let m = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Month)
-        .ok_or(NameError::Malformed)? as i64;
-    let d = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Day)
-        .ok_or(NameError::Malformed)? as i64;
-    let h = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Hour)
-        .ok_or(NameError::Malformed)? as i64;
-    let min = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Minute)
-        .ok_or(NameError::Malformed)? as i64;
-    let sec = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Second)
-        .ok_or(NameError::Malformed)? as i64;
-    let offset = decode_zone_offset_token(zone, separator).ok_or(NameError::Malformed)?;
-    compose_timestamp_fields(y, m, d, h, min, sec, offset).ok_or(NameError::Malformed)
 }
 
 fn date(input: &[u8], short: bool, separator: u8) -> Result<Timestamp, NameError> {

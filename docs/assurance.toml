@@ -261,6 +261,35 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-timestamp-refinement"
+gate = false
+requirements = ["PARSE-NAME-004", "PARSE-NAME-007"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Relates accepted canonical and legacy timestamp bytes to exact UTC seconds;
+# invalid configuration remains distinct from malformed timestamp input. This
+# does not refine the surrounding duplicity filename grammar.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "long_timestamp_result_model" },
+  { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
+]
+proofs = [
+  { id = "name-long-timestamp-refinement-canonical", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "parse_long_timestamp", kind = "contract" },
+  { id = "name-long-timestamp-refinement-legacy", requirement = "PARSE-NAME-007", path = "crates/core/src/names.rs", symbol = "parse_long_timestamp", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" },
+  { package = "duplicity-core", name = "explicit_zone_offset_boundaries_are_exact" },
+  { package = "duplicity-core", name = "explicit_zone_offset_uses_the_configured_separator" },
+  { package = "duplicity-core", name = "month_lengths_follow_gregorian_leap_year_rules" },
+  { package = "duplicity-core", name = "truncated_and_byte_invalid_framing_is_rejected" }
+]
+
+[[milestone]]
 id = "name-zone-token-decoder"
 gate = false
 requirements = ["PARSE-NAME-007"]
