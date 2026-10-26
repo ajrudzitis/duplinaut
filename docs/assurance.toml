@@ -193,6 +193,29 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-incremental-interval-policy"
+gate = false
+requirements = ["PARSE-NAME-006"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Proves the scalar policy: non-incremental names accept every endpoint pair;
+# incremental names require a strictly increasing interval. Timestamp parsing
+# and complete filename grammar remain outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "valid_set_interval" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [{ id = "name-incremental-interval-policy", requirement = "PARSE-NAME-006", path = "crates/core/src/names.rs", symbol = "valid_set_interval", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::set_interval_policy_checks_incremental_order_at_i128_boundaries" },
+  { package = "duplicity-core", name = "base36_overflow_and_increment_order" }
+]
+
+[[milestone]]
 id = "signatures"
 gate = true
 requirements = ["PARSE-SIG-001", "PARSE-SIG-002", "PARSE-SIG-003"]

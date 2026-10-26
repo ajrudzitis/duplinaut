@@ -436,6 +436,27 @@ impl ObjectName {
     }
 }
 
+pub open spec fn valid_set_interval_model(
+    incremental: bool,
+    start: Timestamp,
+    end: Timestamp,
+) -> bool {
+    !incremental || end.0 > start.0
+}
+
+//= docs/parsing-requirements.md#parse-name-006
+//= type=implementation
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+pub fn valid_set_interval(
+    incremental: bool,
+    start: Timestamp,
+    end: Timestamp,
+) -> (result: bool)
+    ensures result == valid_set_interval_model(incremental, start, end),
+{
+    !incremental || end.0 > start.0
+}
+
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -613,6 +634,9 @@ fn stem(kind: ObjectKind, short: bool) -> &'static [u8] {
     }
 }
 
+//= docs/parsing-requirements.md#parse-name-006
+//= type=implementation
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
 fn body(
     input: &[u8],
     kind: ObjectKind,
@@ -631,14 +655,13 @@ fn body(
         if !short && fields.next() != Some(b"to") {
             return Err(NameError::Malformed);
         }
-        let result = date(fields.next().ok_or(NameError::Malformed)?, short, separator)?;
-        if result <= start {
-            return Err(NameError::Malformed);
-        }
-        result
+        date(fields.next().ok_or(NameError::Malformed)?, short, separator)?
     } else {
         start
     };
+    if !valid_set_interval(incremental, start, end) {
+        return Err(NameError::Malformed);
+    }
     let volume = if matches!(kind, ObjectKind::FullVolume | ObjectKind::IncrementalVolume) {
         let field = fields.next().ok_or(NameError::Malformed)?;
         let number = numeral(
@@ -806,6 +829,29 @@ mod tests {
         }
         let overflow = (u64::MAX as u128 + 1).to_string();
         assert_eq!(decode_decimal(overflow.as_bytes()), None);
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-006
+    //= type=test
+    //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+    fn set_interval_policy_checks_incremental_order_at_i128_boundaries() {
+        use super::{valid_set_interval, Timestamp};
+
+        let min = Timestamp(i128::MIN);
+        let min_next = Timestamp(i128::MIN + 1);
+        let max_previous = Timestamp(i128::MAX - 1);
+        let max = Timestamp(i128::MAX);
+
+        for (start, end) in [(min, max), (max, min), (max, max)] {
+            assert!(valid_set_interval(false, start, end));
+        }
+        assert!(valid_set_interval(true, min, min_next));
+        assert!(valid_set_interval(true, max_previous, max));
+        assert!(!valid_set_interval(true, min, min));
+        assert!(!valid_set_interval(true, max, max));
+        assert!(!valid_set_interval(true, max, max_previous));
+        assert!(!valid_set_interval(true, max, min));
     }
 
     fn encode_base36(mut value: u128) -> Vec<u8> {
