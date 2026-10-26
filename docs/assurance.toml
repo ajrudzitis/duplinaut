@@ -338,11 +338,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Relates nonempty short-name base36 timestamp bytes to exact unsigned
-# Unix-epoch seconds and proves their conversion to Timestamp. The surrounding
-# short filename grammar and volume-number policy remain separate obligations.
+# Independently reviewed exact conversion of nonempty short-name base36
+# timestamp bytes to Unix-epoch seconds and `Timestamp`. The surrounding short
+# filename grammar and volume-number policy remain separate obligations.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "decode_short_timestamp" },
   { path = "crates/core/src/names.rs", symbol = "date" }
