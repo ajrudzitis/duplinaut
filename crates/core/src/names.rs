@@ -429,6 +429,9 @@ pub fn zone_offset_seconds(sign: i64, hours: i64, minutes: i64) -> (result: i64)
 
 impl ObjectName {
     /// A partial artifact cannot supply completed-set evidence.
+    //= docs/parsing-requirements.md#parse-name-005
+    //= type=implementation
+    //# Objects marked partial MUST be excluded from completed restore sets.
     pub fn completed(self) -> (result: bool)
         ensures result == (!self.partial && self.envelope != Envelope::Pkcs7),
     {
@@ -791,6 +794,49 @@ mod tests {
     use super::{
         decode_base36, decode_decimal, parse_long_timestamp, time_separator_valid, NameError,
     };
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-005
+    //= type=test
+    //# Objects marked partial MUST be excluded from completed restore sets.
+    fn completed_artifact_policy_excludes_partial_and_unsupported_objects() {
+        use super::{Envelope, ObjectKind, ObjectName, Timestamp};
+
+        let kinds = [
+            ObjectKind::FullVolume,
+            ObjectKind::IncrementalVolume,
+            ObjectKind::FullManifest,
+            ObjectKind::IncrementalManifest,
+            ObjectKind::FullSignatures,
+            ObjectKind::IncrementalSignatures,
+        ];
+        let envelopes = [
+            Envelope::Plain,
+            Envelope::Gzip,
+            Envelope::OpenPgp,
+            Envelope::Pkcs7,
+        ];
+        for kind in kinds {
+            for envelope in envelopes {
+                for partial in [false, true] {
+                    let object = ObjectName {
+                        kind,
+                        start: Timestamp(0),
+                        end: Timestamp(1),
+                        volume: None,
+                        envelope,
+                        partial,
+                        short: false,
+                    };
+                    assert_eq!(
+                        object.completed(),
+                        !partial && envelope != Envelope::Pkcs7,
+                        "{kind:?} {envelope:?} partial={partial}"
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-name-004
