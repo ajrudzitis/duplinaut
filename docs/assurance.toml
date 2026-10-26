@@ -140,7 +140,7 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Proves exact Gregorian month accumulation and UTC seconds conversion for
 # validated fields with a bounded explicit-zone offset. Byte framing, field
