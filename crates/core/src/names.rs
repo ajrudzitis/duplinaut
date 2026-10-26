@@ -496,6 +496,107 @@ pub fn zone_offset_seconds(sign: i64, hours: i64, minutes: i64) -> (result: i64)
     sign * (hours * 3600 + minutes * 60)
 }
 
+pub open spec fn zone_digits_model(zone: Seq<u8>, start: int) -> Option<int>
+    recommends 0 <= start && start + 1 < zone.len(),
+{
+    match (decimal_digit_model(zone[start]), decimal_digit_model(zone[start + 1])) {
+        (Some(tens), Some(ones)) => Some(tens * 10 + ones),
+        _ => None,
+    }
+}
+
+pub open spec fn zone_offset_token_model(zone: Seq<u8>, separator: u8) -> Option<int> {
+    if zone.len() == 1 && (zone[0] == b'Z' || zone[0] == b'z') {
+        Some(0)
+    } else if zone.len() == 6
+        && (zone[0] == b'+' || zone[0] == b'-')
+        && zone[3] == separator
+    {
+        match (zone_digits_model(zone, 1), zone_digits_model(zone, 4)) {
+            (Some(hours), Some(minutes)) if hours <= 23 && minutes <= 59 =>
+                Some((if zone[0] == b'+' { 1 } else { -1 }) * (hours * 3600 + minutes * 60)),
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+pub fn decode_zone_offset_token(zone: &[u8], separator: u8) -> (result: Option<i64>)
+    ensures match zone_offset_token_model(zone@, separator) {
+        Some(offset) => result matches Some(actual) && actual as int == offset,
+        None => result.is_none(),
+    },
+{
+    if zone.len() == 1 {
+        if zone[0] == b'Z' || zone[0] == b'z' {
+            return Some(0);
+        }
+        return None;
+    }
+    if zone.len() != 6 || zone[3] != separator || !matches!(zone[0], b'+' | b'-') {
+        return None;
+    }
+    let hour_tens = match zone[1] {
+        b'0'..=b'9' => (zone[1] - b'0') as i64,
+        _ => return None,
+    };
+    let hour_ones = match zone[2] {
+        b'0'..=b'9' => (zone[2] - b'0') as i64,
+        _ => return None,
+    };
+    let hours = hour_tens * 10 + hour_ones;
+    proof {
+        reveal(zone_offset_token_model);
+        reveal(zone_digits_model);
+        assert(decimal_digit_model(zone@[1]) == Some(hour_tens as int));
+        assert(decimal_digit_model(zone@[2]) == Some(hour_ones as int));
+        assert(zone_digits_model(zone@, 1) == Some(hours as int));
+    }
+    if hours > 23 {
+        proof {
+            reveal(zone_offset_token_model);
+            assert(zone_offset_token_model(zone@, separator).is_none());
+        }
+        return None;
+    }
+    let minute_tens = match zone[4] {
+        b'0'..=b'9' => (zone[4] - b'0') as i64,
+        _ => return None,
+    };
+    let minute_ones = match zone[5] {
+        b'0'..=b'9' => (zone[5] - b'0') as i64,
+        _ => return None,
+    };
+    let minutes = minute_tens * 10 + minute_ones;
+    proof {
+        reveal(zone_offset_token_model);
+        reveal(zone_digits_model);
+        assert(decimal_digit_model(zone@[4]) == Some(minute_tens as int));
+        assert(decimal_digit_model(zone@[5]) == Some(minute_ones as int));
+        assert(zone_digits_model(zone@, 4) == Some(minutes as int));
+    }
+    if minutes > 59 {
+        proof {
+            reveal(zone_offset_token_model);
+            assert(zone_offset_token_model(zone@, separator).is_none());
+        }
+        return None;
+    }
+    let sign = if zone[0] == b'+' { 1 } else { -1 };
+    let result = zone_offset_seconds(sign, hours, minutes);
+    proof {
+        reveal(zone_offset_token_model);
+        reveal(zone_digits_model);
+        assert(zone_offset_token_model(zone@, separator)
+            == Some(zone_offset_seconds_model(sign as int, hours as int, minutes as int)));
+    }
+    Some(result)
+}
+
 pub open spec fn calendar_fields_to_unix_seconds_model(
     year: int,
     month: int,
@@ -744,18 +845,7 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
     if !calendar_date_valid(y, m, d) || !clock_fields_valid(h, min, sec) {
         return Err(NameError::Malformed);
     }
-    let offset = match zone {
-        [b'Z' | b'z'] => 0,
-        [sign @ (b'+' | b'-'), a, b, sep, c, e] if *sep == separator => {
-            let zh = numeral(&[*a, *b], 10)? as i64;
-            let zm = numeral(&[*c, *e], 10)? as i64;
-            if zh > 23 || zm > 59 {
-                return Err(NameError::Malformed);
-            }
-            zone_offset_seconds(if *sign == b'+' { 1 } else { -1 }, zh, zm)
-        }
-        _ => return Err(NameError::Malformed),
-    };
+    let offset = decode_zone_offset_token(zone, separator).ok_or(NameError::Malformed)?;
     Ok(calendar_fields_to_unix_seconds(
         y as u16, m as u8, d as u8, h as u8, min as u8, sec as u8, offset,
     ))
@@ -949,9 +1039,53 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 mod tests {
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
-        clock_fields_valid, decode_base36, decode_decimal, parse_long_timestamp,
-        time_separator_valid, NameError, Timestamp,
+        clock_fields_valid, decode_base36, decode_decimal, decode_zone_offset_token,
+        parse_long_timestamp, time_separator_valid, NameError, Timestamp,
     };
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    fn zone_token_decoder_checks_every_byte_position_and_boundary() {
+        let valid = *b"+00:00";
+        for position in 0..valid.len() {
+            for byte in 0u8..=u8::MAX {
+                let mut token = valid;
+                token[position] = byte;
+                let valid_shape = matches!(token[0], b'+' | b'-')
+                    && token[1].is_ascii_digit()
+                    && token[2].is_ascii_digit()
+                    && token[3] == b':'
+                    && token[4].is_ascii_digit()
+                    && token[5].is_ascii_digit();
+                let valid_range = valid_shape
+                    && (token[1] - b'0') * 10 + (token[2] - b'0') <= 23
+                    && (token[4] - b'0') * 10 + (token[5] - b'0') <= 59;
+                let decoded = decode_zone_offset_token(&token, b':');
+                assert_eq!(
+                    decoded.is_some(),
+                    valid_range,
+                    "position {position}, byte {byte}"
+                );
+            }
+        }
+        assert_eq!(decode_zone_offset_token(b"+23:59", b':'), Some(86_340));
+        assert_eq!(decode_zone_offset_token(b"-23:59", b':'), Some(-86_340));
+        assert_eq!(decode_zone_offset_token(b"Z", b':'), Some(0));
+        assert_eq!(decode_zone_offset_token(b"z", b':'), Some(0));
+        for token in [
+            &b"+24:00"[..],
+            &b"+23:60"[..],
+            &b"+2:00"[..],
+            &b"+023:00"[..],
+            &b"+23;59"[..],
+            &b"*23:59"[..],
+            &b"+2a:00"[..],
+        ] {
+            assert_eq!(decode_zone_offset_token(token, b':'), None, "{token:?}");
+        }
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-name-004
