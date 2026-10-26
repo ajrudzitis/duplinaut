@@ -133,6 +133,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-calendar-field-timestamp-conversion"
+gate = false
+requirements = ["PARSE-NAME-004", "PARSE-NAME-007"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Proves exact Gregorian month accumulation and UTC seconds conversion for
+# validated fields with a bounded explicit-zone offset. Byte framing, field
+# extraction, and complete long-name grammar remain outside.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "calendar_fields_to_unix_seconds" },
+  { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
+]
+proofs = [{ id = "name-calendar-field-timestamp-conversion", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "calendar_fields_to_unix_seconds", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::calendar_fields_convert_to_exact_unix_seconds" },
+  { package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" },
+  { package = "duplicity-core", name = "explicit_zone_offset_boundaries_are_exact" }
+]
+
+[[milestone]]
 id = "names"
 gate = false
 requirements = ["PARSE-NAME-001", "PARSE-NAME-002", "PARSE-NAME-003", "PARSE-NAME-004", "PARSE-NAME-005", "PARSE-NAME-006", "PARSE-NAME-007"]

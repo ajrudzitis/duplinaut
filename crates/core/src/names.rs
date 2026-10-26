@@ -364,6 +364,7 @@ pub proof fn days_before_year_step(year: int)
 pub fn days_before_year(year: u16) -> (result: i64)
     requires 1901 <= year <= 2100,
     ensures result as int == days_before_year_model(year as int),
+        0 <= result as int <= (year as int - 1901) * 366,
 {
     let mut current = 1901u16;
     let mut days = 0i64;
@@ -394,6 +395,26 @@ pub open spec fn month_length_model(year: int, month: int) -> int {
     } else {
         31int
     }
+}
+
+/// Number of Gregorian days before `month` in `year`.
+pub open spec fn days_before_month_model(year: int, month: int) -> int
+    recommends month >= 1,
+    decreases month - 1,
+{
+    if month <= 1 {
+        0
+    } else {
+        days_before_month_model(year, month - 1) + month_length_model(year, month - 1)
+    }
+}
+
+pub proof fn days_before_month_step(year: int, month: int)
+    requires 1 <= month <= 12,
+    ensures days_before_month_model(year, month + 1)
+        == days_before_month_model(year, month) + month_length_model(year, month),
+{
+    reveal(days_before_month_model);
 }
 
 //= docs/parsing-requirements.md#parse-name-004
@@ -473,6 +494,102 @@ pub fn zone_offset_seconds(sign: i64, hours: i64, minutes: i64) -> (result: i64)
     ensures result as int == zone_offset_seconds_model(sign as int, hours as int, minutes as int),
 {
     sign * (hours * 3600 + minutes * 60)
+}
+
+pub open spec fn calendar_fields_to_unix_seconds_model(
+    year: int,
+    month: int,
+    day: int,
+    hour: int,
+    minute: int,
+    second: int,
+    offset_seconds: int,
+) -> int
+    recommends calendar_date_valid_model(year, month, day)
+        && clock_fields_valid_model(hour, minute, second)
+        && -86340 <= offset_seconds <= 86340,
+{
+    let days_since_epoch = days_before_year_model(year)
+        + days_before_month_model(year, month)
+        + day - 1 - 25202;
+    days_since_epoch * 86400 + hour * 3600 + minute * 60 + second - offset_seconds
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+pub fn calendar_fields_to_unix_seconds(
+    year: u16,
+    month: u8,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+    offset_seconds: i64,
+) -> (result: Timestamp)
+    requires 1901 <= year <= 2099,
+        1 <= month <= 12,
+        calendar_date_valid_model(year as int, month as int, day as int),
+        clock_fields_valid_model(hour as int, minute as int, second as int),
+        -86340 <= offset_seconds <= 86340,
+    ensures result.0 as int == calendar_fields_to_unix_seconds_model(
+        year as int,
+        month as int,
+        day as int,
+        hour as int,
+        minute as int,
+        second as int,
+        offset_seconds as int,
+    ),
+{
+    proof {
+        reveal(calendar_date_valid_model);
+        assert(1901 <= year as int <= 2099);
+        assert(1 <= month as int <= 12);
+    }
+    let year_days = days_before_year(year);
+    let mut month_days = 0i128;
+    let mut current_month = 1u8;
+    while current_month < month
+        invariant 1901 <= year <= 2099,
+            1 <= current_month <= month <= 12,
+            month_days as int == days_before_month_model(year as int, current_month as int),
+            0 <= month_days as int <= (current_month as int - 1) * 31,
+        decreases month as int - current_month as int,
+    {
+        proof {
+            days_before_month_step(year as int, current_month as int);
+        }
+        let days_in_month = month_length(year, current_month);
+        proof {
+            reveal(month_length_model);
+            assert(days_in_month as int <= 31);
+        }
+        month_days += days_in_month as i128;
+        current_month += 1;
+    }
+    let days_since_epoch = year_days as i128 + month_days + day as i128 - 1 - 25202;
+    proof {
+        assert(month_days as int == days_before_month_model(year as int, month as int));
+        assert(-100_000 <= days_since_epoch <= 100_000);
+    }
+    let seconds_since_epoch = days_since_epoch * 86400 + hour as i128 * 3600
+        + minute as i128 * 60 + second as i128 - offset_seconds as i128;
+    proof {
+        assert(seconds_since_epoch as int == calendar_fields_to_unix_seconds_model(
+            year as int,
+            month as int,
+            day as int,
+            hour as int,
+            minute as int,
+            second as int,
+            offset_seconds as int,
+        ));
+    }
+    Timestamp(seconds_since_epoch)
 }
 
 impl ObjectName {
@@ -639,15 +756,9 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
         }
         _ => return Err(NameError::Malformed),
     };
-    let mut days = days_before_year(y as u16);
-    for previous in 1..m {
-        days += i64::from(month_length(y as u16, previous as u8));
-    }
-    // 1901-01-01 is exactly 25202 days before the Unix epoch.
-    days += d - 1 - 25202;
-    Ok(Timestamp(i128::from(
-        days * 86400 + h * 3600 + min * 60 + sec - offset,
-    )))
+    Ok(calendar_fields_to_unix_seconds(
+        y as u16, m as u8, d as u8, h as u8, min as u8, sec as u8, offset,
+    ))
 }
 
 fn date(input: &[u8], short: bool, separator: u8) -> Result<Timestamp, NameError> {
@@ -837,9 +948,38 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 #[cfg(test)]
 mod tests {
     use super::{
-        calendar_date_valid, calendar_day_valid, clock_fields_valid, decode_base36, decode_decimal,
-        parse_long_timestamp, time_separator_valid, NameError,
+        calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
+        clock_fields_valid, decode_base36, decode_decimal, parse_long_timestamp,
+        time_separator_valid, NameError, Timestamp,
     };
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    fn calendar_fields_convert_to_exact_unix_seconds() {
+        let cases = [
+            (1901, 1, 1, 0, 0, 0, 0, -2_177_452_800),
+            (1969, 12, 31, 23, 59, 59, 0, -1),
+            (1970, 1, 1, 0, 0, 0, 0, 0),
+            (1970, 1, 1, 23, 59, 0, 86_340, 0),
+            (1969, 12, 31, 0, 1, 0, -86_340, 0),
+            (1970, 1, 1, 0, 0, 0, 86_340, -86_340),
+            (1970, 1, 1, 0, 0, 0, -86_340, 86_340),
+            (2000, 2, 29, 0, 0, 0, 0, 951_782_400),
+            (2099, 12, 31, 23, 59, 59, 0, 4_102_444_799),
+        ];
+        for (year, month, day, hour, minute, second, offset, expected) in cases {
+            assert_eq!(
+                calendar_fields_to_unix_seconds(year, month, day, hour, minute, second, offset),
+                Timestamp(expected),
+                "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02} offset {offset}"
+            );
+        }
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-name-004
