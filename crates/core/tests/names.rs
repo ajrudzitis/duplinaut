@@ -259,6 +259,24 @@ fn near_miss_object_stems_remain_unrecognized() {
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 #[test]
+fn parse_name_finalizes_unrelated_malformed_and_valid_candidates() {
+    let config = NameConfig::default();
+    assert_eq!(parse_name(b"unrelated object", config), Ok(None));
+    assert_eq!(
+        parse_name(b"duplicity-full.bad.vol1.difftar", config),
+        Err(NameError::Malformed)
+    );
+    let valid = parse_name(b"duplicity-full.20231114T221320Z.vol1.difftar", config)
+        .unwrap()
+        .unwrap();
+    assert_eq!(valid.kind, ObjectKind::FullVolume);
+    assert_eq!(valid.volume, Some(1));
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+#[test]
 fn successful_name_survives_a_malformed_overlapping_kind_stem() {
     let parsed = parse_name(
         b"duplicity-full.20231114T221320Z.vol1.difftar",

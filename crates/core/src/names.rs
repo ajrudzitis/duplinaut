@@ -654,6 +654,36 @@ fn merge_name_candidate(
     }
 }
 
+pub closed spec fn name_finalization_model(
+    recognized: bool,
+    candidate: Option<ObjectName>,
+) -> Result<Option<ObjectName>, NameError> {
+    match candidate {
+        Some(parsed) => Ok(Some(parsed)),
+        None if recognized => Err(NameError::Malformed),
+        None => Ok(None),
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+fn finalize_name_classification(
+    recognized: bool,
+    candidate: Option<ObjectName>,
+) -> (result: Result<Option<ObjectName>, NameError>)
+    ensures result == name_finalization_model(recognized, candidate),
+{
+    proof {
+        reveal(name_finalization_model);
+    }
+    match candidate {
+        Some(parsed) => Ok(Some(parsed)),
+        None if recognized => Err(NameError::Malformed),
+        None => Ok(None),
+    }
+}
+
 pub open spec fn base36_digit_model(byte: u8) -> Option<int> {
     if b'0' <= byte && byte <= b'9' {
         Some((byte - b'0') as int)
@@ -2801,11 +2831,10 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
             }
         }
     }
-    if result.is_none() && recognized {
-        Err(NameError::Malformed)
-    } else {
-        Ok(result)
-    }
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=implementation
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    finalize_name_classification(recognized, result)
 }
 
 #[cfg(test)]
@@ -2816,9 +2845,10 @@ mod tests {
         decode_decimal, decode_long_interval, decode_long_timestamp_numeric_field,
         decode_long_trailer_suffix, decode_long_volume_number, decode_short_interval,
         decode_short_timestamp, decode_short_trailer, decode_short_volume_number,
-        decode_zone_offset_token, long_timestamp_field_bounds, long_timestamp_framing_valid,
-        merge_name_candidate, parse_long_timestamp, stem, time_separator_valid, Envelope,
-        LongTimestampField, NameError, ObjectKind, ObjectName, Timestamp,
+        decode_zone_offset_token, finalize_name_classification, long_timestamp_field_bounds,
+        long_timestamp_framing_valid, merge_name_candidate, parse_long_timestamp, stem,
+        time_separator_valid, Envelope, LongTimestampField, NameError, ObjectKind, ObjectName,
+        Timestamp,
     };
 
     #[test]
@@ -2884,6 +2914,35 @@ mod tests {
                 "must distinguish {different:?} from {original:?}"
             );
         }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn name_finalizer_covers_candidate_recognition_state_matrix() {
+        let candidate = ObjectName {
+            kind: ObjectKind::FullVolume,
+            start: Timestamp(10),
+            end: Timestamp(10),
+            volume: Some(1),
+            envelope: Envelope::Plain,
+            partial: false,
+            short: false,
+        };
+        assert_eq!(finalize_name_classification(false, None), Ok(None));
+        assert_eq!(
+            finalize_name_classification(true, None),
+            Err(NameError::Malformed)
+        );
+        assert_eq!(
+            finalize_name_classification(false, Some(candidate)),
+            Ok(Some(candidate))
+        );
+        assert_eq!(
+            finalize_name_classification(true, Some(candidate)),
+            Ok(Some(candidate))
+        );
     }
 
     //= docs/parsing-requirements.md#parse-name-001

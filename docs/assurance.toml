@@ -499,6 +499,28 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-final-classification"
+gate = false
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = false
+proof_required = true
+# Final status decision for unrelated, recognized malformed, and successfully
+# classified names only; the complete parse_name loop is not refined here.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "finalize_name_classification" },
+  { path = "crates/core/src/names.rs", symbol = "parse_name" }
+]
+proofs = [{ id = "name-final-classification", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "finalize_name_classification", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::name_finalizer_covers_candidate_recognition_state_matrix" },
+  { package = "duplicity-core", name = "parse_name_finalizes_unrelated_malformed_and_valid_candidates" }
+]
+
+[[milestone]]
 id = "name-stem-selection"
 gate = true
 requirements = ["PARSE-NAME-001"]
