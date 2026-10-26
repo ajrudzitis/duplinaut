@@ -181,10 +181,10 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Candidate assurance scope covers exact zone-token shape, decimal digits,
-# offset bounds, and its use by parse_long_timestamp. Independent review pending.
+# Independently reviewed exact zone-token shape, decimal digits, offset bounds,
+# and its use by parse_long_timestamp. Full filename grammar remains open.
 implementations = [{ path = "crates/core/src/names.rs", symbol = "decode_zone_offset_token" }, { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }]
 proofs = [{ id = "name-zone-token-decoder", requirement = "PARSE-NAME-007", path = "crates/core/src/names.rs", symbol = "decode_zone_offset_token", kind = "contract" }]
 tests = [
