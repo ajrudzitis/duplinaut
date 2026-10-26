@@ -99,6 +99,122 @@ fn take_dot_field<'a>(remaining: &mut Option<&'a [u8]>) -> (field: Option<&'a [u
     }
 }
 
+closed spec fn optional_body_field_model(input: Option<&[u8]>) -> Option<Seq<u8>> {
+    match input {
+        Some(bytes) => Some(bytes@),
+        None => None,
+    }
+}
+
+closed spec fn body_field_split_model(
+    input: Option<Seq<u8>>,
+    field: Option<Seq<u8>>,
+    remaining: Option<Seq<u8>>,
+) -> bool {
+    match (input, field) {
+        (None, None) => remaining.is_none(),
+        (Some(bytes), Some(value)) => {
+            value.len() <= bytes.len()
+                && value == bytes.subrange(0, value.len() as int)
+                && forall|index: int| 0 <= index < value.len()
+                    ==> value[index] != b'.'
+                && match remaining {
+                    None => value.len() == bytes.len(),
+                    Some(rest) => {
+                        value.len() < bytes.len()
+                            && bytes[value.len() as int] == b'.'
+                            && rest == bytes.subrange(value.len() as int + 1, bytes.len() as int)
+                    }
+                }
+        }
+        _ => false,
+    }
+}
+
+closed spec fn body_suffix_fields_model(
+    input: Option<Seq<u8>>,
+    first: Option<Seq<u8>>,
+    second: Option<Seq<u8>>,
+    third: Option<Seq<u8>>,
+    extra: Option<Seq<u8>>,
+    remaining: Option<Seq<u8>>,
+) -> bool {
+    exists|after_first: Option<Seq<u8>>|
+        body_field_split_model(input, first, after_first)
+            && exists|after_second: Option<Seq<u8>>|
+                body_field_split_model(after_first, second, after_second)
+                    && exists|after_third: Option<Seq<u8>>|
+                        body_field_split_model(after_second, third, after_third)
+                            && body_field_split_model(after_third, extra, remaining)
+}
+
+type BodySuffixFields<'a> = (
+    Option<&'a [u8]>,
+    Option<&'a [u8]>,
+    Option<&'a [u8]>,
+    Option<&'a [u8]>,
+);
+
+/// Consume three optional suffix fields and one excess-field probe.
+///
+/// The caller decides whether the third suffix is admissible for its object
+/// profile. `extra` identifies the first field beyond those three slots.
+fn take_body_suffix_fields<'a>(
+    remaining: &mut Option<&'a [u8]>,
+) -> (suffixes: BodySuffixFields<'a>)
+    ensures body_suffix_fields_model(
+        optional_body_field_model(*old(remaining)),
+        optional_body_field_model(suffixes.0),
+        optional_body_field_model(suffixes.1),
+        optional_body_field_model(suffixes.2),
+        optional_body_field_model(suffixes.3),
+        optional_body_field_model(*final(remaining)),
+    ),
+{
+    let _input = *remaining;
+    let first = take_dot_field(remaining);
+    let _after_first = *remaining;
+    let second = take_dot_field(remaining);
+    let _after_second = *remaining;
+    let third = take_dot_field(remaining);
+    let _after_third = *remaining;
+    let extra = take_dot_field(remaining);
+    proof {
+        reveal(optional_body_field_model);
+        reveal(body_field_split_model);
+        reveal(dot_field_boundary_model);
+        assert(body_field_split_model(
+            optional_body_field_model(_input),
+            optional_body_field_model(first),
+            optional_body_field_model(_after_first),
+        ));
+        assert(body_field_split_model(
+            optional_body_field_model(_after_first),
+            optional_body_field_model(second),
+            optional_body_field_model(_after_second),
+        ));
+        assert(body_field_split_model(
+            optional_body_field_model(_after_second),
+            optional_body_field_model(third),
+            optional_body_field_model(_after_third),
+        ));
+        assert(body_field_split_model(
+            optional_body_field_model(_after_third),
+            optional_body_field_model(extra),
+            optional_body_field_model(*remaining),
+        ));
+        assert(body_suffix_fields_model(
+            optional_body_field_model(_input),
+            optional_body_field_model(first),
+            optional_body_field_model(second),
+            optional_body_field_model(third),
+            optional_body_field_model(extra),
+            optional_body_field_model(*remaining),
+        ));
+    }
+    (first, second, third, extra)
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObjectKind {
     FullVolume,
@@ -3993,10 +4109,8 @@ fn body(
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if third.is_some() || fields.is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if third.is_some() || extra.is_some() || fields.is_some() {
             return Err(NameError::Malformed);
         }
         return short_incremental_signatures_body_fields(
@@ -4012,10 +4126,8 @@ fn body(
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if third.is_some() || fields.is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if third.is_some() || extra.is_some() || fields.is_some() {
             return Err(NameError::Malformed);
         }
         return short_incremental_manifest_body_fields(
@@ -4030,10 +4142,8 @@ fn body(
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if third.is_some() || fields.is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if third.is_some() || extra.is_some() || fields.is_some() {
             return Err(NameError::Malformed);
         }
         return short_full_manifest_body_fields(start_field, trailer, first, second);
@@ -4042,10 +4152,8 @@ fn body(
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if take_dot_field(&mut fields).is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if extra.is_some() {
             return Err(NameError::Malformed);
         }
         return long_full_manifest_body_fields(
@@ -4061,10 +4169,8 @@ fn body(
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if take_dot_field(&mut fields).is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if extra.is_some() {
             return Err(NameError::Malformed);
         }
         return long_full_signatures_body_fields(
@@ -4082,10 +4188,8 @@ fn body(
         let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if take_dot_field(&mut fields).is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if extra.is_some() {
             return Err(NameError::Malformed);
         }
         return long_incremental_manifest_body_fields(
@@ -4105,10 +4209,8 @@ fn body(
         let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if take_dot_field(&mut fields).is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if extra.is_some() {
             return Err(NameError::Malformed);
         }
         return long_incremental_signatures_body_fields(
@@ -4126,10 +4228,8 @@ fn body(
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if third.is_some() || fields.is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if third.is_some() || extra.is_some() || fields.is_some() {
             return Err(NameError::Malformed);
         }
         return short_full_signatures_body_fields(start_field, trailer, first, second);
@@ -4140,10 +4240,8 @@ fn body(
         let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if third.is_some() || fields.is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if third.is_some() || extra.is_some() || fields.is_some() {
             return Err(NameError::Malformed);
         }
         return short_incremental_volume_body_fields(
@@ -4160,10 +4258,8 @@ fn body(
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if third.is_some() || fields.is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if third.is_some() || extra.is_some() || fields.is_some() {
             return Err(NameError::Malformed);
         }
         return short_full_volume_body_fields(start_field, volume_field, trailer, first, second);
@@ -4173,10 +4269,8 @@ fn body(
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if take_dot_field(&mut fields).is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if extra.is_some() {
             return Err(NameError::Malformed);
         }
         return long_full_volume_body_fields(
@@ -4196,10 +4290,8 @@ fn body(
         let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if take_dot_field(&mut fields).is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if extra.is_some() {
             return Err(NameError::Malformed);
         }
         return long_incremental_volume_body_fields(
@@ -4283,10 +4375,8 @@ fn body(
         //= type=implementation
         //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if take_dot_field(&mut fields).is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if extra.is_some() {
             return Err(NameError::Malformed);
         }
         decode_short_trailer(kind, trailer, first, second, third).ok_or(NameError::Malformed)?
@@ -4295,10 +4385,8 @@ fn body(
         //= type=implementation
         //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let first = take_dot_field(&mut fields);
-        let second = take_dot_field(&mut fields);
-        let third = take_dot_field(&mut fields);
-        if take_dot_field(&mut fields).is_some() {
+        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+        if extra.is_some() {
             return Err(NameError::Malformed);
         }
         decode_long_trailer_suffix(kind, trailer, first, second, third)
@@ -4496,7 +4584,7 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 
 #[cfg(test)]
 mod tests {
-    use super::{split_dot_field, take_dot_field};
+    use super::{split_dot_field, take_body_suffix_fields, take_dot_field};
 
     #[test]
     //= docs/parsing-requirements.md#parse-name-001
@@ -4527,6 +4615,77 @@ mod tests {
         let (field, rest) = split_dot_field(b"last");
         assert_eq!(field, b"last");
         assert_eq!(rest, None);
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-gen-002
+    //= type=test
+    //# A successful parser MUST report a consumed input range wholly contained within the supplied input.
+    fn body_suffix_framing_preserves_optional_slots_and_first_excess_field() {
+        let mut remaining = None;
+        assert_eq!(
+            take_body_suffix_fields(&mut remaining),
+            (None, None, None, None)
+        );
+        assert_eq!(remaining, None);
+
+        // An empty first suffix is still a field, and does not collapse the
+        // framing of later suffix positions.
+        let mut remaining = Some(&b""[..]);
+        assert_eq!(
+            take_body_suffix_fields(&mut remaining),
+            (Some(&b""[..]), None, None, None)
+        );
+        assert_eq!(remaining, None);
+
+        // Exercise empty values independently in every optional suffix slot.
+        let mut remaining = Some(&b"base."[..]);
+        assert_eq!(
+            take_body_suffix_fields(&mut remaining),
+            (Some(&b"base"[..]), Some(&b""[..]), None, None)
+        );
+        assert_eq!(remaining, None);
+
+        let mut remaining = Some(&b"base.gz."[..]);
+        assert_eq!(
+            take_body_suffix_fields(&mut remaining),
+            (Some(&b"base"[..]), Some(&b"gz"[..]), Some(&b""[..]), None)
+        );
+        assert_eq!(remaining, None);
+
+        let mut remaining = Some(&b"part.gz"[..]);
+        assert_eq!(
+            take_body_suffix_fields(&mut remaining),
+            (Some(&b"part"[..]), Some(&b"gz"[..]), None, None)
+        );
+        assert_eq!(remaining, None);
+
+        let mut remaining = Some(&b"part.gz.extra.trailing"[..]);
+        assert_eq!(
+            take_body_suffix_fields(&mut remaining),
+            (
+                Some(&b"part"[..]),
+                Some(&b"gz"[..]),
+                Some(&b"extra"[..]),
+                Some(&b"trailing"[..]),
+            )
+        );
+        assert_eq!(remaining, None);
+
+        let mut remaining = Some(&b"part.gz.extra.trailing.unconsumed"[..]);
+        assert_eq!(
+            take_body_suffix_fields(&mut remaining),
+            (
+                Some(&b"part"[..]),
+                Some(&b"gz"[..]),
+                Some(&b"extra"[..]),
+                Some(&b"trailing"[..]),
+            )
+        );
+        assert_eq!(remaining, Some(&b"unconsumed"[..]));
     }
 
     use super::{

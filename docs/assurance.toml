@@ -1789,6 +1789,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-body-suffix-framing"
+gate = false
+requirements = ["PARSE-NAME-001", "PARSE-GEN-002"]
+specified = true
+implemented = true
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+# Shared suffix-field framing only: four exact dot-field takes model three
+# optional suffix slots plus the first excess field. The caller still decides
+# which suffix count/profile is valid; per-kind body dispatch remains unproved.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "take_body_suffix_fields" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-body-suffix-framing", requirement = "PARSE-GEN-002", path = "crates/core/src/names.rs", symbol = "take_body_suffix_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::body_suffix_framing_preserves_optional_slots_and_first_excess_field" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
