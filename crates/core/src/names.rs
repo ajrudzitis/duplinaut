@@ -2338,7 +2338,7 @@ const KINDS: [ObjectKind; 6] = [
 ];
 
 verus! {
-pub open spec fn stem_model(kind: ObjectKind, short: bool) -> Seq<u8> {
+closed spec fn stem_model(kind: ObjectKind, short: bool) -> Seq<u8> {
     match (kind, short) {
         (ObjectKind::FullVolume | ObjectKind::FullManifest, false) => b"duplicity-full."@,
         (ObjectKind::IncrementalVolume | ObjectKind::IncrementalManifest, false) => b"duplicity-inc."@,
@@ -2351,7 +2351,7 @@ pub open spec fn stem_model(kind: ObjectKind, short: bool) -> Seq<u8> {
     }
 }
 
-pub fn stem(kind: ObjectKind, short: bool) -> (result: &'static [u8])
+fn stem(kind: ObjectKind, short: bool) -> (result: &'static [u8])
     ensures result@ == stem_model(kind, short),
 {
     match (kind, short) {
