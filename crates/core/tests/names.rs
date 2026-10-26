@@ -459,6 +459,20 @@ fn long_name_intervals_follow_all_kind_and_timestamp_profiles() {
         );
     }
 
+    let custom_separator = NameConfig {
+        time_separator: b'_',
+        ..NameConfig::default()
+    };
+    let custom_legacy = parse_name(
+        b"duplicity-inc.2023-11-14T22_13_20+00_00.to.2023-11-15T22_13_20Z.manifest",
+        custom_separator,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(custom_legacy.kind, ObjectKind::IncrementalManifest);
+    assert_eq!(custom_legacy.start, Timestamp(1_700_000_000));
+    assert_eq!(custom_legacy.end, Timestamp(1_700_086_400));
+
     let earliest = parse_name(
         b"duplicity-inc.19010101T000000Z.to.19010102T000000Z.manifest",
         config,
