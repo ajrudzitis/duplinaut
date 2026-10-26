@@ -833,6 +833,122 @@ fn long_full_volume_body_composes_fields_and_rejects_malformed_fields() {
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-name-004
+//= type=test
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+//= docs/parsing-requirements.md#parse-name-006
+//= type=test
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+//= docs/parsing-requirements.md#parse-name-007
+//= type=test
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+//= docs/parsing-requirements.md#parse-gen-003
+//= type=test
+//# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+#[test]
+fn long_incremental_volume_body_composes_fields_and_rejects_malformed_fields() {
+    let config = NameConfig::default();
+    let expected_start = parse_long_timestamp(b"20231114T221320Z", b':').unwrap();
+    let expected_end = parse_long_timestamp(b"20231115T221320Z", b':').unwrap();
+    let profiles: [(&[u8], Envelope, bool); 8] = [
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar",
+            Envelope::Plain,
+            false,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.part",
+            Envelope::Plain,
+            true,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz",
+            Envelope::Gzip,
+            false,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gpg",
+            Envelope::OpenPgp,
+            false,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.p7m",
+            Envelope::Pkcs7,
+            false,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.part.gz",
+            Envelope::Gzip,
+            true,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.part.gpg",
+            Envelope::OpenPgp,
+            true,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.part.p7m",
+            Envelope::Pkcs7,
+            true,
+        ),
+    ];
+    for (bytes, envelope, partial) in profiles {
+        let name = parse_name(bytes, config).unwrap().unwrap();
+        assert_eq!(name.kind, ObjectKind::IncrementalVolume, "{bytes:?}");
+        assert_eq!(
+            (name.start, name.end),
+            (expected_start, expected_end),
+            "{bytes:?}"
+        );
+        assert_eq!(name.volume, Some(1), "{bytes:?}");
+        assert_eq!(
+            (name.envelope, name.partial),
+            (envelope, partial),
+            "{bytes:?}"
+        );
+        assert!(!name.short, "{bytes:?}");
+    }
+
+    for malformed in [
+        b"duplicity-inc.bad.to.20231115T221320Z.vol1.difftar" as &[u8],
+        b"duplicity-inc.20231114T221320Z.to.bad.vol1.difftar",
+        b"duplicity-inc.20231114T221320Z.to.20231114T221320Z.vol1.difftar",
+        b"duplicity-inc.20231115T221320Z.to.20231114T221320Z.vol1.difftar",
+        b"duplicity-inc.20231114T221320Z.from.20231115T221320Z.vol1.difftar",
+        b"duplicity-inc.20231114T221320Z.20231115T221320Z.vol1.difftar",
+        b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.difftar",
+        b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol0.difftar",
+        b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol18446744073709551616.difftar",
+        b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz.part",
+        b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.part.part",
+        b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.part.gz.extra",
+        b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.",
+    ] {
+        assert_eq!(
+            parse_name(malformed, config),
+            Err(NameError::Malformed),
+            "{malformed:?}"
+        );
+    }
+
+    let legacy = parse_name(
+        b"duplicity-inc.1970-01-01T00_00_00Z.to.1970-01-02T00_00_00Z.vol1.difftar",
+        NameConfig {
+            time_separator: b'_',
+            ..config
+        },
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        (legacy.start, legacy.end),
+        (Timestamp(0), Timestamp(86_400))
+    );
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 //= docs/parsing-requirements.md#parse-name-003
 //= type=test
 //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
