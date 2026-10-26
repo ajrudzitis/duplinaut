@@ -501,7 +501,7 @@ pub enum NameError {
     Ambiguous,
 }
 
-pub closed spec fn object_kind_equal_model(left: ObjectKind, right: ObjectKind) -> bool {
+closed spec fn object_kind_equal_model(left: ObjectKind, right: ObjectKind) -> bool {
     match (left, right) {
         (ObjectKind::FullVolume, ObjectKind::FullVolume)
         | (ObjectKind::IncrementalVolume, ObjectKind::IncrementalVolume)
@@ -591,7 +591,7 @@ fn object_name_equal(left: ObjectName, right: ObjectName) -> (result: bool)
         && left.short == right.short
 }
 
-pub closed spec fn name_candidate_merge_model(
+closed spec fn name_candidate_merge_model(
     current: Option<ObjectName>,
     candidate: Option<ObjectName>,
 ) -> Result<Option<ObjectName>, NameError> {
