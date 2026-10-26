@@ -454,13 +454,13 @@ tests = [
 
 [[milestone]]
 id = "name-long-trailer"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Exact long-name trailer/envelope/partial classification only. Complete body
 # refinement and the short-name suffix policy remain separate obligations.
