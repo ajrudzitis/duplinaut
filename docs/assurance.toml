@@ -1790,17 +1790,18 @@ tests = [
 
 [[milestone]]
 id = "name-body-suffix-framing"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001", "PARSE-GEN-002"]
 specified = true
 implemented = true
-proved = false
-tested = false
-reviewed = false
+proved = true
+tested = true
+reviewed = true
 proof_required = true
 # Shared suffix-field framing only: four exact dot-field takes model three
 # optional suffix slots plus the first excess field. The caller still decides
 # which suffix count/profile is valid; per-kind body dispatch remains unproved.
+# Independent review and full CI passed for this framing checkpoint.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "take_body_suffix_fields" },
   { path = "crates/core/src/names.rs", symbol = "body" }
