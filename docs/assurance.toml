@@ -1742,17 +1742,17 @@ tests = [
 
 [[milestone]]
 id = "name-long-full-signatures-body"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-007"]
 specified = true
 implemented = true
-proved = false
-tested = false
-reviewed = false
+proved = true
+tested = true
+reviewed = true
 proof_required = true
 # Long FullSignatures body composition only: one long timestamp and the exact
 # signatures trailer/suffix profile produce object fields with no volume.
-# Independent review and full CI are pending.
+# Independent review and full CI passed.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "body" },
   { path = "crates/core/src/names.rs", symbol = "long_full_signatures_body_fields" }
