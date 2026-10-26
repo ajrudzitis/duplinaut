@@ -675,6 +675,57 @@ fn short_trailer_suffixes_classify_kind_envelope_and_partial_status() {
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-name-003
+//= type=test
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+#[test]
+fn short_full_volume_body_composes_fields_and_rejects_malformed_fields() {
+    let config = NameConfig::default();
+    let profiles: [(&[u8], Envelope, bool); 6] = [
+        (b"df.1.1.dt", Envelope::Plain, false),
+        (b"df.1.1.dt.p", Envelope::Plain, true),
+        (b"df.1.1.dt.z", Envelope::Gzip, false),
+        (b"df.1.1.dt.g", Envelope::OpenPgp, false),
+        (b"df.1.1.dt.p.z", Envelope::Gzip, true),
+        (b"df.1.1.dt.p.g", Envelope::OpenPgp, true),
+    ];
+    for (bytes, envelope, partial) in profiles {
+        let name = parse_name(bytes, config).unwrap().unwrap();
+        assert_eq!(name.kind, ObjectKind::FullVolume, "{bytes:?}");
+        assert_eq!(name.start, Timestamp(1), "{bytes:?}");
+        assert_eq!(name.end, Timestamp(1), "{bytes:?}");
+        assert_eq!(name.volume, Some(1), "{bytes:?}");
+        assert_eq!(
+            (name.envelope, name.partial),
+            (envelope, partial),
+            "{bytes:?}"
+        );
+        assert!(name.short, "{bytes:?}");
+    }
+
+    for malformed in [
+        b"df.Invalid.1.dt" as &[u8],
+        b"df.1.0.dt",
+        b"df.1.A.dt",
+        b"df.1.1.bad",
+        b"df.1.1.dt.x",
+        b"df.1.1.dt.z.p",
+        b"df.1.1.dt.p.p",
+        b"df.1.1.dt.p.g.z",
+        b"df.1.1.dt.p.z.extra",
+        b"df.1.1.dt.",
+    ] {
+        assert_eq!(
+            parse_name(malformed, config),
+            Err(NameError::Malformed),
+            "{malformed:?}"
+        );
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 #[test]
 fn long_trailer_suffixes_classify_every_kind_and_reject_extra_fields() {
     let config = NameConfig::default();

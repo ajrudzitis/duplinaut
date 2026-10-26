@@ -1499,6 +1499,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-short-full-body"
+gate = false
+requirements = ["PARSE-NAME-001", "PARSE-NAME-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Short FullVolume body composition only: verified dot-field extraction feeds
+# the short interval, positive base36 volume, and trailer/suffix models to build
+# ObjectName. Short incremental and all long-name body profiles remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "short_full_volume_body_fields" }
+]
+proofs = [
+  { id = "name-short-full-volume-body", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_full_volume_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "short_full_volume_body_composes_fields_and_rejects_malformed_fields" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
