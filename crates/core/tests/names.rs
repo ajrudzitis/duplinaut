@@ -623,6 +623,78 @@ fn short_trailer_suffixes_classify_kind_envelope_and_partial_status() {
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+#[test]
+fn long_trailer_suffixes_classify_every_kind_and_reject_extra_fields() {
+    let config = NameConfig::default();
+    let profiles: [(&[u8], ObjectKind); 6] = [
+        (
+            b"duplicity-full.20231114T221320Z.vol1.difftar",
+            ObjectKind::FullVolume,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar",
+            ObjectKind::IncrementalVolume,
+        ),
+        (
+            b"duplicity-full.20231114T221320Z.manifest",
+            ObjectKind::FullManifest,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest",
+            ObjectKind::IncrementalManifest,
+        ),
+        (
+            b"duplicity-full-signatures.20231114T221320Z.sigtar",
+            ObjectKind::FullSignatures,
+        ),
+        (
+            b"duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar",
+            ObjectKind::IncrementalSignatures,
+        ),
+    ];
+    let suffixes: [(&[u8], Envelope, bool); 8] = [
+        (b"", Envelope::Plain, false),
+        (b".part", Envelope::Plain, true),
+        (b".gz", Envelope::Gzip, false),
+        (b".gpg", Envelope::OpenPgp, false),
+        (b".p7m", Envelope::Pkcs7, false),
+        (b".part.gz", Envelope::Gzip, true),
+        (b".part.gpg", Envelope::OpenPgp, true),
+        (b".part.p7m", Envelope::Pkcs7, true),
+    ];
+    for (base, kind) in profiles {
+        for (suffix, envelope, partial) in suffixes {
+            let name = [base, suffix].concat();
+            let parsed = parse_name(&name, config).unwrap().unwrap();
+            assert_eq!(
+                (parsed.kind, parsed.envelope, parsed.partial),
+                (kind, envelope, partial),
+                "{name:?}"
+            );
+        }
+    }
+
+    for malformed in [
+        b"duplicity-full.20231114T221320Z.vol1.manifest" as &[u8],
+        b"duplicity-full.20231114T221320Z.vol1.difftar.",
+        b"duplicity-full.20231114T221320Z.vol1.difftar.gz.part",
+        b"duplicity-full.20231114T221320Z.vol1.difftar.part.part",
+        b"duplicity-full.20231114T221320Z.vol1.difftar.part.p7m.extra",
+        b"duplicity-full.20231114T221320Z.manifest.gz.part",
+        b"duplicity-full-signatures.20231114T221320Z.sigtar.part.gpg.p7m",
+        b"duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.manifest",
+    ] {
+        assert_eq!(
+            parse_name(malformed, config),
+            Err(NameError::Malformed),
+            "{malformed:?}"
+        );
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 
 #[test]
 fn every_official_archive_basename_is_classified() {
