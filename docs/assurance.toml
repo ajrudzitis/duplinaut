@@ -1500,13 +1500,13 @@ tests = [
 
 [[milestone]]
 id = "name-short-full-body"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-003"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Short FullVolume body composition only: verified dot-field extraction feeds
 # the short interval, positive base36 volume, and trailer/suffix models to build
