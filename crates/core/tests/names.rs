@@ -99,6 +99,22 @@ fn explicit_zone_offset_boundaries_are_exact() {
     }
 }
 
+//= docs/parsing-requirements.md#parse-name-007
+//= type=test
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+
+#[test]
+fn explicit_zone_offset_uses_the_configured_separator() {
+    assert_eq!(
+        parse_long_timestamp(b"1970-01-01T00_00_00+00_00", b'_'),
+        Ok(Timestamp(0))
+    );
+    assert_eq!(
+        parse_long_timestamp(b"1970-01-01T00_00_00+00:00", b'_'),
+        Err(NameError::Malformed)
+    );
+}
+
 //= docs/parsing-requirements.md#parse-name-002
 //= type=test
 //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
