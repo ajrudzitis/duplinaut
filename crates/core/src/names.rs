@@ -34,6 +34,207 @@ pub enum Envelope {
     Pkcs7,
 }
 
+pub open spec fn optional_short_token(input: Option<&[u8]>) -> Option<Seq<u8>> {
+    match input {
+        Some(token) => Some(token@),
+        None => None,
+    }
+}
+
+pub open spec fn optional_short_token_matches(input: Option<&[u8]>, byte: u8) -> bool {
+    match input {
+        Some(token) => single_short_token_model(token@, byte),
+        None => false,
+    }
+}
+
+pub open spec fn single_short_token_model(token: Seq<u8>, byte: u8) -> bool {
+    token.len() == 1 && token[0] == byte
+}
+
+pub fn short_token_matches(token: &[u8], byte: u8) -> (result: bool)
+    ensures result == single_short_token_model(token@, byte),
+{
+    token.len() == 1 && token[0] == byte
+}
+
+pub open spec fn short_trailer_matches_model(kind: ObjectKind, trailer: Seq<u8>) -> bool {
+    match kind {
+        ObjectKind::FullVolume | ObjectKind::IncrementalVolume => {
+            trailer.len() == 2 && trailer[0] == b'd' && trailer[1] == b't'
+        }
+        ObjectKind::FullManifest | ObjectKind::IncrementalManifest => {
+            trailer.len() == 1 && trailer[0] == b'm'
+        }
+        ObjectKind::FullSignatures | ObjectKind::IncrementalSignatures => {
+            trailer.len() == 2 && trailer[0] == b's' && trailer[1] == b't'
+        }
+    }
+}
+
+/// Exact short-name trailer, optional partial marker, envelope suffix, and no extras.
+pub open spec fn short_trailer_model(
+    kind: ObjectKind,
+    trailer: Seq<u8>,
+    first: Option<Seq<u8>>,
+    second: Option<Seq<u8>>,
+    third: Option<Seq<u8>>,
+) -> Option<(Envelope, bool)> {
+    if !short_trailer_matches_model(kind, trailer) || third.is_some() {
+        None
+    } else {
+        match (first, second) {
+            (None, None) => Some((Envelope::Plain, false)),
+            (Some(token), None) if single_short_token_model(token, b'p') => {
+                Some((Envelope::Plain, true))
+            }
+            (Some(token), None) if single_short_token_model(token, b'z') => {
+                Some((Envelope::Gzip, false))
+            }
+            (Some(token), None) if single_short_token_model(token, b'g') => {
+                Some((Envelope::OpenPgp, false))
+            }
+            (Some(marker), Some(token))
+                if single_short_token_model(marker, b'p')
+                    && single_short_token_model(token, b'z') =>
+            {
+                Some((Envelope::Gzip, true))
+            }
+            (Some(marker), Some(token))
+                if single_short_token_model(marker, b'p')
+                    && single_short_token_model(token, b'g') =>
+            {
+                Some((Envelope::OpenPgp, true))
+            }
+            _ => None,
+        }
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+pub fn decode_short_trailer(
+    kind: ObjectKind,
+    trailer: &[u8],
+    first: Option<&[u8]>,
+    second: Option<&[u8]>,
+    third: Option<&[u8]>,
+) -> (result: Option<(Envelope, bool)>)
+    ensures result == short_trailer_model(
+        kind,
+        trailer@,
+        optional_short_token(first),
+        optional_short_token(second),
+        optional_short_token(third),
+    ),
+{
+    let trailer_matches = match kind {
+        ObjectKind::FullVolume | ObjectKind::IncrementalVolume => {
+            trailer.len() == 2 && trailer[0] == b'd' && trailer[1] == b't'
+        }
+        ObjectKind::FullManifest | ObjectKind::IncrementalManifest => {
+            trailer.len() == 1 && trailer[0] == b'm'
+        }
+        ObjectKind::FullSignatures | ObjectKind::IncrementalSignatures => {
+            trailer.len() == 2 && trailer[0] == b's' && trailer[1] == b't'
+        }
+    };
+    proof {
+        reveal(short_trailer_matches_model);
+        match kind {
+            ObjectKind::FullVolume | ObjectKind::IncrementalVolume => {
+                assert(trailer_matches == short_trailer_matches_model(kind, trailer@));
+            }
+            ObjectKind::FullManifest | ObjectKind::IncrementalManifest => {
+                assert(trailer_matches == short_trailer_matches_model(kind, trailer@));
+            }
+            ObjectKind::FullSignatures | ObjectKind::IncrementalSignatures => {
+                assert(trailer_matches == short_trailer_matches_model(kind, trailer@));
+            }
+        }
+    }
+    if !trailer_matches {
+        proof {
+            reveal(short_trailer_model);
+            assert(short_trailer_model(
+                kind,
+                trailer@,
+                optional_short_token(first),
+                optional_short_token(second),
+                optional_short_token(third),
+            ).is_none());
+        }
+        return None;
+    }
+    if third.is_some() {
+        proof {
+            reveal(short_trailer_model);
+            assert(short_trailer_model(
+                kind,
+                trailer@,
+                optional_short_token(first),
+                optional_short_token(second),
+                optional_short_token(third),
+            ).is_none());
+        }
+        return None;
+    }
+    let first_p = match first {
+        Some(token) => short_token_matches(token, b'p'),
+        None => false,
+    };
+    let first_z = match first {
+        Some(token) => short_token_matches(token, b'z'),
+        None => false,
+    };
+    let first_g = match first {
+        Some(token) => short_token_matches(token, b'g'),
+        None => false,
+    };
+    let second_z = match second {
+        Some(token) => short_token_matches(token, b'z'),
+        None => false,
+    };
+    let second_g = match second {
+        Some(token) => short_token_matches(token, b'g'),
+        None => false,
+    };
+    let result = if first.is_none() && second.is_none() {
+        Some((Envelope::Plain, false))
+    } else if first_p && second.is_none() {
+        Some((Envelope::Plain, true))
+    } else if first_z && second.is_none() {
+        Some((Envelope::Gzip, false))
+    } else if first_g && second.is_none() {
+        Some((Envelope::OpenPgp, false))
+    } else if first_p && second_z {
+        Some((Envelope::Gzip, true))
+    } else if first_p && second_g {
+        Some((Envelope::OpenPgp, true))
+    } else {
+        None
+    };
+    proof {
+        reveal(short_trailer_model);
+        reveal(optional_short_token);
+        reveal(single_short_token_model);
+        assert(first_p == optional_short_token_matches(first, b'p'));
+        assert(first_z == optional_short_token_matches(first, b'z'));
+        assert(first_g == optional_short_token_matches(first, b'g'));
+        assert(second_z == optional_short_token_matches(second, b'z'));
+        assert(second_g == optional_short_token_matches(second, b'g'));
+        assert(result == short_trailer_model(
+            kind,
+            trailer@,
+            optional_short_token(first),
+            optional_short_token(second),
+            optional_short_token(third),
+        ));
+    }
+    result
+}
+
 /// Exact Unix seconds. The widened representation includes negative long dates
 /// and every unsigned 64-bit short timestamp without truncation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -1535,32 +1736,44 @@ fn body(
     } else {
         None
     };
-    let trailer: &[u8] = match (kind, short) {
-        (ObjectKind::FullVolume | ObjectKind::IncrementalVolume, false) => b"difftar",
-        (ObjectKind::FullManifest | ObjectKind::IncrementalManifest, false) => b"manifest",
-        (_, false) => b"sigtar",
-        (ObjectKind::FullVolume | ObjectKind::IncrementalVolume, true) => b"dt",
-        (ObjectKind::FullManifest | ObjectKind::IncrementalManifest, true) => b"m",
-        (_, true) => b"st",
+    let (envelope, partial) = if short {
+        //= docs/parsing-requirements.md#parse-name-001
+        //= type=implementation
+        //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+        let trailer = fields.next().ok_or(NameError::Malformed)?;
+        let first = fields.next();
+        let second = fields.next();
+        let third = fields.next();
+        if fields.next().is_some() {
+            return Err(NameError::Malformed);
+        }
+        decode_short_trailer(kind, trailer, first, second, third).ok_or(NameError::Malformed)?
+    } else {
+        let trailer: &[u8] = match kind {
+            ObjectKind::FullVolume | ObjectKind::IncrementalVolume => b"difftar",
+            ObjectKind::FullManifest | ObjectKind::IncrementalManifest => b"manifest",
+            _ => b"sigtar",
+        };
+        if fields.next() != Some(trailer) {
+            return Err(NameError::Malformed);
+        }
+        let mut suffix = fields.next();
+        let partial = suffix == Some(b"part" as &[u8]);
+        if partial {
+            suffix = fields.next();
+        }
+        let envelope = match suffix {
+            None => Envelope::Plain,
+            Some(b"gz") => Envelope::Gzip,
+            Some(b"gpg") => Envelope::OpenPgp,
+            Some(b"p7m") => Envelope::Pkcs7,
+            _ => return Err(NameError::Malformed),
+        };
+        if fields.next().is_some() {
+            return Err(NameError::Malformed);
+        }
+        (envelope, partial)
     };
-    if fields.next() != Some(trailer) {
-        return Err(NameError::Malformed);
-    }
-    let mut suffix = fields.next();
-    let partial = suffix == Some(if short { b"p" as &[u8] } else { b"part" });
-    if partial {
-        suffix = fields.next();
-    }
-    let envelope = match (suffix, short) {
-        (None, _) => Envelope::Plain,
-        (Some(b"z"), true) | (Some(b"gz"), false) => Envelope::Gzip,
-        (Some(b"g"), true) | (Some(b"gpg"), false) => Envelope::OpenPgp,
-        (Some(b"p7m"), false) => Envelope::Pkcs7,
-        _ => return Err(NameError::Malformed),
-    };
-    if fields.next().is_some() {
-        return Err(NameError::Malformed);
-    }
     Ok(ObjectName {
         kind,
         start,
@@ -1647,9 +1860,10 @@ mod tests {
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
         clock_fields_valid, compose_timestamp_fields, decode_base36, decode_decimal,
-        decode_long_timestamp_numeric_field, decode_short_timestamp, decode_short_volume_number,
-        decode_zone_offset_token, long_timestamp_field_bounds, long_timestamp_framing_valid,
-        parse_long_timestamp, time_separator_valid, LongTimestampField, NameError, Timestamp,
+        decode_long_timestamp_numeric_field, decode_short_timestamp, decode_short_trailer,
+        decode_short_volume_number, decode_zone_offset_token, long_timestamp_field_bounds,
+        long_timestamp_framing_valid, parse_long_timestamp, time_separator_valid, Envelope,
+        LongTimestampField, NameError, ObjectKind, Timestamp,
     };
 
     //= docs/parsing-requirements.md#parse-name-004
@@ -2082,6 +2296,62 @@ mod tests {
             decode_short_volume_number(&encode_base36(u64::MAX as u128 + 1)),
             None
         );
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn short_trailer_policy_systematically_checks_kinds_tokens_and_extra_fields() {
+        let kinds = [
+            ObjectKind::FullVolume,
+            ObjectKind::IncrementalVolume,
+            ObjectKind::FullManifest,
+            ObjectKind::IncrementalManifest,
+            ObjectKind::FullSignatures,
+            ObjectKind::IncrementalSignatures,
+        ];
+        let token_choices: [Option<&[u8]>; 6] = [
+            None,
+            Some(b"p"),
+            Some(b"z"),
+            Some(b"g"),
+            Some(b"x"),
+            Some(b""),
+        ];
+        let trailer_choices: [&[u8]; 4] = [b"dt", b"m", b"st", b"x"];
+        for kind in kinds {
+            let expected_trailer: &[u8] = match kind {
+                ObjectKind::FullVolume | ObjectKind::IncrementalVolume => b"dt",
+                ObjectKind::FullManifest | ObjectKind::IncrementalManifest => b"m",
+                ObjectKind::FullSignatures | ObjectKind::IncrementalSignatures => b"st",
+            };
+            for trailer in trailer_choices {
+                for first in token_choices {
+                    for second in token_choices {
+                        for third in token_choices {
+                            let mut expected = None;
+                            if trailer == expected_trailer && third.is_none() {
+                                expected = match (first, second) {
+                                    (None, None) => Some((Envelope::Plain, false)),
+                                    (Some(b"p"), None) => Some((Envelope::Plain, true)),
+                                    (Some(b"z"), None) => Some((Envelope::Gzip, false)),
+                                    (Some(b"g"), None) => Some((Envelope::OpenPgp, false)),
+                                    (Some(b"p"), Some(b"z")) => Some((Envelope::Gzip, true)),
+                                    (Some(b"p"), Some(b"g")) => Some((Envelope::OpenPgp, true)),
+                                    _ => None,
+                                };
+                            }
+                            assert_eq!(
+                                decode_short_trailer(kind, trailer, first, second, third),
+                                expected,
+                                "kind={kind:?}, trailer={trailer:?}, fields={first:?}/{second:?}/{third:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 
     //= docs/parsing-requirements.md#parse-name-003

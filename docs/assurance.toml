@@ -403,6 +403,28 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-short-trailer"
+gate = false
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Exact short-name trailer/envelope/partial classification only. The complete
+# filename parser and long-name trailer policy remain separate obligations.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "decode_short_trailer" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [{ id = "name-short-trailer", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "decode_short_trailer", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::short_trailer_policy_systematically_checks_kinds_tokens_and_extra_fields" },
+  { package = "duplicity-core", name = "short_trailer_suffixes_classify_kind_envelope_and_partial_status" }
+]
+
+[[milestone]]
 id = "name-decimal-decoder"
 gate = false
 requirements = ["PARSE-NAME-004"]

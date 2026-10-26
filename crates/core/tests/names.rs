@@ -291,6 +291,98 @@ fn short_volume_numbers_are_positive_base36_and_long_volumes_remain_decimal() {
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+#[test]
+fn short_trailer_suffixes_classify_kind_envelope_and_partial_status() {
+    let config = NameConfig::default();
+    for (name, kind, envelope, partial) in [
+        (
+            b"df.1.1.dt" as &[u8],
+            ObjectKind::FullVolume,
+            Envelope::Plain,
+            false,
+        ),
+        (
+            b"df.1.1.dt.p",
+            ObjectKind::FullVolume,
+            Envelope::Plain,
+            true,
+        ),
+        (
+            b"df.1.1.dt.z",
+            ObjectKind::FullVolume,
+            Envelope::Gzip,
+            false,
+        ),
+        (
+            b"df.1.1.dt.p.z",
+            ObjectKind::FullVolume,
+            Envelope::Gzip,
+            true,
+        ),
+        (
+            b"di.1.2.1.dt.g",
+            ObjectKind::IncrementalVolume,
+            Envelope::OpenPgp,
+            false,
+        ),
+        (
+            b"di.1.2.1.dt.p.g",
+            ObjectKind::IncrementalVolume,
+            Envelope::OpenPgp,
+            true,
+        ),
+        (b"df.1.m", ObjectKind::FullManifest, Envelope::Plain, false),
+        (
+            b"di.1.2.m.p",
+            ObjectKind::IncrementalManifest,
+            Envelope::Plain,
+            true,
+        ),
+        (
+            b"dfs.1.st.z",
+            ObjectKind::FullSignatures,
+            Envelope::Gzip,
+            false,
+        ),
+        (
+            b"dns.1.2.st.p.g",
+            ObjectKind::IncrementalSignatures,
+            Envelope::OpenPgp,
+            true,
+        ),
+    ] {
+        let parsed = parse_name(name, config).unwrap().unwrap();
+        assert_eq!(
+            (parsed.kind, parsed.envelope, parsed.partial),
+            (kind, envelope, partial),
+            "{name:?}"
+        );
+    }
+    for malformed in [
+        b"df.1.1.m" as &[u8],
+        b"df.1.1.dt.",
+        b"df.1.1.dt.p.",
+        b"df.1.1.dt.x",
+        b"df.1.1.dt.z.p",
+        b"df.1.1.dt.g.p",
+        b"df.1.1.dt.g.z",
+        b"df.1.1.dt.z.g",
+        b"df.1.1.dt.p.p",
+        b"df.1.1.dt.x.p",
+        b"df.1.1.dt.p.z.extra",
+        b"df.1.1.dt.p.g.z",
+    ] {
+        assert_eq!(
+            parse_name(malformed, config),
+            Err(NameError::Malformed),
+            "{malformed:?}"
+        );
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 
 #[test]
 fn every_official_archive_basename_is_classified() {
