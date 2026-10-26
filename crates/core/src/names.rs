@@ -879,6 +879,108 @@ pub fn calendar_fields_to_unix_seconds(
     Timestamp(seconds_since_epoch)
 }
 
+/// Model the admission and UTC composition of already decoded timestamp
+/// components. Calendar and clock fields are validated before the seconds
+/// formula is used; offsets follow the explicit-zone bound.
+pub open spec fn compose_timestamp_fields_model(
+    year: int,
+    month: int,
+    day: int,
+    hour: int,
+    minute: int,
+    second: int,
+    offset_seconds: int,
+) -> Option<int> {
+    if calendar_date_valid_model(year, month, day)
+        && clock_fields_valid_model(hour, minute, second)
+        && -86340 <= offset_seconds
+        && offset_seconds <= 86340
+    {
+        Some(calendar_fields_to_unix_seconds_model(
+            year, month, day, hour, minute, second, offset_seconds,
+        ))
+    } else {
+        None
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+pub fn compose_timestamp_fields(
+    year: i64,
+    month: i64,
+    day: i64,
+    hour: i64,
+    minute: i64,
+    second: i64,
+    offset_seconds: i64,
+) -> (result: Option<Timestamp>)
+    ensures match compose_timestamp_fields_model(
+        year as int, month as int, day as int,
+        hour as int, minute as int, second as int, offset_seconds as int,
+    ) {
+        Some(seconds) => result matches Some(timestamp) && timestamp.0 as int == seconds,
+        None => result.is_none(),
+    },
+{
+    let date_valid = calendar_date_valid(year, month, day);
+    let clock_valid = clock_fields_valid(hour, minute, second);
+    if !date_valid
+        || !clock_valid
+        || !(-86340..=86340).contains(&offset_seconds)
+    {
+        proof {
+            reveal(compose_timestamp_fields_model);
+            if !date_valid {
+                reveal(calendar_date_valid_model);
+            }
+            if !clock_valid {
+                reveal(clock_fields_valid_model);
+            }
+            assert(compose_timestamp_fields_model(
+                year as int, month as int, day as int,
+                hour as int, minute as int, second as int, offset_seconds as int,
+            ).is_none());
+        }
+        return None;
+    }
+
+    proof {
+        reveal(compose_timestamp_fields_model);
+        reveal(calendar_date_valid_model);
+        reveal(clock_fields_valid_model);
+        assert(calendar_date_valid_model(year as int, month as int, day as int));
+        assert(clock_fields_valid_model(hour as int, minute as int, second as int));
+        assert(-86340 <= offset_seconds as int <= 86340);
+        assert(compose_timestamp_fields_model(
+            year as int, month as int, day as int,
+            hour as int, minute as int, second as int, offset_seconds as int,
+        ) == Some(calendar_fields_to_unix_seconds_model(
+            year as int, month as int, day as int,
+            hour as int, minute as int, second as int, offset_seconds as int,
+        )));
+        assert(1901 <= year as int <= 2099);
+        assert(1 <= month as int <= 12);
+        assert(1 <= day as int <= 31);
+        assert(0 <= hour as int <= 23);
+        assert(0 <= minute as int <= 59);
+        assert(0 <= second as int <= 59);
+    }
+    Some(calendar_fields_to_unix_seconds(
+        year as u16,
+        month as u8,
+        day as u8,
+        hour as u8,
+        minute as u8,
+        second as u8,
+        offset_seconds,
+    ))
+}
+
 impl ObjectName {
     /// A partial artifact cannot supply completed-set evidence.
     //= docs/parsing-requirements.md#parse-name-005
@@ -1013,13 +1115,8 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
         .ok_or(NameError::Malformed)? as i64;
     let sec = decode_long_timestamp_numeric_field(input, separator, LongTimestampField::Second)
         .ok_or(NameError::Malformed)? as i64;
-    if !calendar_date_valid(y, m, d) || !clock_fields_valid(h, min, sec) {
-        return Err(NameError::Malformed);
-    }
     let offset = decode_zone_offset_token(zone, separator).ok_or(NameError::Malformed)?;
-    Ok(calendar_fields_to_unix_seconds(
-        y as u16, m as u8, d as u8, h as u8, min as u8, sec as u8, offset,
-    ))
+    compose_timestamp_fields(y, m, d, h, min, sec, offset).ok_or(NameError::Malformed)
 }
 
 fn date(input: &[u8], short: bool, separator: u8) -> Result<Timestamp, NameError> {
@@ -1210,10 +1307,55 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 mod tests {
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
-        clock_fields_valid, decode_base36, decode_decimal, decode_long_timestamp_numeric_field,
-        decode_zone_offset_token, long_timestamp_field_bounds, long_timestamp_framing_valid,
-        parse_long_timestamp, time_separator_valid, LongTimestampField, NameError, Timestamp,
+        clock_fields_valid, compose_timestamp_fields, decode_base36, decode_decimal,
+        decode_long_timestamp_numeric_field, decode_zone_offset_token, long_timestamp_field_bounds,
+        long_timestamp_framing_valid, parse_long_timestamp, time_separator_valid,
+        LongTimestampField, NameError, Timestamp,
     };
+
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    #[test]
+    fn validated_timestamp_components_compose_exact_utc_seconds() {
+        for (fields, expected) in [
+            ((1970, 1, 1, 0, 0, 0, 0), 0),
+            ((1969, 12, 31, 23, 59, 59, 0), -1),
+            ((2000, 2, 29, 0, 0, 0, 0), 951_782_400),
+            ((2038, 1, 19, 3, 14, 7, 0), 2_147_483_647),
+            ((1970, 1, 1, 23, 59, 0, 86_340), 0),
+            ((1969, 12, 31, 0, 1, 0, -86_340), 0),
+        ] {
+            let (year, month, day, hour, minute, second, offset) = fields;
+            assert_eq!(
+                compose_timestamp_fields(year, month, day, hour, minute, second, offset),
+                Some(Timestamp(expected)),
+                "{fields:?}"
+            );
+        }
+
+        for fields in [
+            (1900, 1, 1, 0, 0, 0, 0),
+            (2100, 1, 1, 0, 0, 0, 0),
+            (2000, 0, 1, 0, 0, 0, 0),
+            (2001, 2, 29, 0, 0, 0, 0),
+            (2000, 1, 1, 24, 0, 0, 0),
+            (2000, 1, 1, 0, 60, 0, 0),
+            (2000, 1, 1, 0, 0, 60, 0),
+            (2000, 1, 1, 0, 0, 0, 86_341),
+            (2000, 1, 1, 0, 0, 0, -86_341),
+        ] {
+            let (year, month, day, hour, minute, second, offset) = fields;
+            assert_eq!(
+                compose_timestamp_fields(year, month, day, hour, minute, second, offset),
+                None,
+                "{fields:?}"
+            );
+        }
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-name-007

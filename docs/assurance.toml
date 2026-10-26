@@ -232,6 +232,35 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-timestamp-component-composition"
+gate = false
+requirements = ["PARSE-NAME-004", "PARSE-NAME-007"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Independently verifies that validated decoded calendar/clock fields and a
+# bounded explicit-zone offset compose to exact UTC seconds. parse_long_timestamp
+# calls this helper; framing, field decoding and full filename grammar remain
+# separate obligations.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "compose_timestamp_fields" },
+  { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
+]
+proofs = [
+  { id = "name-timestamp-component-composition-canonical", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "compose_timestamp_fields", kind = "contract" },
+  { id = "name-timestamp-component-composition-legacy", requirement = "PARSE-NAME-007", path = "crates/core/src/names.rs", symbol = "compose_timestamp_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::validated_timestamp_components_compose_exact_utc_seconds" },
+  { package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" },
+  { package = "duplicity-core", name = "explicit_zone_offset_boundaries_are_exact" },
+  { package = "duplicity-core", name = "explicit_zone_offset_uses_the_configured_separator" }
+]
+
+[[milestone]]
 id = "name-zone-token-decoder"
 gate = false
 requirements = ["PARSE-NAME-007"]
