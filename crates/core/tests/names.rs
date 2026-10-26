@@ -236,6 +236,30 @@ fn base36_overflow_and_increment_order() {
     assert_eq!(partial.envelope, Envelope::OpenPgp);
 }
 
+//= docs/parsing-requirements.md#parse-name-003
+//= type=test
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+#[test]
+fn short_name_timestamps_are_exact_epoch_seconds() {
+    let config = NameConfig::default();
+    for (name, expected) in [
+        (b"df.0.1.dt" as &[u8], 0),
+        (b"df.1.1.dt", 1),
+        (b"df.z.1.dt", 35),
+        (b"df.10.1.dt", 36),
+        (b"df.3w5e11264sgsf.1.dt", u64::MAX),
+    ] {
+        assert_eq!(
+            parse_name(name, config).unwrap().unwrap().start,
+            Timestamp(expected as i128),
+            "{name:?}"
+        );
+    }
+    for malformed in [b"df..1.dt" as &[u8], b"df.A.1.dt", b"df.3w5e11264sgsg.1.dt"] {
+        assert_eq!(parse_name(malformed, config), Err(NameError::Malformed));
+    }
+}
+
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.

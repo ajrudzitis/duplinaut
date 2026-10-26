@@ -182,6 +182,45 @@ pub fn decode_base36(input: &[u8]) -> (result: Option<u64>)
     Some(result)
 }
 
+/// Unix-epoch seconds represented by a short-name base36 timestamp.
+pub open spec fn short_timestamp_seconds_model(input: Seq<u8>) -> Option<int> {
+    if input.len() == 0 {
+        None
+    } else {
+        base36_value_model(input, input.len() as int)
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-003
+//= type=implementation
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+pub fn decode_short_timestamp(input: &[u8]) -> (result: Option<Timestamp>)
+    ensures match short_timestamp_seconds_model(input@) {
+        Some(seconds) => result matches Some(timestamp) && timestamp.0 as int == seconds,
+        None => result.is_none(),
+    },
+{
+    match decode_base36(input) {
+        Some(seconds) => {
+            proof {
+                reveal(short_timestamp_seconds_model);
+                assert(input@.len() > 0);
+                assert(base36_value_model(input@, input@.len() as int) == Some(seconds as int));
+            }
+            Some(Timestamp(seconds as i128))
+        }
+        None => {
+            proof {
+                reveal(short_timestamp_seconds_model);
+                if input@.len() > 0 {
+                    assert(base36_value_model(input@, input@.len() as int).is_none());
+                }
+            }
+            None
+        }
+    }
+}
+
 pub open spec fn decimal_digit_model(byte: u8) -> Option<int> {
     if b'0' <= byte && byte <= b'9' {
         Some((byte - b'0') as int)
@@ -1367,9 +1406,12 @@ fn numeral(input: &[u8], radix: u64) -> Result<u64, NameError> {
     Ok(result)
 }
 
+//= docs/parsing-requirements.md#parse-name-003
+//= type=implementation
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
 fn date(input: &[u8], short: bool, separator: u8) -> Result<Timestamp, NameError> {
     if short {
-        Ok(Timestamp(i128::from(numeral(input, 36)?)))
+        decode_short_timestamp(input).ok_or(NameError::Malformed)
     } else {
         parse_long_timestamp(input, separator)
     }
@@ -1556,9 +1598,9 @@ mod tests {
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
         clock_fields_valid, compose_timestamp_fields, decode_base36, decode_decimal,
-        decode_long_timestamp_numeric_field, decode_zone_offset_token, long_timestamp_field_bounds,
-        long_timestamp_framing_valid, parse_long_timestamp, time_separator_valid,
-        LongTimestampField, NameError, Timestamp,
+        decode_long_timestamp_numeric_field, decode_short_timestamp, decode_zone_offset_token,
+        long_timestamp_field_bounds, long_timestamp_framing_valid, parse_long_timestamp,
+        time_separator_valid, LongTimestampField, NameError, Timestamp,
     };
 
     //= docs/parsing-requirements.md#parse-name-004
@@ -1942,6 +1984,61 @@ mod tests {
             assert_eq!(decode_base36(invalid), None, "{invalid:?}");
         }
         assert_eq!(decode_base36(&encode_base36(u64::MAX as u128 + 1)), None);
+    }
+
+    //= docs/parsing-requirements.md#parse-name-003
+    //= type=test
+    //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    #[test]
+    fn short_timestamp_decodes_base36_epoch_seconds_exactly() {
+        for byte in 0..=u8::MAX {
+            let expected = decode_base36(&[byte]).map(|seconds| Timestamp(seconds as i128));
+            assert_eq!(
+                decode_short_timestamp(&[byte]),
+                expected,
+                "byte {byte:#04x}"
+            );
+        }
+        for high in 0..36u8 {
+            for low in 0..36u8 {
+                let digit = |value: u8| {
+                    if value < 10 {
+                        b'0' + value
+                    } else {
+                        b'a' + value - 10
+                    }
+                };
+                let text = [digit(high), digit(low)];
+                let seconds = u64::from(high) * 36 + u64::from(low);
+                assert_eq!(
+                    decode_short_timestamp(&text),
+                    Some(Timestamp(seconds as i128))
+                );
+            }
+        }
+        for seconds in [0, 1, 35, 36, 1295, u64::MAX as u128] {
+            let encoded = encode_base36(seconds);
+            assert_eq!(
+                decode_short_timestamp(&encoded),
+                Some(Timestamp(seconds as i128)),
+                "{seconds}"
+            );
+        }
+    }
+
+    //= docs/parsing-requirements.md#parse-name-003
+    //= type=test
+    //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    #[test]
+    fn short_timestamp_rejects_empty_invalid_and_overflowing_values() {
+        assert_eq!(decode_short_timestamp(b""), None);
+        for invalid in [b"A" as &[u8], b"-", b"_", b"0A", b"a_"] {
+            assert_eq!(decode_short_timestamp(invalid), None, "{invalid:?}");
+        }
+        assert_eq!(
+            decode_short_timestamp(&encode_base36(u64::MAX as u128 + 1)),
+            None
+        );
     }
 
     #[test]
