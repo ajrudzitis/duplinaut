@@ -2234,6 +2234,39 @@ closed spec fn long_incremental_manifest_fields_model(
     }
 }
 
+closed spec fn long_incremental_signatures_fields_model(
+    start_field: Seq<u8>,
+    separator: u8,
+    marker: Seq<u8>,
+    end_field: Seq<u8>,
+    trailer: Seq<u8>,
+    first: Option<Seq<u8>>,
+    second: Option<Seq<u8>>,
+    third: Option<Seq<u8>>,
+) -> Option<(int, int, Envelope, bool)> {
+    match (
+        long_interval_model(
+            ObjectKind::IncrementalSignatures,
+            start_field,
+            separator,
+            Some(marker),
+            Some(end_field),
+        ),
+        long_trailer_suffix_model(
+            ObjectKind::IncrementalSignatures,
+            trailer,
+            first,
+            second,
+            third,
+        ),
+    ) {
+        (Some((start, end)), Some((envelope, partial))) => {
+            Some((start, end, envelope, partial))
+        }
+        _ => None,
+    }
+}
+
 closed spec fn short_full_manifest_fields_model(
     start_field: Seq<u8>,
     trailer: Seq<u8>,
@@ -3481,6 +3514,107 @@ fn long_incremental_manifest_body_fields(
 //= docs/parsing-requirements.md#parse-name-004
 //= type=implementation
 //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+//= docs/parsing-requirements.md#parse-name-006
+//= type=implementation
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+verus! {
+#[allow(clippy::too_many_arguments)] // Long-name fields map directly to the parsed body.
+fn long_incremental_signatures_body_fields(
+    start_field: &[u8],
+    separator: u8,
+    marker: &[u8],
+    end_field: &[u8],
+    trailer: &[u8],
+    first: Option<&[u8]>,
+    second: Option<&[u8]>,
+    third: Option<&[u8]>,
+) -> (result: Result<ObjectName, NameError>)
+    ensures match result {
+        Err(_) => long_incremental_signatures_fields_model(
+            start_field@,
+            separator,
+            marker@,
+            end_field@,
+            trailer@,
+            optional_short_token(first),
+            optional_short_token(second),
+            optional_short_token(third),
+        ).is_none(),
+        Ok(name) => match long_incremental_signatures_fields_model(
+            start_field@,
+            separator,
+            marker@,
+            end_field@,
+            trailer@,
+            optional_short_token(first),
+            optional_short_token(second),
+            optional_short_token(third),
+        ) {
+            Some((start, end, envelope, partial)) =>
+                name.kind == ObjectKind::IncrementalSignatures
+                    && name.start.0 as int == start
+                    && name.end.0 as int == end
+                    && name.volume.is_none()
+                    && name.envelope == envelope
+                    && name.partial == partial
+                    && !name.short,
+            None => false,
+        },
+    },
+{
+    let (start, end) = decode_long_interval(
+        ObjectKind::IncrementalSignatures,
+        start_field,
+        separator,
+        Some(marker),
+        Some(end_field),
+    ).ok_or(NameError::Malformed)?;
+    let (envelope, partial) = decode_long_trailer_suffix(
+        ObjectKind::IncrementalSignatures,
+        trailer,
+        first,
+        second,
+        third,
+    ).ok_or(NameError::Malformed)?;
+    let result = ObjectName {
+        kind: ObjectKind::IncrementalSignatures,
+        start,
+        end,
+        volume: None,
+        envelope,
+        partial,
+        short: false,
+    };
+    proof {
+        reveal(long_incremental_signatures_fields_model);
+        assert(long_interval_model(
+            ObjectKind::IncrementalSignatures,
+            start_field@,
+            separator,
+            Some(marker@),
+            Some(end_field@),
+        ) == Some((start.0 as int, end.0 as int)));
+        assert(long_trailer_suffix_model(
+            ObjectKind::IncrementalSignatures,
+            trailer@,
+            optional_short_token(first),
+            optional_short_token(second),
+            optional_short_token(third),
+        ) == Some((envelope, partial)));
+    }
+    Ok(result)
+}
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
 //= docs/parsing-requirements.md#parse-name-007
 //= type=implementation
 //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
@@ -3955,6 +4089,29 @@ fn body(
             return Err(NameError::Malformed);
         }
         return long_incremental_manifest_body_fields(
+            start_field,
+            separator,
+            marker,
+            end_field,
+            trailer,
+            first,
+            second,
+            third,
+        );
+    }
+    if kind == ObjectKind::IncrementalSignatures && !short {
+        let mut fields = Some(input);
+        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+        let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+        let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+        let first = take_dot_field(&mut fields);
+        let second = take_dot_field(&mut fields);
+        let third = take_dot_field(&mut fields);
+        if take_dot_field(&mut fields).is_some() {
+            return Err(NameError::Malformed);
+        }
+        return long_incremental_signatures_body_fields(
             start_field,
             separator,
             marker,
