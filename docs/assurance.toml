@@ -268,11 +268,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Relates accepted canonical and legacy timestamp bytes to exact UTC seconds;
-# invalid configuration remains distinct from malformed timestamp input. This
-# does not refine the surrounding duplicity filename grammar.
+# Independently reviewed end-to-end refinement of accepted canonical and legacy
+# timestamp bytes to exact UTC seconds; invalid configuration remains distinct
+# from malformed input. The surrounding filename grammar remains open.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "long_timestamp_result_model" },
   { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
