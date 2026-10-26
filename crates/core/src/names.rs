@@ -1,9 +1,10 @@
 //! Bounded, timezone-independent duplicity basename parsing.
 //!
-//! This native checkpoint has no formal assurance claim yet. Configuration-dependent
-//! literal prefixes and Gregorian calendar arithmetic are explicit scalar kernels;
-//! verification must refine them against the reviewed grammar before the reader gate
-//! can become active. No regular expressions, locale, host timezone, or allocation.
+//! The complete native filename parser remains unrefined against the reviewed grammar,
+//! though individual kernels have contracts. Configuration-dependent literal prefixes
+//! and Gregorian calendar arithmetic are explicit scalar kernels. No regular
+//! expressions, locale, or host timezone are used.
+//! Delimiter fields use a bounded scalar scanner and return borrowed source slices.
 
 use crate::generated::names::CanonicalTimestampFmt;
 #[cfg(verus_keep_ghost)]
