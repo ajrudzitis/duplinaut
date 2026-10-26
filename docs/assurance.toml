@@ -1548,6 +1548,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-short-full-manifest-body"
+gate = false
+requirements = ["PARSE-NAME-001", "PARSE-NAME-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Short FullManifest body composition only: the short timestamp interval and
+# manifest trailer/suffix model produce an ObjectName with no volume field.
+# Other short object kinds and all long-name body profiles remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "short_full_manifest_body_fields" }
+]
+proofs = [
+  { id = "name-short-full-manifest-body", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_full_manifest_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "short_full_manifest_body_composes_fields_and_rejects_malformed_fields" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
