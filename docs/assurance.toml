@@ -1597,17 +1597,17 @@ tests = [
 
 [[milestone]]
 id = "name-short-incremental-signatures-body"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-003", "PARSE-NAME-006"]
 specified = true
 implemented = true
-proved = false
-tested = false
-reviewed = false
+proved = true
+tested = true
+reviewed = true
 proof_required = true
 # Short IncrementalSignatures body composition only: short timestamps, a
 # strictly increasing interval, and signature trailer/suffix fields produce an
-# ObjectName with no volume. Acceptance awaits independent review and full CI.
+# ObjectName with no volume. Independent review and full CI passed.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "body" },
   { path = "crates/core/src/names.rs", symbol = "short_incremental_signatures_body_fields" }
