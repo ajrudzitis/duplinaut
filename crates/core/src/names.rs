@@ -427,6 +427,27 @@ pub fn calendar_day_valid(year: u16, month: u8, day: u8) -> (result: bool)
     day >= 1 && day <= month_length(year, month)
 }
 
+pub open spec fn calendar_date_valid_model(year: int, month: int, day: int) -> bool {
+    1901 <= year && year <= 2099
+        && 1 <= month && month <= 12
+        && calendar_day_valid_model(year, month, day)
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+pub fn calendar_date_valid(year: i64, month: i64, day: i64) -> (result: bool)
+    ensures result == calendar_date_valid_model(year as int, month as int, day as int),
+{
+    if !matches!(year, 1901..=2099)
+        || !matches!(month, 1..=12)
+        || !matches!(day, 1..=31)
+    {
+        return false;
+    }
+    calendar_day_valid(year as u16, month as u8, day as u8)
+}
+
 pub open spec fn clock_fields_valid_model(hour: int, minute: int, second: int) -> bool {
     0 <= hour && hour <= 23 && 0 <= minute && minute <= 59 && 0 <= second && second <= 59
 }
@@ -603,10 +624,7 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
     let h = numeral(hour, 10)? as i64;
     let min = numeral(minute, 10)? as i64;
     let sec = numeral(second, 10)? as i64;
-    if !(1901..=2099).contains(&y) || !(1..=12).contains(&m) || !clock_fields_valid(h, min, sec) {
-        return Err(NameError::Malformed);
-    }
-    if !calendar_day_valid(y as u16, m as u8, d as u8) {
+    if !calendar_date_valid(y, m, d) || !clock_fields_valid(h, min, sec) {
         return Err(NameError::Malformed);
     }
     let offset = match zone {
@@ -819,7 +837,7 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 #[cfg(test)]
 mod tests {
     use super::{
-        calendar_day_valid, clock_fields_valid, decode_base36, decode_decimal,
+        calendar_date_valid, calendar_day_valid, clock_fields_valid, decode_base36, decode_decimal,
         parse_long_timestamp, time_separator_valid, NameError,
     };
 
@@ -866,6 +884,55 @@ mod tests {
                         calendar_day_valid(year, month, day),
                         (1..=days).contains(&day),
                         "{year:04}-{month:02}-{day:02}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    fn calendar_date_policy_rejects_out_of_profile_fields() {
+        for year in [i64::MIN, 1900, 1901, 2099, 2100, i64::MAX] {
+            for month in [i64::MIN, 0, 1, 12, 13, i64::MAX] {
+                for day in [i64::MIN, 0, 1, 28, 29, 30, 31, 32, i64::MAX] {
+                    let valid = matches!(year, 1901..=2099)
+                        && matches!(month, 1..=12)
+                        && if matches!(month, 1 | 3 | 5 | 7 | 8 | 10 | 12) {
+                            matches!(day, 1..=31)
+                        } else if month == 2 {
+                            let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+                            if leap {
+                                matches!(day, 1..=29)
+                            } else {
+                                matches!(day, 1..=28)
+                            }
+                        } else {
+                            matches!(day, 1..=30)
+                        };
+                    assert_eq!(calendar_date_valid(year, month, day), valid);
+                }
+            }
+        }
+        for year in 1901..=2099i64 {
+            for month in 1..=12i64 {
+                let max_day = if month == 2 {
+                    if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
+                        29
+                    } else {
+                        28
+                    }
+                } else if matches!(month, 4 | 6 | 9 | 11) {
+                    30
+                } else {
+                    31
+                };
+                for day in 0..=max_day + 1 {
+                    assert_eq!(
+                        calendar_date_valid(year, month, day),
+                        (1..=max_day).contains(&day)
                     );
                 }
             }

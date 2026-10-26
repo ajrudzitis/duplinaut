@@ -217,6 +217,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-calendar-date-policy"
+gate = false
+requirements = ["PARSE-NAME-004"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Proves the total supported-year/month/day predicate and traces its use in
+# long timestamp parsing. Field decoding, clock checks and UTC composition
+# remain separate obligations.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "calendar_date_valid" },
+  { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
+]
+proofs = [{ id = "name-calendar-date-policy", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "calendar_date_valid", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::calendar_date_policy_rejects_out_of_profile_fields" },
+  { package = "duplicity-core", name = "names::tests::calendar_day_predicate_matches_gregorian_month_boundaries" },
+  { package = "duplicity-core", name = "every_supported_calendar_day_is_contiguous" },
+  { package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" }
+]
+
+[[milestone]]
 id = "name-calendar-day-policy"
 gate = false
 requirements = ["PARSE-NAME-004"]
