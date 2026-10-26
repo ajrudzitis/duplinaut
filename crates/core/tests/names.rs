@@ -386,6 +386,97 @@ fn short_name_intervals_follow_full_and_incremental_kind_policy() {
     assert_eq!(max_interval.end, Timestamp(u64::MAX as i128));
 }
 
+//= docs/parsing-requirements.md#parse-name-004
+//= type=test
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+//= docs/parsing-requirements.md#parse-name-006
+//= type=test
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+//= docs/parsing-requirements.md#parse-name-007
+//= type=test
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+#[test]
+fn long_name_intervals_follow_all_kind_and_timestamp_profiles() {
+    let config = NameConfig::default();
+    for (name, kind, start, end) in [
+        (
+            b"duplicity-full.20231114T221320Z.vol1.difftar" as &[u8],
+            ObjectKind::FullVolume,
+            1_700_000_000,
+            1_700_000_000,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar",
+            ObjectKind::IncrementalVolume,
+            1_700_000_000,
+            1_700_086_400,
+        ),
+        (
+            b"duplicity-full.2023-11-14T22:13:20Z.manifest",
+            ObjectKind::FullManifest,
+            1_700_000_000,
+            1_700_000_000,
+        ),
+        (
+            b"duplicity-inc.2023-11-14T22:13:20Z.to.2023-11-15T22:13:20Z.manifest",
+            ObjectKind::IncrementalManifest,
+            1_700_000_000,
+            1_700_086_400,
+        ),
+        (
+            b"duplicity-full-signatures.20231114T221320Z.sigtar",
+            ObjectKind::FullSignatures,
+            1_700_000_000,
+            1_700_000_000,
+        ),
+        (
+            b"duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar",
+            ObjectKind::IncrementalSignatures,
+            1_700_000_000,
+            1_700_086_400,
+        ),
+    ] {
+        let parsed = parse_name(name, config).unwrap().unwrap();
+        assert_eq!(parsed.kind, kind, "{name:?}");
+        assert_eq!(parsed.start, Timestamp(start), "{name:?}");
+        assert_eq!(parsed.end, Timestamp(end), "{name:?}");
+    }
+
+    for malformed in [
+        b"duplicity-inc.20231114T221320Z.20231115T221320Z.vol1.difftar" as &[u8],
+        b"duplicity-inc.20231114T221320Z.from.20231115T221320Z.vol1.difftar",
+        b"duplicity-inc.20231114T221320Z.to.vol1.difftar",
+        b"duplicity-inc.20231114T221320Z.to.20231114T221320Z.vol1.difftar",
+        b"duplicity-inc.20231115T221320Z.to.20231114T221320Z.vol1.difftar",
+        b"duplicity-inc.20231114T221320Z.to.20230230T221320Z.vol1.difftar",
+        b"duplicity-new-signatures.20231114T221320Z.from.20231115T221320Z.sigtar",
+        b"duplicity-inc.2023-11-14T22:13:20Z.to.2023-11-13T22:13:20Z.manifest",
+    ] {
+        assert_eq!(
+            parse_name(malformed, config),
+            Err(NameError::Malformed),
+            "{malformed:?}"
+        );
+    }
+
+    let earliest = parse_name(
+        b"duplicity-inc.19010101T000000Z.to.19010102T000000Z.manifest",
+        config,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(earliest.start, Timestamp(-2_177_452_800));
+    assert_eq!(earliest.end, Timestamp(-2_177_366_400));
+    let latest = parse_name(
+        b"duplicity-inc.20991230T000000Z.to.20991231T000000Z.manifest",
+        config,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(latest.start, Timestamp(4_102_272_000));
+    assert_eq!(latest.end, Timestamp(4_102_358_400));
+}
+
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.

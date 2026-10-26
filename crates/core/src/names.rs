@@ -1558,6 +1558,287 @@ pub fn decode_short_interval(
     }
 }
 
+pub open spec fn long_kind_is_incremental_model(kind: ObjectKind) -> bool {
+    matches!(kind,
+        ObjectKind::IncrementalVolume
+            | ObjectKind::IncrementalManifest
+            | ObjectKind::IncrementalSignatures)
+}
+
+pub open spec fn long_to_marker_model(marker: Seq<u8>) -> bool {
+    marker.len() == 2 && marker[0] == b't' && marker[1] == b'o'
+}
+
+pub fn long_to_marker_matches(marker: &[u8]) -> (result: bool)
+    ensures result == long_to_marker_model(marker@),
+{
+    marker.len() == 2 && marker[0] == b't' && marker[1] == b'o'
+}
+
+pub open spec fn long_interval_model(
+    kind: ObjectKind,
+    start: Seq<u8>,
+    separator: u8,
+    marker: Option<Seq<u8>>,
+    end: Option<Seq<u8>>,
+) -> Option<(int, int)> {
+    if !time_separator_valid_model(separator) {
+        None
+    } else if long_kind_is_incremental_model(kind) {
+        match (marker, end) {
+            (Some(marker_bytes), Some(end_bytes))
+                if long_to_marker_model(marker_bytes) => match (
+                long_timestamp_result_model(start, separator),
+                long_timestamp_result_model(end_bytes, separator),
+            ) {
+                (Some(start_seconds), Some(end_seconds)) if end_seconds > start_seconds => {
+                    Some((start_seconds, end_seconds))
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    } else {
+        match (marker, end, long_timestamp_result_model(start, separator)) {
+            (None, None, Some(start_seconds)) => Some((start_seconds, start_seconds)),
+            _ => None,
+        }
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+//= docs/parsing-requirements.md#parse-name-006
+//= type=implementation
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+#[allow(clippy::manual_map)]
+pub fn decode_long_interval(
+    kind: ObjectKind,
+    start: &[u8],
+    separator: u8,
+    marker: Option<&[u8]>,
+    end: Option<&[u8]>,
+) -> (result: Option<(Timestamp, Timestamp)>)
+    ensures match long_interval_model(
+        kind,
+        start@,
+        separator,
+        optional_short_token(marker),
+        optional_short_token(end),
+    ) {
+        Some((start_seconds, end_seconds)) => result matches Some(interval)
+            && interval.0.0 as int == start_seconds
+            && interval.1.0 as int == end_seconds,
+        None => result.is_none(),
+    },
+{
+    if !time_separator_valid(separator) {
+        proof {
+            reveal(long_interval_model);
+            reveal(time_separator_valid_model);
+            assert(!time_separator_valid_model(separator));
+        }
+        return None;
+    }
+    proof {
+        assert(time_separator_valid_model(separator));
+    }
+    let incremental = matches!(
+        kind,
+        ObjectKind::IncrementalVolume
+            | ObjectKind::IncrementalManifest
+            | ObjectKind::IncrementalSignatures
+    );
+    let marker_is_to = match marker {
+        Some(token) => Some(long_to_marker_matches(token)),
+        None => None,
+    };
+    proof {
+        reveal(long_to_marker_model);
+        match marker {
+            Some(token) => assert(marker_is_to == Some(long_to_marker_model(token@))),
+            None => assert(marker_is_to.is_none()),
+        }
+        reveal(long_kind_is_incremental_model);
+        assert(incremental == long_kind_is_incremental_model(kind));
+    }
+    match (incremental, marker_is_to, end) {
+        (false, None, None) => {
+            let start_result = parse_long_timestamp(start, separator);
+            let start_timestamp = match start_result {
+                Ok(timestamp) => {
+                    proof {
+                        reveal(long_timestamp_result_model);
+                        match long_timestamp_result_model(start@, separator) {
+                            Some(seconds) => {
+                                assert(start_result == Ok(Timestamp(seconds as i128)));
+                                assert(timestamp == Timestamp(seconds as i128));
+                            }
+                            None => assert(false),
+                        }
+                    }
+                    timestamp
+                }
+                Err(_) => {
+                    proof {
+                        reveal(long_timestamp_result_model);
+                        assert(long_timestamp_result_model(start@, separator).is_none());
+                        reveal(long_interval_model);
+                        assert(long_interval_model(
+                            kind,
+                            start@,
+                            separator,
+                            optional_short_token(marker),
+                            optional_short_token(end),
+                        ).is_none());
+                    }
+                    return None;
+                }
+            };
+            proof {
+                reveal(long_interval_model);
+                reveal(long_kind_is_incremental_model);
+                reveal(long_timestamp_result_model);
+                assert(!long_kind_is_incremental_model(kind));
+                assert(marker.is_none());
+                assert(end.is_none());
+                assert(long_timestamp_result_model(start@, separator)
+                    == Some(start_timestamp.0 as int));
+                assert(long_interval_model(
+                    kind,
+                    start@,
+                    separator,
+                    optional_short_token(marker),
+                    optional_short_token(end),
+                ) == Some((start_timestamp.0 as int, start_timestamp.0 as int)));
+            }
+            Some((start_timestamp, start_timestamp))
+        }
+        (true, Some(true), Some(end_bytes)) => {
+            let start_result = parse_long_timestamp(start, separator);
+            let start_timestamp = match start_result {
+                Ok(timestamp) => {
+                    proof {
+                        reveal(long_timestamp_result_model);
+                        match long_timestamp_result_model(start@, separator) {
+                            Some(seconds) => {
+                                assert(start_result == Ok(Timestamp(seconds as i128)));
+                                assert(timestamp == Timestamp(seconds as i128));
+                            }
+                            None => assert(false),
+                        }
+                    }
+                    timestamp
+                }
+                Err(_) => {
+                    proof {
+                        reveal(long_timestamp_result_model);
+                        assert(long_timestamp_result_model(start@, separator).is_none());
+                        reveal(long_interval_model);
+                        assert(long_interval_model(
+                            kind,
+                            start@,
+                            separator,
+                            optional_short_token(marker),
+                            optional_short_token(end),
+                        ).is_none());
+                    }
+                    return None;
+                }
+            };
+            let end_result = parse_long_timestamp(end_bytes, separator);
+            let end_timestamp = match end_result {
+                Ok(timestamp) => {
+                    proof {
+                        reveal(long_timestamp_result_model);
+                        match long_timestamp_result_model(end_bytes@, separator) {
+                            Some(seconds) => {
+                                assert(end_result == Ok(Timestamp(seconds as i128)));
+                                assert(timestamp == Timestamp(seconds as i128));
+                            }
+                            None => assert(false),
+                        }
+                    }
+                    timestamp
+                }
+                Err(_) => {
+                    proof {
+                        reveal(long_timestamp_result_model);
+                        assert(long_timestamp_result_model(end_bytes@, separator).is_none());
+                        reveal(long_interval_model);
+                        assert(long_timestamp_result_model(start@, separator).is_some());
+                        assert(long_interval_model(
+                            kind,
+                            start@,
+                            separator,
+                            optional_short_token(marker),
+                            optional_short_token(end),
+                        ).is_none());
+                    }
+                    return None;
+                }
+            };
+            if !valid_set_interval(true, start_timestamp, end_timestamp) {
+                proof {
+                    reveal(long_interval_model);
+                    reveal(long_kind_is_incremental_model);
+                    reveal(long_timestamp_result_model);
+                    assert(long_timestamp_result_model(start@, separator)
+                        == Some(start_timestamp.0 as int));
+                    assert(long_timestamp_result_model(end_bytes@, separator)
+                        == Some(end_timestamp.0 as int));
+                    assert(end_timestamp.0 <= start_timestamp.0);
+                    assert(long_interval_model(
+                        kind,
+                        start@,
+                        separator,
+                        optional_short_token(marker),
+                        optional_short_token(end),
+                    ).is_none());
+                }
+                return None;
+            }
+            proof {
+                reveal(long_interval_model);
+                reveal(long_kind_is_incremental_model);
+                reveal(long_timestamp_result_model);
+                assert(long_timestamp_result_model(start@, separator)
+                    == Some(start_timestamp.0 as int));
+                assert(long_timestamp_result_model(end_bytes@, separator)
+                    == Some(end_timestamp.0 as int));
+                assert(end_timestamp.0 > start_timestamp.0);
+                assert(long_interval_model(
+                    kind,
+                    start@,
+                    separator,
+                    optional_short_token(marker),
+                    optional_short_token(end),
+                ) == Some((start_timestamp.0 as int, end_timestamp.0 as int)));
+            }
+            Some((start_timestamp, end_timestamp))
+        }
+        _ => {
+            proof {
+                reveal(long_interval_model);
+                reveal(long_kind_is_incremental_model);
+                reveal(long_timestamp_result_model);
+                assert(long_interval_model(
+                    kind,
+                    start@,
+                    separator,
+                    optional_short_token(marker),
+                    optional_short_token(end),
+                ).is_none());
+            }
+            None
+        }
+    }
+}
+
 //= docs/parsing-requirements.md#parse-name-006
 //= type=implementation
 //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
@@ -1581,9 +1862,15 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> (result: Result<Time
     ensures if !time_separator_valid_model(separator) {
         result == Err(NameError::Configuration)
     } else {
-        match long_timestamp_result_model(input@, separator) {
+        (match long_timestamp_result_model(input@, separator) {
             Some(seconds) => result == Ok(Timestamp(seconds as i128)),
             None => result == Err(NameError::Malformed),
+        })
+        && match result {
+            Ok(timestamp) => long_timestamp_result_model(input@, separator)
+                == Some(timestamp.0 as int),
+            Err(NameError::Malformed) => long_timestamp_result_model(input@, separator).is_none(),
+            _ => false,
         }
     },
 {
@@ -1750,17 +2037,6 @@ fn numeral(input: &[u8], radix: u64) -> Result<u64, NameError> {
     Ok(result)
 }
 
-//= docs/parsing-requirements.md#parse-name-003
-//= type=implementation
-//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
-fn date(input: &[u8], short: bool, separator: u8) -> Result<Timestamp, NameError> {
-    if short {
-        decode_short_timestamp(input).ok_or(NameError::Malformed)
-    } else {
-        parse_long_timestamp(input, separator)
-    }
-}
-
 const KINDS: [ObjectKind; 6] = [
     ObjectKind::FullVolume,
     ObjectKind::IncrementalVolume,
@@ -1816,19 +2092,23 @@ fn body(
         //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
         decode_short_interval(kind, start_field, end_field).ok_or(NameError::Malformed)?
     } else {
-        let start = date(start_field, false, separator)?;
-        let end = if incremental {
-            if fields.next() != Some(b"to") {
-                return Err(NameError::Malformed);
-            }
-            date(fields.next().ok_or(NameError::Malformed)?, false, separator)?
+        let marker = if incremental { fields.next() } else { None };
+        let end_field = if marker.is_some() {
+            fields.next()
         } else {
-            start
+            None
         };
-        if !valid_set_interval(incremental, start, end) {
-            return Err(NameError::Malformed);
-        }
-        (start, end)
+        //= docs/parsing-requirements.md#parse-name-004
+        //= type=implementation
+        //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+        //= docs/parsing-requirements.md#parse-name-006
+        //= type=implementation
+        //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+        //= docs/parsing-requirements.md#parse-name-007
+        //= type=implementation
+        //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+        decode_long_interval(kind, start_field, separator, marker, end_field)
+            .ok_or(NameError::Malformed)?
     };
     let volume = if matches!(kind, ObjectKind::FullVolume | ObjectKind::IncrementalVolume) {
         let field = fields.next().ok_or(NameError::Malformed)?;
@@ -2083,11 +2363,11 @@ mod tests {
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
         clock_fields_valid, compose_timestamp_fields, configured_prefix_remainder, decode_base36,
-        decode_decimal, decode_long_timestamp_numeric_field, decode_short_interval,
-        decode_short_timestamp, decode_short_trailer, decode_short_volume_number,
-        decode_zone_offset_token, long_timestamp_field_bounds, long_timestamp_framing_valid,
-        parse_long_timestamp, time_separator_valid, Envelope, LongTimestampField, NameError,
-        ObjectKind, Timestamp,
+        decode_decimal, decode_long_interval, decode_long_timestamp_numeric_field,
+        decode_short_interval, decode_short_timestamp, decode_short_trailer,
+        decode_short_volume_number, decode_zone_offset_token, long_timestamp_field_bounds,
+        long_timestamp_framing_valid, parse_long_timestamp, time_separator_valid, Envelope,
+        LongTimestampField, NameError, ObjectKind, Timestamp,
     };
 
     //= docs/parsing-requirements.md#parse-name-002
@@ -2551,6 +2831,102 @@ mod tests {
         for kind in full_kinds.into_iter().chain(incremental_kinds) {
             assert_eq!(decode_short_interval(kind, b"", None), None);
             assert_eq!(decode_short_interval(kind, b"A", None), None);
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    //= docs/parsing-requirements.md#parse-name-006
+    //= type=test
+    //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    fn long_interval_decoder_couples_kind_marker_timestamp_and_order_policy() {
+        let full_kinds = [
+            ObjectKind::FullVolume,
+            ObjectKind::FullManifest,
+            ObjectKind::FullSignatures,
+        ];
+        let incremental_kinds = [
+            ObjectKind::IncrementalVolume,
+            ObjectKind::IncrementalManifest,
+            ObjectKind::IncrementalSignatures,
+        ];
+        let canonical_start = b"20231114T221320Z";
+        let canonical_end = b"20231115T221320Z";
+        let legacy_start = b"2023-11-14T22:13:20Z";
+        let legacy_end = b"2023-11-15T22:13:20Z";
+        let expected_start = parse_long_timestamp(canonical_start, b':').unwrap();
+        let expected_end = parse_long_timestamp(canonical_end, b':').unwrap();
+
+        for kind in full_kinds {
+            for (start, separator) in [
+                (canonical_start as &[u8], b':'),
+                (legacy_start as &[u8], b':'),
+            ] {
+                let timestamp = parse_long_timestamp(start, separator).unwrap();
+                assert_eq!(
+                    decode_long_interval(kind, start, separator, None, None),
+                    Some((timestamp, timestamp)),
+                    "{kind:?} {start:?}"
+                );
+            }
+            assert_eq!(
+                decode_long_interval(kind, canonical_start, b':', Some(b"to"), None),
+                None
+            );
+        }
+
+        for kind in incremental_kinds {
+            for (start, end, separator, expected) in [
+                (
+                    canonical_start as &[u8],
+                    canonical_end as &[u8],
+                    b':',
+                    Some((expected_start, expected_end)),
+                ),
+                (
+                    legacy_start as &[u8],
+                    legacy_end as &[u8],
+                    b':',
+                    Some((expected_start, expected_end)),
+                ),
+                (
+                    b"19010101T000000Z" as &[u8],
+                    b"19010102T000000Z" as &[u8],
+                    b':',
+                    Some((Timestamp(-2_177_452_800), Timestamp(-2_177_366_400))),
+                ),
+                (
+                    b"20991230T000000Z" as &[u8],
+                    b"20991231T000000Z" as &[u8],
+                    b':',
+                    Some((Timestamp(4_102_272_000), Timestamp(4_102_358_400))),
+                ),
+            ] {
+                assert_eq!(
+                    decode_long_interval(kind, start, separator, Some(b"to"), Some(end)),
+                    expected,
+                    "{kind:?} {start:?}..{end:?}"
+                );
+            }
+            for (marker, end) in [
+                (None, Some(canonical_end as &[u8])),
+                (Some(b"TO" as &[u8]), Some(canonical_end as &[u8])),
+                (Some(b"to" as &[u8]), None),
+                (Some(b"to" as &[u8]), Some(b"bad" as &[u8])),
+                (Some(b"to" as &[u8]), Some(canonical_start as &[u8])),
+                (Some(b"to" as &[u8]), Some(b"20231113T221320Z" as &[u8])),
+            ] {
+                assert_eq!(
+                    decode_long_interval(kind, canonical_start, b':', marker, end),
+                    None,
+                    "{kind:?} {marker:?} {end:?}"
+                );
+            }
         }
     }
 
