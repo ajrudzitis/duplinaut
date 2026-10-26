@@ -1596,6 +1596,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-short-incremental-signatures-body"
+gate = false
+requirements = ["PARSE-NAME-001", "PARSE-NAME-003", "PARSE-NAME-006"]
+specified = true
+implemented = true
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+# Short IncrementalSignatures body composition only: short timestamps, a
+# strictly increasing interval, and signature trailer/suffix fields produce an
+# ObjectName with no volume. Acceptance awaits independent review and full CI.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_signatures_body_fields" }
+]
+proofs = [
+  { id = "name-short-incremental-signatures-body", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_incremental_signatures_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "short_incremental_signatures_body_composes_fields_and_rejects_malformed_fields" }
+]
+
+[[milestone]]
 id = "name-short-incremental-manifest-body"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-003", "PARSE-NAME-006"]
