@@ -1401,6 +1401,7 @@ tests = [
   { package = "duplicity-core", name = "public_crypto_reader_rejects_wrong_symmetric_credentials_without_snapshot_or_secret_disclosure" },
   { package = "duplicity-core", name = "public_crypto_reader_rejects_unsupported_pkesk_algorithm_without_snapshot" },
   { package = "duplicity-core", name = "public_crypto_reader_rejects_authenticated_manifest_ciphertext_mutation" },
+  { package = "duplicity-core", name = "public_reader_rejects_authenticated_nonfinal_ciphertext_topoff_mismatch" },
   { package = "duplicity-core", name = "signer_policy_rejects_plain_incremental_after_signed_encrypted_full" },
   { package = "duplicity-core", name = "crypto_decoded_and_each_receipt_bound_fail_through_catalog_reader" },
   { package = "duplicity-core", name = "multipart::openpgp_tests::authenticated_nonfinal_topoff_must_match_regenerated_ciphertext_prefix" },

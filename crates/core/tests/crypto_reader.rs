@@ -687,6 +687,160 @@ fn public_crypto_reader_rejects_authenticated_manifest_ciphertext_mutation() {
     ));
 }
 
+fn encrypt_test_seipdv1(plaintext: &[u8], password: &pgp::types::Password) -> Vec<u8> {
+    use pgp::{
+        composed::MessageBuilder,
+        crypto::{hash::HashAlgorithm, sym::SymmetricKeyAlgorithm},
+        types::StringToKey,
+    };
+    use rand::{rngs::StdRng, SeedableRng};
+
+    let mut rng = StdRng::seed_from_u64(0x6475_706c_696e_6175);
+    let mut message = MessageBuilder::from_bytes("", plaintext.to_vec())
+        .seipd_v1(&mut rng, SymmetricKeyAlgorithm::AES256);
+    message
+        .encrypt_with_password(
+            StringToKey::new_iterated(&mut rng, HashAlgorithm::Sha256, 0),
+            password,
+        )
+        .unwrap();
+    message.to_vec(&mut rng).unwrap()
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-017
+//= type=test
+//# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+//= docs/parsing-requirements.md#parse-env-020
+//= type=test
+//# Reader and multipart integration MUST admit decrypted data only through a private path that itself decodes the original stored object under the supplied policy and applies its correct envelope-specific container rules.
+//= docs/parsing-requirements.md#parse-multi-003
+//= type=test
+//# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+fn public_reader_rejects_authenticated_nonfinal_ciphertext_topoff_mismatch() {
+    use flate2::read::GzDecoder;
+    use sha1::Digest as _;
+    use std::io::Read as _;
+
+    let mut source = FixtureSource::new("plain", None);
+    let volume_suffix = "duplicity-full.20231114T221320Z.vol1.difftar.gz";
+    let volume_index = source
+        .values
+        .iter()
+        .position(|(object, _)| object.key.ends_with(volume_suffix))
+        .expect("official first full volume");
+    let original_stored = source.values[volume_index].1.clone();
+    let old_digest: String = sha1::Sha1::digest(&original_stored)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+
+    let mut plaintext = Vec::new();
+    GzDecoder::new(std::io::Cursor::new(&original_stored))
+        .read_to_end(&mut plaintext)
+        .expect("official first volume gzip");
+    // The official gzip volume ends at a completed tar-entry boundary rather
+    // than carrying the OpenPGP profile's record footer. Make the tar footer
+    // explicit before adding the top-off that exercises the encrypted rule.
+    let footer_cursor = plaintext.len();
+    let zero_end = footer_cursor + (10_240 - footer_cursor % 10_240);
+    plaintext.truncate(footer_cursor);
+    plaintext.resize(zero_end, 0);
+    // The encrypted stream authenticates this arbitrary suffix, but it is not
+    // the prefix of the exact stored ciphertext as a nonfinal volume requires.
+    plaintext.extend_from_slice(b"not-the-ciphertext-prefix");
+
+    let raw_password = "duplicity-reader-public-test-fixture";
+    let ciphertext = encrypt_test_seipdv1(&plaintext, &pgp::types::Password::from(raw_password));
+    let new_digest: String = sha1::Sha1::digest(&ciphertext)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    assert_ne!(old_digest, new_digest);
+
+    let new_key = source.values[volume_index]
+        .0
+        .key
+        .replace(".difftar.gz", ".difftar.gpg");
+    let new_identity = ObjectIdentity {
+        version_id: Some("fixture-v1".into()),
+        etag: Some(format!("{:x}", Sha256::digest(&ciphertext))),
+    };
+    source.values[volume_index] = (
+        StoredObject {
+            key: new_key,
+            size: ciphertext.len() as u64,
+            identity: new_identity,
+        },
+        ciphertext,
+    );
+
+    let manifest_index = source
+        .values
+        .iter()
+        .position(|(object, _)| {
+            object
+                .key
+                .ends_with("duplicity-full.20231114T221320Z.manifest")
+        })
+        .expect("official full manifest");
+    let (manifest_object, manifest_bytes) = &mut source.values[manifest_index];
+    let old = old_digest.as_bytes();
+    let positions: Vec<_> = manifest_bytes
+        .windows(old.len())
+        .enumerate()
+        .filter_map(|(index, window)| (window == old).then_some(index))
+        .collect();
+    assert_eq!(positions.len(), 1, "the first volume digest is unique");
+    manifest_bytes[positions[0]..positions[0] + old.len()].copy_from_slice(new_digest.as_bytes());
+    manifest_object.size = manifest_bytes.len() as u64;
+    manifest_object.identity.etag = Some(format!("{:x}", Sha256::digest(&*manifest_bytes)));
+
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .expect("modified source retains a valid discoverable catalog");
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .expect("full set is present")
+        .0;
+    let password = OpenPgpPassword::from(raw_password);
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    let result = catalog.read_snapshot_with_crypto(
+        anchor,
+        Timestamp(1700000000),
+        &Cancellation::default(),
+        &context,
+    );
+    assert!(
+        matches!(
+            result,
+            Err(ReaderError::Assembly(
+                duplicity_core::multipart::AssemblyError::Tar(
+                    duplicity_core::tar::TarError::Termination
+                )
+            ))
+        ),
+        "expected the public reader to reject the authenticated ciphertext top-off after digest verification, got {:?}",
+        result.as_ref().err()
+    );
+}
+
 #[test]
 //= docs/parsing-requirements.md#parse-env-024
 //= type=test
