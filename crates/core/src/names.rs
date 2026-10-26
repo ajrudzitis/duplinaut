@@ -1462,6 +1462,102 @@ pub open spec fn valid_set_interval_model(
     !incremental || end.0 > start.0
 }
 
+pub open spec fn short_kind_is_incremental_model(kind: ObjectKind) -> bool {
+    matches!(kind,
+        ObjectKind::IncrementalVolume
+            | ObjectKind::IncrementalManifest
+            | ObjectKind::IncrementalSignatures)
+}
+
+pub open spec fn short_interval_model(
+    kind: ObjectKind,
+    start: Seq<u8>,
+    end: Option<Seq<u8>>,
+) -> Option<(int, int)> {
+    match (short_kind_is_incremental_model(kind), short_timestamp_seconds_model(start), end) {
+        (false, Some(start_seconds), None) => Some((start_seconds, start_seconds)),
+        (true, Some(start_seconds), Some(end_bytes)) =>
+            match short_timestamp_seconds_model(end_bytes) {
+                Some(end_seconds) if end_seconds > start_seconds => Some((start_seconds, end_seconds)),
+                _ => None,
+            },
+        _ => None,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-003
+//= type=implementation
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+//= docs/parsing-requirements.md#parse-name-006
+//= type=implementation
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+pub fn decode_short_interval(
+    kind: ObjectKind,
+    start: &[u8],
+    end: Option<&[u8]>,
+) -> (result: Option<(Timestamp, Timestamp)>)
+    ensures match short_interval_model(kind, start@, optional_short_token(end)) {
+        Some((start_seconds, end_seconds)) => result matches Some(interval)
+            && interval.0.0 as int == start_seconds
+            && interval.1.0 as int == end_seconds,
+        None => result.is_none(),
+    },
+{
+    let incremental = matches!(
+        kind,
+        ObjectKind::IncrementalVolume
+            | ObjectKind::IncrementalManifest
+            | ObjectKind::IncrementalSignatures
+    );
+    let start_timestamp = decode_short_timestamp(start)?;
+    match (incremental, end) {
+        (false, None) => {
+            proof {
+                reveal(short_interval_model);
+                reveal(short_kind_is_incremental_model);
+                reveal(short_timestamp_seconds_model);
+                assert(short_interval_model(kind, start@, optional_short_token(end))
+                    == Some((start_timestamp.0 as int, start_timestamp.0 as int)));
+            }
+            Some((start_timestamp, start_timestamp))
+        }
+        (true, Some(end_bytes)) => match decode_short_timestamp(end_bytes) {
+            Some(end_timestamp) if valid_set_interval(true, start_timestamp, end_timestamp) => {
+                proof {
+                    reveal(short_interval_model);
+                    reveal(short_kind_is_incremental_model);
+                    reveal(short_timestamp_seconds_model);
+                    assert(start_timestamp.0 as int
+                        == short_timestamp_seconds_model(start@).unwrap());
+                    assert(end_timestamp.0 as int
+                        == short_timestamp_seconds_model(end_bytes@).unwrap());
+                    assert(end_timestamp.0 > start_timestamp.0);
+                }
+                Some((start_timestamp, end_timestamp))
+            }
+            _ => {
+                proof {
+                    reveal(short_interval_model);
+                    reveal(short_kind_is_incremental_model);
+                    if let Some(end_bytes) = end {
+                        if let Some(end_seconds) = short_timestamp_seconds_model(end_bytes@) {
+                            assert(end_seconds <= start_timestamp.0 as int);
+                        }
+                    }
+                }
+                None
+            }
+        },
+        _ => {
+            proof {
+                reveal(short_interval_model);
+                reveal(short_kind_is_incremental_model);
+            }
+            None
+        }
+    }
+}
+
 //= docs/parsing-requirements.md#parse-name-006
 //= type=implementation
 //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
@@ -1699,24 +1795,41 @@ fn body(
     separator: u8,
 ) -> Result<ObjectName, NameError> {
     let mut fields = input.split(|byte| *byte == b'.');
-    let start = date(fields.next().ok_or(NameError::Malformed)?, short, separator)?;
+    let start_field = fields.next().ok_or(NameError::Malformed)?;
     let incremental = matches!(
         kind,
         ObjectKind::IncrementalVolume
             | ObjectKind::IncrementalManifest
             | ObjectKind::IncrementalSignatures
     );
-    let end = if incremental {
-        if !short && fields.next() != Some(b"to") {
+    let (start, end) = if short {
+        let end_field = if incremental {
+            Some(fields.next().ok_or(NameError::Malformed)?)
+        } else {
+            None
+        };
+        //= docs/parsing-requirements.md#parse-name-003
+        //= type=implementation
+        //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+        //= docs/parsing-requirements.md#parse-name-006
+        //= type=implementation
+        //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+        decode_short_interval(kind, start_field, end_field).ok_or(NameError::Malformed)?
+    } else {
+        let start = date(start_field, false, separator)?;
+        let end = if incremental {
+            if fields.next() != Some(b"to") {
+                return Err(NameError::Malformed);
+            }
+            date(fields.next().ok_or(NameError::Malformed)?, false, separator)?
+        } else {
+            start
+        };
+        if !valid_set_interval(incremental, start, end) {
             return Err(NameError::Malformed);
         }
-        date(fields.next().ok_or(NameError::Malformed)?, short, separator)?
-    } else {
-        start
+        (start, end)
     };
-    if !valid_set_interval(incremental, start, end) {
-        return Err(NameError::Malformed);
-    }
     let volume = if matches!(kind, ObjectKind::FullVolume | ObjectKind::IncrementalVolume) {
         let field = fields.next().ok_or(NameError::Malformed)?;
         //= docs/parsing-requirements.md#parse-name-003
@@ -1970,10 +2083,11 @@ mod tests {
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
         clock_fields_valid, compose_timestamp_fields, configured_prefix_remainder, decode_base36,
-        decode_decimal, decode_long_timestamp_numeric_field, decode_short_timestamp,
-        decode_short_trailer, decode_short_volume_number, decode_zone_offset_token,
-        long_timestamp_field_bounds, long_timestamp_framing_valid, parse_long_timestamp,
-        time_separator_valid, Envelope, LongTimestampField, NameError, ObjectKind, Timestamp,
+        decode_decimal, decode_long_timestamp_numeric_field, decode_short_interval,
+        decode_short_timestamp, decode_short_trailer, decode_short_volume_number,
+        decode_zone_offset_token, long_timestamp_field_bounds, long_timestamp_framing_valid,
+        parse_long_timestamp, time_separator_valid, Envelope, LongTimestampField, NameError,
+        ObjectKind, Timestamp,
     };
 
     //= docs/parsing-requirements.md#parse-name-002
@@ -2381,6 +2495,63 @@ mod tests {
         }
         result.reverse();
         result
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-003
+    //= type=test
+    //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    //= docs/parsing-requirements.md#parse-name-006
+    //= type=test
+    //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+    fn short_interval_decoder_couples_kind_timestamp_and_order_policy() {
+        use super::ObjectKind;
+        let full_kinds = [
+            ObjectKind::FullVolume,
+            ObjectKind::FullManifest,
+            ObjectKind::FullSignatures,
+        ];
+        let incremental_kinds = [
+            ObjectKind::IncrementalVolume,
+            ObjectKind::IncrementalManifest,
+            ObjectKind::IncrementalSignatures,
+        ];
+
+        for kind in full_kinds {
+            assert_eq!(
+                decode_short_interval(kind, b"3w5e11264sgsf", None),
+                Some((Timestamp(u64::MAX as i128), Timestamp(u64::MAX as i128)))
+            );
+            assert_eq!(decode_short_interval(kind, b"1", Some(b"2")), None);
+        }
+        for kind in incremental_kinds {
+            for (start, end, expected) in [
+                (b"0" as &[u8], b"1" as &[u8], Some((0, 1))),
+                (
+                    b"3w5e11264sgse",
+                    b"3w5e11264sgsf",
+                    Some((u64::MAX - 1, u64::MAX)),
+                ),
+                (b"1", b"1", None),
+                (b"2", b"1", None),
+            ] {
+                assert_eq!(
+                    decode_short_interval(kind, start, Some(end)),
+                    expected.map(|(start, end)| (Timestamp(start as i128), Timestamp(end as i128))),
+                    "{kind:?} {start:?}..{end:?}"
+                );
+            }
+            assert_eq!(decode_short_interval(kind, b"1", None), None);
+            assert_eq!(decode_short_interval(kind, b"1", Some(b"A")), None);
+            assert_eq!(
+                decode_short_interval(kind, b"1", Some(b"3w5e11264sgsg")),
+                None
+            );
+        }
+        for kind in full_kinds.into_iter().chain(incremental_kinds) {
+            assert_eq!(decode_short_interval(kind, b"", None), None);
+            assert_eq!(decode_short_interval(kind, b"A", None), None);
+        }
     }
 
     #[test]

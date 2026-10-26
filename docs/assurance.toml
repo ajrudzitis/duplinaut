@@ -355,6 +355,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-short-interval"
+gate = false
+requirements = ["PARSE-NAME-003", "PARSE-NAME-006"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Short timestamp decoding plus full/incremental kind shape and strict interval
+# ordering only; complete body and long-name parsing remain separate.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "decode_short_interval" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-short-interval-timestamp", requirement = "PARSE-NAME-003", path = "crates/core/src/names.rs", symbol = "decode_short_interval", kind = "contract" },
+  { id = "name-short-interval-order", requirement = "PARSE-NAME-006", path = "crates/core/src/names.rs", symbol = "decode_short_interval", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::short_interval_decoder_couples_kind_timestamp_and_order_policy" },
+  { package = "duplicity-core", name = "short_name_intervals_follow_full_and_incremental_kind_policy" }
+]
+
+[[milestone]]
 id = "name-short-volume"
 gate = true
 requirements = ["PARSE-NAME-003"]

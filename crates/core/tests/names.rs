@@ -329,6 +329,63 @@ fn short_volume_numbers_are_positive_base36_and_long_volumes_remain_decimal() {
     );
 }
 
+//= docs/parsing-requirements.md#parse-name-003
+//= type=test
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+//= docs/parsing-requirements.md#parse-name-006
+//= type=test
+//# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+#[test]
+fn short_name_intervals_follow_full_and_incremental_kind_policy() {
+    let config = NameConfig::default();
+    for (name, kind) in [
+        (b"df.1.1.dt" as &[u8], ObjectKind::FullVolume),
+        (b"df.1.m", ObjectKind::FullManifest),
+        (b"dfs.1.st", ObjectKind::FullSignatures),
+        (b"di.1.2.1.dt", ObjectKind::IncrementalVolume),
+        (b"di.1.2.m", ObjectKind::IncrementalManifest),
+        (b"dns.1.2.st", ObjectKind::IncrementalSignatures),
+    ] {
+        let parsed = parse_name(name, config).unwrap().unwrap();
+        assert_eq!(parsed.kind, kind, "{name:?}");
+        assert_eq!(parsed.start, Timestamp(1), "{name:?}");
+        assert_eq!(
+            parsed.end,
+            if matches!(
+                kind,
+                ObjectKind::IncrementalVolume
+                    | ObjectKind::IncrementalManifest
+                    | ObjectKind::IncrementalSignatures
+            ) {
+                Timestamp(2)
+            } else {
+                Timestamp(1)
+            },
+            "{name:?}"
+        );
+    }
+    for malformed in [
+        b"di.1.1.1.dt" as &[u8],
+        b"di.2.1.1.dt",
+        b"di.3w5e11264sgsf.3w5e11264sgsf.1.dt",
+        b"di.1.3w5e11264sgsg.m",
+        b"dns.2.1.st",
+    ] {
+        assert_eq!(
+            parse_name(malformed, config),
+            Err(NameError::Malformed),
+            "{malformed:?}"
+        );
+    }
+    let max = parse_name(b"df.3w5e11264sgsf.m", config).unwrap().unwrap();
+    assert_eq!(max.start, Timestamp(u64::MAX as i128));
+    assert_eq!(max.end, max.start);
+    let max_interval = parse_name(b"di.3w5e11264sgse.3w5e11264sgsf.m", config)
+        .unwrap()
+        .unwrap();
+    assert_eq!(max_interval.end, Timestamp(u64::MAX as i128));
+}
+
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
