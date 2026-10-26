@@ -224,7 +224,7 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Proves the total supported-year/month/day predicate and traces its use in
 # long timestamp parsing. Field decoding, clock checks and UTC composition
