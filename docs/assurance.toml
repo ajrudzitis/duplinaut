@@ -381,13 +381,13 @@ tests = [
 
 [[milestone]]
 id = "name-long-interval"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-004", "PARSE-NAME-006", "PARSE-NAME-007"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Long timestamp endpoint composition and incremental marker/order only. Full
 # long filename suffix and complete parser refinement remain separate.
