@@ -1838,6 +1838,29 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-body-long-signatures-dispatch"
+gate = false
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = false
+proof_required = true
+# The long FullSignatures body selector is true exactly for that kind/profile
+# pair. Other object-kind dispatch and result refinement remain open.
+implementations = [
+  { path = "crates/core/src/name_dispatch.rs", symbol = "long_full_signatures_route" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-body-long-signatures-dispatch", requirement = "PARSE-NAME-001", path = "crates/core/src/name_dispatch.rs", symbol = "long_full_signatures_route", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::long_full_signatures_dispatch_selects_only_its_profile" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

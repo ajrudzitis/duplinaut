@@ -19,4 +19,22 @@ pub(crate) fn short_full_signatures_route(kind: ObjectKind, short: bool) -> (rou
         _ => false,
     }
 }
+
+pub open spec fn long_full_signatures_route_model(kind: ObjectKind, short: bool) -> bool {
+    kind == ObjectKind::FullSignatures && !short
+}
+
+/// Identify exactly the long FullSignatures route in the body dispatcher.
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+#[allow(clippy::match_like_matches_macro)]
+pub(crate) fn long_full_signatures_route(kind: ObjectKind, short: bool) -> (route: bool)
+    ensures route == long_full_signatures_route_model(kind, short),
+{
+    match (kind, short) {
+        (ObjectKind::FullSignatures, false) => true,
+        _ => false,
+    }
+}
 }
