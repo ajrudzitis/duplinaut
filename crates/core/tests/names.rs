@@ -260,6 +260,34 @@ fn short_name_timestamps_are_exact_epoch_seconds() {
     }
 }
 
+//= docs/parsing-requirements.md#parse-name-003
+//= type=test
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+#[test]
+fn short_volume_numbers_are_positive_base36_and_long_volumes_remain_decimal() {
+    let config = NameConfig::default();
+    for (name, volume) in [
+        (b"df.1.1.dt" as &[u8], 1),
+        (b"df.1.z.dt", 35),
+        (b"df.1.10.dt", 36),
+    ] {
+        assert_eq!(
+            parse_name(name, config).unwrap().unwrap().volume,
+            Some(volume)
+        );
+    }
+    for malformed in [b"df.1.0.dt" as &[u8], b"df.1.00.dt", b"df.1.A.dt"] {
+        assert_eq!(parse_name(malformed, config), Err(NameError::Malformed));
+    }
+    assert_eq!(
+        parse_name(b"duplicity-full.20231114T221320Z.vol10.difftar", config)
+            .unwrap()
+            .unwrap()
+            .volume,
+        Some(10)
+    );
+}
+
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.

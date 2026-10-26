@@ -355,6 +355,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-short-volume"
+gate = false
+requirements = ["PARSE-NAME-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Positive short-volume values are refined from base36 decoding; zero is
+# rejected by volume policy. Long-name volume fields remain decimal. Complete
+# short-name grammar and classification are outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "decode_short_volume_number" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [{ id = "name-short-volume", requirement = "PARSE-NAME-003", path = "crates/core/src/names.rs", symbol = "decode_short_volume_number", kind = "contract" }]
+tests = [
+  { package = "duplicity-core", name = "names::tests::short_volume_number_exhaustively_decodes_one_and_two_digits" },
+  { package = "duplicity-core", name = "names::tests::short_volume_number_rejects_empty_zero_invalid_and_overflow" },
+  { package = "duplicity-core", name = "short_volume_numbers_are_positive_base36_and_long_volumes_remain_decimal" }
+]
+
+[[milestone]]
 id = "name-base36-decoder"
 gate = false
 requirements = ["PARSE-NAME-003"]

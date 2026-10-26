@@ -221,6 +221,53 @@ pub fn decode_short_timestamp(input: &[u8]) -> (result: Option<Timestamp>)
     }
 }
 
+/// Positive volume number encoded in a short duplicity filename.
+pub open spec fn short_volume_number_model(input: Seq<u8>) -> Option<int> {
+    match base36_value_model(input, input.len() as int) {
+        Some(value) if value > 0 => Some(value),
+        _ => None,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-003
+//= type=implementation
+//# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+pub fn decode_short_volume_number(input: &[u8]) -> (result: Option<u64>)
+    ensures match short_volume_number_model(input@) {
+        Some(value) => result matches Some(actual) && actual as int == value,
+        None => result.is_none(),
+    },
+{
+    match decode_base36(input) {
+        Some(number) if number > 0 => {
+            proof {
+                reveal(short_volume_number_model);
+                assert(base36_value_model(input@, input@.len() as int) == Some(number as int));
+            }
+            Some(number)
+        }
+        Some(_) => {
+            proof {
+                reveal(short_volume_number_model);
+                assert(base36_value_model(input@, input@.len() as int) == Some(0));
+            }
+            None
+        }
+        None => {
+            proof {
+                reveal(short_volume_number_model);
+                if input@.len() == 0 {
+                    reveal(base36_value_model);
+                    assert(base36_value_model(input@, 0) == Some(0));
+                } else {
+                    assert(base36_value_model(input@, input@.len() as int).is_none());
+                }
+            }
+            None
+        }
+    }
+}
+
 pub open spec fn decimal_digit_model(byte: u8) -> Option<int> {
     if b'0' <= byte && byte <= b'9' {
         Some((byte - b'0') as int)
@@ -1471,17 +1518,19 @@ fn body(
     }
     let volume = if matches!(kind, ObjectKind::FullVolume | ObjectKind::IncrementalVolume) {
         let field = fields.next().ok_or(NameError::Malformed)?;
-        let number = numeral(
-            if short {
-                field
-            } else {
-                field.strip_prefix(b"vol").ok_or(NameError::Malformed)?
-            },
-            if short { 36 } else { 10 },
-        )?;
-        if number == 0 {
-            return Err(NameError::Malformed);
-        }
+        //= docs/parsing-requirements.md#parse-name-003
+        //= type=implementation
+        //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+        let number = if short {
+            decode_short_volume_number(field).ok_or(NameError::Malformed)?
+        } else {
+            let decimal = field.strip_prefix(b"vol").ok_or(NameError::Malformed)?;
+            let number = numeral(decimal, 10)?;
+            if number == 0 {
+                return Err(NameError::Malformed);
+            }
+            number
+        };
         Some(number)
     } else {
         None
@@ -1598,9 +1647,9 @@ mod tests {
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
         clock_fields_valid, compose_timestamp_fields, decode_base36, decode_decimal,
-        decode_long_timestamp_numeric_field, decode_short_timestamp, decode_zone_offset_token,
-        long_timestamp_field_bounds, long_timestamp_framing_valid, parse_long_timestamp,
-        time_separator_valid, LongTimestampField, NameError, Timestamp,
+        decode_long_timestamp_numeric_field, decode_short_timestamp, decode_short_volume_number,
+        decode_zone_offset_token, long_timestamp_field_bounds, long_timestamp_framing_valid,
+        parse_long_timestamp, time_separator_valid, LongTimestampField, NameError, Timestamp,
     };
 
     //= docs/parsing-requirements.md#parse-name-004
@@ -1984,6 +2033,55 @@ mod tests {
             assert_eq!(decode_base36(invalid), None, "{invalid:?}");
         }
         assert_eq!(decode_base36(&encode_base36(u64::MAX as u128 + 1)), None);
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-003
+    //= type=test
+    //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    fn short_volume_number_exhaustively_decodes_one_and_two_digits() {
+        for first in 0..=u8::MAX {
+            assert_eq!(
+                decode_short_volume_number(&[first]),
+                decode_base36(&[first]).filter(|number| *number > 0),
+                "byte {first:#04x}"
+            );
+        }
+        for high in 0..36u8 {
+            for low in 0..36u8 {
+                let digit = |value: u8| {
+                    if value < 10 {
+                        b'0' + value
+                    } else {
+                        b'a' + value - 10
+                    }
+                };
+                let encoded = [digit(high), digit(low)];
+                assert_eq!(
+                    decode_short_volume_number(&encoded),
+                    Some(u64::from(high) * 36 + u64::from(low)).filter(|number| *number > 0),
+                    "{encoded:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-003
+    //= type=test
+    //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    fn short_volume_number_rejects_empty_zero_invalid_and_overflow() {
+        assert_eq!(decode_short_volume_number(b""), None);
+        for zero in [b"0" as &[u8], b"00", b"000"] {
+            assert_eq!(decode_short_volume_number(zero), None);
+        }
+        for invalid in [b"A" as &[u8], b"-", b"_", b"0A", b"a_"] {
+            assert_eq!(decode_short_volume_number(invalid), None, "{invalid:?}");
+        }
+        assert_eq!(
+            decode_short_volume_number(&encode_base36(u64::MAX as u128 + 1)),
+            None
+        );
     }
 
     //= docs/parsing-requirements.md#parse-name-003
