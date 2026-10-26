@@ -330,6 +330,54 @@ pub(crate) fn time_separator_valid(byte: u8) -> (result: bool)
         && byte != b'z'
 }
 
+/// Exact punctuation and length framing for the supported long timestamp
+/// forms. Numeric fields and the zone token are validated by their own kernels.
+pub open spec fn long_timestamp_framing_model(input: Seq<u8>, separator: u8) -> bool {
+    (input.len() == 16
+        && (input[8] == b'T' || input[8] == b't')
+        && (input[15] == b'Z' || input[15] == b'z'))
+        || ((input.len() == 20 || input.len() == 25)
+            && input[4] == b'-'
+            && input[7] == b'-'
+            && (input[10] == b'T' || input[10] == b't')
+            && input[13] == separator
+            && input[16] == separator
+            && if input.len() == 20 {
+                input[19] == b'Z' || input[19] == b'z'
+            } else {
+                (input[19] == b'+' || input[19] == b'-') && input[22] == separator
+            })
+}
+
+//= docs/parsing-requirements.md#parse-name-004
+//= type=implementation
+//# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+//= docs/parsing-requirements.md#parse-name-007
+//= type=implementation
+//# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+pub fn long_timestamp_framing_valid(input: &[u8], separator: u8) -> (result: bool)
+    ensures result == long_timestamp_framing_model(input@, separator),
+{
+    match input.len() {
+        16 => (input[8] == b'T' || input[8] == b't')
+            && (input[15] == b'Z' || input[15] == b'z'),
+        20 => input[4] == b'-'
+            && input[7] == b'-'
+            && (input[10] == b'T' || input[10] == b't')
+            && input[13] == separator
+            && input[16] == separator
+            && (input[19] == b'Z' || input[19] == b'z'),
+        25 => input[4] == b'-'
+            && input[7] == b'-'
+            && (input[10] == b'T' || input[10] == b't')
+            && input[13] == separator
+            && input[16] == separator
+            && (input[19] == b'+' || input[19] == b'-')
+            && input[22] == separator,
+        _ => false,
+    }
+}
+
 /// Gregorian days between 1901-01-01 and January 1 of `year`.
 ///
 /// This is the bounded calendar arithmetic kernel used by the native long-name
@@ -799,6 +847,9 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> Result<Timestamp, Na
     if !time_separator_valid(separator) {
         return Err(NameError::Configuration);
     }
+    if !long_timestamp_framing_valid(input, separator) {
+        return Err(NameError::Malformed);
+    }
     if input.len() == 16 {
         let (consumed, _) = CanonicalTimestampFmt
             .parse(&input)
@@ -1040,7 +1091,8 @@ mod tests {
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
         clock_fields_valid, decode_base36, decode_decimal, decode_zone_offset_token,
-        parse_long_timestamp, time_separator_valid, NameError, Timestamp,
+        long_timestamp_framing_valid, parse_long_timestamp, time_separator_valid, NameError,
+        Timestamp,
     };
 
     #[test]
@@ -1407,6 +1459,60 @@ mod tests {
                 parse_long_timestamp(b"2024-01-01T12:34:56Z", separator),
                 Err(NameError::Configuration)
             );
+        }
+    }
+
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    #[test]
+    fn timestamp_framing_checks_all_supported_lengths_and_delimiters() {
+        let samples: [(&[u8], u8, &[usize]); 3] = [
+            (b"19700101T000000Z", b':', &[8, 15]),
+            (b"1970-01-01T00:00:00Z", b':', &[4, 7, 10, 13, 16, 19]),
+            (
+                b"1970-01-01t00_00_00+00_00",
+                b'_',
+                &[4, 7, 10, 13, 16, 19, 22],
+            ),
+        ];
+        for (sample, separator, positions) in samples {
+            assert!(
+                long_timestamp_framing_valid(sample, separator),
+                "{sample:?}"
+            );
+            for position in 0..sample.len() {
+                for byte in 0u8..=u8::MAX {
+                    let mut mutated = sample.to_vec();
+                    mutated[position] = byte;
+                    let expected = if positions.contains(&position) {
+                        match (sample.len(), position) {
+                            (16, 8) | (20 | 25, 10) => matches!(byte, b'T' | b't'),
+                            (16, 15) | (20, 19) => matches!(byte, b'Z' | b'z'),
+                            (25, 19) => matches!(byte, b'+' | b'-'),
+                            (25, 22) => byte == separator,
+                            (20 | 25, 13 | 16) => byte == separator,
+                            (20 | 25, 4 | 7) => byte == b'-',
+                            _ => unreachable!("unclassified framing position"),
+                        }
+                    } else {
+                        true
+                    };
+                    assert_eq!(
+                        long_timestamp_framing_valid(&mutated, separator),
+                        expected,
+                        "sample {sample:?}, position {position}, byte {byte:#04x}"
+                    );
+                }
+            }
+        }
+        for length in 0..=32 {
+            if !matches!(length, 16 | 20 | 25) {
+                assert!(!long_timestamp_framing_valid(&vec![b'0'; length], b':'));
+            }
         }
     }
 }

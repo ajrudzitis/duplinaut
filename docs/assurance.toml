@@ -174,6 +174,34 @@ proofs = [{ id = "name-days-before-year", requirement = "PARSE-NAME-004", path =
 tests = [{ package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" }, { package = "duplicity-core", name = "explicit_zone_offset_boundaries_are_exact" }, { package = "duplicity-core", name = "month_lengths_follow_gregorian_leap_year_rules" }, { package = "duplicity-core", name = "exact_names_suffixes_prefixes_and_limits" }, { package = "duplicity-core", name = "base36_overflow_and_increment_order" }, { package = "duplicity-core", name = "every_official_archive_basename_is_classified" }, { package = "duplicity-core", name = "every_supported_calendar_day_is_contiguous" }, { package = "duplicity-core", name = "truncated_and_byte_invalid_framing_is_rejected" }]
 
 [[milestone]]
+id = "name-timestamp-framing"
+gate = false
+requirements = ["PARSE-NAME-004", "PARSE-NAME-007"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Proves exact supported long-timestamp lengths and punctuation for canonical
+# UTC and legacy explicit-zone forms. Field digits, calendar values, zone
+# decoding, and the complete filename grammar remain separate obligations.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "long_timestamp_framing_valid" },
+  { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
+]
+proofs = [
+  { id = "name-timestamp-framing-canonical", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "long_timestamp_framing_valid", kind = "contract" },
+  { id = "name-timestamp-framing-legacy", requirement = "PARSE-NAME-007", path = "crates/core/src/names.rs", symbol = "long_timestamp_framing_valid", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::timestamp_framing_checks_all_supported_lengths_and_delimiters" },
+  { package = "duplicity-core", name = "gregorian_dates_and_zones_are_exact" },
+  { package = "duplicity-core", name = "explicit_zone_offset_boundaries_are_exact" },
+  { package = "duplicity-core", name = "explicit_zone_offset_uses_the_configured_separator" }
+]
+
+[[milestone]]
 id = "name-zone-token-decoder"
 gate = false
 requirements = ["PARSE-NAME-007"]
