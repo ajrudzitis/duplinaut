@@ -1800,6 +1800,116 @@ fn body(
 //= docs/parsing-requirements.md#parse-name-006
 //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
 
+verus! {
+pub open spec fn literal_prefix_model(input: Seq<u8>, prefix: Seq<u8>) -> bool {
+    prefix.len() <= input.len()
+        && forall|index: int| 0 <= index < prefix.len() ==> input[index] == prefix[index]
+}
+
+pub open spec fn configured_prefix_remainder_model(
+    input: Seq<u8>,
+    global_prefix: Seq<u8>,
+    kind_prefix: Seq<u8>,
+) -> Option<Seq<u8>> {
+    let global_end = global_prefix.len() as int;
+    let kind_end = global_end + kind_prefix.len() as int;
+    if literal_prefix_model(input, global_prefix)
+        && literal_prefix_model(input.subrange(global_end, input.len() as int), kind_prefix)
+    {
+        Some(input.subrange(kind_end, input.len() as int))
+    } else {
+        None
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-002
+//= type=implementation
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+pub fn configured_prefix_remainder<'a>(
+    input: &'a [u8],
+    global_prefix: &[u8],
+    kind_prefix: &[u8],
+) -> (result: Option<&'a [u8]>)
+    ensures match result {
+        Some(rest) => configured_prefix_remainder_model(input@, global_prefix@, kind_prefix@)
+            == Some(rest@),
+        None => configured_prefix_remainder_model(input@, global_prefix@, kind_prefix@).is_none(),
+    },
+{
+    if input.len() < global_prefix.len() {
+        proof {
+            reveal(configured_prefix_remainder_model);
+            reveal(literal_prefix_model);
+            assert(!literal_prefix_model(input@, global_prefix@));
+        }
+        return None;
+    }
+    let mut global_index = 0usize;
+    while global_index < global_prefix.len()
+        invariant global_index <= global_prefix.len(),
+            global_prefix.len() <= input.len(),
+            forall|index: int| 0 <= index < global_index as int
+                ==> input@[index] == global_prefix@[index],
+        decreases global_prefix.len() - global_index,
+    {
+        if input[global_index] != global_prefix[global_index] {
+            proof {
+                reveal(configured_prefix_remainder_model);
+                reveal(literal_prefix_model);
+                assert(!literal_prefix_model(input@, global_prefix@));
+            }
+            return None;
+        }
+        global_index += 1;
+    }
+    let after_global = &input[global_prefix.len()..];
+    proof {
+        reveal(literal_prefix_model);
+        assert(literal_prefix_model(input@, global_prefix@));
+        assert(after_global@ == input@.subrange(global_prefix.len() as int, input.len() as int));
+    }
+    if after_global.len() < kind_prefix.len() {
+        proof {
+            reveal(configured_prefix_remainder_model);
+            reveal(literal_prefix_model);
+            assert(!literal_prefix_model(after_global@, kind_prefix@));
+        }
+        return None;
+    }
+    let mut kind_index = 0usize;
+    while kind_index < kind_prefix.len()
+        invariant kind_index <= kind_prefix.len(),
+            kind_prefix.len() <= after_global.len(),
+            after_global@ == input@.subrange(global_prefix.len() as int, input.len() as int),
+            forall|index: int| 0 <= index < kind_index as int
+                ==> after_global@[index] == kind_prefix@[index],
+        decreases kind_prefix.len() - kind_index,
+    {
+        if after_global[kind_index] != kind_prefix[kind_index] {
+            proof {
+                reveal(configured_prefix_remainder_model);
+                reveal(literal_prefix_model);
+                assert(!literal_prefix_model(after_global@, kind_prefix@));
+            }
+            return None;
+        }
+        kind_index += 1;
+    }
+    let rest = &after_global[kind_prefix.len()..];
+    proof {
+        reveal(configured_prefix_remainder_model);
+        reveal(literal_prefix_model);
+        assert(literal_prefix_model(input@, global_prefix@));
+        assert(literal_prefix_model(after_global@, kind_prefix@));
+        assert(rest@ == after_global@.subrange(kind_prefix.len() as int, after_global.len() as int));
+        assert(input@.subrange(global_prefix.len() as int, input.len() as int)
+            .subrange(kind_prefix.len() as int, after_global.len() as int)
+            == input@.subrange((global_prefix.len() + kind_prefix.len()) as int, input.len() as int));
+    }
+    Some(rest)
+}
+}
+
 /// Parse a basename, not an S3 key. Unrelated names return `Ok(None)`.
 /// Conflicting prefix configurations producing distinct successful classifications
 /// return `Ambiguous`; malformed recognized stems are errors rather than ignored.
@@ -1822,9 +1932,6 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
     if input.contains(&b'/') || input.contains(&0) {
         return Err(NameError::Malformed);
     }
-    let Some(input) = input.strip_prefix(config.global_prefix) else {
-        return Ok(None);
-    };
     let mut recognized = false;
     let mut result = None;
     for kind in KINDS {
@@ -1833,7 +1940,10 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
             ObjectKind::FullManifest | ObjectKind::IncrementalManifest => config.manifest_prefix,
             _ => config.signature_prefix,
         };
-        let Some(rest) = input.strip_prefix(prefix) else {
+        //= docs/parsing-requirements.md#parse-name-002
+        //= type=implementation
+        //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+        let Some(rest) = configured_prefix_remainder(input, config.global_prefix, prefix) else {
             continue;
         };
         for short in [false, true] {
@@ -1859,12 +1969,82 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 mod tests {
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
-        clock_fields_valid, compose_timestamp_fields, decode_base36, decode_decimal,
-        decode_long_timestamp_numeric_field, decode_short_timestamp, decode_short_trailer,
-        decode_short_volume_number, decode_zone_offset_token, long_timestamp_field_bounds,
-        long_timestamp_framing_valid, parse_long_timestamp, time_separator_valid, Envelope,
-        LongTimestampField, NameError, ObjectKind, Timestamp,
+        clock_fields_valid, compose_timestamp_fields, configured_prefix_remainder, decode_base36,
+        decode_decimal, decode_long_timestamp_numeric_field, decode_short_timestamp,
+        decode_short_trailer, decode_short_volume_number, decode_zone_offset_token,
+        long_timestamp_field_bounds, long_timestamp_framing_valid, parse_long_timestamp,
+        time_separator_valid, Envelope, LongTimestampField, NameError, ObjectKind, Timestamp,
     };
+
+    //= docs/parsing-requirements.md#parse-name-002
+    //= type=test
+    //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+    #[test]
+    fn configured_prefix_remainder_matches_ordered_literal_bytes() {
+        let prefixes: [&[u8]; 7] = [b"", b"a", b"ab", b"a+", b"[g]", b"\0", b"/"];
+        for global in prefixes {
+            for kind in prefixes {
+                let mut exact = global.to_vec();
+                exact.extend_from_slice(kind);
+                exact.extend_from_slice(b"stem");
+                let expected = exact.strip_prefix(global).unwrap().strip_prefix(kind);
+                assert_eq!(
+                    configured_prefix_remainder(&exact, global, kind),
+                    expected,
+                    "global={global:?} kind={kind:?}"
+                );
+
+                if !global.is_empty() {
+                    let mut global_mismatch = exact.clone();
+                    global_mismatch[0] ^= 0xff;
+                    assert_eq!(
+                        configured_prefix_remainder(&global_mismatch, global, kind),
+                        None
+                    );
+                }
+
+                if !kind.is_empty() {
+                    let mut kind_mismatch = exact.clone();
+                    kind_mismatch[global.len()] ^= 0xff;
+                    assert_eq!(
+                        configured_prefix_remainder(&kind_mismatch, global, kind),
+                        None
+                    );
+                }
+
+                for input in [
+                    global,
+                    &exact[..global.len()],
+                    &exact[..global.len().saturating_add(kind.len()).saturating_sub(1)],
+                ] {
+                    let expected = input
+                        .strip_prefix(global)
+                        .and_then(|rest| rest.strip_prefix(kind));
+                    assert_eq!(configured_prefix_remainder(input, global, kind), expected);
+                }
+            }
+        }
+
+        for global in 0..=u8::MAX {
+            for kind in 0..=u8::MAX {
+                let input = [global, kind, 0, b'/'];
+                assert_eq!(
+                    configured_prefix_remainder(&input, &[global], &[kind]),
+                    Some(&input[2..])
+                );
+                let global_wrong = [global.wrapping_add(1), kind, 0, b'/'];
+                assert_eq!(
+                    configured_prefix_remainder(&global_wrong, &[global], &[kind]),
+                    None
+                );
+                let kind_wrong = [global, kind.wrapping_add(1), 0, b'/'];
+                assert_eq!(
+                    configured_prefix_remainder(&kind_wrong, &[global], &[kind]),
+                    None
+                );
+            }
+        }
+    }
 
     //= docs/parsing-requirements.md#parse-name-004
     //= type=test

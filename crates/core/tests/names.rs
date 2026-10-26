@@ -195,6 +195,47 @@ fn exact_names_suffixes_prefixes_and_limits() {
     );
 }
 
+//= docs/parsing-requirements.md#parse-name-002
+//= type=test
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+#[test]
+fn configured_name_prefixes_are_consumed_global_then_kind_specific() {
+    let base = b"duplicity-full.20231114T221320Z.vol1.difftar";
+    let config = NameConfig {
+        global_prefix: b"a",
+        archive_prefix: b"ab",
+        ..NameConfig::default()
+    };
+    let parsed = parse_name(&[b"aab" as &[u8], base].concat(), config)
+        .unwrap()
+        .unwrap();
+    assert_eq!(parsed.kind, ObjectKind::FullVolume);
+    assert_eq!(parsed.volume, Some(1));
+    assert_eq!(
+        parse_name(&[b"ab" as &[u8], base].concat(), config),
+        Ok(None)
+    );
+    assert_eq!(
+        parse_name(&[b"aa" as &[u8], base].concat(), config),
+        Ok(None)
+    );
+
+    let metacharacters = NameConfig {
+        global_prefix: b"[g]",
+        archive_prefix: b"a+",
+        ..NameConfig::default()
+    };
+    assert!(
+        parse_name(&[b"[g]a+" as &[u8], base].concat(), metacharacters)
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(
+        parse_name(&[b"ga+" as &[u8], base].concat(), metacharacters),
+        Ok(None)
+    );
+}
+
 //= docs/parsing-requirements.md#parse-name-003
 //= type=test
 //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
