@@ -1473,13 +1473,13 @@ tests = [
 
 [[milestone]]
 id = "name-body-dot-fields"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001", "PARSE-GEN-002"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Exact first-dot boundary and borrowed field/remainder slices only. The full
 # name loop and body-to-ObjectName refinement remain open.
