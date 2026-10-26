@@ -476,13 +476,13 @@ tests = [
 
 [[milestone]]
 id = "name-stem-selection"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Exact kind/profile-to-stem table only. This does not claim full name
 # recognition or body parsing.
