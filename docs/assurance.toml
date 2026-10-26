@@ -1815,16 +1815,17 @@ tests = [
 
 [[milestone]]
 id = "name-body-signatures-dispatch"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001"]
 specified = true
 implemented = true
 proved = true
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # The short FullSignatures body selector is true exactly for that kind/profile
 # pair. Long signatures and all other object-kind dispatch remain open.
+# Independent review and candidate full CI passed; integrated-state CI follows.
 implementations = [
   { path = "crates/core/src/name_dispatch.rs", symbol = "short_full_signatures_route" },
   { path = "crates/core/src/names.rs", symbol = "body" }
