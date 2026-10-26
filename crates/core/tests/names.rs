@@ -329,6 +329,43 @@ fn short_volume_numbers_are_positive_base36_and_long_volumes_remain_decimal() {
     );
 }
 
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-gen-003
+//= type=test
+//# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+#[test]
+fn long_volume_fields_require_positive_decimal_after_exact_vol_prefix() {
+    let config = NameConfig::default();
+    for (field, expected) in [(b"vol1" as &[u8], 1), (b"vol01", 1), (b"vol10", 10)] {
+        let mut name = b"duplicity-full.20231114T221320Z.".to_vec();
+        name.extend_from_slice(field);
+        name.extend_from_slice(b".difftar");
+        assert_eq!(
+            parse_name(&name, config).unwrap().unwrap().volume,
+            Some(expected)
+        );
+    }
+    for field in [
+        b"vol" as &[u8],
+        b"vol0",
+        b"vol00",
+        b"Vol1",
+        b"foo1",
+        b"vol1a",
+    ] {
+        let mut name = b"duplicity-full.20231114T221320Z.".to_vec();
+        name.extend_from_slice(field);
+        name.extend_from_slice(b".difftar");
+        assert_eq!(
+            parse_name(&name, config),
+            Err(NameError::Malformed),
+            "{field:?}"
+        );
+    }
+}
+
 //= docs/parsing-requirements.md#parse-name-003
 //= type=test
 //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.

@@ -644,6 +644,83 @@ pub fn decode_decimal(input: &[u8]) -> (result: Option<u64>)
     Some(result)
 }
 
+pub open spec fn long_volume_number_model(field: Seq<u8>) -> Option<int> {
+    if field.len() < 3 {
+        None
+    } else if field[0] != b'v' || field[1] != b'o' || field[2] != b'l' || field.len() == 3 {
+        None
+    } else {
+        match decimal_value_model(field.subrange(3, field.len() as int), field.len() as int - 3) {
+            Some(value) if value > 0 => Some(value),
+            _ => None,
+        }
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-gen-003
+//= type=implementation
+//# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+pub fn decode_long_volume_number(field: &[u8]) -> (result: Option<u64>)
+    ensures match long_volume_number_model(field@) {
+        Some(value) => result matches Some(actual) && actual as int == value,
+        None => result.is_none(),
+    },
+{
+    if field.len() < 3 {
+        proof {
+            reveal(long_volume_number_model);
+            assert(long_volume_number_model(field@).is_none());
+        }
+        return None;
+    }
+    if field[0] != b'v' || field[1] != b'o' || field[2] != b'l' {
+        proof {
+            reveal(long_volume_number_model);
+            assert(long_volume_number_model(field@).is_none());
+        }
+        return None;
+    }
+    if field.len() == 3 {
+        proof {
+            reveal(long_volume_number_model);
+            assert(long_volume_number_model(field@).is_none());
+        }
+        return None;
+    }
+    let digits = &field[3..];
+    proof {
+        reveal(long_volume_number_model);
+        assert(field@[0] == b'v' && field@[1] == b'o' && field@[2] == b'l');
+        assert(digits@ == field@.subrange(3, field@.len() as int));
+    }
+    match decode_decimal(digits) {
+        Some(number) if number > 0 => {
+            proof {
+                reveal(long_volume_number_model);
+                assert(decimal_value_model(digits@, digits@.len() as int) == Some(number as int));
+            }
+            Some(number)
+        }
+        Some(_) => {
+            proof {
+                reveal(long_volume_number_model);
+                assert(decimal_value_model(digits@, digits@.len() as int) == Some(0));
+            }
+            None
+        }
+        None => {
+            proof {
+                reveal(long_volume_number_model);
+                assert(decimal_value_model(digits@, digits@.len() as int).is_none());
+            }
+            None
+        }
+    }
+}
+
 /// The explicit reader policy for a configured separator in legacy timestamps.
 pub open spec fn time_separator_valid_model(byte: u8) -> bool {
     0x21 <= byte && byte <= 0x7e
@@ -2009,34 +2086,6 @@ impl Default for NameConfig<'_> {
     }
 }
 
-fn numeral(input: &[u8], radix: u64) -> Result<u64, NameError> {
-    if input.is_empty() {
-        return Err(NameError::Malformed);
-    }
-    if radix == 10 {
-        return decode_decimal(input).ok_or(NameError::Malformed);
-    }
-    if radix == 36 {
-        return decode_base36(input).ok_or(NameError::Malformed);
-    }
-    let mut result = 0u64;
-    for &byte in input {
-        let digit = match byte {
-            b'0'..=b'9' => u64::from(byte - b'0'),
-            b'a'..=b'z' if radix == 36 => u64::from(byte - b'a') + 10,
-            _ => return Err(NameError::Malformed),
-        };
-        if digit >= radix {
-            return Err(NameError::Malformed);
-        }
-        result = result
-            .checked_mul(radix)
-            .and_then(|value| value.checked_add(digit))
-            .ok_or(NameError::Malformed)?;
-    }
-    Ok(result)
-}
-
 const KINDS: [ObjectKind; 6] = [
     ObjectKind::FullVolume,
     ObjectKind::IncrementalVolume,
@@ -2118,12 +2167,13 @@ fn body(
         let number = if short {
             decode_short_volume_number(field).ok_or(NameError::Malformed)?
         } else {
-            let decimal = field.strip_prefix(b"vol").ok_or(NameError::Malformed)?;
-            let number = numeral(decimal, 10)?;
-            if number == 0 {
-                return Err(NameError::Malformed);
-            }
-            number
+            //= docs/parsing-requirements.md#parse-name-001
+            //= type=implementation
+            //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+            //= docs/parsing-requirements.md#parse-gen-003
+            //= type=implementation
+            //# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+            decode_long_volume_number(field).ok_or(NameError::Malformed)?
         };
         Some(number)
     } else {
@@ -2364,10 +2414,10 @@ mod tests {
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
         clock_fields_valid, compose_timestamp_fields, configured_prefix_remainder, decode_base36,
         decode_decimal, decode_long_interval, decode_long_timestamp_numeric_field,
-        decode_short_interval, decode_short_timestamp, decode_short_trailer,
-        decode_short_volume_number, decode_zone_offset_token, long_timestamp_field_bounds,
-        long_timestamp_framing_valid, parse_long_timestamp, time_separator_valid, Envelope,
-        LongTimestampField, NameError, ObjectKind, Timestamp,
+        decode_long_volume_number, decode_short_interval, decode_short_timestamp,
+        decode_short_trailer, decode_short_volume_number, decode_zone_offset_token,
+        long_timestamp_field_bounds, long_timestamp_framing_valid, parse_long_timestamp,
+        time_separator_valid, Envelope, LongTimestampField, NameError, ObjectKind, Timestamp,
     };
 
     //= docs/parsing-requirements.md#parse-name-002
@@ -3023,6 +3073,62 @@ mod tests {
             decode_short_volume_number(&encode_base36(u64::MAX as u128 + 1)),
             None
         );
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-gen-003
+    //= type=test
+    //# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+    fn long_volume_number_exhaustively_decodes_positive_decimal_tail() {
+        for byte in 0..=u8::MAX {
+            let mut field = b"vol".to_vec();
+            field.push(byte);
+            let expected = decode_decimal(&[byte]).filter(|number| *number > 0);
+            assert_eq!(decode_long_volume_number(&field), expected, "{field:?}");
+        }
+        for high in 0..=9u8 {
+            for low in 0..=9u8 {
+                let field = [b'v', b'o', b'l', b'0' + high, b'0' + low];
+                let expected =
+                    Some(u64::from(high) * 10 + u64::from(low)).filter(|number| *number > 0);
+                assert_eq!(decode_long_volume_number(&field), expected, "{field:?}");
+            }
+        }
+        for value in [1, 9, 10, 99, u32::MAX as u64, u64::MAX] {
+            let field = format!("vol{value}");
+            assert_eq!(decode_long_volume_number(field.as_bytes()), Some(value));
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-gen-003
+    //= type=test
+    //# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+    fn long_volume_number_rejects_bad_prefix_zero_invalid_and_overflow() {
+        for malformed in [
+            b"" as &[u8],
+            b"v",
+            b"vo",
+            b"vol",
+            b"vol0",
+            b"vol00",
+            b"Vol1",
+            b"VOL1",
+            b"voL1",
+            b"vol-1",
+            b"vol1a",
+            b"vol_1",
+        ] {
+            assert_eq!(decode_long_volume_number(malformed), None, "{malformed:?}");
+        }
+        let overflow = format!("vol{}", u64::MAX as u128 + 1);
+        assert_eq!(decode_long_volume_number(overflow.as_bytes()), None);
     }
 
     #[test]

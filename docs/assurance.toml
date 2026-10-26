@@ -443,8 +443,7 @@ proof_required = true
 # invalid digits and overflow. Decimal date-field decoding, zero-volume policy,
 # and complete short-name grammar remain outside this scalar decoder proof.
 implementations = [
-  { path = "crates/core/src/names.rs", symbol = "decode_base36" },
-  { path = "crates/core/src/names.rs", symbol = "numeral" }
+  { path = "crates/core/src/names.rs", symbol = "decode_base36" }
 ]
 proofs = [{ id = "name-base36-decoder", requirement = "PARSE-NAME-003", path = "crates/core/src/names.rs", symbol = "decode_base36", kind = "contract" }]
 tests = [
@@ -498,6 +497,32 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-volume"
+gate = false
+requirements = ["PARSE-NAME-001", "PARSE-GEN-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = true
+# Exact long-volume field prefix, decimal range, and positive-value policy only.
+# Complete long-name and filename classification remain separate obligations.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "decode_long_volume_number" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-long-volume-field", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "decode_long_volume_number", kind = "contract" },
+  { id = "name-long-volume-bounds", requirement = "PARSE-GEN-003", path = "crates/core/src/names.rs", symbol = "decode_long_volume_number", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::long_volume_number_exhaustively_decodes_positive_decimal_tail" },
+  { package = "duplicity-core", name = "names::tests::long_volume_number_rejects_bad_prefix_zero_invalid_and_overflow" },
+  { package = "duplicity-core", name = "long_volume_fields_require_positive_decimal_after_exact_vol_prefix" }
+]
+
+[[milestone]]
 id = "name-decimal-decoder"
 gate = false
 requirements = ["PARSE-NAME-004"]
@@ -511,8 +536,7 @@ proof_required = true
 # invalid digits and overflow. Calendar validity, timestamp framing, and the
 # complete long-name parser remain outside this scalar decoder proof.
 implementations = [
-  { path = "crates/core/src/names.rs", symbol = "decode_decimal" },
-  { path = "crates/core/src/names.rs", symbol = "numeral" }
+  { path = "crates/core/src/names.rs", symbol = "decode_decimal" }
 ]
 proofs = [{ id = "name-decimal-decoder", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "decode_decimal", kind = "contract" }]
 tests = [

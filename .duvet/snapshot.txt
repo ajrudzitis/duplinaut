@@ -6,7 +6,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,test]: A successful parser MUST report a consumed input range wholly contained within the supplied input.
 
   SECTION: [PARSE-GEN-003](#parse-gen-003)
-    TEXT[!MUST,implementation]: A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+    TEXT[!MUST,implementation,test]: A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
 
   SECTION: [PARSE-GEN-004](#parse-gen-004)
     TEXT[!MUST]: A parser MUST terminate without panicking on every finite input within its configured resource limits.
