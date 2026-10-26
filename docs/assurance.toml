@@ -200,7 +200,7 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Proves the scalar policy: non-incremental names accept every endpoint pair;
 # incremental names require a strictly increasing interval. Timestamp parsing
