@@ -426,13 +426,13 @@ tests = [
 
 [[milestone]]
 id = "name-prefix-order"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-002"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Literal global-then-kind prefix slicing only; the stem and complete filename
 # classification remain outside this checkpoint.
