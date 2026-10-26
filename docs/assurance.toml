@@ -132,7 +132,7 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Proves the configured byte predicate and its configuration-error boundary.
 # Timestamp framing, calendar conversion, and complete filename parsing remain
