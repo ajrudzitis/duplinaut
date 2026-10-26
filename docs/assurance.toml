@@ -1573,13 +1573,13 @@ tests = [
 
 [[milestone]]
 id = "name-short-full-signatures-body"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-003"]
 specified = true
 implemented = true
-proved = false
-tested = false
-reviewed = false
+proved = true
+tested = true
+reviewed = true
 proof_required = true
 # Short FullSignatures body composition only: the short timestamp interval and
 # signature trailer/suffix model produce an ObjectName with no volume field.
