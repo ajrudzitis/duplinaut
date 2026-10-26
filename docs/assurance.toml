@@ -209,11 +209,11 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
-# Relates each timestamp field to its exact canonical or legacy byte slice and
-# proves decimal decoding of that slice. Overall timestamp and filename grammar
-# refinement remains a separate open obligation.
+# Independently reviewed field bounds and decimal decoding for exact canonical
+# or legacy byte slices. Overall timestamp and filename grammar refinement
+# remains a separate open obligation.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "long_timestamp_field_bounds" },
   { path = "crates/core/src/names.rs", symbol = "decode_long_timestamp_numeric_field" },
