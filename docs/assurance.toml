@@ -404,13 +404,13 @@ tests = [
 
 [[milestone]]
 id = "name-short-trailer"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Exact short-name trailer/envelope/partial classification only. The complete
 # filename parser and long-name trailer policy remain separate obligations.
