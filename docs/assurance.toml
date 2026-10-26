@@ -491,11 +491,12 @@ specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # A clear cancellation observation after successful reconstruction is required
 # to advance the ordered completion cursor. AtomicBool timing/races, snapshot
 # state rollback and whole-reader refinement remain outside this transition.
+# Independent review accepted the transition and trace mapping before integration.
 implementations = [
   { path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" },
   { path = "crates/core/src/verified/reader_completion.rs", symbol = "commit_set_completion" }
