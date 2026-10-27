@@ -179,17 +179,17 @@ tests = [{ package = "duplicity-core", name = "gregorian_dates_and_zones_are_exa
 
 [[milestone]]
 id = "name-timestamp-framing"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-004", "PARSE-NAME-007"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Independently reviewed exact supported long-timestamp lengths and punctuation
-# for canonical UTC and legacy explicit-zone forms. Field digits, calendar
-# values, zone decoding, and complete filename grammar remain separate.
+# Exact supported long-timestamp lengths and punctuation for canonical UTC and
+# legacy explicit-zone forms only. Numeric fields, calendar values, zone
+# decoding, and complete filename grammar remain separate.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "long_timestamp_framing_valid" },
   { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
