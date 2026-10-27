@@ -3192,6 +3192,63 @@ fn stem(kind: ObjectKind, short: bool) -> (result: &'static [u8])
         (ObjectKind::IncrementalSignatures, true) => b"dns.",
     }
 }
+
+closed spec fn stem_remainder_model(input: Seq<u8>, prefix: Seq<u8>) -> Option<Seq<u8>> {
+    if prefix.len() <= input.len()
+        && input.subrange(0, prefix.len() as int) == prefix
+    {
+        Some(input.subrange(prefix.len() as int, input.len() as int))
+    } else {
+        None
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+fn stem_remainder<'a>(input: &'a [u8], prefix: &[u8]) -> (result: Option<&'a [u8]>)
+    ensures match result {
+        Some(rest) => prefix.len() <= input.len()
+            && prefix@ == input@.subrange(0, prefix.len() as int)
+            && rest@ == input@.subrange(prefix.len() as int, input@.len() as int)
+            && Some(rest@) == stem_remainder_model(input@, prefix@),
+        None => stem_remainder_model(input@, prefix@).is_none(),
+    },
+{
+    if prefix.len() > input.len() {
+        proof {
+            reveal(stem_remainder_model);
+            assert(prefix.len() > input.len());
+        }
+        return None;
+    }
+
+    let mut matched = 0usize;
+    while matched < prefix.len()
+        invariant matched <= prefix.len(),
+            prefix.len() <= input.len(),
+            forall|index: int| 0 <= index < matched as int
+                ==> input@[index] == prefix@[index],
+        decreases prefix.len() - matched,
+    {
+        if input[matched] != prefix[matched] {
+            proof {
+                reveal(stem_remainder_model);
+                assert(input@[matched as int] != prefix@[matched as int]);
+                assert(input@.subrange(0, prefix.len() as int) != prefix@);
+            }
+            return None;
+        }
+        matched += 1;
+    }
+
+    proof {
+        reveal(stem_remainder_model);
+        assert(matched == prefix.len());
+        assert(input@.subrange(0, prefix.len() as int) == prefix@);
+    }
+    Some(&input[prefix.len()..])
+}
 }
 
 //= docs/parsing-requirements.md#parse-name-001
@@ -4911,7 +4968,7 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
         let Some(rest) = configured_prefix_remainder(input, config.global_prefix, prefix) else {
             continue;
         };
-        if let Some(rest) = rest.strip_prefix(stem(kind, short)) {
+        if let Some(rest) = stem_remainder(rest, stem(kind, short)) {
             recognized = true;
             if let Ok(parsed) = body(rest, kind, short, config.time_separator) {
                 //= docs/parsing-requirements.md#parse-name-001
@@ -4962,6 +5019,42 @@ mod tests {
             assert_eq!(pair[0].0, pair[1].0);
             assert!(!pair[0].1);
             assert!(pair[1].1);
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn stem_remainder_matches_exact_prefix_and_returns_borrowed_tail() {
+        assert_eq!(
+            super::stem_remainder(b"duplicity-full.manifest", b"duplicity-full."),
+            Some(&b"manifest"[..])
+        );
+        assert_eq!(super::stem_remainder(b"df.", b"df."), Some(&b""[..]));
+        assert_eq!(
+            super::stem_remainder(b"anything", b""),
+            Some(&b"anything"[..])
+        );
+        assert_eq!(super::stem_remainder(b"", b""), Some(&b""[..]));
+
+        for (kind, short) in super::name_candidate_table() {
+            let prefix = super::stem(kind, short);
+            let input = [prefix, b"matched-suffix"].concat();
+            assert_eq!(
+                super::stem_remainder(&input, prefix),
+                Some(&input[prefix.len()..]),
+                "{kind:?}, short={short}"
+            );
+        }
+
+        for (input, prefix) in [
+            (&b"dg.rest"[..], &b"df."[..]),
+            (&b"df"[..], &b"df."[..]),
+            (&b"duplicity-fullXrest"[..], &b"duplicity-full."[..]),
+            (&b""[..], &b"df."[..]),
+        ] {
+            assert_eq!(super::stem_remainder(input, prefix), None);
         }
     }
 
