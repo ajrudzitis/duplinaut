@@ -616,11 +616,11 @@ tests = [
 
 [[milestone]]
 id = "name-decimal-decoder"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-004"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
