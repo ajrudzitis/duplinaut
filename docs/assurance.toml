@@ -1961,6 +1961,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-full-manifest-raw-body-controller"
+gate = true
+requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-007"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Successful long FullManifest body parsing composes exact raw dot/suffix
+# extraction with the canonical/legacy timestamp and manifest trailer model.
+# Errors and other parser routes remain outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "long_full_manifest_body_fields" }
+]
+proofs = [
+  { id = "name-long-full-manifest-raw-body-controller", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "body", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "long_full_manifest_body_composes_fields_and_rejects_malformed_fields" }
+]
+
+[[milestone]]
 id = "name-long-incremental-manifest-body"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-006", "PARSE-NAME-007"]

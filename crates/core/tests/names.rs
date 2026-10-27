@@ -1116,7 +1116,19 @@ fn long_full_manifest_body_composes_fields_and_rejects_malformed_fields() {
         assert!(!name.short, "{bytes:?}");
     }
 
+    let nontrivial_timestamp = parse_name(b"duplicity-full.19700101T000001Z.manifest", config)
+        .unwrap()
+        .unwrap();
+    assert_eq!(nontrivial_timestamp.kind, ObjectKind::FullManifest);
+    assert_eq!(nontrivial_timestamp.start, Timestamp(1));
+    assert_eq!(nontrivial_timestamp.end, Timestamp(1));
+    assert_eq!(nontrivial_timestamp.volume, None);
+    assert_eq!(nontrivial_timestamp.envelope, Envelope::Plain);
+    assert!(!nontrivial_timestamp.partial);
+    assert!(!nontrivial_timestamp.short);
+
     for malformed in [
+        b"duplicity-full..manifest" as &[u8],
         b"duplicity-full.bad.manifest" as &[u8],
         b"duplicity-full.20231114T221320Z",
         b"duplicity-full.20231114T221320Z.wrong",

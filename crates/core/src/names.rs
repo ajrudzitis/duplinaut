@@ -2397,6 +2397,37 @@ closed spec fn long_full_manifest_fields_model(
     }
 }
 
+closed spec fn long_full_manifest_raw_body_model(
+    input: Seq<u8>,
+    separator: u8,
+    start: int,
+    end: int,
+    envelope: Envelope,
+    partial: bool,
+) -> bool {
+    exists|start_field: Seq<u8>, trailer: Seq<u8>,
+        first: Option<Seq<u8>>, second: Option<Seq<u8>>, third: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>, after_trailer: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            long_full_manifest_fields_model(
+                start_field, separator, trailer, first, second, third,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(trailer), after_trailer)
+            && body_suffix_fields_model(
+                after_trailer, first, second, third, extra, None,
+            )
+            && extra.is_none()
+            && long_full_manifest_fields_model(
+                start_field, separator, trailer, first, second, third,
+            ) == Some((start, end, envelope, partial))
+}
+
 closed spec fn long_full_signatures_fields_model(
     start_field: Seq<u8>,
     separator: u8,
@@ -4538,6 +4569,16 @@ fn body(
                         name.envelope,
                         name.partial,
                     )
+            } else if kind == ObjectKind::FullManifest && !short {
+                name.volume.is_none()
+                    && long_full_manifest_raw_body_model(
+                        input@,
+                        separator,
+                        name.start.0 as int,
+                        name.end.0 as int,
+                        name.envelope,
+                        name.partial,
+                    )
             } else {
                 true
             },
@@ -4684,12 +4725,46 @@ fn body(
         crate::name_dispatch::BodyRoute::LongFullManifest => {
             let mut fields = Some(input);
             let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let _after_start = fields;
             let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let _after_trailer = fields;
             let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-            if extra.is_some() {
+            if extra.is_some() || fields.is_some() {
                 return Err(NameError::Malformed);
             }
-            long_full_manifest_body_fields(start_field, separator, trailer, first, second, third)
+            let result = long_full_manifest_body_fields(
+                start_field,
+                separator,
+                trailer,
+                first,
+                second,
+                third,
+            );
+            proof {
+                if let Ok(name) = result {
+                    reveal(long_full_manifest_raw_body_model);
+                    reveal(long_full_manifest_fields_model);
+                    reveal(body_suffix_fields_model);
+                    reveal(body_field_split_model);
+                    assert(body_field_split_model(
+                        Some(input@), Some(start_field@),
+                        optional_body_field_model(_after_start),
+                    ));
+                    assert(body_field_split_model(
+                        optional_body_field_model(_after_start), Some(trailer@),
+                        optional_body_field_model(_after_trailer),
+                    ));
+                    assert(body_suffix_fields_model(
+                        optional_body_field_model(_after_trailer),
+                        optional_body_field_model(first),
+                        optional_body_field_model(second),
+                        optional_body_field_model(third),
+                        optional_body_field_model(extra),
+                        optional_body_field_model(fields),
+                    ));
+                }
+            }
+            result
         }
         crate::name_dispatch::BodyRoute::LongFullSignatures => {
             let mut fields = Some(input);
