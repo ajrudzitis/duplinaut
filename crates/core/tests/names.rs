@@ -910,7 +910,18 @@ fn short_full_volume_body_composes_fields_and_rejects_malformed_fields() {
         assert!(name.short, "{bytes:?}");
     }
 
+    let nontrivial_fields = parse_name(b"df.2.z.dt", config).unwrap().unwrap();
+    assert_eq!(nontrivial_fields.kind, ObjectKind::FullVolume);
+    assert_eq!(nontrivial_fields.start, Timestamp(2));
+    assert_eq!(nontrivial_fields.end, Timestamp(2));
+    assert_eq!(nontrivial_fields.volume, Some(35));
+    assert_eq!(nontrivial_fields.envelope, Envelope::Plain);
+    assert!(!nontrivial_fields.partial);
+    assert!(nontrivial_fields.short);
+
     for malformed in [
+        b"df.1" as &[u8],
+        b"df.1.1",
         b"df.Invalid.1.dt" as &[u8],
         b"df.1.0.dt",
         b"df.1.A.dt",

@@ -1647,6 +1647,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-short-full-volume-raw-body-controller"
+gate = true
+requirements = ["PARSE-NAME-001", "PARSE-NAME-003"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Successful Short FullVolume body parsing composes exact dot/suffix extraction
+# with short timestamp, positive base36 volume, and trailer/suffix models.
+# Errors and other parser routes remain outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "short_full_volume_body_fields" }
+]
+proofs = [
+  { id = "name-short-full-volume-raw-body-controller", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "body", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "short_full_volume_body_composes_fields_and_rejects_malformed_fields" }
+]
+
+[[milestone]]
 id = "name-short-incremental-volume-body"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-003", "PARSE-NAME-006"]
