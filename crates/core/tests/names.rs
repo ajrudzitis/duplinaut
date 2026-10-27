@@ -1365,9 +1365,22 @@ fn long_incremental_manifest_body_composes_fields_and_rejects_malformed_fields()
         assert!(!name.short, "{bytes:?}");
     }
 
+    let nontrivial = parse_name(
+        b"duplicity-inc.19700101T000001Z.to.19700102T000001Z.manifest",
+        config,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(nontrivial.start, Timestamp(1));
+    assert_eq!(nontrivial.end, Timestamp(86_401));
+    assert_eq!(nontrivial.volume, None);
+
     for malformed in [
         b"duplicity-inc.bad.to.20231115T221320Z.manifest" as &[u8],
+        b"duplicity-inc.20231114T221320Z.20231115T221320Z.manifest",
         b"duplicity-inc.20231114T221320Z.to.bad.manifest",
+        b"duplicity-inc.20231114T221320Z.to.manifest",
+        b"duplicity-inc.20231114T221320Z.to.20231115T221320Z",
         b"duplicity-inc.20231114T221320Z.to.20231114T221320Z.manifest",
         b"duplicity-inc.20231115T221320Z.to.20231114T221320Z.manifest",
         b"duplicity-inc.20231114T221320Z.from.20231115T221320Z.manifest",
@@ -1377,6 +1390,7 @@ fn long_incremental_manifest_body_composes_fields_and_rejects_malformed_fields()
         b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest.gz.part",
         b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest.part.part",
         b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest.part.gz.extra",
+        b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest.part.gz.extra.more",
         b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest.",
     ] {
         assert_eq!(
