@@ -6146,13 +6146,7 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
     //= docs/parsing-requirements.md#parse-name-001
     //= type=implementation
     //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-    //= docs/parsing-requirements.md#parse-name-001
-    //= type=implementation
-    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-    match result {
-        Err(error) => Err(error),
-        Ok(candidate) => finalize_name_classification(recognized, candidate),
-    }
+    finalize_name_candidate_controller(recognized, successful_candidates, result)
 }
 
 verus! {
@@ -6233,6 +6227,37 @@ fn merge_name_candidate_successes(
 //= docs/parsing-requirements.md#parse-name-001
 //= type=implementation
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+closed spec fn name_candidate_controller_result_model(
+    recognized: bool,
+    candidates: Seq<Option<ObjectName>>,
+) -> Result<Option<ObjectName>, NameError> {
+    match name_candidate_accumulation_model(candidates, 12) {
+        Err(error) => Err(error),
+        Ok(candidate) => name_finalization_model(recognized, candidate),
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+fn finalize_name_candidate_controller(
+    recognized: bool,
+    candidates: [Option<ObjectName>; 12],
+    accumulated: Result<Option<ObjectName>, NameError>,
+) -> (result: Result<Option<ObjectName>, NameError>)
+    requires accumulated == name_candidate_accumulation_model(candidates@, 12),
+    ensures result == name_candidate_controller_result_model(recognized, candidates@),
+{
+    let _ = candidates;
+    match accumulated {
+        Err(error) => Err(error),
+        Ok(candidate) => finalize_name_classification(recognized, candidate),
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 // Keep the explicit match so Verus can carry the body's success contract into
 // the loop invariant; Option::map hides that branch relation from the proof.
 #[allow(clippy::manual_map)]
@@ -6285,20 +6310,63 @@ fn collect_name_body_outcomes(
     }
     outcomes
 }
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+closed spec fn successful_name_body_candidate_model(
+    outcome: Option<Result<ObjectName, NameError>>,
+) -> Option<ObjectName> {
+    match outcome {
+        Some(Ok(name)) => Some(name),
+        None | Some(Err(_)) => None,
+    }
 }
 
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+fn successful_name_body_candidate(
+    outcome: Option<Result<ObjectName, NameError>>,
+) -> (candidate: Option<ObjectName>)
+    ensures candidate == successful_name_body_candidate_model(outcome),
+{
+    match outcome {
+        Some(Ok(name)) => Some(name),
+        None | Some(Err(_)) => None,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 fn successful_name_body_candidates(
     outcomes: [Option<Result<ObjectName, NameError>>; 12],
-) -> [Option<ObjectName>; 12] {
+) -> (candidates: [Option<ObjectName>; 12])
+    ensures forall|index: int| #![trigger candidates@[index]]
+        0 <= index < 12 ==>
+        candidates@[index] == successful_name_body_candidate_model(outcomes@[index]),
+{
     let mut candidates = [None; 12];
     let mut index = 0usize;
-    while index < outcomes.len() {
-        if let Some(Ok(parsed)) = outcomes[index] {
-            candidates[index] = Some(parsed);
+    while index < outcomes.len()
+        invariant index <= outcomes.len(),
+            forall|prior: int| #![trigger candidates@[prior], outcomes@[prior]]
+                0 <= prior < index as int ==>
+                candidates@[prior] == successful_name_body_candidate_model(outcomes@[prior]),
+        decreases outcomes.len() - index,
+    {
+        candidates[index] = successful_name_body_candidate(outcomes[index]);
+        proof {
+            reveal(successful_name_body_candidate_model);
+            assert(candidates@[index as int] == successful_name_body_candidate_model(
+                outcomes@[index as int],
+            ));
         }
         index += 1;
     }
     candidates
+}
 }
 
 #[cfg(test)]
@@ -6479,6 +6547,34 @@ mod tests {
         let accumulated = super::merge_name_candidate_successes(candidates);
         assert!(candidates[1].is_some());
         assert_eq!(accumulated, Err(super::NameError::Ambiguous));
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn parse_name_final_result_composes_candidate_model() {
+        let config = super::NameConfig::default();
+        for input in [
+            &b"unrelated"[..],
+            &b"duplicity-full.bad.vol1.difftar"[..],
+            &b"duplicity-full.20231114T221320Z.vol1.difftar"[..],
+        ] {
+            let direct = super::parse_name(input, config);
+            let (remainders, recognized) = super::name_candidate_remainders(
+                input,
+                config.global_prefix,
+                config.archive_prefix,
+                config.manifest_prefix,
+                config.signature_prefix,
+            );
+            let outcomes = super::collect_name_body_outcomes(remainders, config.time_separator);
+            let candidates = super::successful_name_body_candidates(outcomes);
+            let accumulated = super::merge_name_candidate_successes(candidates);
+            let composed =
+                super::finalize_name_candidate_controller(recognized, candidates, accumulated);
+            assert_eq!(direct, composed, "input: {:?}", input);
+        }
     }
 
     #[test]
