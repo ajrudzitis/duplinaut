@@ -4253,7 +4253,7 @@ fn body(
             second,
         );
     }
-    if kind == ObjectKind::FullVolume && short {
+    if crate::name_dispatch::short_full_volume_route(kind, short) {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4773,6 +4773,28 @@ mod tests {
             assert!(!crate::name_dispatch::long_incremental_signatures_route(
                 kind, true
             ));
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn short_full_volume_dispatch_selects_only_its_profile() {
+        let kinds = [
+            super::ObjectKind::FullVolume,
+            super::ObjectKind::IncrementalVolume,
+            super::ObjectKind::FullManifest,
+            super::ObjectKind::IncrementalManifest,
+            super::ObjectKind::FullSignatures,
+            super::ObjectKind::IncrementalSignatures,
+        ];
+        for kind in kinds {
+            assert_eq!(
+                crate::name_dispatch::short_full_volume_route(kind, true),
+                kind == super::ObjectKind::FullVolume
+            );
+            assert!(!crate::name_dispatch::short_full_volume_route(kind, false));
         }
     }
 
