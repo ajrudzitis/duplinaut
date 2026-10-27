@@ -1226,7 +1226,20 @@ fn long_full_signatures_body_composes_fields_and_rejects_malformed_fields() {
         assert!(!name.short, "{bytes:?}");
     }
 
+    let nontrivial_timestamp =
+        parse_name(b"duplicity-full-signatures.19700101T000001Z.sigtar", config)
+            .unwrap()
+            .unwrap();
+    assert_eq!(nontrivial_timestamp.kind, ObjectKind::FullSignatures);
+    assert_eq!(nontrivial_timestamp.start, Timestamp(1));
+    assert_eq!(nontrivial_timestamp.end, Timestamp(1));
+    assert_eq!(nontrivial_timestamp.volume, None);
+    assert_eq!(nontrivial_timestamp.envelope, Envelope::Plain);
+    assert!(!nontrivial_timestamp.partial);
+    assert!(!nontrivial_timestamp.short);
+
     for malformed in [
+        b"duplicity-full-signatures..sigtar" as &[u8],
         b"duplicity-full-signatures.bad.sigtar" as &[u8],
         b"duplicity-full-signatures.20231114T221320Z",
         b"duplicity-full-signatures.20231114T221320Z.wrong",
