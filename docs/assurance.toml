@@ -1865,6 +1865,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-short-incremental-volume-raw-body-controller"
+gate = true
+requirements = ["PARSE-NAME-001", "PARSE-NAME-003", "PARSE-NAME-006"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Successful Short IncrementalVolume body parsing composes exact raw
+# dot/suffix extraction with an increasing interval, positive base36 volume,
+# and trailer model. Errors and other parser routes remain outside this scope.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body_fields" }
+]
+proofs = [
+  { id = "name-short-incremental-volume-raw-body-controller", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "body", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "short_incremental_volume_body_composes_fields_and_rejects_malformed_fields" }
+]
+
+[[milestone]]
 id = "name-long-full-volume-body"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-007", "PARSE-GEN-003"]

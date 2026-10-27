@@ -1720,7 +1720,21 @@ fn short_incremental_volume_body_composes_fields_and_rejects_malformed_fields() 
         assert!(name.short, "{bytes:?}");
     }
 
+    let nontrivial_fields = parse_name(b"di.2.z.3.dt", config).unwrap().unwrap();
+    assert_eq!(nontrivial_fields.kind, ObjectKind::IncrementalVolume);
+    assert_eq!(nontrivial_fields.start, Timestamp(2));
+    assert_eq!(nontrivial_fields.end, Timestamp(35));
+    assert_eq!(nontrivial_fields.volume, Some(3));
+    assert_eq!(nontrivial_fields.envelope, Envelope::Plain);
+    assert!(!nontrivial_fields.partial);
+    assert!(nontrivial_fields.short);
+
     for malformed in [
+        b"di.2" as &[u8],
+        b"di.2.z",
+        b"di.2.z..dt",
+        b"di.2.z.3",
+        b"di.2.z.3.m",
         b"di.1.1.1.dt" as &[u8],
         b"di.2.1.1.dt",
         b"di.Invalid.2.1.dt",
