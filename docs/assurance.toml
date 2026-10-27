@@ -110,17 +110,18 @@ tests = [
 
 [[milestone]]
 id = "name-clock-field-policy"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-004"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
 # Proves the hour/minute/second range predicate and traces its use in long
 # timestamp parsing. Numeric decoding, framing, calendar validation and UTC
 # composition remain separate obligations.
+# The range contract is present in current sources and passes fresh full-workspace Verus.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "clock_fields_valid" },
   { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
