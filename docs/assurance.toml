@@ -1910,6 +1910,29 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-body-short-incremental-manifest-dispatch"
+gate = false
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = false
+proof_required = true
+# The short IncrementalManifest body selector is true exactly for that kind/profile
+# pair. Other object-kind dispatch and result refinement remain open.
+implementations = [
+  { path = "crates/core/src/name_dispatch.rs", symbol = "short_incremental_manifest_route" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-body-short-incremental-manifest-dispatch", requirement = "PARSE-NAME-001", path = "crates/core/src/name_dispatch.rs", symbol = "short_incremental_manifest_route", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::short_incremental_manifest_dispatch_selects_only_its_profile" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
