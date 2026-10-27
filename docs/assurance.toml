@@ -432,17 +432,18 @@ tests = [
 
 [[milestone]]
 id = "name-base36-decoder"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-003"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
 # The checked decoder refines nonempty base36 values through u64, rejecting
 # invalid digits and overflow. Decimal date-field decoding, zero-volume policy,
 # and complete short-name grammar remain outside this scalar decoder proof.
+# Fresh full-workspace Verus verifies this nonempty, checked u64 refinement.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "decode_base36" }
 ]
