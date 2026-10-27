@@ -199,4 +199,22 @@ pub(crate) fn short_incremental_volume_route(kind: ObjectKind, short: bool) -> (
         _ => false,
     }
 }
+
+pub open spec fn long_incremental_volume_route_model(kind: ObjectKind, short: bool) -> bool {
+    kind == ObjectKind::IncrementalVolume && !short
+}
+
+/// Identify exactly the long IncrementalVolume route in the body dispatcher.
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+#[allow(clippy::match_like_matches_macro)]
+pub(crate) fn long_incremental_volume_route(kind: ObjectKind, short: bool) -> (route: bool)
+    ensures route == long_incremental_volume_route_model(kind, short),
+{
+    match (kind, short) {
+        (ObjectKind::IncrementalVolume, false) => true,
+        _ => false,
+    }
+}
 }
