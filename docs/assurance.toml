@@ -1958,6 +1958,29 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-body-short-incremental-signatures-dispatch"
+gate = false
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = false
+proof_required = true
+# The short IncrementalSignatures selector is true exactly for that kind/profile
+# pair. Helper-result refinement and other object-kind dispatch remain open.
+implementations = [
+  { path = "crates/core/src/name_dispatch.rs", symbol = "short_incremental_signatures_route" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-body-short-incremental-signatures-dispatch", requirement = "PARSE-NAME-001", path = "crates/core/src/name_dispatch.rs", symbol = "short_incremental_signatures_route", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::short_incremental_signatures_dispatch_selects_only_its_profile" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
