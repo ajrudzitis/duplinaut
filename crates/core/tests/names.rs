@@ -1492,9 +1492,22 @@ fn long_incremental_signatures_body_composes_fields_and_rejects_malformed_fields
         assert!(!name.short, "{bytes:?}");
     }
 
+    let nontrivial = parse_name(
+        b"duplicity-new-signatures.19700101T000001Z.to.19700102T000001Z.sigtar",
+        config,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(nontrivial.start, Timestamp(1));
+    assert_eq!(nontrivial.end, Timestamp(86_401));
+    assert_eq!(nontrivial.volume, None);
+
     for malformed in [
         b"duplicity-new-signatures.bad.to.20231115T221320Z.sigtar" as &[u8],
+        b"duplicity-new-signatures.20231114T221320Z.20231115T221320Z.sigtar",
         b"duplicity-new-signatures.20231114T221320Z.to.bad.sigtar",
+        b"duplicity-new-signatures.20231114T221320Z.to.sigtar",
+        b"duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z",
         b"duplicity-new-signatures.20231114T221320Z.to.20231114T221320Z.sigtar",
         b"duplicity-new-signatures.20231115T221320Z.to.20231114T221320Z.sigtar",
         b"duplicity-new-signatures.20231114T221320Z.from.20231115T221320Z.sigtar",
@@ -1504,6 +1517,7 @@ fn long_incremental_signatures_body_composes_fields_and_rejects_malformed_fields
         b"duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar.gz.part",
         b"duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar.part.part",
         b"duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar.part.gz.extra",
+        b"duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar.part.gz.extra.more",
         b"duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar.",
     ] {
         assert_eq!(
