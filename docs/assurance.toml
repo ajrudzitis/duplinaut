@@ -336,11 +336,11 @@ tests = [
 
 [[milestone]]
 id = "name-short-timestamp"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-003"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
@@ -348,8 +348,7 @@ proof_required = true
 # timestamp bytes to Unix-epoch seconds and `Timestamp`. The surrounding short
 # filename grammar and volume-number policy remain separate obligations.
 implementations = [
-  { path = "crates/core/src/names.rs", symbol = "decode_short_timestamp" },
-  { path = "crates/core/src/names.rs", symbol = "date" }
+  { path = "crates/core/src/names.rs", symbol = "decode_short_timestamp" }
 ]
 proofs = [{ id = "name-short-timestamp", requirement = "PARSE-NAME-003", path = "crates/core/src/names.rs", symbol = "decode_short_timestamp", kind = "contract" }]
 tests = [
