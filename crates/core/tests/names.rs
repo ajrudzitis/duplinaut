@@ -1841,7 +1841,18 @@ fn short_incremental_signatures_body_composes_fields_and_rejects_malformed_field
         assert!(name.short, "{bytes:?}");
     }
 
+    let nontrivial_fields = parse_name(b"dns.2.z.st", config).unwrap().unwrap();
+    assert_eq!(nontrivial_fields.kind, ObjectKind::IncrementalSignatures);
+    assert_eq!(nontrivial_fields.start, Timestamp(2));
+    assert_eq!(nontrivial_fields.end, Timestamp(35));
+    assert_eq!(nontrivial_fields.volume, None);
+    assert_eq!(nontrivial_fields.envelope, Envelope::Plain);
+    assert!(!nontrivial_fields.partial);
+    assert!(nontrivial_fields.short);
+
     for malformed in [
+        b"dns.2" as &[u8],
+        b"dns.2.z",
         b"dns.1.1.st" as &[u8],
         b"dns.2.1.st",
         b"dns.Invalid.2.st",
