@@ -4683,7 +4683,59 @@ fn short_incremental_volume_body_fields(
 //= docs/parsing-requirements.md#parse-name-006
 //= type=implementation
 //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 verus! {
+closed spec fn body_success_result_model(
+    input: Seq<u8>,
+    kind: ObjectKind,
+    short: bool,
+    separator: u8,
+    name: ObjectName,
+) -> bool {
+    name.kind == kind && name.short == short
+        && if kind == ObjectKind::FullManifest && short {
+            name.volume.is_none()
+                && short_full_manifest_raw_body_model(input, name.start.0 as int, name.end.0 as int, name.envelope, name.partial)
+        } else if kind == ObjectKind::FullSignatures && short {
+            name.volume.is_none()
+                && short_full_signatures_raw_body_model(input, name.start.0 as int, name.end.0 as int, name.envelope, name.partial)
+        } else if kind == ObjectKind::FullVolume && short {
+            name.volume matches Some(volume)
+                && short_full_volume_raw_body_model(input, name.start.0 as int, name.end.0 as int, volume as int, name.envelope, name.partial)
+        } else if kind == ObjectKind::IncrementalManifest && short {
+            name.volume.is_none()
+                && short_incremental_manifest_raw_body_model(input, name.start.0 as int, name.end.0 as int, name.envelope, name.partial)
+        } else if kind == ObjectKind::IncrementalSignatures && short {
+            name.volume.is_none()
+                && short_incremental_signatures_raw_body_model(input, name.start.0 as int, name.end.0 as int, name.envelope, name.partial)
+        } else if kind == ObjectKind::IncrementalVolume && short {
+            name.volume matches Some(volume)
+                && short_incremental_volume_raw_body_model(input, name.start.0 as int, name.end.0 as int, volume as int, name.envelope, name.partial)
+        } else if kind == ObjectKind::FullManifest && !short {
+            name.volume.is_none()
+                && long_full_manifest_raw_body_model(input, separator, name.start.0 as int, name.end.0 as int, name.envelope, name.partial)
+        } else if kind == ObjectKind::FullSignatures && !short {
+            name.volume.is_none()
+                && long_full_signatures_raw_body_model(input, separator, name.start.0 as int, name.end.0 as int, name.envelope, name.partial)
+        } else if kind == ObjectKind::FullVolume && !short {
+            name.volume matches Some(volume)
+                && long_full_volume_raw_body_model(input, separator, name.start.0 as int, name.end.0 as int, volume as int, name.envelope, name.partial)
+        } else if kind == ObjectKind::IncrementalManifest && !short {
+            name.volume.is_none()
+                && long_incremental_manifest_raw_body_model(input, separator, name.start.0 as int, name.end.0 as int, name.envelope, name.partial)
+        } else if kind == ObjectKind::IncrementalSignatures && !short {
+            name.volume.is_none()
+                && long_incremental_signatures_raw_body_model(input, separator, name.start.0 as int, name.end.0 as int, name.envelope, name.partial)
+        } else if kind == ObjectKind::IncrementalVolume && !short {
+            name.volume matches Some(volume)
+                && long_incremental_volume_raw_body_model(input, separator, name.start.0 as int, name.end.0 as int, volume as int, name.envelope, name.partial)
+        } else {
+            true
+        }
+}
+
 #[verifier::spinoff_prover]
 #[verifier::rlimit(20)]
 fn body(
@@ -4693,131 +4745,13 @@ fn body(
     separator: u8,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Ok(name) => name.kind == kind && name.short == short
-            && if kind == ObjectKind::FullManifest && short {
-                name.volume.is_none()
-                    && short_full_manifest_raw_body_model(
-                        input@,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else if kind == ObjectKind::FullSignatures && short {
-                name.volume.is_none()
-                    && short_full_signatures_raw_body_model(
-                        input@,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else if kind == ObjectKind::FullVolume && short {
-                name.volume matches Some(volume)
-                    && short_full_volume_raw_body_model(
-                        input@,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        volume as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else if kind == ObjectKind::IncrementalManifest && short {
-                name.volume.is_none()
-                    && short_incremental_manifest_raw_body_model(
-                        input@,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else if kind == ObjectKind::IncrementalSignatures && short {
-                name.volume.is_none()
-                    && short_incremental_signatures_raw_body_model(
-                        input@,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else if kind == ObjectKind::IncrementalVolume && short {
-                name.volume matches Some(volume)
-                    && short_incremental_volume_raw_body_model(
-                        input@,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        volume as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else if kind == ObjectKind::FullManifest && !short {
-                name.volume.is_none()
-                    && long_full_manifest_raw_body_model(
-                        input@,
-                        separator,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else if kind == ObjectKind::FullSignatures && !short {
-                name.volume.is_none()
-                    && long_full_signatures_raw_body_model(
-                        input@,
-                        separator,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else if kind == ObjectKind::FullVolume && !short {
-                name.volume matches Some(volume)
-                    && long_full_volume_raw_body_model(
-                        input@,
-                        separator,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        volume as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else if kind == ObjectKind::IncrementalManifest && !short {
-                name.volume.is_none()
-                    && long_incremental_manifest_raw_body_model(
-                        input@,
-                        separator,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else if kind == ObjectKind::IncrementalSignatures && !short {
-                name.volume.is_none()
-                    && long_incremental_signatures_raw_body_model(
-                        input@,
-                        separator,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else if kind == ObjectKind::IncrementalVolume && !short {
-                name.volume matches Some(volume)
-                    && long_incremental_volume_raw_body_model(
-                        input@,
-                        separator,
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        volume as int,
-                        name.envelope,
-                        name.partial,
-                    )
-            } else {
-                true
-            },
+        Ok(name) => body_success_result_model(input@, kind, short, separator, name),
         Err(_) => true,
     },
 {
+    proof {
+        reveal(body_success_result_model);
+    }
     let selected_route = crate::name_dispatch::select_body_route(kind, short);
     match selected_route {
         crate::name_dispatch::BodyRoute::ShortIncrementalSignatures => {
@@ -6295,23 +6229,62 @@ fn merge_name_candidate_successes(
     }
     accumulated
 }
-}
 
 //= docs/parsing-requirements.md#parse-name-001
 //= type=implementation
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+// Keep the explicit match so Verus can carry the body's success contract into
+// the loop invariant; Option::map hides that branch relation from the proof.
+#[allow(clippy::manual_map)]
 fn collect_name_body_outcomes(
     remainders: [Option<&[u8]>; 12],
     separator: u8,
-) -> [Option<Result<ObjectName, NameError>>; 12] {
+) -> (outcomes: [Option<Result<ObjectName, NameError>>; 12])
+    ensures forall|index: int| #![trigger outcomes@[index]]
+        0 <= index < 12 ==>
+        match (remainders@[index], outcomes@[index]) {
+            (None, None) => true,
+            (Some(rest), Some(Ok(name))) => {
+                let (kind, short) = name_candidate_table_model()[index];
+                body_success_result_model(rest@, kind, short, separator, name)
+            },
+            (Some(_), Some(Err(_))) => true,
+            _ => false,
+        },
+{
     let candidates = name_candidate_table();
-    let mut outcomes = [None; 12];
-    for (index, (kind, short)) in candidates.into_iter().enumerate() {
-        if let Some(rest) = remainders[index] {
-            outcomes[index] = Some(body(rest, kind, short, separator));
+    let mut index = 0usize;
+    let mut outcomes: [Option<Result<ObjectName, NameError>>; 12] = [None; 12];
+    while index < candidates.len()
+        invariant index <= candidates.len(),
+            candidates@ == name_candidate_table_model(),
+            forall|prior: int| #![trigger remainders@[prior], outcomes@[prior]]
+                0 <= prior < index as int ==>
+                match (remainders@[prior], outcomes@[prior]) {
+                    (None, None) => true,
+                    (Some(rest), Some(Ok(name))) => {
+                        let (kind, short) = candidates@[prior];
+                        body_success_result_model(rest@, kind, short, separator, name)
+                    },
+                    (Some(_), Some(Err(_))) => true,
+                    _ => false,
+                },
+        decreases candidates.len() - index,
+    {
+        let (kind, short) = candidates[index];
+        let outcome = match remainders[index] {
+            Some(rest) => Some(body(rest, kind, short, separator)),
+            None => None,
+        };
+        outcomes[index] = outcome;
+        proof {
+            reveal(body_success_result_model);
+            assert(candidates@[index as int] == (kind, short));
         }
+        index += 1;
     }
     outcomes
+}
 }
 
 fn successful_name_body_candidates(
@@ -6403,6 +6376,77 @@ mod tests {
             let (_, recognized) =
                 super::name_candidate_remainders(&near_miss, global, archive, manifest, signatures);
             assert!(!recognized);
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn body_outcome_collection_refines_all_kind_profile_routes() {
+        let examples = [
+            (
+                super::ObjectKind::FullVolume,
+                false,
+                &b"20231114T221320Z.vol1.difftar"[..],
+            ),
+            (super::ObjectKind::FullVolume, true, &b"1.1.dt"[..]),
+            (
+                super::ObjectKind::IncrementalVolume,
+                false,
+                &b"20231114T221320Z.to.20231115T221320Z.vol1.difftar"[..],
+            ),
+            (super::ObjectKind::IncrementalVolume, true, &b"1.2.1.dt"[..]),
+            (
+                super::ObjectKind::FullManifest,
+                false,
+                &b"20231114T221320Z.manifest"[..],
+            ),
+            (super::ObjectKind::FullManifest, true, &b"1.m"[..]),
+            (
+                super::ObjectKind::IncrementalManifest,
+                false,
+                &b"20231114T221320Z.to.20231115T221320Z.manifest"[..],
+            ),
+            (super::ObjectKind::IncrementalManifest, true, &b"1.2.m"[..]),
+            (
+                super::ObjectKind::FullSignatures,
+                false,
+                &b"20231114T221320Z.sigtar"[..],
+            ),
+            (super::ObjectKind::FullSignatures, true, &b"1.st"[..]),
+            (
+                super::ObjectKind::IncrementalSignatures,
+                false,
+                &b"20231114T221320Z.to.20231115T221320Z.sigtar"[..],
+            ),
+            (
+                super::ObjectKind::IncrementalSignatures,
+                true,
+                &b"1.2.st"[..],
+            ),
+        ];
+        for (expected_index, (kind, short, suffix)) in examples.into_iter().enumerate() {
+            assert_eq!(super::name_candidate_table()[expected_index], (kind, short));
+            let input = [super::stem(kind, short), suffix].concat();
+            let (remainders, recognized) =
+                super::name_candidate_remainders(&input, b"", b"", b"", b"");
+            assert!(recognized, "{kind:?}, short={short}");
+            let outcomes = super::collect_name_body_outcomes(remainders, b':');
+            for (index, outcome) in outcomes.into_iter().enumerate() {
+                if index == expected_index {
+                    let name = match outcome {
+                        Some(Ok(name)) => name,
+                        other => panic!("expected successful outcome, got {other:?}"),
+                    };
+                    assert_eq!((name.kind, name.short), (kind, short));
+                } else {
+                    assert!(
+                        !matches!(outcome, Some(Ok(_))),
+                        "unexpected successful route {index} for {kind:?}"
+                    );
+                }
+            }
         }
     }
 

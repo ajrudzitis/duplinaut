@@ -2645,6 +2645,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-body-outcome-refinement"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Every present candidate remainder is sent to the matching kind/profile body
+# route. Successful outputs are tied to the shared raw-body semantic model;
+# error completeness and complete parse_name result refinement remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body_success_result_model" },
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "collect_name_body_outcomes" }
+]
+proofs = [
+  { id = "name-body-outcome-refinement", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "collect_name_body_outcomes", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::body_outcome_collection_refines_all_kind_profile_routes" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
