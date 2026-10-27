@@ -4286,313 +4286,302 @@ fn short_incremental_volume_body_fields(
 }
 }
 
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 //= docs/parsing-requirements.md#parse-name-006
 //= type=implementation
 //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+verus! {
 fn body(
     input: &[u8],
     kind: ObjectKind,
     short: bool,
     separator: u8,
-) -> Result<ObjectName, NameError> {
+) -> (result: Result<ObjectName, NameError>)
+    ensures match result {
+        Ok(name) => name.kind == kind && name.short == short,
+        Err(_) => true,
+    },
+{
     let selected_route = crate::name_dispatch::select_body_route(kind, short);
-    if selected_route == crate::name_dispatch::BodyRoute::ShortIncrementalSignatures {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if third.is_some() || extra.is_some() || fields.is_some() {
-            return Err(NameError::Malformed);
+    match selected_route {
+        crate::name_dispatch::BodyRoute::ShortIncrementalSignatures => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if third.is_some() || extra.is_some() || fields.is_some() {
+                return Err(NameError::Malformed);
+            }
+            short_incremental_signatures_body_fields(start_field, end_field, trailer, first, second)
         }
-        return short_incremental_signatures_body_fields(
-            start_field,
-            end_field,
-            trailer,
-            first,
-            second,
-        );
+        crate::name_dispatch::BodyRoute::ShortIncrementalManifest => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if third.is_some() || extra.is_some() || fields.is_some() {
+                return Err(NameError::Malformed);
+            }
+            short_incremental_manifest_body_fields(start_field, end_field, trailer, first, second)
+        }
+        crate::name_dispatch::BodyRoute::ShortFullManifest => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if third.is_some() || extra.is_some() || fields.is_some() {
+                return Err(NameError::Malformed);
+            }
+            short_full_manifest_body_fields(start_field, trailer, first, second)
+        }
+        crate::name_dispatch::BodyRoute::LongFullManifest => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if extra.is_some() {
+                return Err(NameError::Malformed);
+            }
+            long_full_manifest_body_fields(start_field, separator, trailer, first, second, third)
+        }
+        crate::name_dispatch::BodyRoute::LongFullSignatures => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if extra.is_some() {
+                return Err(NameError::Malformed);
+            }
+            long_full_signatures_body_fields(start_field, separator, trailer, first, second, third)
+        }
+        crate::name_dispatch::BodyRoute::LongIncrementalManifest => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if extra.is_some() {
+                return Err(NameError::Malformed);
+            }
+            long_incremental_manifest_body_fields(
+                start_field,
+                separator,
+                marker,
+                end_field,
+                trailer,
+                first,
+                second,
+                third,
+            )
+        }
+        crate::name_dispatch::BodyRoute::LongIncrementalSignatures => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if extra.is_some() {
+                return Err(NameError::Malformed);
+            }
+            long_incremental_signatures_body_fields(
+                start_field,
+                separator,
+                marker,
+                end_field,
+                trailer,
+                first,
+                second,
+                third,
+            )
+        }
+        crate::name_dispatch::BodyRoute::ShortFullSignatures => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if third.is_some() || extra.is_some() || fields.is_some() {
+                return Err(NameError::Malformed);
+            }
+            short_full_signatures_body_fields(start_field, trailer, first, second)
+        }
+        crate::name_dispatch::BodyRoute::ShortIncrementalVolume => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if third.is_some() || extra.is_some() || fields.is_some() {
+                return Err(NameError::Malformed);
+            }
+            short_incremental_volume_body_fields(
+                start_field,
+                end_field,
+                volume_field,
+                trailer,
+                first,
+                second,
+            )
+        }
+        crate::name_dispatch::BodyRoute::ShortFullVolume => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if third.is_some() || extra.is_some() || fields.is_some() {
+                return Err(NameError::Malformed);
+            }
+            short_full_volume_body_fields(start_field, volume_field, trailer, first, second)
+        }
+        crate::name_dispatch::BodyRoute::LongFullVolume => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if extra.is_some() {
+                return Err(NameError::Malformed);
+            }
+            long_full_volume_body_fields(
+                start_field,
+                separator,
+                volume_field,
+                trailer,
+                first,
+                second,
+                third,
+            )
+        }
+        crate::name_dispatch::BodyRoute::LongIncrementalVolume => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+            if extra.is_some() {
+                return Err(NameError::Malformed);
+            }
+            long_incremental_volume_body_fields(
+                start_field,
+                separator,
+                marker,
+                end_field,
+                volume_field,
+                trailer,
+                first,
+                second,
+                third,
+            )
+        }
+        crate::name_dispatch::BodyRoute::Unmatched => {
+            let mut fields = Some(input);
+            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let incremental = matches!(
+                kind,
+                ObjectKind::IncrementalVolume
+                    | ObjectKind::IncrementalManifest
+                    | ObjectKind::IncrementalSignatures
+            );
+            let (start, end) = if short {
+                let end_field = if incremental {
+                    Some(take_dot_field(&mut fields).ok_or(NameError::Malformed)?)
+                } else {
+                    None
+                };
+                //= docs/parsing-requirements.md#parse-name-003
+                //= type=implementation
+                //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+                //= docs/parsing-requirements.md#parse-name-006
+                //= type=implementation
+                //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+                decode_short_interval(kind, start_field, end_field).ok_or(NameError::Malformed)?
+            } else {
+                let marker = if incremental {
+                    take_dot_field(&mut fields)
+                } else {
+                    None
+                };
+                let end_field = if marker.is_some() {
+                    take_dot_field(&mut fields)
+                } else {
+                    None
+                };
+                //= docs/parsing-requirements.md#parse-name-004
+                //= type=implementation
+                //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+                //= docs/parsing-requirements.md#parse-name-006
+                //= type=implementation
+                //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+                //= docs/parsing-requirements.md#parse-name-007
+                //= type=implementation
+                //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+                decode_long_interval(kind, start_field, separator, marker, end_field)
+                    .ok_or(NameError::Malformed)?
+            };
+            let volume = if matches!(kind, ObjectKind::FullVolume | ObjectKind::IncrementalVolume) {
+                let field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+                //= docs/parsing-requirements.md#parse-name-003
+                //= type=implementation
+                //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+                let number = if short {
+                    decode_short_volume_number(field).ok_or(NameError::Malformed)?
+                } else {
+                    //= docs/parsing-requirements.md#parse-name-001
+                    //= type=implementation
+                    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+                    //= docs/parsing-requirements.md#parse-gen-003
+                    //= type=implementation
+                    //# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+                    decode_long_volume_number(field).ok_or(NameError::Malformed)?
+                };
+                Some(number)
+            } else {
+                None
+            };
+            let (envelope, partial) = if short {
+                //= docs/parsing-requirements.md#parse-name-001
+                //= type=implementation
+                //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+                let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+                let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+                if extra.is_some() {
+                    return Err(NameError::Malformed);
+                }
+                decode_short_trailer(kind, trailer, first, second, third)
+                    .ok_or(NameError::Malformed)?
+            } else {
+                //= docs/parsing-requirements.md#parse-name-001
+                //= type=implementation
+                //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+                let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+                let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+                if extra.is_some() {
+                    return Err(NameError::Malformed);
+                }
+                decode_long_trailer_suffix(kind, trailer, first, second, third)
+                    .ok_or(NameError::Malformed)?
+            };
+            Ok(ObjectName {
+                kind,
+                start,
+                end,
+                volume,
+                envelope,
+                partial,
+                short,
+            })
+        }
     }
-    if selected_route == crate::name_dispatch::BodyRoute::ShortIncrementalManifest {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if third.is_some() || extra.is_some() || fields.is_some() {
-            return Err(NameError::Malformed);
-        }
-        return short_incremental_manifest_body_fields(
-            start_field,
-            end_field,
-            trailer,
-            first,
-            second,
-        );
-    }
-    if selected_route == crate::name_dispatch::BodyRoute::ShortFullManifest {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if third.is_some() || extra.is_some() || fields.is_some() {
-            return Err(NameError::Malformed);
-        }
-        return short_full_manifest_body_fields(start_field, trailer, first, second);
-    }
-    if selected_route == crate::name_dispatch::BodyRoute::LongFullManifest {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if extra.is_some() {
-            return Err(NameError::Malformed);
-        }
-        return long_full_manifest_body_fields(
-            start_field,
-            separator,
-            trailer,
-            first,
-            second,
-            third,
-        );
-    }
-    if selected_route == crate::name_dispatch::BodyRoute::LongFullSignatures {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if extra.is_some() {
-            return Err(NameError::Malformed);
-        }
-        return long_full_signatures_body_fields(
-            start_field,
-            separator,
-            trailer,
-            first,
-            second,
-            third,
-        );
-    }
-    if selected_route == crate::name_dispatch::BodyRoute::LongIncrementalManifest {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if extra.is_some() {
-            return Err(NameError::Malformed);
-        }
-        return long_incremental_manifest_body_fields(
-            start_field,
-            separator,
-            marker,
-            end_field,
-            trailer,
-            first,
-            second,
-            third,
-        );
-    }
-    if selected_route == crate::name_dispatch::BodyRoute::LongIncrementalSignatures {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if extra.is_some() {
-            return Err(NameError::Malformed);
-        }
-        return long_incremental_signatures_body_fields(
-            start_field,
-            separator,
-            marker,
-            end_field,
-            trailer,
-            first,
-            second,
-            third,
-        );
-    }
-    if selected_route == crate::name_dispatch::BodyRoute::ShortFullSignatures {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if third.is_some() || extra.is_some() || fields.is_some() {
-            return Err(NameError::Malformed);
-        }
-        return short_full_signatures_body_fields(start_field, trailer, first, second);
-    }
-    if selected_route == crate::name_dispatch::BodyRoute::ShortIncrementalVolume {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if third.is_some() || extra.is_some() || fields.is_some() {
-            return Err(NameError::Malformed);
-        }
-        return short_incremental_volume_body_fields(
-            start_field,
-            end_field,
-            volume_field,
-            trailer,
-            first,
-            second,
-        );
-    }
-    if selected_route == crate::name_dispatch::BodyRoute::ShortFullVolume {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if third.is_some() || extra.is_some() || fields.is_some() {
-            return Err(NameError::Malformed);
-        }
-        return short_full_volume_body_fields(start_field, volume_field, trailer, first, second);
-    }
-    if selected_route == crate::name_dispatch::BodyRoute::LongFullVolume {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if extra.is_some() {
-            return Err(NameError::Malformed);
-        }
-        return long_full_volume_body_fields(
-            start_field,
-            separator,
-            volume_field,
-            trailer,
-            first,
-            second,
-            third,
-        );
-    }
-    if selected_route == crate::name_dispatch::BodyRoute::LongIncrementalVolume {
-        let mut fields = Some(input);
-        let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if extra.is_some() {
-            return Err(NameError::Malformed);
-        }
-        return long_incremental_volume_body_fields(
-            start_field,
-            separator,
-            marker,
-            end_field,
-            volume_field,
-            trailer,
-            first,
-            second,
-            third,
-        );
-    }
-    let mut fields = Some(input);
-    let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-    let incremental = matches!(
-        kind,
-        ObjectKind::IncrementalVolume
-            | ObjectKind::IncrementalManifest
-            | ObjectKind::IncrementalSignatures
-    );
-    let (start, end) = if short {
-        let end_field = if incremental {
-            Some(take_dot_field(&mut fields).ok_or(NameError::Malformed)?)
-        } else {
-            None
-        };
-        //= docs/parsing-requirements.md#parse-name-003
-        //= type=implementation
-        //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
-        //= docs/parsing-requirements.md#parse-name-006
-        //= type=implementation
-        //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
-        decode_short_interval(kind, start_field, end_field).ok_or(NameError::Malformed)?
-    } else {
-        let marker = if incremental {
-            take_dot_field(&mut fields)
-        } else {
-            None
-        };
-        let end_field = if marker.is_some() {
-            take_dot_field(&mut fields)
-        } else {
-            None
-        };
-        //= docs/parsing-requirements.md#parse-name-004
-        //= type=implementation
-        //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
-        //= docs/parsing-requirements.md#parse-name-006
-        //= type=implementation
-        //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
-        //= docs/parsing-requirements.md#parse-name-007
-        //= type=implementation
-        //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
-        decode_long_interval(kind, start_field, separator, marker, end_field)
-            .ok_or(NameError::Malformed)?
-    };
-    let volume = if matches!(kind, ObjectKind::FullVolume | ObjectKind::IncrementalVolume) {
-        let field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        //= docs/parsing-requirements.md#parse-name-003
-        //= type=implementation
-        //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
-        let number = if short {
-            decode_short_volume_number(field).ok_or(NameError::Malformed)?
-        } else {
-            //= docs/parsing-requirements.md#parse-name-001
-            //= type=implementation
-            //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-            //= docs/parsing-requirements.md#parse-gen-003
-            //= type=implementation
-            //# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
-            decode_long_volume_number(field).ok_or(NameError::Malformed)?
-        };
-        Some(number)
-    } else {
-        None
-    };
-    let (envelope, partial) = if short {
-        //= docs/parsing-requirements.md#parse-name-001
-        //= type=implementation
-        //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if extra.is_some() {
-            return Err(NameError::Malformed);
-        }
-        decode_short_trailer(kind, trailer, first, second, third).ok_or(NameError::Malformed)?
-    } else {
-        //= docs/parsing-requirements.md#parse-name-001
-        //= type=implementation
-        //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-        let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-        let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-        if extra.is_some() {
-            return Err(NameError::Malformed);
-        }
-        decode_long_trailer_suffix(kind, trailer, first, second, third)
-            .ok_or(NameError::Malformed)?
-    };
-    Ok(ObjectName {
-        kind,
-        start,
-        end,
-        volume,
-        envelope,
-        partial,
-        short,
-    })
+}
 }
 
 //= docs/parsing-requirements.md#parse-name-001
@@ -5393,6 +5382,57 @@ mod tests {
                 crate::name_dispatch::select_body_route(kind, short),
                 expected
             );
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn successful_body_results_preserve_selected_kind_and_profile() {
+        let cases: [(super::ObjectKind, bool, &[u8]); 12] = [
+            (
+                super::ObjectKind::FullVolume,
+                false,
+                b"19700101T000000Z.vol1.difftar",
+            ),
+            (super::ObjectKind::FullVolume, true, b"1.1.dt"),
+            (
+                super::ObjectKind::IncrementalVolume,
+                false,
+                b"19700101T000000Z.to.19700101T000001Z.vol1.difftar",
+            ),
+            (super::ObjectKind::IncrementalVolume, true, b"1.2.1.dt"),
+            (
+                super::ObjectKind::FullManifest,
+                false,
+                b"19700101T000000Z.manifest",
+            ),
+            (super::ObjectKind::FullManifest, true, b"1.m"),
+            (
+                super::ObjectKind::IncrementalManifest,
+                false,
+                b"19700101T000000Z.to.19700101T000001Z.manifest",
+            ),
+            (super::ObjectKind::IncrementalManifest, true, b"1.2.m"),
+            (
+                super::ObjectKind::FullSignatures,
+                false,
+                b"19700101T000000Z.sigtar",
+            ),
+            (super::ObjectKind::FullSignatures, true, b"1.st"),
+            (
+                super::ObjectKind::IncrementalSignatures,
+                false,
+                b"19700101T000000Z.to.19700101T000001Z.sigtar",
+            ),
+            (super::ObjectKind::IncrementalSignatures, true, b"1.2.st"),
+        ];
+
+        for (kind, short, input) in cases {
+            let name = super::body(input, kind, short, b':').expect("valid body");
+            assert_eq!(name.kind, kind);
+            assert_eq!(name.short, short);
         }
     }
 

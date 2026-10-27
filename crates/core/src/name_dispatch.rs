@@ -55,6 +55,33 @@ pub closed spec fn selected_body_route_model(kind: ObjectKind, short: bool) -> B
 pub(crate) fn select_body_route(kind: ObjectKind, short: bool) -> (route: BodyRoute)
     ensures route == selected_body_route_model(kind, short),
         route != BodyRoute::Unmatched,
+        match route {
+            BodyRoute::ShortIncrementalSignatures => {
+                kind == ObjectKind::IncrementalSignatures && short
+            }
+            BodyRoute::ShortIncrementalManifest => {
+                kind == ObjectKind::IncrementalManifest && short
+            }
+            BodyRoute::ShortFullManifest => kind == ObjectKind::FullManifest && short,
+            BodyRoute::LongFullManifest => kind == ObjectKind::FullManifest && !short,
+            BodyRoute::LongFullSignatures => kind == ObjectKind::FullSignatures && !short,
+            BodyRoute::LongIncrementalManifest => {
+                kind == ObjectKind::IncrementalManifest && !short
+            }
+            BodyRoute::LongIncrementalSignatures => {
+                kind == ObjectKind::IncrementalSignatures && !short
+            }
+            BodyRoute::ShortFullSignatures => kind == ObjectKind::FullSignatures && short,
+            BodyRoute::ShortIncrementalVolume => {
+                kind == ObjectKind::IncrementalVolume && short
+            }
+            BodyRoute::ShortFullVolume => kind == ObjectKind::FullVolume && short,
+            BodyRoute::LongFullVolume => kind == ObjectKind::FullVolume && !short,
+            BodyRoute::LongIncrementalVolume => {
+                kind == ObjectKind::IncrementalVolume && !short
+            }
+            BodyRoute::Unmatched => false,
+        },
 {
     let _count = body_route_partition(kind, short);
     let route = if short_incremental_signatures_route(kind, short) {
@@ -89,6 +116,33 @@ pub(crate) fn select_body_route(kind: ObjectKind, short: bool) -> (route: BodyRo
         reveal(body_route_count_model);
         assert(_count == 1);
         assert(route != BodyRoute::Unmatched);
+        assert(match route {
+            BodyRoute::ShortIncrementalSignatures => {
+                kind == ObjectKind::IncrementalSignatures && short
+            }
+            BodyRoute::ShortIncrementalManifest => {
+                kind == ObjectKind::IncrementalManifest && short
+            }
+            BodyRoute::ShortFullManifest => kind == ObjectKind::FullManifest && short,
+            BodyRoute::LongFullManifest => kind == ObjectKind::FullManifest && !short,
+            BodyRoute::LongFullSignatures => kind == ObjectKind::FullSignatures && !short,
+            BodyRoute::LongIncrementalManifest => {
+                kind == ObjectKind::IncrementalManifest && !short
+            }
+            BodyRoute::LongIncrementalSignatures => {
+                kind == ObjectKind::IncrementalSignatures && !short
+            }
+            BodyRoute::ShortFullSignatures => kind == ObjectKind::FullSignatures && short,
+            BodyRoute::ShortIncrementalVolume => {
+                kind == ObjectKind::IncrementalVolume && short
+            }
+            BodyRoute::ShortFullVolume => kind == ObjectKind::FullVolume && short,
+            BodyRoute::LongFullVolume => kind == ObjectKind::FullVolume && !short,
+            BodyRoute::LongIncrementalVolume => {
+                kind == ObjectKind::IncrementalVolume && !short
+            }
+            BodyRoute::Unmatched => false,
+        }) by (compute);
     }
     route
 }
