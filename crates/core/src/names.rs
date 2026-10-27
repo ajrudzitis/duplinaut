@@ -4684,6 +4684,8 @@ fn short_incremental_volume_body_fields(
 //= type=implementation
 //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
 verus! {
+#[verifier::spinoff_prover]
+#[verifier::rlimit(20)]
 fn body(
     input: &[u8],
     kind: ObjectKind,
@@ -6204,27 +6206,126 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
         config.manifest_prefix,
         config.signature_prefix,
     );
-    let mut result = None;
+    let body_outcomes = collect_name_body_outcomes(candidate_remainders, config.time_separator);
+    let successful_candidates = successful_name_body_candidates(body_outcomes);
+    let result = merge_name_candidate_successes(successful_candidates);
     //= docs/parsing-requirements.md#parse-name-001
     //= type=implementation
     //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-    for (candidate_index, (kind, short)) in name_candidate_table().into_iter().enumerate() {
-        //= docs/parsing-requirements.md#parse-name-002
-        //= type=implementation
-        //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
-        if let Some(rest) = candidate_remainders[candidate_index] {
-            if let Ok(parsed) = body(rest, kind, short, config.time_separator) {
-                //= docs/parsing-requirements.md#parse-name-001
-                //= type=implementation
-                //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-                result = merge_name_candidate(result, Some(parsed))?;
-            }
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=implementation
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    match result {
+        Err(error) => Err(error),
+        Ok(candidate) => finalize_name_classification(recognized, candidate),
+    }
+}
+
+verus! {
+closed spec fn name_candidate_merge_success_model(
+    current: Option<ObjectName>,
+    candidate: Option<ObjectName>,
+) -> Result<Option<ObjectName>, NameError> {
+    match candidate {
+        None => Ok(current),
+        Some(parsed) => name_candidate_merge_model(current, Some(parsed)),
+    }
+}
+
+closed spec fn name_candidate_accumulation_model(
+    candidates: Seq<Option<ObjectName>>,
+    count: int,
+) -> Result<Option<ObjectName>, NameError>
+    decreases count,
+{
+    if count <= 0 || count > candidates.len() {
+        Ok(None)
+    } else {
+        match name_candidate_accumulation_model(candidates, count - 1) {
+            Err(error) => Err(error),
+            Ok(current) => name_candidate_merge_success_model(current, candidates[count - 1]),
         }
     }
-    //= docs/parsing-requirements.md#parse-name-001
-    //= type=implementation
-    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-    finalize_name_classification(recognized, result)
+}
+
+proof fn lemma_name_candidate_accumulation_step(
+    candidates: Seq<Option<ObjectName>>,
+    count: int,
+)
+    requires 0 <= count < candidates.len(),
+    ensures name_candidate_accumulation_model(candidates, count + 1)
+        == match name_candidate_accumulation_model(candidates, count) {
+            Err(error) => Err(error),
+            Ok(current) => name_candidate_merge_success_model(current, candidates[count]),
+        },
+{
+    reveal(name_candidate_accumulation_model);
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+fn merge_name_candidate_successes(
+    candidates: [Option<ObjectName>; 12],
+) -> (result: Result<Option<ObjectName>, NameError>)
+    ensures result == name_candidate_accumulation_model(candidates@, 12),
+{
+    let mut index = 0usize;
+    let mut accumulated: Result<Option<ObjectName>, NameError> = Ok(None);
+    while index < candidates.len()
+        invariant index <= candidates.len(),
+            accumulated == name_candidate_accumulation_model(candidates@, index as int),
+        decreases candidates.len() - index,
+    {
+        let candidate = candidates[index];
+        accumulated = match accumulated {
+            Err(error) => Err(error),
+            Ok(current) => merge_name_candidate(current, candidate),
+        };
+        proof {
+            lemma_name_candidate_accumulation_step(candidates@, index as int);
+            reveal(name_candidate_merge_success_model);
+            reveal(name_candidate_merge_model);
+            assert(accumulated == name_candidate_accumulation_model(
+                candidates@,
+                (index + 1) as int,
+            ));
+        }
+        index += 1;
+    }
+    accumulated
+}
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+fn collect_name_body_outcomes(
+    remainders: [Option<&[u8]>; 12],
+    separator: u8,
+) -> [Option<Result<ObjectName, NameError>>; 12] {
+    let candidates = name_candidate_table();
+    let mut outcomes = [None; 12];
+    for (index, (kind, short)) in candidates.into_iter().enumerate() {
+        if let Some(rest) = remainders[index] {
+            outcomes[index] = Some(body(rest, kind, short, separator));
+        }
+    }
+    outcomes
+}
+
+fn successful_name_body_candidates(
+    outcomes: [Option<Result<ObjectName, NameError>>; 12],
+) -> [Option<ObjectName>; 12] {
+    let mut candidates = [None; 12];
+    let mut index = 0usize;
+    while index < outcomes.len() {
+        if let Some(Ok(parsed)) = outcomes[index] {
+            candidates[index] = Some(parsed);
+        }
+        index += 1;
+    }
+    candidates
 }
 
 #[cfg(test)]
@@ -6303,6 +6404,37 @@ mod tests {
                 super::name_candidate_remainders(&near_miss, global, archive, manifest, signatures);
             assert!(!recognized);
         }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn body_candidate_accumulation_ignores_errors_and_merges_successes_in_order() {
+        let mut remainders: [Option<&[u8]>; 12] = [None; 12];
+        remainders[0] = Some(b"malformed");
+        let outcomes = super::collect_name_body_outcomes(remainders, b':');
+        assert!(matches!(outcomes[0], Some(Err(_))));
+        let accumulated =
+            super::merge_name_candidate_successes(super::successful_name_body_candidates(outcomes));
+        assert_eq!(accumulated, Ok(None));
+
+        remainders[0] = Some(b"20231114T221320Z.vol1.difftar");
+        let outcomes = super::collect_name_body_outcomes(remainders, b':');
+        let candidates = super::successful_name_body_candidates(outcomes);
+        let accumulated = super::merge_name_candidate_successes(candidates);
+        let parsed = match candidates[0] {
+            Some(name) => name,
+            _ => panic!("valid long full-volume body must parse"),
+        };
+        assert_eq!(accumulated, Ok(Some(parsed)));
+
+        remainders[1] = Some(b"1.1.dt");
+        let outcomes = super::collect_name_body_outcomes(remainders, b':');
+        let candidates = super::successful_name_body_candidates(outcomes);
+        let accumulated = super::merge_name_candidate_successes(candidates);
+        assert!(candidates[1].is_some());
+        assert_eq!(accumulated, Err(super::NameError::Ambiguous));
     }
 
     #[test]

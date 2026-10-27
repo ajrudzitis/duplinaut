@@ -2616,6 +2616,35 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-candidate-body-accumulation"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Parse-name records each body Result at its candidate slot and maps only
+# successful parses to the verified outcome array. The verified fold merges
+# successful candidates left to right; absent remainders and body errors map
+# to None in the executable adapter. Body-error completeness and full
+# end-to-end result refinement remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "collect_name_body_outcomes" },
+  { path = "crates/core/src/names.rs", symbol = "successful_name_body_candidates" },
+  { path = "crates/core/src/names.rs", symbol = "merge_name_candidate_successes" },
+  { path = "crates/core/src/names.rs", symbol = "name_candidate_accumulation_model" },
+  { path = "crates/core/src/names.rs", symbol = "parse_name" }
+]
+proofs = [
+  { id = "name-candidate-body-accumulation", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "merge_name_candidate_successes", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::body_candidate_accumulation_ignores_errors_and_merges_successes_in_order" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
