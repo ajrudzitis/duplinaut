@@ -1720,6 +1720,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-short-full-signatures-raw-body-controller"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Successful Short FullSignatures body parsing composes exact dot/suffix
+# extraction with the semantic fields model. Errors and other parser routes
+# remain outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "short_full_signatures_body_fields" }
+]
+proofs = [
+  { id = "name-short-full-signatures-raw-body-controller", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "body", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "short_full_signatures_body_composes_fields_and_rejects_malformed_fields" }
+]
+
+[[milestone]]
 id = "name-short-incremental-signatures-body"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-003", "PARSE-NAME-006"]

@@ -1657,6 +1657,7 @@ fn short_full_signatures_body_composes_fields_and_rejects_malformed_fields() {
     }
 
     for malformed in [
+        b"dfs.1" as &[u8],
         b"dfs.Invalid.st" as &[u8],
         b"dfs.1.bad",
         b"dfs.1.st.x",
