@@ -4203,7 +4203,7 @@ fn body(
             third,
         );
     }
-    if kind == ObjectKind::IncrementalSignatures && !short {
+    if crate::name_dispatch::long_incremental_signatures_route(kind, short) {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4748,6 +4748,30 @@ mod tests {
             );
             assert!(!crate::name_dispatch::short_incremental_signatures_route(
                 kind, false
+            ));
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn long_incremental_signatures_dispatch_selects_only_its_profile() {
+        let kinds = [
+            super::ObjectKind::FullVolume,
+            super::ObjectKind::IncrementalVolume,
+            super::ObjectKind::FullManifest,
+            super::ObjectKind::IncrementalManifest,
+            super::ObjectKind::FullSignatures,
+            super::ObjectKind::IncrementalSignatures,
+        ];
+        for kind in kinds {
+            assert_eq!(
+                crate::name_dispatch::long_incremental_signatures_route(kind, false),
+                kind == super::ObjectKind::IncrementalSignatures
+            );
+            assert!(!crate::name_dispatch::long_incremental_signatures_route(
+                kind, true
             ));
         }
     }
