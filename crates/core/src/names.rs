@@ -5729,6 +5729,245 @@ pub fn configured_prefix_remainder<'a>(
 }
 
 verus! {
+closed spec fn name_candidate_remainder_model(
+    input: Seq<u8>,
+    global_prefix: Seq<u8>,
+    archive_prefix: Seq<u8>,
+    manifest_prefix: Seq<u8>,
+    signature_prefix: Seq<u8>,
+    kind: ObjectKind,
+    short: bool,
+) -> Option<Seq<u8>> {
+    match configured_prefix_remainder_model(
+        input,
+        global_prefix,
+        kind_specific_prefix_model(kind, archive_prefix, manifest_prefix, signature_prefix),
+    ) {
+        Some(after_prefix) => stem_remainder_model(after_prefix, stem_model(kind, short)),
+        None => None,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-002
+//= type=implementation
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+fn name_candidate_remainder<'a>(
+    input: &'a [u8],
+    global_prefix: &[u8],
+    archive_prefix: &[u8],
+    manifest_prefix: &[u8],
+    signature_prefix: &[u8],
+    kind: ObjectKind,
+    short: bool,
+) -> (remainder: Option<&'a [u8]>)
+    ensures match remainder {
+        Some(rest) => name_candidate_remainder_model(
+            input@,
+            global_prefix@,
+            archive_prefix@,
+            manifest_prefix@,
+            signature_prefix@,
+            kind,
+            short,
+        ) == Some(rest@),
+        None => name_candidate_remainder_model(
+            input@,
+            global_prefix@,
+            archive_prefix@,
+            manifest_prefix@,
+            signature_prefix@,
+            kind,
+            short,
+        ).is_none(),
+    },
+{
+    let kind_prefix = kind_specific_prefix(kind, archive_prefix, manifest_prefix, signature_prefix);
+    match configured_prefix_remainder(input, global_prefix, kind_prefix) {
+        Some(after_prefix) => stem_remainder(after_prefix, stem(kind, short)),
+        None => None,
+    }
+}
+
+closed spec fn name_candidate_table_has_stem_model(
+    input: Seq<u8>,
+    global_prefix: Seq<u8>,
+    archive_prefix: Seq<u8>,
+    manifest_prefix: Seq<u8>,
+    signature_prefix: Seq<u8>,
+) -> bool {
+    exists|index: int| 0 <= index < name_candidate_table_model().len()
+        && name_candidate_remainder_model(
+            input,
+            global_prefix,
+            archive_prefix,
+            manifest_prefix,
+            signature_prefix,
+            name_candidate_table_model()[index].0,
+            name_candidate_table_model()[index].1,
+        ).is_some()
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-name-002
+//= type=implementation
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+fn name_candidate_remainders<'a>(
+    input: &'a [u8],
+    global_prefix: &[u8],
+    archive_prefix: &[u8],
+    manifest_prefix: &[u8],
+    signature_prefix: &[u8],
+) -> (result: ([Option<&'a [u8]>; 12], bool))
+    ensures result.1 == name_candidate_table_has_stem_model(
+            input@,
+            global_prefix@,
+            archive_prefix@,
+            manifest_prefix@,
+            signature_prefix@,
+        ),
+        forall|candidate: int| #![trigger result.0@[candidate]]
+            0 <= candidate < 12 ==>
+            match result.0@[candidate] {
+                Some(rest) => name_candidate_remainder_model(
+                    input@,
+                    global_prefix@,
+                    archive_prefix@,
+                    manifest_prefix@,
+                    signature_prefix@,
+                    name_candidate_table_model()[candidate].0,
+                    name_candidate_table_model()[candidate].1,
+                ) == Some(rest@),
+                None => name_candidate_remainder_model(
+                    input@,
+                    global_prefix@,
+                    archive_prefix@,
+                    manifest_prefix@,
+                    signature_prefix@,
+                    name_candidate_table_model()[candidate].0,
+                    name_candidate_table_model()[candidate].1,
+                ).is_none(),
+            },
+{
+    let candidates = name_candidate_table();
+    let mut index = 0usize;
+    let mut recognized = false;
+    let mut remainders: [Option<&'a [u8]>; 12] = [None; 12];
+    while index < candidates.len()
+        invariant index <= candidates.len(),
+            recognized == (exists|prior: int| 0 <= prior < index as int
+                && name_candidate_remainder_model(
+                    input@,
+                    global_prefix@,
+                    archive_prefix@,
+                    manifest_prefix@,
+                    signature_prefix@,
+                    candidates@[prior].0,
+                    candidates@[prior].1,
+                ).is_some()),
+            forall|prior: int| #![trigger remainders@[prior]]
+                0 <= prior < index as int ==>
+                match remainders@[prior] {
+                    Some(rest) => name_candidate_remainder_model(
+                        input@,
+                        global_prefix@,
+                        archive_prefix@,
+                        manifest_prefix@,
+                        signature_prefix@,
+                        candidates@[prior].0,
+                        candidates@[prior].1,
+                    ) == Some(rest@),
+                    None => name_candidate_remainder_model(
+                        input@,
+                        global_prefix@,
+                        archive_prefix@,
+                        manifest_prefix@,
+                        signature_prefix@,
+                        candidates@[prior].0,
+                        candidates@[prior].1,
+                    ).is_none(),
+                },
+        decreases candidates.len() - index,
+    {
+        let (kind, short) = candidates[index];
+        let remainder = name_candidate_remainder(
+            input,
+            global_prefix,
+            archive_prefix,
+            manifest_prefix,
+            signature_prefix,
+            kind,
+            short,
+        );
+        remainders[index] = remainder;
+        if remainder.is_some() {
+            recognized = true;
+        }
+        proof {
+            reveal(name_candidate_remainder_model);
+            reveal(name_candidate_table_has_stem_model);
+            assert(candidates@[index as int] == (kind, short));
+            if remainder.is_some() {
+                assert(name_candidate_remainder_model(
+                    input@,
+                    global_prefix@,
+                    archive_prefix@,
+                    manifest_prefix@,
+                    signature_prefix@,
+                    kind,
+                    short,
+                ).is_some());
+                assert(exists|prior: int| 0 <= prior < (index + 1) as int
+                    && name_candidate_remainder_model(
+                        input@,
+                        global_prefix@,
+                        archive_prefix@,
+                        manifest_prefix@,
+                        signature_prefix@,
+                        candidates@[prior].0,
+                        candidates@[prior].1,
+                    ).is_some());
+            } else {
+                assert(name_candidate_remainder_model(
+                    input@,
+                    global_prefix@,
+                    archive_prefix@,
+                    manifest_prefix@,
+                    signature_prefix@,
+                    kind,
+                    short,
+                ).is_none());
+                assert(recognized == (exists|prior: int| 0 <= prior < (index + 1) as int
+                    && name_candidate_remainder_model(
+                        input@,
+                        global_prefix@,
+                        archive_prefix@,
+                        manifest_prefix@,
+                        signature_prefix@,
+                        candidates@[prior].0,
+                        candidates@[prior].1,
+                    ).is_some()));
+            }
+        }
+        index += 1;
+    }
+    proof {
+        reveal(name_candidate_table_has_stem_model);
+        assert(candidates@ == name_candidate_table_model());
+        assert(recognized == name_candidate_table_has_stem_model(
+            input@,
+            global_prefix@,
+            archive_prefix@,
+            manifest_prefix@,
+            signature_prefix@,
+        ));
+    }
+    (remainders, recognized)
+}
+}
+
+verus! {
 /// Input-byte predicate for the basename boundary.
 closed spec fn name_basename_bytes_valid_model(input: Seq<u8>) -> bool {
     forall|index: int| 0 <= index < input.len()
@@ -5958,26 +6197,22 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
         config.signature_prefix,
         config.max_name_bytes,
     )?;
-    let mut recognized = false;
+    let (candidate_remainders, recognized) = name_candidate_remainders(
+        input,
+        config.global_prefix,
+        config.archive_prefix,
+        config.manifest_prefix,
+        config.signature_prefix,
+    );
     let mut result = None;
     //= docs/parsing-requirements.md#parse-name-001
     //= type=implementation
     //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-    for (kind, short) in name_candidate_table() {
-        let prefix = kind_specific_prefix(
-            kind,
-            config.archive_prefix,
-            config.manifest_prefix,
-            config.signature_prefix,
-        );
+    for (candidate_index, (kind, short)) in name_candidate_table().into_iter().enumerate() {
         //= docs/parsing-requirements.md#parse-name-002
         //= type=implementation
         //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
-        let Some(rest) = configured_prefix_remainder(input, config.global_prefix, prefix) else {
-            continue;
-        };
-        if let Some(rest) = stem_remainder(rest, stem(kind, short)) {
-            recognized = true;
+        if let Some(rest) = candidate_remainders[candidate_index] {
             if let Ok(parsed) = body(rest, kind, short, config.time_separator) {
                 //= docs/parsing-requirements.md#parse-name-001
                 //= type=implementation
@@ -6027,6 +6262,46 @@ mod tests {
             assert_eq!(pair[0].0, pair[1].0);
             assert!(!pair[0].1);
             assert!(pair[1].1);
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-002
+    //= type=test
+    //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+    fn candidate_controller_recognizes_each_exact_kind_profile_route() {
+        let global = b"root-";
+        let archive = b"arc/";
+        let manifest = b"man/";
+        let signatures = b"sig/";
+        for (candidate_index, (kind, short)) in
+            super::name_candidate_table().into_iter().enumerate()
+        {
+            let kind_prefix = super::kind_specific_prefix(kind, archive, manifest, signatures);
+            let mut input = global.to_vec();
+            input.extend_from_slice(kind_prefix);
+            input.extend_from_slice(super::stem(kind, short));
+            input.extend_from_slice(b"malformed-body");
+            assert!(super::name_candidate_remainder(
+                &input, global, archive, manifest, signatures, kind, short,
+            )
+            .is_some());
+            let (remainders, recognized) =
+                super::name_candidate_remainders(&input, global, archive, manifest, signatures);
+            assert!(recognized);
+            assert_eq!(
+                remainders[candidate_index],
+                Some(&input[input.len() - b"malformed-body".len()..])
+            );
+
+            let mut near_miss = input.clone();
+            near_miss[global.len()] ^= 1;
+            let (_, recognized) =
+                super::name_candidate_remainders(&near_miss, global, archive, manifest, signatures);
+            assert!(!recognized);
         }
     }
 

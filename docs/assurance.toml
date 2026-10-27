@@ -2589,6 +2589,33 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-candidate-controller-match"
+gate = true
+requirements = ["PARSE-NAME-001", "PARSE-NAME-002"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Compose kind/profile table entries with ordered configured-prefix matching
+# and exact stem slicing. One candidate scan returns all remainders and the
+# recognized-state flag, which parse_name reuses when parsing bodies. Body
+# success/error completeness and final parser result refinement remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "name_candidate_remainder" },
+  { path = "crates/core/src/names.rs", symbol = "name_candidate_remainders" },
+  { path = "crates/core/src/names.rs", symbol = "parse_name" }
+]
+proofs = [
+  { id = "name-candidate-remainder", requirement = "PARSE-NAME-002", path = "crates/core/src/names.rs", symbol = "name_candidate_remainder", kind = "contract" },
+  { id = "name-candidate-remainders", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "name_candidate_remainders", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::candidate_controller_recognizes_each_exact_kind_profile_route" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
