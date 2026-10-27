@@ -4234,7 +4234,7 @@ fn body(
         }
         return short_full_signatures_body_fields(start_field, trailer, first, second);
     }
-    if kind == ObjectKind::IncrementalVolume && short {
+    if crate::name_dispatch::short_incremental_volume_route(kind, short) {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4817,6 +4817,30 @@ mod tests {
                 kind == super::ObjectKind::FullVolume
             );
             assert!(!crate::name_dispatch::long_full_volume_route(kind, true));
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn short_incremental_volume_dispatch_selects_only_its_profile() {
+        let kinds = [
+            super::ObjectKind::FullVolume,
+            super::ObjectKind::IncrementalVolume,
+            super::ObjectKind::FullManifest,
+            super::ObjectKind::IncrementalManifest,
+            super::ObjectKind::FullSignatures,
+            super::ObjectKind::IncrementalSignatures,
+        ];
+        for kind in kinds {
+            assert_eq!(
+                crate::name_dispatch::short_incremental_volume_route(kind, true),
+                kind == super::ObjectKind::IncrementalVolume
+            );
+            assert!(!crate::name_dispatch::short_incremental_volume_route(
+                kind, false
+            ));
         }
     }
 
