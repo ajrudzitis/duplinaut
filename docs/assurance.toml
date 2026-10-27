@@ -639,17 +639,18 @@ tests = [
 
 [[milestone]]
 id = "name-calendar-date-policy"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-004"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
 # Proves the total supported-year/month/day predicate and traces its use in
 # long timestamp parsing. Field decoding, clock checks and UTC composition
 # remain separate obligations.
+# Fresh full-workspace verification covers the exact calendar-date contract.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "calendar_date_valid" },
   { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
