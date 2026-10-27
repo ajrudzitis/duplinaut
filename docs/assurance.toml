@@ -690,17 +690,18 @@ tests = [
 
 [[milestone]]
 id = "name-incremental-interval-policy"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-006"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
 # Proves the scalar policy: non-incremental names accept every endpoint pair;
 # incremental names require a strictly increasing interval. Timestamp parsing
 # and complete filename grammar remain outside this checkpoint.
+# Fresh full-workspace Verus proves the exact scalar relation.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "valid_set_interval" },
   { path = "crates/core/src/names.rs", symbol = "body" }
