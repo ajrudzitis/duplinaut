@@ -714,19 +714,20 @@ tests = [
 
 [[milestone]]
 id = "name-completed-artifact-policy"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-005"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
 # Proves the ObjectName completion predicate: partial and unsupported PKCS#7
 # artifacts are not completed evidence. Reader-level set selection and restore
 # publication remain outside this checkpoint.
-implementations = [{ path = "crates/core/src/names.rs", symbol = "ObjectName::completed" }]
-proofs = [{ id = "name-completed-artifact-policy", requirement = "PARSE-NAME-005", path = "crates/core/src/names.rs", symbol = "ObjectName::completed", kind = "contract" }]
+# Fresh full-workspace Verus proves the exact completion predicate.
+implementations = [{ path = "crates/core/src/names.rs", symbol = "completed" }]
+proofs = [{ id = "name-completed-artifact-policy", requirement = "PARSE-NAME-005", path = "crates/core/src/names.rs", symbol = "completed", kind = "contract" }]
 tests = [
   { package = "duplicity-core", name = "names::tests::completed_artifact_policy_excludes_partial_and_unsupported_objects" },
   { package = "duplicity-core", name = "exact_names_suffixes_prefixes_and_limits" }
