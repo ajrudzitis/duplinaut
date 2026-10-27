@@ -1607,6 +1607,7 @@ fn short_full_manifest_body_composes_fields_and_rejects_malformed_fields() {
     }
 
     for malformed in [
+        b"df.1" as &[u8],
         b"df.Invalid.m" as &[u8],
         b"df.1.bad",
         b"df.1.m.x",
