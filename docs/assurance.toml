@@ -2103,16 +2103,17 @@ tests = [
 
 [[milestone]]
 id = "name-body-route-partition"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-001"]
 specified = true
 implemented = true
 proved = true
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # The twelve kind/profile selectors collectively select exactly one route.
 # This is a structural dispatch claim; body field and result refinement remain open.
+# Independent review and candidate full CI passed; integrated-state CI follows.
 implementations = [
   { path = "crates/core/src/name_dispatch.rs", symbol = "body_route_partition" },
   { path = "crates/core/src/names.rs", symbol = "body" }
