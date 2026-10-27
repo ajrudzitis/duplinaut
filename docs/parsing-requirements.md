@@ -161,6 +161,12 @@ The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SS
 
 Provenance: SRC-TIME; valid-calendar bounds follow PARSE-NAME-004. Zone hours/minutes are 00..23/00..59, and UTC is local calendar time minus the signed offset. The separator defaults to `:` and is supplied explicitly by the caller for other archives. Its precise supported predicate is one byte in `0x21..0x7e` excluding `/`, `.`, `+`, `-`, ASCII digits, and `T`, `t`, `Z`, `z`; other values are configuration errors. This is POLICY rather than the upstream parser's unrestricted configuration. Accepted `T`/`Z` letters are case-insensitive. Short timestamps remain epoch seconds. Official 0.8.23 legacy UTC filenames with `_` separator have source/restore evidence; other separators/non-UTC legacy zones and native compatibility remain pending, distinct from this explicit reader grammar.
 
+### PARSE-NAME-008
+
+For a valid parser configuration, the reader MUST return the name-size limit error when a basename exceeds its configured byte limit, before checking basename contents. At or below that limit, the reader MUST reject a basename containing NUL or `/` with the malformed-name error.
+
+Provenance: POLICY. This specifies preflight error precedence and does not define configuration-validation precedence or the subsequent filename classification.
+
 ### PARSE-NAME-005
 
 Objects marked partial MUST be excluded from completed restore sets.

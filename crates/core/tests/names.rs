@@ -195,6 +195,80 @@ fn exact_names_suffixes_prefixes_and_limits() {
     );
 }
 
+//= docs/parsing-requirements.md#parse-name-008
+//= type=test
+//# For a valid parser configuration, the reader MUST return the name-size limit error when a basename exceeds its configured byte limit, before checking basename contents. At or below that limit, the reader MUST reject a basename containing NUL or `/` with the malformed-name error.
+#[test]
+fn parse_name_preflight_checks_size_before_basename_bytes() {
+    let config = NameConfig::default();
+
+    assert_eq!(
+        parse_name(
+            b"",
+            NameConfig {
+                max_name_bytes: 0,
+                ..config
+            }
+        ),
+        Ok(None)
+    );
+    for invalid_basename in [b"/" as &[u8], b"a\0b"] {
+        assert_eq!(
+            parse_name(
+                invalid_basename,
+                NameConfig {
+                    max_name_bytes: 0,
+                    ..config
+                },
+            ),
+            Err(NameError::Limit),
+            "size limit takes precedence for {invalid_basename:?}"
+        );
+        assert_eq!(
+            parse_name(
+                invalid_basename,
+                NameConfig {
+                    max_name_bytes: invalid_basename.len(),
+                    ..config
+                },
+            ),
+            Err(NameError::Malformed),
+            "invalid basename byte is rejected at the exact limit: {invalid_basename:?}"
+        );
+        assert_eq!(
+            parse_name(
+                invalid_basename,
+                NameConfig {
+                    max_name_bytes: invalid_basename.len() + 1,
+                    ..config
+                },
+            ),
+            Err(NameError::Malformed),
+            "invalid basename byte is rejected below the limit: {invalid_basename:?}"
+        );
+    }
+    assert_eq!(
+        parse_name(
+            b"opaque",
+            NameConfig {
+                max_name_bytes: 6,
+                ..config
+            }
+        ),
+        Ok(None)
+    );
+    assert_eq!(
+        parse_name(
+            b"opaque",
+            NameConfig {
+                max_name_bytes: 5,
+                ..config
+            }
+        ),
+        Err(NameError::Limit)
+    );
+}
+
 //= docs/parsing-requirements.md#parse-name-002
 //= type=test
 //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.

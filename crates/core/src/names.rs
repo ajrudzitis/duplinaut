@@ -4602,6 +4602,60 @@ pub fn configured_prefix_remainder<'a>(
 }
 }
 
+verus! {
+/// Input-byte predicate for the basename boundary.
+closed spec fn name_basename_bytes_valid_model(input: Seq<u8>) -> bool {
+    forall|index: int| 0 <= index < input.len()
+        ==> input[index] != 0 && input[index] != b'/'
+}
+
+/// Enforce the input-size limit before rejecting path separators or NUL bytes.
+/// This keeps the public parser's preflight error precedence explicit.
+//= docs/parsing-requirements.md#parse-name-008
+//= type=implementation
+//# For a valid parser configuration, the reader MUST return the name-size limit error when a basename exceeds its configured byte limit, before checking basename contents. At or below that limit, the reader MUST reject a basename containing NUL or `/` with the malformed-name error.
+fn validate_name_basename(input: &[u8], max_name_bytes: usize) -> (result: Result<(), NameError>)
+    ensures match result {
+        Ok(()) => input.len() <= max_name_bytes && name_basename_bytes_valid_model(input@),
+        Err(NameError::Limit) => input.len() > max_name_bytes,
+        Err(NameError::Malformed) => input.len() <= max_name_bytes
+            && !name_basename_bytes_valid_model(input@),
+        _ => false,
+    },
+{
+    if input.len() > max_name_bytes {
+        return Err(NameError::Limit);
+    }
+    let mut index = 0usize;
+    while index < input.len()
+        invariant index <= input.len(),
+            input.len() <= max_name_bytes,
+            forall|prior: int| 0 <= prior < index as int
+                ==> input@[prior] != 0 && input@[prior] != b'/',
+        decreases input.len() - index,
+    {
+        if input[index] == 0 || input[index] == b'/' {
+            proof {
+                assert(exists|bad: int| 0 <= bad < input@.len()
+                    && (input@[bad] == 0 || input@[bad] == b'/')) by {
+                    assert(0 <= index as int);
+                    assert((index as int) < input@.len() as int);
+                    assert(input@[index as int] == 0 || input@[index as int] == b'/');
+                }
+                reveal(name_basename_bytes_valid_model);
+            }
+            return Err(NameError::Malformed);
+        }
+        index += 1;
+    }
+    proof {
+        reveal(name_basename_bytes_valid_model);
+        assert(name_basename_bytes_valid_model(input@));
+    }
+    Ok(())
+}
+}
+
 /// Parse a basename, not an S3 key. Unrelated names return `Ok(None)`.
 /// Conflicting prefix configurations producing distinct successful classifications
 /// return `Ambiguous`; malformed recognized stems are errors rather than ignored.
@@ -4618,12 +4672,7 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
     {
         return Err(NameError::Configuration);
     }
-    if input.len() > config.max_name_bytes {
-        return Err(NameError::Limit);
-    }
-    if input.contains(&b'/') || input.contains(&0) {
-        return Err(NameError::Malformed);
-    }
+    validate_name_basename(input, config.max_name_bytes)?;
     let mut recognized = false;
     let mut result = None;
     for kind in KINDS {

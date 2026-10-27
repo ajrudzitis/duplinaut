@@ -38,6 +38,10 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
   SECTION: [PARSE-NAME-007](#parse-name-007)
     TEXT[!MUST,implementation,test]: The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
 
+  SECTION: [PARSE-NAME-008](#parse-name-008)
+    TEXT[!MUST,implementation,test]: For a valid parser configuration, the reader MUST return the name-size limit error when a basename exceeds its configured byte limit, before checking basename contents.
+    TEXT[!MUST,implementation,test]: At or below that limit, the reader MUST reject a basename containing NUL or `/` with the malformed-name error.
+
   SECTION: [PARSE-NAME-005](#parse-name-005)
     TEXT[!MUST,implementation,test]: Objects marked partial MUST be excluded from completed restore sets.
 

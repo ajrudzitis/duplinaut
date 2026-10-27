@@ -527,6 +527,25 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-basename-preflight"
+gate = true
+requirements = ["PARSE-NAME-008"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Size-limit precedence and basename NUL/slash rejection only; configuration
+# validation and the rest of the parse_name controller remain separate.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "validate_name_basename" },
+  { path = "crates/core/src/names.rs", symbol = "parse_name" }
+]
+proofs = [{ id = "name-basename-preflight", requirement = "PARSE-NAME-008", path = "crates/core/src/names.rs", symbol = "validate_name_basename", kind = "contract" }]
+tests = [{ package = "duplicity-core", name = "parse_name_preflight_checks_size_before_basename_bytes" }]
+
+[[milestone]]
 id = "name-final-classification"
 gate = true
 requirements = ["PARSE-NAME-001"]
