@@ -1016,17 +1016,37 @@ fn long_full_volume_body_composes_fields_and_rejects_malformed_fields() {
         assert!(!name.short, "{bytes:?}");
     }
 
+    let nontrivial = parse_name(b"duplicity-full.19700101T000001Z.vol42.difftar", config)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        (nontrivial.start, nontrivial.end),
+        (Timestamp(1), Timestamp(1))
+    );
+    assert_eq!(nontrivial.volume, Some(42));
+
+    // The existing decimal volume model accepts leading zeroes while still
+    // requiring the decoded value to be positive.
+    let leading_zero = parse_name(b"duplicity-full.19700101T000001Z.vol01.difftar", config)
+        .unwrap()
+        .unwrap();
+    assert_eq!(leading_zero.volume, Some(1));
+
     for malformed in [
         b"duplicity-full.bad.vol1.difftar" as &[u8],
+        b"duplicity-full..vol1.difftar",
         b"duplicity-full.20231114T221320Z.difftar",
+        b"duplicity-full.20231114T221320Z.vol1.",
         b"duplicity-full.20231114T221320Z.vol.difftar",
         b"duplicity-full.20231114T221320Z.vol0.difftar",
+        b"duplicity-full.20231114T221320Z.vol18446744073709551616.difftar",
         b"duplicity-full.20231114T221320Z.volume1.difftar",
         b"duplicity-full.20231114T221320Z.vol1",
         b"duplicity-full.20231114T221320Z.vol1.manifest",
         b"duplicity-full.20231114T221320Z.vol1.difftar.gz.part",
         b"duplicity-full.20231114T221320Z.vol1.difftar.part.part",
         b"duplicity-full.20231114T221320Z.vol1.difftar.part.gz.extra",
+        b"duplicity-full.20231114T221320Z.vol1.difftar.part.gz.extra.more",
         b"duplicity-full.20231114T221320Z.vol1.difftar.",
     ] {
         assert_eq!(
