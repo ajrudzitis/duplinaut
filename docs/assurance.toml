@@ -675,6 +675,22 @@ proofs = [{ id = "name-kind-prefix-routing", requirement = "PARSE-NAME-002", pat
 tests = [{ package = "duplicity-core", name = "each_object_kind_uses_its_configured_prefix_family" }]
 
 [[milestone]]
+id = "name-candidate-table"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Exact ordered 12-entry enumeration table only; matching outcomes and complete
+# filename classification remain outside this checkpoint.
+implementations = [{ path = "crates/core/src/names.rs", symbol = "name_candidate_table" }, { path = "crates/core/src/names.rs", symbol = "parse_name" }]
+proofs = [{ id = "name-candidate-table", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "name_candidate_table", kind = "contract" }]
+tests = [{ package = "duplicity-core", name = "names::tests::name_candidate_table_covers_each_kind_profile_once_in_order" }]
+
+[[milestone]]
 id = "name-long-volume"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-GEN-003"]

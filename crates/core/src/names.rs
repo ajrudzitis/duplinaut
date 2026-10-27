@@ -3092,19 +3092,49 @@ impl Default for NameConfig<'_> {
     }
 }
 
-const KINDS: [ObjectKind; 6] = [
-    ObjectKind::FullVolume,
-    ObjectKind::IncrementalVolume,
-    ObjectKind::FullManifest,
-    ObjectKind::IncrementalManifest,
-    ObjectKind::FullSignatures,
-    ObjectKind::IncrementalSignatures,
-];
-
 //= docs/parsing-requirements.md#parse-name-002
 //= type=implementation
 //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
 verus! {
+closed spec fn name_candidate_table_model() -> Seq<(ObjectKind, bool)> {
+    seq![
+        (ObjectKind::FullVolume, false),
+        (ObjectKind::FullVolume, true),
+        (ObjectKind::IncrementalVolume, false),
+        (ObjectKind::IncrementalVolume, true),
+        (ObjectKind::FullManifest, false),
+        (ObjectKind::FullManifest, true),
+        (ObjectKind::IncrementalManifest, false),
+        (ObjectKind::IncrementalManifest, true),
+        (ObjectKind::FullSignatures, false),
+        (ObjectKind::FullSignatures, true),
+        (ObjectKind::IncrementalSignatures, false),
+        (ObjectKind::IncrementalSignatures, true),
+    ]
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+fn name_candidate_table() -> (candidates: [(ObjectKind, bool); 12])
+    ensures candidates@ == name_candidate_table_model(),
+{
+    [
+        (ObjectKind::FullVolume, false),
+        (ObjectKind::FullVolume, true),
+        (ObjectKind::IncrementalVolume, false),
+        (ObjectKind::IncrementalVolume, true),
+        (ObjectKind::FullManifest, false),
+        (ObjectKind::FullManifest, true),
+        (ObjectKind::IncrementalManifest, false),
+        (ObjectKind::IncrementalManifest, true),
+        (ObjectKind::FullSignatures, false),
+        (ObjectKind::FullSignatures, true),
+        (ObjectKind::IncrementalSignatures, false),
+        (ObjectKind::IncrementalSignatures, true),
+    ]
+}
+
 closed spec fn kind_specific_prefix_model(
     kind: ObjectKind,
     archive: Seq<u8>,
@@ -4865,7 +4895,10 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
     )?;
     let mut recognized = false;
     let mut result = None;
-    for kind in KINDS {
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=implementation
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    for (kind, short) in name_candidate_table() {
         let prefix = kind_specific_prefix(
             kind,
             config.archive_prefix,
@@ -4878,15 +4911,13 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
         let Some(rest) = configured_prefix_remainder(input, config.global_prefix, prefix) else {
             continue;
         };
-        for short in [false, true] {
-            if let Some(rest) = rest.strip_prefix(stem(kind, short)) {
-                recognized = true;
-                if let Ok(parsed) = body(rest, kind, short, config.time_separator) {
-                    //= docs/parsing-requirements.md#parse-name-001
-                    //= type=implementation
-                    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-                    result = merge_name_candidate(result, Some(parsed))?;
-                }
+        if let Some(rest) = rest.strip_prefix(stem(kind, short)) {
+            recognized = true;
+            if let Ok(parsed) = body(rest, kind, short, config.time_separator) {
+                //= docs/parsing-requirements.md#parse-name-001
+                //= type=implementation
+                //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+                result = merge_name_candidate(result, Some(parsed))?;
             }
         }
     }
@@ -4899,6 +4930,40 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
 #[cfg(test)]
 mod tests {
     use super::{split_dot_field, take_body_suffix_fields, take_dot_field};
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn name_candidate_table_covers_each_kind_profile_once_in_order() {
+        let candidates = super::name_candidate_table();
+        let expected = [
+            (super::ObjectKind::FullVolume, false),
+            (super::ObjectKind::FullVolume, true),
+            (super::ObjectKind::IncrementalVolume, false),
+            (super::ObjectKind::IncrementalVolume, true),
+            (super::ObjectKind::FullManifest, false),
+            (super::ObjectKind::FullManifest, true),
+            (super::ObjectKind::IncrementalManifest, false),
+            (super::ObjectKind::IncrementalManifest, true),
+            (super::ObjectKind::FullSignatures, false),
+            (super::ObjectKind::FullSignatures, true),
+            (super::ObjectKind::IncrementalSignatures, false),
+            (super::ObjectKind::IncrementalSignatures, true),
+        ];
+        assert_eq!(candidates, expected);
+        for i in 0..candidates.len() {
+            for j in i + 1..candidates.len() {
+                assert_ne!(candidates[i], candidates[j]);
+            }
+        }
+        for i in (0..candidates.len()).step_by(2) {
+            let pair = &candidates[i..i + 2];
+            assert_eq!(pair[0].0, pair[1].0);
+            assert!(!pair[0].1);
+            assert!(pair[1].1);
+        }
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-name-001
