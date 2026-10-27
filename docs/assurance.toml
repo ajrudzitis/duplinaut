@@ -1937,6 +1937,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-incremental-volume-raw-body-controller"
+gate = true
+requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-006", "PARSE-NAME-007", "PARSE-GEN-003"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Successful long IncrementalVolume body parsing composes exact raw
+# start/marker/end/volume/trailer and suffix splits with configured timestamps,
+# the increasing interval, positive volume, and suffix semantics. Errors and
+# other routes remain outside this scope.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body" },
+  { path = "crates/core/src/names.rs", symbol = "long_incremental_volume_body_fields" }
+]
+proofs = [
+  { id = "name-long-incremental-volume-raw-body-controller", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "body", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "long_incremental_volume_body_composes_fields_and_rejects_malformed_fields" }
+]
+
+[[milestone]]
 id = "name-long-full-manifest-body"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-007"]

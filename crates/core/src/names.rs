@@ -2372,6 +2372,48 @@ closed spec fn long_incremental_volume_fields_model(
     }
 }
 
+closed spec fn long_incremental_volume_raw_body_model(
+    input: Seq<u8>,
+    separator: u8,
+    start: int,
+    end: int,
+    volume: int,
+    envelope: Envelope,
+    partial: bool,
+) -> bool {
+    exists|start_field: Seq<u8>, marker: Seq<u8>, end_field: Seq<u8>,
+        volume_field: Seq<u8>, trailer: Seq<u8>,
+        first: Option<Seq<u8>>, second: Option<Seq<u8>>, third: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>, after_marker: Option<Seq<u8>>,
+        after_end: Option<Seq<u8>>, after_volume: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>, extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(marker), after_marker),
+            body_field_split_model(after_marker, Some(end_field), after_end),
+            body_field_split_model(after_end, Some(volume_field), after_volume),
+            body_field_split_model(after_volume, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            long_incremental_volume_fields_model(
+                start_field, separator, marker, end_field, volume_field, trailer,
+                first, second, third,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(marker), after_marker)
+            && body_field_split_model(after_marker, Some(end_field), after_end)
+            && body_field_split_model(after_end, Some(volume_field), after_volume)
+            && body_field_split_model(after_volume, Some(trailer), after_trailer)
+            && body_suffix_fields_model(
+                after_trailer, first, second, third, extra, None,
+            )
+            && extra.is_none()
+            && long_incremental_volume_fields_model(
+                start_field, separator, marker, end_field, volume_field, trailer,
+                first, second, third,
+            ) == Some((start, end, volume, envelope, partial))
+}
+
 closed spec fn long_full_manifest_fields_model(
     start_field: Seq<u8>,
     separator: u8,
@@ -4757,6 +4799,17 @@ fn body(
                         name.envelope,
                         name.partial,
                     )
+            } else if kind == ObjectKind::IncrementalVolume && !short {
+                name.volume matches Some(volume)
+                    && long_incremental_volume_raw_body_model(
+                        input@,
+                        separator,
+                        name.start.0 as int,
+                        name.end.0 as int,
+                        volume as int,
+                        name.envelope,
+                        name.partial,
+                    )
             } else {
                 true
             },
@@ -5360,15 +5413,20 @@ fn body(
         crate::name_dispatch::BodyRoute::LongIncrementalVolume => {
             let mut fields = Some(input);
             let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let _after_start = fields;
             let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let _after_marker = fields;
             let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let _after_end = fields;
             let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let _after_volume = fields;
             let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+            let _after_trailer = fields;
             let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-            if extra.is_some() {
+            if extra.is_some() || fields.is_some() {
                 return Err(NameError::Malformed);
             }
-            long_incremental_volume_body_fields(
+            let result = long_incremental_volume_body_fields(
                 start_field,
                 separator,
                 marker,
@@ -5378,7 +5436,70 @@ fn body(
                 first,
                 second,
                 third,
-            )
+            );
+            proof {
+                if let Ok(name) = result {
+                    let volume = match name.volume {
+                        Some(value) => value,
+                        None => 0,
+                    };
+                    reveal(long_incremental_volume_raw_body_model);
+                    reveal(long_incremental_volume_fields_model);
+                    reveal(long_interval_model);
+                    reveal(long_timestamp_result_model);
+                    reveal(long_volume_number_model);
+                    reveal(long_trailer_suffix_model);
+                    reveal(body_suffix_fields_model);
+                    reveal(body_field_split_model);
+                    assert(body_field_split_model(
+                        Some(input@), Some(start_field@),
+                        optional_body_field_model(_after_start),
+                    ));
+                    assert(body_field_split_model(
+                        optional_body_field_model(_after_start), Some(marker@),
+                        optional_body_field_model(_after_marker),
+                    ));
+                    assert(body_field_split_model(
+                        optional_body_field_model(_after_marker), Some(end_field@),
+                        optional_body_field_model(_after_end),
+                    ));
+                    assert(body_field_split_model(
+                        optional_body_field_model(_after_end), Some(volume_field@),
+                        optional_body_field_model(_after_volume),
+                    ));
+                    assert(body_field_split_model(
+                        optional_body_field_model(_after_volume), Some(trailer@),
+                        optional_body_field_model(_after_trailer),
+                    ));
+                    assert(body_suffix_fields_model(
+                        optional_body_field_model(_after_trailer),
+                        optional_body_field_model(first),
+                        optional_body_field_model(second),
+                        optional_body_field_model(third),
+                        optional_body_field_model(extra),
+                        optional_body_field_model(fields),
+                    ));
+                    assert(name.volume matches Some(_));
+                    assert(long_incremental_volume_fields_model(
+                        start_field@,
+                        separator,
+                        marker@,
+                        end_field@,
+                        volume_field@,
+                        trailer@,
+                        optional_short_token(first),
+                        optional_short_token(second),
+                        optional_short_token(third),
+                    ) == Some((
+                        name.start.0 as int,
+                        name.end.0 as int,
+                        volume as int,
+                        name.envelope,
+                        name.partial,
+                    )));
+                }
+            }
+            result
         }
         crate::name_dispatch::BodyRoute::Unmatched => {
             let mut fields = Some(input);
