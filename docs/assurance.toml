@@ -295,11 +295,11 @@ tests = [
 
 [[milestone]]
 id = "name-zone-token-decoder"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-007"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
