@@ -1776,7 +1776,18 @@ fn short_incremental_manifest_body_composes_fields_and_rejects_malformed_fields(
         assert!(name.short, "{bytes:?}");
     }
 
+    let nontrivial_fields = parse_name(b"di.2.z.m", config).unwrap().unwrap();
+    assert_eq!(nontrivial_fields.kind, ObjectKind::IncrementalManifest);
+    assert_eq!(nontrivial_fields.start, Timestamp(2));
+    assert_eq!(nontrivial_fields.end, Timestamp(35));
+    assert_eq!(nontrivial_fields.volume, None);
+    assert_eq!(nontrivial_fields.envelope, Envelope::Plain);
+    assert!(!nontrivial_fields.partial);
+    assert!(nontrivial_fields.short);
+
     for malformed in [
+        b"di.2" as &[u8],
+        b"di.2.z",
         b"di.1.1.m" as &[u8],
         b"di.2.1.m",
         b"di.Invalid.2.m",
