@@ -4698,7 +4698,9 @@ mod tests {
                 crate::name_dispatch::short_incremental_manifest_route(kind, true),
                 kind == super::ObjectKind::IncrementalManifest
             );
-            assert!(!crate::name_dispatch::short_incremental_manifest_route(kind, false));
+            assert!(!crate::name_dispatch::short_incremental_manifest_route(
+                kind, false
+            ));
         }
     }
 
