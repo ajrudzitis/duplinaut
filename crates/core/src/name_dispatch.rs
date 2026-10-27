@@ -217,4 +217,62 @@ pub(crate) fn long_incremental_volume_route(kind: ObjectKind, short: bool) -> (r
         _ => false,
     }
 }
+
+pub open spec fn body_route_count_model(kind: ObjectKind, short: bool) -> int {
+    (if short_full_signatures_route_model(kind, short) { 1int } else { 0int })
+        + (if long_full_signatures_route_model(kind, short) { 1int } else { 0int })
+        + (if short_full_manifest_route_model(kind, short) { 1int } else { 0int })
+        + (if long_full_manifest_route_model(kind, short) { 1int } else { 0int })
+        + (if short_incremental_manifest_route_model(kind, short) { 1int } else { 0int })
+        + (if long_incremental_manifest_route_model(kind, short) { 1int } else { 0int })
+        + (if short_incremental_signatures_route_model(kind, short) { 1int } else { 0int })
+        + (if long_incremental_signatures_route_model(kind, short) { 1int } else { 0int })
+        + (if short_full_volume_route_model(kind, short) { 1int } else { 0int })
+        + (if long_full_volume_route_model(kind, short) { 1int } else { 0int })
+        + (if short_incremental_volume_route_model(kind, short) { 1int } else { 0int })
+        + (if long_incremental_volume_route_model(kind, short) { 1int } else { 0int })
+}
+
+/// Prove the body dispatcher selects exactly one object-kind/profile route.
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+pub(crate) fn body_route_partition(kind: ObjectKind, short: bool) -> (count: u8)
+    ensures count == 1,
+        count as int == body_route_count_model(kind, short),
+{
+    let count = short_full_signatures_route(kind, short) as u8
+        + long_full_signatures_route(kind, short) as u8
+        + short_full_manifest_route(kind, short) as u8
+        + long_full_manifest_route(kind, short) as u8
+        + short_incremental_manifest_route(kind, short) as u8
+        + long_incremental_manifest_route(kind, short) as u8
+        + short_incremental_signatures_route(kind, short) as u8
+        + long_incremental_signatures_route(kind, short) as u8
+        + short_full_volume_route(kind, short) as u8
+        + long_full_volume_route(kind, short) as u8
+        + short_incremental_volume_route(kind, short) as u8
+        + long_incremental_volume_route(kind, short) as u8;
+    proof {
+        reveal(body_route_count_model);
+        assert(count as int == body_route_count_model(kind, short));
+        match (kind, short) {
+            (ObjectKind::FullSignatures, true)
+            | (ObjectKind::FullSignatures, false)
+            | (ObjectKind::FullManifest, true)
+            | (ObjectKind::FullManifest, false)
+            | (ObjectKind::IncrementalManifest, true)
+            | (ObjectKind::IncrementalManifest, false)
+            | (ObjectKind::IncrementalSignatures, true)
+            | (ObjectKind::IncrementalSignatures, false)
+            | (ObjectKind::FullVolume, true)
+            | (ObjectKind::FullVolume, false)
+            | (ObjectKind::IncrementalVolume, true)
+            | (ObjectKind::IncrementalVolume, false) => {
+                assert(body_route_count_model(kind, short) == 1);
+            }
+        }
+    }
+    count
+}
 }

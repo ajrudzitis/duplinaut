@@ -4104,6 +4104,7 @@ fn body(
     short: bool,
     separator: u8,
 ) -> Result<ObjectName, NameError> {
+    assert_eq!(crate::name_dispatch::body_route_partition(kind, short), 1);
     if crate::name_dispatch::short_incremental_signatures_route(kind, short) {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4841,6 +4842,26 @@ mod tests {
             assert!(!crate::name_dispatch::short_incremental_volume_route(
                 kind, false
             ));
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn body_route_partition_covers_every_kind_and_profile_exactly_once() {
+        let kinds = [
+            super::ObjectKind::FullVolume,
+            super::ObjectKind::IncrementalVolume,
+            super::ObjectKind::FullManifest,
+            super::ObjectKind::IncrementalManifest,
+            super::ObjectKind::FullSignatures,
+            super::ObjectKind::IncrementalSignatures,
+        ];
+        for kind in kinds {
+            for short in [false, true] {
+                assert_eq!(crate::name_dispatch::body_route_partition(kind, short), 1);
+            }
         }
     }
 

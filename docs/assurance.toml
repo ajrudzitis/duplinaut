@@ -2102,6 +2102,29 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-body-route-partition"
+gate = false
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = false
+proof_required = true
+# The twelve kind/profile selectors collectively select exactly one route.
+# This is a structural dispatch claim; body field and result refinement remain open.
+implementations = [
+  { path = "crates/core/src/name_dispatch.rs", symbol = "body_route_partition" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-body-route-partition", requirement = "PARSE-NAME-001", path = "crates/core/src/name_dispatch.rs", symbol = "body_route_partition", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::body_route_partition_covers_every_kind_and_profile_exactly_once" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
