@@ -266,17 +266,18 @@ tests = [
 
 [[milestone]]
 id = "name-long-timestamp-refinement"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-004", "PARSE-NAME-007"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Independently reviewed end-to-end refinement of accepted canonical and legacy
-# timestamp bytes to exact UTC seconds; invalid configuration remains distinct
-# from malformed input. The surrounding filename grammar remains open.
+# Independently reviewed refinement of accepted canonical and legacy timestamp
+# bytes to exact UTC seconds under the current Gregorian epoch-offset model;
+# invalid configuration remains distinct from malformed input. Independent
+# year-offset policy and the surrounding filename grammar remain open.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "long_timestamp_result_model" },
   { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
