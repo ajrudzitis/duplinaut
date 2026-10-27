@@ -75,7 +75,11 @@ fn split_dot_field(input: &[u8]) -> (result: (&[u8], Option<&[u8]>))
 }
 
 fn take_dot_field<'a>(remaining: &mut Option<&'a [u8]>) -> (field: Option<&'a [u8]>)
-    ensures match *old(remaining) {
+    ensures body_field_split_model(
+        optional_body_field_model(*old(remaining)),
+        optional_body_field_model(field),
+        optional_body_field_model(*final(remaining)),
+    ) && match *old(remaining) {
         Some(input) => match field {
             Some(value) => dot_field_boundary_model(input@, value.len() as nat)
                 && value@ == input@.subrange(0, value.len() as int)
@@ -89,14 +93,45 @@ fn take_dot_field<'a>(remaining: &mut Option<&'a [u8]>) -> (field: Option<&'a [u
         None => field.is_none() && *final(remaining) == None,
     },
 {
-    match remaining.take() {
+    let _input = *remaining;
+    let field = match remaining.take() {
         Some(input) => {
             let (field, rest) = split_dot_field(input);
+            proof {
+                reveal(optional_body_field_model);
+                reveal(body_field_split_model);
+                reveal(dot_field_boundary_model);
+                assert(body_field_split_model(
+                    Some(input@),
+                    Some(field@),
+                    match rest {
+                        Some(bytes) => Some(bytes@),
+                        None => None,
+                    },
+                ));
+            }
             *remaining = rest;
             Some(field)
         }
-        None => None,
+        None => {
+            proof {
+                reveal(optional_body_field_model);
+                reveal(body_field_split_model);
+                assert(body_field_split_model(None, None, None));
+            }
+            None
+        }
+    };
+    proof {
+        reveal(optional_body_field_model);
+        reveal(body_field_split_model);
+        assert(body_field_split_model(
+            optional_body_field_model(_input),
+            optional_body_field_model(field),
+            optional_body_field_model(*remaining),
+        ));
     }
+    field
 }
 
 closed spec fn optional_body_field_model(input: Option<&[u8]>) -> Option<Seq<u8>> {
@@ -188,21 +223,40 @@ fn take_body_suffix_fields<'a>(
             optional_body_field_model(first),
             optional_body_field_model(_after_first),
         ));
+    }
+    proof {
+        reveal(optional_body_field_model);
+        reveal(body_field_split_model);
+        reveal(dot_field_boundary_model);
         assert(body_field_split_model(
             optional_body_field_model(_after_first),
             optional_body_field_model(second),
             optional_body_field_model(_after_second),
         ));
+    }
+    proof {
+        reveal(optional_body_field_model);
+        reveal(body_field_split_model);
+        reveal(dot_field_boundary_model);
         assert(body_field_split_model(
             optional_body_field_model(_after_second),
             optional_body_field_model(third),
             optional_body_field_model(_after_third),
         ));
+    }
+    proof {
+        reveal(optional_body_field_model);
+        reveal(body_field_split_model);
+        reveal(dot_field_boundary_model);
         assert(body_field_split_model(
             optional_body_field_model(_after_third),
             optional_body_field_model(extra),
             optional_body_field_model(*remaining),
         ));
+    }
+    proof {
+        reveal(optional_body_field_model);
+        reveal(body_suffix_fields_model);
         assert(body_suffix_fields_model(
             optional_body_field_model(_input),
             optional_body_field_model(first),
@@ -1699,6 +1753,23 @@ pub open spec fn year_is_leap(year: int) -> bool {
     year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 }
 
+/// Days from the calendar model's 1901 origin to the Unix epoch.
+pub const UNIX_EPOCH_DAYS_FROM_1901: i128 = 25_202;
+
+/// Derive the epoch offset by summing the supported Gregorian year recurrence.
+pub proof fn unix_epoch_year_offset_is_exact()
+    ensures days_before_year_model(1970) == UNIX_EPOCH_DAYS_FROM_1901 as int,
+{
+    assert(days_before_year_model(1970) == 25_202int) by (compute);
+}
+
+/// Check the Gregorian century exceptions used by the year recurrence.
+pub proof fn gregorian_century_leap_policy()
+    ensures !year_is_leap(1900) && year_is_leap(2000) && !year_is_leap(2100),
+{
+    assert(!year_is_leap(1900) && year_is_leap(2000) && !year_is_leap(2100)) by (compute);
+}
+
 pub proof fn days_before_year_step(year: int)
     requires 1901 <= year < 2100,
     ensures days_before_year_model(year + 1)
@@ -1961,7 +2032,7 @@ pub open spec fn calendar_fields_to_unix_seconds_model(
 {
     let days_since_epoch = days_before_year_model(year)
         + days_before_month_model(year, month)
-        + day - 1 - 25202;
+        + day - 1 - UNIX_EPOCH_DAYS_FROM_1901;
     days_since_epoch * 86400 + hour * 3600 + minute * 60 + second - offset_seconds
 }
 
@@ -1995,6 +2066,7 @@ pub fn calendar_fields_to_unix_seconds(
         offset_seconds as int,
     ),
 {
+    proof { unix_epoch_year_offset_is_exact(); }
     proof {
         reveal(calendar_date_valid_model);
         assert(1901 <= year as int <= 2099);
@@ -2021,7 +2093,8 @@ pub fn calendar_fields_to_unix_seconds(
         month_days += days_in_month as i128;
         current_month += 1;
     }
-    let days_since_epoch = year_days as i128 + month_days + day as i128 - 1 - 25202;
+    let days_since_epoch = year_days as i128 + month_days + day as i128 - 1
+        - UNIX_EPOCH_DAYS_FROM_1901;
     proof {
         assert(month_days as int == days_before_month_model(year as int, month as int));
         assert(-100_000 <= days_since_epoch <= 100_000);
@@ -5005,14 +5078,14 @@ mod tests {
 
     use super::{
         calendar_date_valid, calendar_day_valid, calendar_fields_to_unix_seconds,
-        clock_fields_valid, compose_timestamp_fields, configured_prefix_remainder, decode_base36,
-        decode_decimal, decode_long_interval, decode_long_timestamp_numeric_field,
-        decode_long_trailer_suffix, decode_long_volume_number, decode_short_interval,
-        decode_short_timestamp, decode_short_trailer, decode_short_volume_number,
-        decode_zone_offset_token, finalize_name_classification, long_timestamp_field_bounds,
-        long_timestamp_framing_valid, merge_name_candidate, parse_long_timestamp, stem,
-        time_separator_valid, Envelope, LongTimestampField, NameError, ObjectKind, ObjectName,
-        Timestamp,
+        clock_fields_valid, compose_timestamp_fields, configured_prefix_remainder,
+        days_before_year, decode_base36, decode_decimal, decode_long_interval,
+        decode_long_timestamp_numeric_field, decode_long_trailer_suffix, decode_long_volume_number,
+        decode_short_interval, decode_short_timestamp, decode_short_trailer,
+        decode_short_volume_number, decode_zone_offset_token, finalize_name_classification,
+        long_timestamp_field_bounds, long_timestamp_framing_valid, merge_name_candidate,
+        parse_long_timestamp, stem, time_separator_valid, Envelope, LongTimestampField, NameError,
+        ObjectKind, ObjectName, Timestamp, UNIX_EPOCH_DAYS_FROM_1901,
     };
 
     #[test]
@@ -5324,6 +5397,41 @@ mod tests {
                 "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02} offset {offset}"
             );
         }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    fn unix_epoch_year_offset_matches_gregorian_boundaries() {
+        assert_eq!(UNIX_EPOCH_DAYS_FROM_1901, 25_202);
+        assert_eq!(days_before_year(1970), 25_202);
+        assert!(calendar_date_valid(1904, 2, 29));
+        // The date API starts in 1901, so this also verifies lower-bound rejection.
+        assert!(!calendar_date_valid(1900, 2, 29));
+        assert!(calendar_date_valid(2000, 2, 29));
+        let day_before_leap_day = calendar_fields_to_unix_seconds(1904, 2, 28, 0, 0, 0, 0);
+        let leap_day = calendar_fields_to_unix_seconds(1904, 2, 29, 0, 0, 0, 0);
+        let day_after_leap_day = calendar_fields_to_unix_seconds(1904, 3, 1, 0, 0, 0, 0);
+        assert_eq!(leap_day.0 - day_before_leap_day.0, 86_400);
+        assert_eq!(day_after_leap_day.0 - leap_day.0, 86_400);
+        let day_before_2000_leap_day = calendar_fields_to_unix_seconds(2000, 2, 28, 0, 0, 0, 0);
+        let leap_day_2000 = calendar_fields_to_unix_seconds(2000, 2, 29, 0, 0, 0, 0);
+        let day_after_2000_leap_day = calendar_fields_to_unix_seconds(2000, 3, 1, 0, 0, 0, 0);
+        assert_eq!(leap_day_2000.0 - day_before_2000_leap_day.0, 86_400);
+        assert_eq!(day_after_2000_leap_day.0 - leap_day_2000.0, 86_400);
+        assert_eq!(
+            calendar_fields_to_unix_seconds(1970, 1, 1, 0, 0, 0, 0),
+            Timestamp(0)
+        );
+        assert_eq!(
+            calendar_fields_to_unix_seconds(1969, 12, 31, 23, 59, 59, 0),
+            Timestamp(-1)
+        );
+        assert_eq!(
+            calendar_fields_to_unix_seconds(1970, 1, 2, 0, 0, 0, 0),
+            Timestamp(86_400)
+        );
     }
 
     #[test]

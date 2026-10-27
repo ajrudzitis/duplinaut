@@ -162,6 +162,29 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-unix-epoch-year-offset"
+gate = true
+requirements = ["PARSE-NAME-004"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Derives the named 1901-to-1970 day offset by the Gregorian year recurrence;
+# calendar conversion uses that constant. Complete long-name parsing remains open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "calendar_fields_to_unix_seconds" }
+]
+proofs = [
+  { id = "name-unix-epoch-year-offset", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "unix_epoch_year_offset_is_exact", kind = "lemma" },
+  { id = "name-gregorian-century-leap-policy", requirement = "PARSE-NAME-004", path = "crates/core/src/names.rs", symbol = "gregorian_century_leap_policy", kind = "lemma" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::unix_epoch_year_offset_matches_gregorian_boundaries" }
+]
+
+[[milestone]]
 id = "names"
 gate = false
 requirements = ["PARSE-NAME-001", "PARSE-NAME-002", "PARSE-NAME-003", "PARSE-NAME-004", "PARSE-NAME-005", "PARSE-NAME-006", "PARSE-NAME-007"]
