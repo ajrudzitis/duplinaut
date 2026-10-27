@@ -207,11 +207,11 @@ tests = [
 
 [[milestone]]
 id = "name-timestamp-field-slices"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-004", "PARSE-NAME-007"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
