@@ -237,18 +237,18 @@ tests = [
 
 [[milestone]]
 id = "name-timestamp-component-composition"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-004", "PARSE-NAME-007"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Independently reviewed composition of validated decoded calendar/clock fields
-# and a bounded explicit-zone offset into exact UTC seconds. parse_long_timestamp
-# calls this helper; framing, field decoding and full filename grammar remain
-# separate obligations.
+# Composition of validated decoded calendar/clock fields and a bounded
+# explicit-zone offset into exact UTC seconds. parse_long_timestamp calls this
+# helper; framing, field decoding and full filename grammar remain separate.
+# Fresh full-workspace Verus and the exact UTC component tests passed.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "compose_timestamp_fields" },
   { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
