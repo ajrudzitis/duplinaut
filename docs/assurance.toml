@@ -2030,6 +2030,29 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-body-long-full-volume-dispatch"
+gate = false
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = false
+proof_required = true
+# The long FullVolume selector is true exactly for that kind/profile pair.
+# Helper-result refinement and other object-kind dispatch remain open.
+implementations = [
+  { path = "crates/core/src/name_dispatch.rs", symbol = "long_full_volume_route" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-body-long-full-volume-dispatch", requirement = "PARSE-NAME-001", path = "crates/core/src/name_dispatch.rs", symbol = "long_full_volume_route", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::long_full_volume_dispatch_selects_only_its_profile" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

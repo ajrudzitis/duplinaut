@@ -163,4 +163,22 @@ pub(crate) fn short_full_volume_route(kind: ObjectKind, short: bool) -> (route: 
         _ => false,
     }
 }
+
+pub open spec fn long_full_volume_route_model(kind: ObjectKind, short: bool) -> bool {
+    kind == ObjectKind::FullVolume && !short
+}
+
+/// Identify exactly the long FullVolume route in the body dispatcher.
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+#[allow(clippy::match_like_matches_macro)]
+pub(crate) fn long_full_volume_route(kind: ObjectKind, short: bool) -> (route: bool)
+    ensures route == long_full_volume_route_model(kind, short),
+{
+    match (kind, short) {
+        (ObjectKind::FullVolume, false) => true,
+        _ => false,
+    }
+}
 }
