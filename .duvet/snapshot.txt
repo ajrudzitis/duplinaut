@@ -28,6 +28,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
 
   SECTION: [PARSE-NAME-002](#parse-name-002)
     TEXT[!MUST,implementation,test]: Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+    TEXT[!MUST,implementation,test]: Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
 
   SECTION: [PARSE-NAME-003](#parse-name-003)
     TEXT[!MUST,implementation,test]: Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.

@@ -117,7 +117,7 @@ fn explicit_zone_offset_uses_the_configured_separator() {
 
 //= docs/parsing-requirements.md#parse-name-002
 //= type=test
-//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
 
 //= docs/parsing-requirements.md#parse-name-005
 //= type=test
@@ -333,7 +333,7 @@ fn parse_name_rejects_invalid_configuration_before_basename_errors() {
 
 //= docs/parsing-requirements.md#parse-name-002
 //= type=test
-//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
 #[test]
 fn configured_name_prefixes_are_consumed_global_then_kind_specific() {
     let base = b"duplicity-full.20231114T221320Z.vol1.difftar";
@@ -370,6 +370,77 @@ fn configured_name_prefixes_are_consumed_global_then_kind_specific() {
         parse_name(&[b"ga+" as &[u8], base].concat(), metacharacters),
         Ok(None)
     );
+}
+
+//= docs/parsing-requirements.md#parse-name-002
+//= type=test
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
+#[test]
+fn each_object_kind_uses_its_configured_prefix_family() {
+    let config = NameConfig {
+        global_prefix: b"\x80",
+        archive_prefix: b"archive-",
+        manifest_prefix: b"manifest-",
+        signature_prefix: b"\xfe",
+        ..NameConfig::default()
+    };
+    let examples: &[(&[u8], &[u8], ObjectKind)] = &[
+        (
+            b"duplicity-full.20231114T221320Z.vol1.difftar",
+            config.archive_prefix,
+            ObjectKind::FullVolume,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar",
+            config.archive_prefix,
+            ObjectKind::IncrementalVolume,
+        ),
+        (
+            b"duplicity-full.20231114T221320Z.manifest",
+            config.manifest_prefix,
+            ObjectKind::FullManifest,
+        ),
+        (
+            b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest",
+            config.manifest_prefix,
+            ObjectKind::IncrementalManifest,
+        ),
+        (
+            b"duplicity-full-signatures.20231114T221320Z.sigtar",
+            config.signature_prefix,
+            ObjectKind::FullSignatures,
+        ),
+        (
+            b"duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar",
+            config.signature_prefix,
+            ObjectKind::IncrementalSignatures,
+        ),
+    ];
+
+    for (stemmed, selected_prefix, expected_kind) in examples {
+        let input = [config.global_prefix, *selected_prefix, *stemmed].concat();
+        assert_eq!(
+            parse_name(&input, config).unwrap().unwrap().kind,
+            *expected_kind
+        );
+
+        for wrong_prefix in [
+            config.archive_prefix,
+            config.manifest_prefix,
+            config.signature_prefix,
+        ] {
+            if wrong_prefix != *selected_prefix {
+                let wrong = [config.global_prefix, wrong_prefix, *stemmed].concat();
+                assert_ne!(
+                    parse_name(&wrong, config)
+                        .ok()
+                        .flatten()
+                        .map(|name| name.kind),
+                    Some(*expected_kind)
+                );
+            }
+        }
+    }
 }
 
 //= docs/parsing-requirements.md#parse-name-001

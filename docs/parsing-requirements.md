@@ -139,7 +139,7 @@ Provenance: DOC-NAME, SRC-NAME. Matching consumes the complete basename; unrelat
 
 ### PARSE-NAME-002
 
-Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
 
 Provenance: DOC-DUP, SRC-NAME; literal matching is POLICY rather than reproducing unescaped regular expressions.
 

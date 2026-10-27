@@ -659,6 +659,22 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-kind-prefix-routing"
+gate = true
+requirements = ["PARSE-NAME-002"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Exact ObjectKind-to-configured-prefix selection only; complete filename routing
+# and parsing remain outside this checkpoint.
+implementations = [{ path = "crates/core/src/names.rs", symbol = "kind_specific_prefix" }, { path = "crates/core/src/names.rs", symbol = "parse_name" }]
+proofs = [{ id = "name-kind-prefix-routing", requirement = "PARSE-NAME-002", path = "crates/core/src/names.rs", symbol = "kind_specific_prefix", kind = "contract" }]
+tests = [{ package = "duplicity-core", name = "each_object_kind_uses_its_configured_prefix_family" }]
+
+[[milestone]]
 id = "name-long-volume"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-GEN-003"]

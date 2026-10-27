@@ -3101,7 +3101,38 @@ const KINDS: [ObjectKind; 6] = [
     ObjectKind::IncrementalSignatures,
 ];
 
+//= docs/parsing-requirements.md#parse-name-002
+//= type=implementation
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
 verus! {
+closed spec fn kind_specific_prefix_model(
+    kind: ObjectKind,
+    archive: Seq<u8>,
+    manifest: Seq<u8>,
+    signatures: Seq<u8>,
+) -> Seq<u8> {
+    match kind {
+        ObjectKind::FullVolume | ObjectKind::IncrementalVolume => archive,
+        ObjectKind::FullManifest | ObjectKind::IncrementalManifest => manifest,
+        ObjectKind::FullSignatures | ObjectKind::IncrementalSignatures => signatures,
+    }
+}
+
+fn kind_specific_prefix<'a>(
+    kind: ObjectKind,
+    archive: &'a [u8],
+    manifest: &'a [u8],
+    signatures: &'a [u8],
+) -> (prefix: &'a [u8])
+    ensures prefix@ == kind_specific_prefix_model(kind, archive@, manifest@, signatures@),
+{
+    match kind {
+        ObjectKind::FullVolume | ObjectKind::IncrementalVolume => archive,
+        ObjectKind::FullManifest | ObjectKind::IncrementalManifest => manifest,
+        ObjectKind::FullSignatures | ObjectKind::IncrementalSignatures => signatures,
+    }
+}
+
 closed spec fn stem_model(kind: ObjectKind, short: bool) -> Seq<u8> {
     match (kind, short) {
         (ObjectKind::FullVolume | ObjectKind::FullManifest, false) => b"duplicity-full."@,
@@ -4835,14 +4866,15 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
     let mut recognized = false;
     let mut result = None;
     for kind in KINDS {
-        let prefix = match kind {
-            ObjectKind::FullVolume | ObjectKind::IncrementalVolume => config.archive_prefix,
-            ObjectKind::FullManifest | ObjectKind::IncrementalManifest => config.manifest_prefix,
-            _ => config.signature_prefix,
-        };
+        let prefix = kind_specific_prefix(
+            kind,
+            config.archive_prefix,
+            config.manifest_prefix,
+            config.signature_prefix,
+        );
         //= docs/parsing-requirements.md#parse-name-002
         //= type=implementation
-        //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.
+        //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
         let Some(rest) = configured_prefix_remainder(input, config.global_prefix, prefix) else {
             continue;
         };
