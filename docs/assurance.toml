@@ -665,18 +665,19 @@ tests = [
 
 [[milestone]]
 id = "name-calendar-day-policy"
-gate = false
+gate = true
 requirements = ["PARSE-NAME-004"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Proves the Gregorian day-of-month bound for supported years and months and
-# traces its use in long timestamp parsing. Timestamp framing and composition
-# remain outside this checkpoint.
+# Proves month lengths, Gregorian leap years, and the day-of-month predicate
+# for supported years and months. Timestamp framing and composition remain
+# outside this checkpoint.
 implementations = [
+  { path = "crates/core/src/names.rs", symbol = "month_length" },
   { path = "crates/core/src/names.rs", symbol = "calendar_day_valid" },
   { path = "crates/core/src/names.rs", symbol = "parse_long_timestamp" }
 ]
