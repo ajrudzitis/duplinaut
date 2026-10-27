@@ -2250,6 +2250,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-body-selected-route"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The selector contract links each (kind, profile) pair to one typed handler
+# and body() dispatches using that selected value. This does not prove any
+# handler's field parsing or the complete parse_name classification.
+implementations = [
+  { path = "crates/core/src/name_dispatch.rs", symbol = "select_body_route" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-body-selected-route", requirement = "PARSE-NAME-001", path = "crates/core/src/name_dispatch.rs", symbol = "select_body_route", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::selected_body_route_matches_all_kind_and_profile_pairs" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

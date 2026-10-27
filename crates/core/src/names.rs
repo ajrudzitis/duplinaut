@@ -4295,8 +4295,8 @@ fn body(
     short: bool,
     separator: u8,
 ) -> Result<ObjectName, NameError> {
-    assert_eq!(crate::name_dispatch::body_route_partition(kind, short), 1);
-    if crate::name_dispatch::short_incremental_signatures_route(kind, short) {
+    let selected_route = crate::name_dispatch::select_body_route(kind, short);
+    if selected_route == crate::name_dispatch::BodyRoute::ShortIncrementalSignatures {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4313,7 +4313,7 @@ fn body(
             second,
         );
     }
-    if crate::name_dispatch::short_incremental_manifest_route(kind, short) {
+    if selected_route == crate::name_dispatch::BodyRoute::ShortIncrementalManifest {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4330,7 +4330,7 @@ fn body(
             second,
         );
     }
-    if crate::name_dispatch::short_full_manifest_route(kind, short) {
+    if selected_route == crate::name_dispatch::BodyRoute::ShortFullManifest {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4340,7 +4340,7 @@ fn body(
         }
         return short_full_manifest_body_fields(start_field, trailer, first, second);
     }
-    if crate::name_dispatch::long_full_manifest_route(kind, short) {
+    if selected_route == crate::name_dispatch::BodyRoute::LongFullManifest {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4357,7 +4357,7 @@ fn body(
             third,
         );
     }
-    if crate::name_dispatch::long_full_signatures_route(kind, short) {
+    if selected_route == crate::name_dispatch::BodyRoute::LongFullSignatures {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4374,7 +4374,7 @@ fn body(
             third,
         );
     }
-    if crate::name_dispatch::long_incremental_manifest_route(kind, short) {
+    if selected_route == crate::name_dispatch::BodyRoute::LongIncrementalManifest {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4395,7 +4395,7 @@ fn body(
             third,
         );
     }
-    if crate::name_dispatch::long_incremental_signatures_route(kind, short) {
+    if selected_route == crate::name_dispatch::BodyRoute::LongIncrementalSignatures {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4416,7 +4416,7 @@ fn body(
             third,
         );
     }
-    if crate::name_dispatch::short_full_signatures_route(kind, short) {
+    if selected_route == crate::name_dispatch::BodyRoute::ShortFullSignatures {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4426,7 +4426,7 @@ fn body(
         }
         return short_full_signatures_body_fields(start_field, trailer, first, second);
     }
-    if crate::name_dispatch::short_incremental_volume_route(kind, short) {
+    if selected_route == crate::name_dispatch::BodyRoute::ShortIncrementalVolume {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4445,7 +4445,7 @@ fn body(
             second,
         );
     }
-    if crate::name_dispatch::short_full_volume_route(kind, short) {
+    if selected_route == crate::name_dispatch::BodyRoute::ShortFullVolume {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4456,7 +4456,7 @@ fn body(
         }
         return short_full_volume_body_fields(start_field, volume_field, trailer, first, second);
     }
-    if crate::name_dispatch::long_full_volume_route(kind, short) {
+    if selected_route == crate::name_dispatch::BodyRoute::LongFullVolume {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -4475,7 +4475,7 @@ fn body(
             third,
         );
     }
-    if crate::name_dispatch::long_incremental_volume_route(kind, short) {
+    if selected_route == crate::name_dispatch::BodyRoute::LongIncrementalVolume {
         let mut fields = Some(input);
         let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
         let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
@@ -5333,6 +5333,66 @@ mod tests {
             for short in [false, true] {
                 assert_eq!(crate::name_dispatch::body_route_partition(kind, short), 1);
             }
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    fn selected_body_route_matches_all_kind_and_profile_pairs() {
+        use crate::name_dispatch::BodyRoute as R;
+        let cases = [
+            (super::ObjectKind::FullVolume, false, R::LongFullVolume),
+            (super::ObjectKind::FullVolume, true, R::ShortFullVolume),
+            (
+                super::ObjectKind::IncrementalVolume,
+                false,
+                R::LongIncrementalVolume,
+            ),
+            (
+                super::ObjectKind::IncrementalVolume,
+                true,
+                R::ShortIncrementalVolume,
+            ),
+            (super::ObjectKind::FullManifest, false, R::LongFullManifest),
+            (super::ObjectKind::FullManifest, true, R::ShortFullManifest),
+            (
+                super::ObjectKind::IncrementalManifest,
+                false,
+                R::LongIncrementalManifest,
+            ),
+            (
+                super::ObjectKind::IncrementalManifest,
+                true,
+                R::ShortIncrementalManifest,
+            ),
+            (
+                super::ObjectKind::FullSignatures,
+                false,
+                R::LongFullSignatures,
+            ),
+            (
+                super::ObjectKind::FullSignatures,
+                true,
+                R::ShortFullSignatures,
+            ),
+            (
+                super::ObjectKind::IncrementalSignatures,
+                false,
+                R::LongIncrementalSignatures,
+            ),
+            (
+                super::ObjectKind::IncrementalSignatures,
+                true,
+                R::ShortIncrementalSignatures,
+            ),
+        ];
+        for (kind, short, expected) in cases {
+            assert_eq!(
+                crate::name_dispatch::select_body_route(kind, short),
+                expected
+            );
         }
     }
 

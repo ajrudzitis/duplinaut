@@ -2,6 +2,97 @@ use crate::names::ObjectKind;
 use vstd::prelude::*;
 
 verus! {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BodyRoute {
+    ShortIncrementalSignatures,
+    ShortIncrementalManifest,
+    ShortFullManifest,
+    LongFullManifest,
+    LongFullSignatures,
+    LongIncrementalManifest,
+    LongIncrementalSignatures,
+    ShortFullSignatures,
+    ShortIncrementalVolume,
+    ShortFullVolume,
+    LongFullVolume,
+    LongIncrementalVolume,
+    Unmatched,
+}
+
+pub closed spec fn selected_body_route_model(kind: ObjectKind, short: bool) -> BodyRoute {
+    if short_incremental_signatures_route_model(kind, short) {
+        BodyRoute::ShortIncrementalSignatures
+    } else if short_incremental_manifest_route_model(kind, short) {
+        BodyRoute::ShortIncrementalManifest
+    } else if short_full_manifest_route_model(kind, short) {
+        BodyRoute::ShortFullManifest
+    } else if long_full_manifest_route_model(kind, short) {
+        BodyRoute::LongFullManifest
+    } else if long_full_signatures_route_model(kind, short) {
+        BodyRoute::LongFullSignatures
+    } else if long_incremental_manifest_route_model(kind, short) {
+        BodyRoute::LongIncrementalManifest
+    } else if long_incremental_signatures_route_model(kind, short) {
+        BodyRoute::LongIncrementalSignatures
+    } else if short_full_signatures_route_model(kind, short) {
+        BodyRoute::ShortFullSignatures
+    } else if short_incremental_volume_route_model(kind, short) {
+        BodyRoute::ShortIncrementalVolume
+    } else if short_full_volume_route_model(kind, short) {
+        BodyRoute::ShortFullVolume
+    } else if long_full_volume_route_model(kind, short) {
+        BodyRoute::LongFullVolume
+    } else if long_incremental_volume_route_model(kind, short) {
+        BodyRoute::LongIncrementalVolume
+    } else {
+        BodyRoute::Unmatched
+    }
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+pub(crate) fn select_body_route(kind: ObjectKind, short: bool) -> (route: BodyRoute)
+    ensures route == selected_body_route_model(kind, short),
+        route != BodyRoute::Unmatched,
+{
+    let _count = body_route_partition(kind, short);
+    let route = if short_incremental_signatures_route(kind, short) {
+        BodyRoute::ShortIncrementalSignatures
+    } else if short_incremental_manifest_route(kind, short) {
+        BodyRoute::ShortIncrementalManifest
+    } else if short_full_manifest_route(kind, short) {
+        BodyRoute::ShortFullManifest
+    } else if long_full_manifest_route(kind, short) {
+        BodyRoute::LongFullManifest
+    } else if long_full_signatures_route(kind, short) {
+        BodyRoute::LongFullSignatures
+    } else if long_incremental_manifest_route(kind, short) {
+        BodyRoute::LongIncrementalManifest
+    } else if long_incremental_signatures_route(kind, short) {
+        BodyRoute::LongIncrementalSignatures
+    } else if short_full_signatures_route(kind, short) {
+        BodyRoute::ShortFullSignatures
+    } else if short_incremental_volume_route(kind, short) {
+        BodyRoute::ShortIncrementalVolume
+    } else if short_full_volume_route(kind, short) {
+        BodyRoute::ShortFullVolume
+    } else if long_full_volume_route(kind, short) {
+        BodyRoute::LongFullVolume
+    } else if long_incremental_volume_route(kind, short) {
+        BodyRoute::LongIncrementalVolume
+    } else {
+        BodyRoute::Unmatched
+    };
+    proof {
+        reveal(selected_body_route_model);
+        reveal(body_route_count_model);
+        assert(_count == 1);
+        assert(route != BodyRoute::Unmatched);
+    }
+    route
+}
+
 pub open spec fn short_full_signatures_route_model(kind: ObjectKind, short: bool) -> bool {
     kind == ObjectKind::FullSignatures && short
 }
