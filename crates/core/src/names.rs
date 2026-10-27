@@ -4654,25 +4654,184 @@ fn validate_name_basename(input: &[u8], max_name_bytes: usize) -> (result: Resul
     }
     Ok(())
 }
+
+closed spec fn configured_name_prefix_valid_model(prefix: Seq<u8>) -> bool {
+    forall|index: int| 0 <= index < prefix.len()
+        ==> prefix[index] != 0 && prefix[index] != b'/'
+}
+
+//= docs/parsing-requirements.md#parse-name-009
+//= type=implementation
+//# Configured global, archive, manifest, and signature prefixes MAY be empty and otherwise contain arbitrary bytes, but MUST NOT contain NUL or `/`.
+fn configured_name_prefix_valid(prefix: &[u8]) -> (result: bool)
+    ensures result == configured_name_prefix_valid_model(prefix@),
+{
+    let mut index = 0usize;
+    while index < prefix.len()
+        invariant index <= prefix.len(),
+            forall|prior: int| 0 <= prior < index as int
+                ==> prefix@[prior] != 0 && prefix@[prior] != b'/',
+        decreases prefix.len() - index,
+    {
+        if prefix[index] == 0 || prefix[index] == b'/' {
+            proof {
+                reveal(configured_name_prefix_valid_model);
+                assert(!configured_name_prefix_valid_model(prefix@));
+            }
+            return false;
+        }
+        index += 1;
+    }
+    proof {
+        reveal(configured_name_prefix_valid_model);
+        assert(configured_name_prefix_valid_model(prefix@));
+    }
+    true
+}
+
+closed spec fn name_configuration_valid_model(
+    separator: u8,
+    global_prefix: Seq<u8>,
+    archive_prefix: Seq<u8>,
+    manifest_prefix: Seq<u8>,
+    signature_prefix: Seq<u8>,
+) -> bool {
+    time_separator_valid_model(separator)
+        && configured_name_prefix_valid_model(global_prefix)
+        && configured_name_prefix_valid_model(archive_prefix)
+        && configured_name_prefix_valid_model(manifest_prefix)
+        && configured_name_prefix_valid_model(signature_prefix)
+}
+
+//= docs/parsing-requirements.md#parse-name-009
+//= type=implementation
+//# The time separator MUST be in the valid set in PARSE-NAME-007.
+fn name_configuration_valid(
+    separator: u8,
+    global_prefix: &[u8],
+    archive_prefix: &[u8],
+    manifest_prefix: &[u8],
+    signature_prefix: &[u8],
+) -> (result: bool)
+    ensures result == name_configuration_valid_model(
+        separator,
+        global_prefix@,
+        archive_prefix@,
+        manifest_prefix@,
+        signature_prefix@,
+    ),
+{
+    let result = time_separator_valid(separator)
+        && configured_name_prefix_valid(global_prefix)
+        && configured_name_prefix_valid(archive_prefix)
+        && configured_name_prefix_valid(manifest_prefix)
+        && configured_name_prefix_valid(signature_prefix);
+    proof {
+        reveal(name_configuration_valid_model);
+        assert(result == name_configuration_valid_model(
+            separator,
+            global_prefix@,
+            archive_prefix@,
+            manifest_prefix@,
+            signature_prefix@,
+        ));
+    }
+    result
+}
+
+//= docs/parsing-requirements.md#parse-name-009
+//= type=implementation
+//# Before checking basename size or bytes, the reader MUST validate the parser configuration.
+//= docs/parsing-requirements.md#parse-name-009
+//= type=implementation
+//# Invalid configuration MUST return the configuration error before basename limit or malformed-name errors; valid configuration MUST proceed to the checks in PARSE-NAME-008.
+fn validate_name_preflight(
+    input: &[u8],
+    separator: u8,
+    global_prefix: &[u8],
+    archive_prefix: &[u8],
+    manifest_prefix: &[u8],
+    signature_prefix: &[u8],
+    max_name_bytes: usize,
+) -> (result: Result<(), NameError>)
+    ensures match result {
+        Err(NameError::Configuration) => !name_configuration_valid_model(
+            separator,
+            global_prefix@,
+            archive_prefix@,
+            manifest_prefix@,
+            signature_prefix@,
+        ),
+        Err(NameError::Limit) => name_configuration_valid_model(
+            separator,
+            global_prefix@,
+            archive_prefix@,
+            manifest_prefix@,
+            signature_prefix@,
+        ) && input.len() > max_name_bytes,
+        Err(NameError::Malformed) => name_configuration_valid_model(
+            separator,
+            global_prefix@,
+            archive_prefix@,
+            manifest_prefix@,
+            signature_prefix@,
+        ) && input.len() <= max_name_bytes && !name_basename_bytes_valid_model(input@),
+        Ok(()) => name_configuration_valid_model(
+            separator,
+            global_prefix@,
+            archive_prefix@,
+            manifest_prefix@,
+            signature_prefix@,
+        ) && input.len() <= max_name_bytes && name_basename_bytes_valid_model(input@),
+        _ => false,
+    },
+{
+    if !name_configuration_valid(
+        separator,
+        global_prefix,
+        archive_prefix,
+        manifest_prefix,
+        signature_prefix,
+    ) {
+        proof {
+            reveal(name_configuration_valid_model);
+            assert(!name_configuration_valid_model(
+                separator,
+                global_prefix@,
+                archive_prefix@,
+                manifest_prefix@,
+                signature_prefix@,
+            ));
+        }
+        return Err(NameError::Configuration);
+    }
+    proof {
+        reveal(name_configuration_valid_model);
+        assert(name_configuration_valid_model(
+            separator,
+            global_prefix@,
+            archive_prefix@,
+            manifest_prefix@,
+            signature_prefix@,
+        ));
+    }
+    validate_name_basename(input, max_name_bytes)
+}
 }
 
 /// Parse a basename, not an S3 key. Unrelated names return `Ok(None)`.
 /// Conflicting prefix configurations producing distinct successful classifications
 /// return `Ambiguous`; malformed recognized stems are errors rather than ignored.
 pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectName>, NameError> {
-    if !time_separator_valid(config.time_separator)
-        || [
-            config.global_prefix,
-            config.archive_prefix,
-            config.manifest_prefix,
-            config.signature_prefix,
-        ]
-        .iter()
-        .any(|prefix| prefix.contains(&0) || prefix.contains(&b'/'))
-    {
-        return Err(NameError::Configuration);
-    }
-    validate_name_basename(input, config.max_name_bytes)?;
+    validate_name_preflight(
+        input,
+        config.time_separator,
+        config.global_prefix,
+        config.archive_prefix,
+        config.manifest_prefix,
+        config.signature_prefix,
+        config.max_name_bytes,
+    )?;
     let mut recognized = false;
     let mut result = None;
     for kind in KINDS {

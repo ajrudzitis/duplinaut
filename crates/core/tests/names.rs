@@ -269,6 +269,68 @@ fn parse_name_preflight_checks_size_before_basename_bytes() {
     );
 }
 
+//= docs/parsing-requirements.md#parse-name-009
+//= type=test
+//# Before checking basename size or bytes, the reader MUST validate the parser configuration. The time separator MUST be in the valid set in PARSE-NAME-007. Configured global, archive, manifest, and signature prefixes MAY be empty and otherwise contain arbitrary bytes, but MUST NOT contain NUL or `/`. Invalid configuration MUST return the configuration error before basename limit or malformed-name errors; valid configuration MUST proceed to the checks in PARSE-NAME-008.
+#[test]
+fn parse_name_rejects_invalid_configuration_before_basename_errors() {
+    let base = NameConfig::default();
+    let inputs: [&[u8]; 3] = [b"/", b"a\0b", b"oversized"];
+
+    let invalid_separator = NameConfig {
+        time_separator: 0,
+        max_name_bytes: 0,
+        ..base
+    };
+    for input in inputs {
+        assert_eq!(
+            parse_name(input, invalid_separator),
+            Err(NameError::Configuration),
+            "invalid separator takes precedence for {input:?}"
+        );
+    }
+
+    for invalid_prefix in [b"/" as &[u8], b"x\0y"] {
+        for field in 0..4 {
+            let config = match field {
+                0 => NameConfig {
+                    global_prefix: invalid_prefix,
+                    max_name_bytes: 0,
+                    ..base
+                },
+                1 => NameConfig {
+                    archive_prefix: invalid_prefix,
+                    max_name_bytes: 0,
+                    ..base
+                },
+                2 => NameConfig {
+                    manifest_prefix: invalid_prefix,
+                    max_name_bytes: 0,
+                    ..base
+                },
+                _ => NameConfig {
+                    signature_prefix: invalid_prefix,
+                    max_name_bytes: 0,
+                    ..base
+                },
+            };
+            for input in inputs {
+                assert_eq!(
+                    parse_name(input, config),
+                    Err(NameError::Configuration),
+                    "invalid prefix {field} takes precedence for {input:?}"
+                );
+            }
+        }
+    }
+
+    let arbitrary_prefix_byte = NameConfig {
+        global_prefix: b"\xff",
+        ..base
+    };
+    assert_eq!(parse_name(b"unrelated", arbitrary_prefix_byte), Ok(None));
+}
+
 //= docs/parsing-requirements.md#parse-name-002
 //= type=test
 //# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem.

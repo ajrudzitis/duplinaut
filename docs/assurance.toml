@@ -546,6 +546,31 @@ proofs = [{ id = "name-basename-preflight", requirement = "PARSE-NAME-008", path
 tests = [{ package = "duplicity-core", name = "parse_name_preflight_checks_size_before_basename_bytes" }]
 
 [[milestone]]
+id = "name-configuration-preflight"
+gate = true
+requirements = ["PARSE-NAME-009"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Configuration validity and Configuration-error precedence before the proved
+# PARSE-NAME-008 name-size and basename-byte checks.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "configured_name_prefix_valid" },
+  { path = "crates/core/src/names.rs", symbol = "name_configuration_valid" },
+  { path = "crates/core/src/names.rs", symbol = "validate_name_preflight" },
+  { path = "crates/core/src/names.rs", symbol = "parse_name" }
+]
+proofs = [
+  { id = "name-configuration-prefix", requirement = "PARSE-NAME-009", path = "crates/core/src/names.rs", symbol = "configured_name_prefix_valid", kind = "contract" },
+  { id = "name-configuration-validity", requirement = "PARSE-NAME-009", path = "crates/core/src/names.rs", symbol = "name_configuration_valid", kind = "contract" },
+  { id = "name-configuration-preflight-order", requirement = "PARSE-NAME-009", path = "crates/core/src/names.rs", symbol = "validate_name_preflight", kind = "contract" }
+]
+tests = [{ package = "duplicity-core", name = "parse_name_rejects_invalid_configuration_before_basename_errors" }]
+
+[[milestone]]
 id = "name-final-classification"
 gate = true
 requirements = ["PARSE-NAME-001"]

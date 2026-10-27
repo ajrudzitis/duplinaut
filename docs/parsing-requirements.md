@@ -167,6 +167,12 @@ For a valid parser configuration, the reader MUST return the name-size limit err
 
 Provenance: POLICY. This specifies preflight error precedence and does not define configuration-validation precedence or the subsequent filename classification.
 
+### PARSE-NAME-009
+
+Before checking basename size or bytes, the reader MUST validate the parser configuration. The time separator MUST be in the valid set in PARSE-NAME-007. Configured global, archive, manifest, and signature prefixes MAY be empty and otherwise contain arbitrary bytes, but MUST NOT contain NUL or `/`. Invalid configuration MUST return the configuration error before basename limit or malformed-name errors; valid configuration MUST proceed to the checks in PARSE-NAME-008.
+
+Provenance: PARSE-NAME-007 defines the time-separator set. Rejecting NUL and `/` in configured prefixes, and configuration-error precedence over input errors, are POLICY choices.
+
 ### PARSE-NAME-005
 
 Objects marked partial MUST be excluded from completed restore sets.

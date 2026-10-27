@@ -42,6 +42,12 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: For a valid parser configuration, the reader MUST return the name-size limit error when a basename exceeds its configured byte limit, before checking basename contents.
     TEXT[!MUST,implementation,test]: At or below that limit, the reader MUST reject a basename containing NUL or `/` with the malformed-name error.
 
+  SECTION: [PARSE-NAME-009](#parse-name-009)
+    TEXT[!MUST,implementation,test]: Before checking basename size or bytes, the reader MUST validate the parser configuration.
+    TEXT[!MUST,implementation,test]: The time separator MUST be in the valid set in PARSE-NAME-007.
+    TEXT[!MUST,implementation,test]: Configured global, archive, manifest, and signature prefixes MAY be empty and otherwise contain arbitrary bytes, but MUST NOT contain NUL or `/`.
+    TEXT[!MUST,implementation,test]: Invalid configuration MUST return the configuration error before basename limit or malformed-name errors; valid configuration MUST proceed to the checks in PARSE-NAME-008.
+
   SECTION: [PARSE-NAME-005](#parse-name-005)
     TEXT[!MUST,implementation,test]: Objects marked partial MUST be excluded from completed restore sets.
 
