@@ -236,6 +236,21 @@ pub fn owner_name_requires_utf8(charset: Option<&[u8]>) -> (result: bool)
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+//= docs/parsing-requirements.md#parse-tar-004
+//# Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.
+
+/// Recognize exactly the PAX header charset tokens supported by the native parser.
+pub fn hdrcharset_value_supported(value: &[u8]) -> (result: bool)
+    ensures result == (value@ == b"BINARY"@ || value@ == b"UTF-8"@
+        || value@ == b"ISO-IR 10646 2000 UTF-8"@),
+{
+    bytes_eq(value, b"BINARY") || bytes_eq(value, b"UTF-8")
+        || bytes_eq(value, b"ISO-IR 10646 2000 UTF-8")
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PaxSizeError {
     Invalid,
@@ -409,7 +424,8 @@ mod tests {
     use super::{
         admit_record, effective_id, effective_link_override, effective_mtime,
         effective_name_override, effective_optional_time, effective_owner_name, effective_size,
-        owner_name_requires_utf8, PaxIdError, PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
+        hdrcharset_value_supported, owner_name_requires_utf8, PaxIdError, PaxRecordAdmissionError,
+        PaxSizeError, PaxTimeError,
     };
 
     #[test]
@@ -467,6 +483,26 @@ mod tests {
         assert!(owner_name_requires_utf8(Some(b"UTF-8")));
         assert!(owner_name_requires_utf8(Some(b"ISO-IR 10646 2000 UTF-8")));
         assert!(!owner_name_requires_utf8(Some(b"BINARY")));
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-003
+    //= type=test
+    //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+    #[test]
+    fn hdrcharset_value_admission_matches_exact_supported_tokens() {
+        for value in [b"BINARY" as &[u8], b"UTF-8", b"ISO-IR 10646 2000 UTF-8"] {
+            assert!(hdrcharset_value_supported(value));
+        }
+        for value in [
+            b"binary" as &[u8],
+            b"UTF8",
+            b"ISO-IR 10646 2000 UTF-8 ",
+            b"ASCII",
+            b"unknown",
+            b"",
+        ] {
+            assert!(!hdrcharset_value_supported(value));
+        }
     }
 
     #[test]

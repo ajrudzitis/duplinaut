@@ -787,6 +787,13 @@ fn malformed_and_unsupported_pax_are_not_skipped() {
     ] {
         assert!(parse(&member(b"pax", b'x', &record(key, value))).is_err());
     }
+    for value in [b"binary" as &[u8], b"UTF8", b"UTF-8 ", b"ASCII", b"unknown"] {
+        assert_eq!(
+            parse(&member(b"pax", b'x', &record(b"hdrcharset", value))).unwrap_err(),
+            TarError::UnsupportedPax,
+            "{value:?}"
+        );
+    }
     let duplicate = [record(b"size", b"1"), record(b"size", b"2")].concat();
     assert_eq!(
         parse(&member(b"pax", b'x', &duplicate)).unwrap_err(),
@@ -804,6 +811,37 @@ fn malformed_and_unsupported_pax_are_not_skipped() {
     ]
     .concat();
     assert_eq!(parse(&size).unwrap().entries[0].payload, b"a");
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+//= docs/parsing-requirements.md#parse-tar-004
+//= type=test
+//# Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.
+#[test]
+fn hdrcharset_exact_tokens_and_empty_local_deletion_are_enforced() {
+    for charset in [b"BINARY" as &[u8], b"UTF-8", b"ISO-IR 10646 2000 UTF-8"] {
+        let archive = [
+            member(b"local", b'x', &record(b"hdrcharset", charset)),
+            member(b"snapshot/file", b'0', b""),
+        ]
+        .concat();
+        assert_eq!(parse(&archive).unwrap().entries.len(), 1, "{charset:?}");
+    }
+
+    let global = member(b"global", b'g', &record(b"hdrcharset", b"BINARY"));
+    let local = [record(b"hdrcharset", b""), record(b"uname", b"user-\xff")].concat();
+    let archive = [
+        global,
+        member(b"local", b'x', &local),
+        member(b"snapshot/file", b'0', b""),
+    ]
+    .concat();
+    // Empty local hdrcharset deletes the inherited BINARY value, so PAX uname
+    // returns to the default UTF-8 validation policy.
+    assert_eq!(parse(&archive).unwrap_err(), TarError::TextEncoding);
 }
 
 //= docs/parsing-requirements.md#parse-tar-003

@@ -129,7 +129,7 @@ fn pax(bytes: &[u8]) -> Result<Pax<'_>, TarError> {
                 3 | 8 | 9 => {
                     time(value)?;
                 }
-                10 if !matches!(value, b"BINARY" | b"ISO-IR 10646 2000 UTF-8" | b"UTF-8") => {
+                10 if !crate::verified::tar_pax::hdrcharset_value_supported(value) => {
                     return Err(TarError::UnsupportedPax)
                 }
                 _ => {}
