@@ -10,6 +10,9 @@
 use super::tar_helpers::decimal;
 #[cfg(verus_keep_ghost)]
 use super::tar_helpers::decimal_prefix;
+use super::tar_time::time;
+#[cfg(verus_keep_ghost)]
+use super::tar_time::time_model;
 use vest_lib::core::exec::bytes_eq;
 use vstd::prelude::*;
 verus! {
@@ -174,6 +177,35 @@ pub fn effective_size(value: Option<&[u8]>, header_size: u64)
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PaxTimeError {
+    Invalid,
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+/// Use the resolved PAX mtime when present; otherwise keep the header seconds.
+pub fn effective_mtime(value: Option<&[u8]>, header_seconds: i64)
+    -> (result: Result<(i64, u32), PaxTimeError>)
+    ensures match value {
+        None => result == Ok((header_seconds, 0)),
+        Some(bytes) => match result {
+            Ok((seconds, nanos)) => time_model(bytes@) == Some((seconds as int, nanos as int))
+                && nanos < 1000000000,
+            Err(error) => error == PaxTimeError::Invalid && time_model(bytes@) is None,
+        },
+    },
+{
+    match value {
+        None => Ok((header_seconds, 0)),
+        Some(bytes) => match time(bytes) {
+            Some(value) => Ok(value),
+            None => Err(PaxTimeError::Invalid),
+        },
+    }
+}
+
 pub fn key_index(input: &[u8]) -> (result: Option<usize>)
     ensures result == key_model(input@), result is Some ==> result.unwrap() < 11,
 {
@@ -194,7 +226,7 @@ pub fn key_index(input: &[u8]) -> (result: Option<usize>)
 
 #[cfg(test)]
 mod tests {
-    use super::{effective_size, PaxSizeError};
+    use super::{effective_mtime, effective_size, PaxSizeError, PaxTimeError};
 
     #[test]
     fn effective_pax_size_selects_override_fallback_and_invalid_values() {
@@ -207,5 +239,26 @@ mod tests {
             Err(PaxSizeError::Invalid)
         );
         assert_eq!(effective_size(Some(b"1x"), 17), Err(PaxSizeError::Invalid));
+    }
+
+    #[test]
+    fn effective_pax_mtime_selects_header_fallback_and_verified_time_values() {
+        assert_eq!(effective_mtime(None, -7), Ok((-7, 0)));
+        assert_eq!(
+            effective_mtime(Some(b"-0.000000001"), 7),
+            Ok((-1, 999_999_999))
+        );
+        assert_eq!(
+            effective_mtime(Some(b"+0.100000000000"), 7),
+            Ok((0, 100_000_000))
+        );
+        for value in [
+            b"1.1234567891" as &[u8],
+            b"1.",
+            b"18446744073709551616",
+            b"-9223372036854775808.000000001",
+        ] {
+            assert_eq!(effective_mtime(Some(value), 7), Err(PaxTimeError::Invalid));
+        }
     }
 }

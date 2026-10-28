@@ -414,6 +414,45 @@ fn pax_size_override_controls_payload_and_empty_local_deletion_falls_back() {
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
 #[test]
+fn pax_mtime_global_local_and_empty_local_deletion_resolve_exactly() {
+    let bytes = [
+        member(b"global", b'g', &record(b"mtime", b"2.25")),
+        member(b"snapshot/global", b'0', b""),
+        member(b"local", b'x', &record(b"mtime", b"-0.000000001")),
+        member(b"snapshot/local", b'0', b""),
+        member(b"local", b'x', &record(b"mtime", b"")),
+        member(b"snapshot/header", b'0', b""),
+    ]
+    .concat();
+    let parsed = parse(&bytes).unwrap();
+    assert_eq!(
+        parsed.entries[0].mtime,
+        TarTime {
+            seconds: 2,
+            nanoseconds: 250_000_000
+        }
+    );
+    assert_eq!(
+        parsed.entries[1].mtime,
+        TarTime {
+            seconds: -1,
+            nanoseconds: 999_999_999
+        }
+    );
+    assert_eq!(
+        parsed.entries[2].mtime,
+        TarTime {
+            seconds: 1,
+            nanoseconds: 0
+        }
+    );
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+#[test]
 fn official_duplicity_307_pax_path_override_is_applied() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.vol1.difftar.gz");
@@ -426,6 +465,44 @@ fn official_duplicity_307_pax_path_override_is_applied() {
         .entries
         .iter()
         .any(|entry| entry.name == b"multivol_snapshot/large.bin/1"));
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+#[test]
+fn official_duplicity_307_pax_path_preserves_header_mtime() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.vol1.difftar.gz");
+    let mut decoded = Vec::new();
+    flate2::read::GzDecoder::new(std::fs::File::open(path).unwrap())
+        .read_to_end(&mut decoded)
+        .unwrap();
+    let parsed = TarVolume::parse(&decoded, Termination::Data, TarLimits::default()).unwrap();
+    let mut archive = tar::Archive::new(decoded.as_slice());
+    let expected: Vec<_> = archive
+        .entries()
+        .unwrap()
+        .map(|entry| {
+            let entry = entry.unwrap();
+            (
+                entry.path_bytes().into_owned(),
+                entry.header().mtime().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(parsed.entries.len(), expected.len());
+    for (native, (name, seconds)) in parsed.entries.iter().zip(expected) {
+        assert_eq!(native.name, name);
+        assert_eq!(
+            native.mtime,
+            TarTime {
+                seconds: seconds as i64,
+                nanoseconds: 0
+            }
+        );
+    }
 }
 
 //= docs/parsing-requirements.md#parse-tar-003

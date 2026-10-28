@@ -240,10 +240,8 @@ impl<'a> TarVolume<'a> {
             let mut uid = unsigned(h.uid)?;
             let mut gid = unsigned(h.gid)?;
             let raw_size = unsigned(h.size)?;
-            let mut mtime = TarTime {
-                seconds: i64::try_from(number(h.mtime)?).map_err(|_| TarError::Numeric)?,
-                nanoseconds: 0,
-            };
+            let header_mtime_seconds =
+                i64::try_from(number(h.mtime)?).map_err(|_| TarError::Numeric)?;
             let device_major = unsigned(h.device_major)?;
             let device_minor = unsigned(h.device_minor)?;
             let extension = matches!(h.entry_type, b'L' | b'K' | b'x' | b'g');
@@ -356,9 +354,13 @@ impl<'a> TarVolume<'a> {
             if name.is_empty() || name.contains(&0) || link.contains(&0) {
                 return Err(TarError::TextEncoding);
             }
-            if let Some(value) = values[3] {
-                mtime = time(value)?;
-            }
+            let (mtime_seconds, mtime_nanoseconds) =
+                crate::verified::tar_pax::effective_mtime(values[3], header_mtime_seconds)
+                    .map_err(|_| TarError::Numeric)?;
+            let mtime = TarTime {
+                seconds: mtime_seconds,
+                nanoseconds: mtime_nanoseconds,
+            };
             if let Some(value) = values[4] {
                 uid = decimal(value)?;
             }
