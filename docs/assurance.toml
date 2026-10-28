@@ -1889,6 +1889,32 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-short-incremental-volume-success-result-refinement"
+gate = true
+requirements = ["PARSE-NAME-001", "PARSE-NAME-003", "PARSE-NAME-006"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# A successful short IncrementalVolume body result is tied to the exact raw
+# field/suffix decomposition and the semantic interval, positive base36
+# volume, trailer and partial-profile model. This does not prove the reverse
+# implication, error completeness, or the complete filename grammar.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body" },
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body_fields" },
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_raw_body_from_fields" }
+]
+proofs = [
+  { id = "name-short-incremental-volume-success-result-refinement", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::short_incremental_volume_success_route_composes_interval_volume_and_trailer" }
+]
+
+[[milestone]]
 id = "name-long-full-volume-body"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-007", "PARSE-GEN-003"]

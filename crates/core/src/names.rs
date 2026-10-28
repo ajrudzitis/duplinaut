@@ -7707,6 +7707,49 @@ mod tests {
     //= docs/parsing-requirements.md#parse-name-001
     //= type=test
     //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-003
+    //= type=test
+    //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    //= docs/parsing-requirements.md#parse-name-006
+    //= type=test
+    //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+    fn short_incremental_volume_success_route_composes_interval_volume_and_trailer() {
+        let profiles: [(&[u8], super::Envelope, bool); 6] = [
+            (b"1.2.1.dt", super::Envelope::Plain, false),
+            (b"1.2.1.dt.p", super::Envelope::Plain, true),
+            (b"1.2.1.dt.z", super::Envelope::Gzip, false),
+            (b"1.2.1.dt.g", super::Envelope::OpenPgp, false),
+            (b"1.2.1.dt.p.z", super::Envelope::Gzip, true),
+            (b"1.2.1.dt.p.g", super::Envelope::OpenPgp, true),
+        ];
+        for (input, envelope, partial) in profiles {
+            let name = super::short_incremental_volume_body(input, b':').unwrap();
+            assert_eq!(name.kind, super::ObjectKind::IncrementalVolume, "{input:?}");
+            assert_eq!(name.start, super::Timestamp(1), "{input:?}");
+            assert_eq!(name.end, super::Timestamp(2), "{input:?}");
+            assert_eq!(name.volume, Some(1), "{input:?}");
+            assert_eq!(
+                (name.envelope, name.partial),
+                (envelope, partial),
+                "{input:?}"
+            );
+            assert!(name.short, "{input:?}");
+        }
+
+        let nontrivial = super::short_incremental_volume_body(b"2.z.3.dt.p.g", b'\0').unwrap();
+        assert_eq!(nontrivial.kind, super::ObjectKind::IncrementalVolume);
+        assert_eq!(nontrivial.start, super::Timestamp(2));
+        assert_eq!(nontrivial.end, super::Timestamp(35));
+        assert_eq!(nontrivial.volume, Some(3));
+        assert_eq!(nontrivial.envelope, super::Envelope::OpenPgp);
+        assert!(nontrivial.partial);
+        assert!(nontrivial.short);
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
     fn long_incremental_volume_dispatch_selects_only_its_profile() {
         let kinds = [
             super::ObjectKind::FullVolume,
