@@ -2062,6 +2062,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-full-manifest-field-success"
+gate = true
+requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-007"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Refines a valid canonical or legacy long FullManifest field model to the
+# exact successful ObjectName, including supported envelope/partial profiles.
+# Model-None/error outcomes and outer scanner completeness remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "long_full_manifest_fields_model" },
+  { path = "crates/core/src/names.rs", symbol = "long_full_manifest_body_fields" }
+]
+proofs = [
+  { id = "name-long-full-manifest-field-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "long_full_manifest_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::long_full_manifest_fields_refine_timestamp_and_suffix_profiles" }
+]
+
+[[milestone]]
 id = "name-long-incremental-manifest-body"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-006", "PARSE-NAME-007"]
