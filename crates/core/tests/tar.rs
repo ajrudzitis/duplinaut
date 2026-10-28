@@ -848,6 +848,71 @@ fn hdrcharset_exact_tokens_and_empty_local_deletion_are_enforced() {
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 #[test]
+fn global_and_local_pax_resolution_composes_all_supported_fields() {
+    let global = [
+        record(b"path", b"snapshot/global"),
+        record(b"linkpath", b"global-link"),
+        record(b"size", b"5"),
+        record(b"mtime", b"2"),
+        record(b"uid", b"9"),
+        record(b"gid", b"10"),
+        record(b"uname", b"global-user"),
+        record(b"gname", b"global-group"),
+        record(b"atime", b"9"),
+        record(b"ctime", b"10"),
+        record(b"hdrcharset", b"UTF-8"),
+    ]
+    .concat();
+    let local = [
+        record(b"path", b"snapshot/local"),
+        record(b"linkpath", b"local-link"),
+        record(b"size", b""),
+        record(b"mtime", b""),
+        record(b"uid", b""),
+        record(b"gid", b"42"),
+        record(b"uname", b""),
+        record(b"atime", b""),
+        record(b"ctime", b"11.5"),
+        record(b"hdrcharset", b""),
+    ]
+    .concat();
+    let archive = [
+        member(b"global", b'g', &global),
+        member(b"local", b'x', &local),
+        member(b"snapshot/header", b'0', b"abc"),
+    ]
+    .concat();
+    let parsed = parse(&archive).unwrap();
+    assert_eq!(parsed.entries.len(), 1);
+    let entry = &parsed.entries[0];
+    assert_eq!(entry.name, b"snapshot/local");
+    assert_eq!(entry.linkname, b"local-link");
+    assert_eq!(entry.payload, b"abc");
+    assert_eq!(
+        entry.mtime,
+        TarTime {
+            seconds: 1,
+            nanoseconds: 0
+        }
+    );
+    assert_eq!(entry.uid, 0);
+    assert_eq!(entry.gid, 42);
+    assert!(entry.uname.is_empty());
+    assert_eq!(entry.gname, b"global-group");
+    assert_eq!(entry.atime, None);
+    assert_eq!(
+        entry.ctime,
+        Some(TarTime {
+            seconds: 11,
+            nanoseconds: 500_000_000
+        })
+    );
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+#[test]
 fn pax_record_admission_preserves_duplicate_nul_unknown_and_empty_value_behavior() {
     let duplicate = [
         record(b"path", b"snapshot/first"),

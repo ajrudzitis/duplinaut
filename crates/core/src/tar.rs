@@ -141,11 +141,7 @@ fn pax(bytes: &[u8]) -> Result<Pax<'_>, TarError> {
     Ok(result)
 }
 fn resolved<'a>(global: Pax<'a>, local: Pax<'a>) -> Pax<'a> {
-    let mut result = global;
-    for i in 0..11 {
-        result[i] = crate::verified::tar_pax::resolve_value(global[i], local[i]);
-    }
-    result
+    crate::verified::tar_pax::resolve_values(global, local)
 }
 fn charge(used: &mut usize, amount: usize, limit: usize) -> Result<(), TarError> {
     *used = used.checked_add(amount).ok_or(TarError::Limit)?;

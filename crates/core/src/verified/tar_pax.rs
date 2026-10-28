@@ -124,6 +124,19 @@ pub open spec fn key_model(input: Seq<u8>) -> Option<usize> {
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
 /// Runtime slot selection used by the native PAX controller.
+pub open spec fn resolve_value_model(
+    global: Option<&[u8]>,
+    local: Option<&[u8]>,
+) -> Option<Seq<u8>> {
+    match local {
+        Some(value) => if value.len() == 0 { None } else { Some(value@) },
+        None => match global {
+            Some(value) => Some(value@),
+            None => None,
+        },
+    }
+}
+
 pub fn resolve_value<'a>(global: Option<&'a [u8]>, local: Option<&'a [u8]>)
     -> (result: Option<&'a [u8]>)
     ensures match local {
@@ -140,11 +153,46 @@ pub fn resolve_value<'a>(global: Option<&'a [u8]>, local: Option<&'a [u8]>)
             },
         },
     },
+    resolve_value_model(global, local) == match result {
+        None => None,
+        Some(value) => Some(value@),
+    },
 {
     match local {
         None => global,
         Some(value) => if value.is_empty() { None } else { Some(value) },
     }
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+/// Resolve every supported PAX slot using the existing per-slot rule.
+pub fn resolve_values<'a>(
+    global: [Option<&'a [u8]>; 11],
+    local: [Option<&'a [u8]>; 11],
+) -> (result: [Option<&'a [u8]>; 11])
+    ensures forall|i: int| 0 <= i < 11 ==> resolve_value_model(global[i], local[i])
+        == match result[i] {
+            None => None,
+            Some(value) => Some(value@),
+        },
+{
+    let mut result = global;
+    let mut i = 0;
+    while i < 11
+        invariant 0 <= i <= 11,
+            forall|j: int| 0 <= j < i ==> resolve_value_model(global[j], local[j])
+                == match result[j] {
+                    None => None,
+                    Some(value) => Some(value@),
+                },
+        decreases 11 - i,
+    {
+        result[i] = resolve_value(global[i], local[i]);
+        i += 1;
+    }
+    result
 }
 
 //= docs/parsing-requirements.md#parse-tar-003
@@ -424,8 +472,8 @@ mod tests {
     use super::{
         admit_record, effective_id, effective_link_override, effective_mtime,
         effective_name_override, effective_optional_time, effective_owner_name, effective_size,
-        hdrcharset_value_supported, owner_name_requires_utf8, PaxIdError, PaxRecordAdmissionError,
-        PaxSizeError, PaxTimeError,
+        hdrcharset_value_supported, owner_name_requires_utf8, resolve_values, PaxIdError,
+        PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
     };
 
     #[test]
@@ -483,6 +531,23 @@ mod tests {
         assert!(owner_name_requires_utf8(Some(b"UTF-8")));
         assert!(owner_name_requires_utf8(Some(b"ISO-IR 10646 2000 UTF-8")));
         assert!(!owner_name_requires_utf8(Some(b"BINARY")));
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-003
+    //= type=test
+    //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+    #[test]
+    fn resolve_values_composes_inherit_delete_and_override_for_all_slots() {
+        let global = [Some(&b"global"[..]); 11];
+        let inherit = resolve_values(global, [None; 11]);
+        let delete = resolve_values(global, [Some(&b""[..]); 11]);
+        let override_local = resolve_values(global, [Some(&b"local"[..]); 11]);
+
+        for i in 0..11 {
+            assert_eq!(inherit[i], Some(&b"global"[..]), "inherit slot {i}");
+            assert_eq!(delete[i], None, "delete slot {i}");
+            assert_eq!(override_local[i], Some(&b"local"[..]), "override slot {i}");
+        }
     }
 
     //= docs/parsing-requirements.md#parse-tar-003
