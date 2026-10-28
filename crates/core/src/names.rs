@@ -5330,6 +5330,77 @@ fn short_full_volume_body(
     result
 }
 
+//= docs/parsing-requirements.md#parse-name-010
+//= type=implementation
+//# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+#[verifier::spinoff_prover]
+#[verifier::rlimit(40)]
+fn long_full_manifest_body(
+    input: &[u8],
+    separator: u8,
+) -> (result: Result<ObjectName, NameError>)
+    ensures match result {
+        Err(error) => error == NameError::Malformed,
+        Ok(name) => name.kind == ObjectKind::FullManifest
+            && !name.short
+            && name.volume.is_none()
+            && long_full_manifest_raw_body_model(
+                input@,
+                separator,
+                name.start.0 as int,
+                name.end.0 as int,
+                name.envelope,
+                name.partial,
+            ),
+    },
+{
+    let mut fields = Some(input);
+    let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+    let _after_start = fields;
+    let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+    let _after_trailer = fields;
+    let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+    if extra.is_some() || fields.is_some() {
+        return Err(NameError::Malformed);
+    }
+    let result = match long_full_manifest_body_fields(
+        start_field,
+        separator,
+        trailer,
+        first,
+        second,
+        third,
+    ) {
+        Ok(name) => Ok(name),
+        Err(_) => Err(NameError::Malformed),
+    };
+    proof {
+        if let Ok(name) = result {
+            reveal(long_full_manifest_raw_body_model);
+            reveal(long_full_manifest_fields_model);
+            reveal(body_suffix_fields_model);
+            reveal(body_field_split_model);
+            assert(body_field_split_model(
+                Some(input@), Some(start_field@),
+                optional_body_field_model(_after_start),
+            ));
+            assert(body_field_split_model(
+                optional_body_field_model(_after_start), Some(trailer@),
+                optional_body_field_model(_after_trailer),
+            ));
+            assert(body_suffix_fields_model(
+                optional_body_field_model(_after_trailer),
+                optional_body_field_model(first),
+                optional_body_field_model(second),
+                optional_body_field_model(third),
+                optional_body_field_model(extra),
+                optional_body_field_model(fields),
+            ));
+        }
+    }
+    result
+}
+
 #[verifier::spinoff_prover]
 #[verifier::rlimit(40)]
 //= docs/parsing-requirements.md#parse-name-010
@@ -5394,44 +5465,14 @@ fn body(
             result
         }
         crate::name_dispatch::BodyRoute::LongFullManifest => {
-            let mut fields = Some(input);
-            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_start = fields;
-            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_trailer = fields;
-            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-            if extra.is_some() || fields.is_some() {
-                return Err(NameError::Malformed);
-            }
-            let result = long_full_manifest_body_fields(
-                start_field,
-                separator,
-                trailer,
-                first,
-                second,
-                third,
-            );
+            let result = long_full_manifest_body(input, separator);
             proof {
                 if let Ok(name) = result {
-                    reveal(long_full_manifest_raw_body_model);
-                    reveal(long_full_manifest_fields_model);
-                    reveal(body_suffix_fields_model);
-                    reveal(body_field_split_model);
-                    assert(body_field_split_model(
-                        Some(input@), Some(start_field@),
-                        optional_body_field_model(_after_start),
-                    ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_start), Some(trailer@),
-                        optional_body_field_model(_after_trailer),
-                    ));
-                    assert(body_suffix_fields_model(
-                        optional_body_field_model(_after_trailer),
-                        optional_body_field_model(first),
-                        optional_body_field_model(second),
-                        optional_body_field_model(third),
-                        optional_body_field_model(extra),
-                        optional_body_field_model(fields),
+                    reveal(body_success_result_model);
+                    assert(kind == ObjectKind::FullManifest);
+                    assert(!short);
+                    assert(body_success_result_model(
+                        input@, kind, short, separator, name,
                     ));
                 }
             }
@@ -6996,6 +7037,50 @@ mod tests {
             if kind == super::ObjectKind::FullVolume {
                 assert_eq!(result, Err(super::NameError::Configuration));
             }
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-010
+    //= type=test
+    //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    fn long_full_manifest_body_error_and_success_edge_matrix() {
+        for (input, separator) in [
+            (b"20231114T221320Z.manifest" as &[u8], b':'),
+            (b"1970-01-01T00:00:00Z.manifest", b':'),
+        ] {
+            let name = super::long_full_manifest_body(input, separator).expect("valid body");
+            assert_eq!(name.kind, super::ObjectKind::FullManifest, "{input:?}");
+            assert_eq!(name.start, name.end, "{input:?}");
+            assert!(name.volume.is_none(), "{input:?}");
+            assert!(!name.short, "{input:?}");
+        }
+
+        let malformed: [(&[u8], u8); 8] = [
+            (b"", b':'),
+            (b"bad.manifest", b':'),
+            (b"20231114T221320Z", b':'),
+            (b"20231114T221320Z.bad", b':'),
+            (b"20231114T221320Z.manifest.extra", b':'),
+            (b"20231114T221320Z.manifest", b'\0'),
+            (b"1970-01-01T00:00:00Z.manifest", b'\0'),
+            (b"1970-01-01T00_00_00Z.manifest", b'\0'),
+        ];
+        for (input, separator) in malformed {
+            assert_eq!(
+                super::long_full_manifest_body(input, separator),
+                Err(super::NameError::Malformed),
+                "{input:?} with separator {separator:?}"
+            );
         }
     }
 
