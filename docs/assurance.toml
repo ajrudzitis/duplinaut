@@ -2727,6 +2727,36 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-public-result-controller"
+gate = true
+requirements = ["PARSE-NAME-001", "PARSE-NAME-009"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The post-preflight controller requires the separately verified valid
+# preflight model and composes its result with a witness sequence whose twelve
+# slots match the configured prefix/stem candidate model and body outcome
+# model; successful values map to the candidate fold/finalizer model. Exact
+# parser error outcomes and raw grammar iff remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "parse_name_after_preflight" },
+  { path = "crates/core/src/names.rs", symbol = "name_preflight_contract_model" },
+  { path = "crates/core/src/names.rs", symbol = "parse_name_body_outcomes_model" },
+  { path = "crates/core/src/names.rs", symbol = "name_success_candidates_match_model" },
+  { path = "crates/core/src/names.rs", symbol = "name_candidate_controller_result_model" }
+]
+proofs = [
+  { id = "name-public-result-controller", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "parse_name_after_preflight", kind = "contract" },
+  { id = "name-public-preflight-controller", requirement = "PARSE-NAME-009", path = "crates/core/src/names.rs", symbol = "validate_name_preflight", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::parse_name_final_result_composes_candidate_model" }
+]
+
+[[milestone]]
 id = "name-final-result-composition"
 gate = true
 requirements = ["PARSE-NAME-001"]

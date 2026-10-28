@@ -3460,6 +3460,7 @@ pub fn parse_long_timestamp(input: &[u8], separator: u8) -> (result: Result<Time
 
 }
 
+verus! {
 #[derive(Clone, Copy, Debug)]
 pub struct NameConfig<'a> {
     pub global_prefix: &'a [u8],
@@ -3468,6 +3469,7 @@ pub struct NameConfig<'a> {
     pub signature_prefix: &'a [u8],
     pub time_separator: u8,
     pub max_name_bytes: usize,
+}
 }
 
 impl Default for NameConfig<'_> {
@@ -4776,6 +4778,53 @@ closed spec fn body_outcome_result_model(
         Ok(name) => body_success_result_model(input, kind, short, separator, name),
         Err(error) => body_error_result_model(separator, error),
     }
+}
+
+pub closed spec fn parse_name_body_outcomes_model(
+    input: Seq<u8>,
+    global_prefix: Seq<u8>,
+    archive_prefix: Seq<u8>,
+    manifest_prefix: Seq<u8>,
+    signature_prefix: Seq<u8>,
+    separator: u8,
+    outcomes: Seq<Option<Result<ObjectName, NameError>>>,
+) -> bool {
+    outcomes.len() == 12
+        && forall|index: int| #![trigger outcomes[index]]
+            0 <= index < 12 ==>
+            match (
+                name_candidate_remainder_model(
+                    input,
+                    global_prefix,
+                    archive_prefix,
+                    manifest_prefix,
+                    signature_prefix,
+                    name_candidate_table_model()[index].0,
+                    name_candidate_table_model()[index].1,
+                ),
+                outcomes[index],
+            ) {
+                (None, None) => true,
+                (Some(rest), Some(outcome)) => body_outcome_result_model(
+                    rest,
+                    name_candidate_table_model()[index].0,
+                    name_candidate_table_model()[index].1,
+                    separator,
+                    outcome,
+                ),
+                _ => false,
+            }
+}
+
+pub closed spec fn name_success_candidates_match_model(
+    outcomes: Seq<Option<Result<ObjectName, NameError>>>,
+    candidates: Seq<Option<ObjectName>>,
+) -> bool {
+    outcomes.len() == 12
+        && candidates.len() == 12
+        && forall|index: int| #![trigger candidates[index]]
+            0 <= index < 12 ==>
+            candidates[index] == successful_name_body_candidate_model(outcomes[index])
 }
 
 //= docs/parsing-requirements.md#parse-name-010
@@ -6171,7 +6220,7 @@ fn name_candidate_remainder<'a>(
     }
 }
 
-closed spec fn name_candidate_table_has_stem_model(
+pub closed spec fn name_candidate_table_has_stem_model(
     input: Seq<u8>,
     global_prefix: Seq<u8>,
     archive_prefix: Seq<u8>,
@@ -6451,6 +6500,29 @@ closed spec fn name_configuration_valid_model(
         && configured_name_prefix_valid_model(signature_prefix)
 }
 
+pub closed spec fn name_preflight_contract_model(
+    input: Seq<u8>,
+    separator: u8,
+    global_prefix: Seq<u8>,
+    archive_prefix: Seq<u8>,
+    manifest_prefix: Seq<u8>,
+    signature_prefix: Seq<u8>,
+    max_name_bytes: usize,
+) -> bool {
+    time_separator_valid_model(separator)
+        && forall|index: int| 0 <= index < global_prefix.len()
+            ==> global_prefix[index] != 0 && global_prefix[index] != b'/'
+        && forall|index: int| 0 <= index < archive_prefix.len()
+            ==> archive_prefix[index] != 0 && archive_prefix[index] != b'/'
+        && forall|index: int| 0 <= index < manifest_prefix.len()
+            ==> manifest_prefix[index] != 0 && manifest_prefix[index] != b'/'
+        && forall|index: int| 0 <= index < signature_prefix.len()
+            ==> signature_prefix[index] != 0 && signature_prefix[index] != b'/'
+        && input.len() <= max_name_bytes
+        && forall|index: int| 0 <= index < input.len()
+            ==> input[index] != 0 && input[index] != b'/'
+}
+
 //= docs/parsing-requirements.md#parse-name-009
 //= type=implementation
 //# The time separator MUST be in the valid set in PARSE-NAME-007.
@@ -6567,11 +6639,16 @@ fn validate_name_preflight(
 }
 }
 
+//= docs/parsing-requirements.md#parse-name-009
+//= type=implementation
+//# Invalid configuration MUST return the configuration error before basename limit or malformed-name errors; valid configuration MUST proceed to the checks in PARSE-NAME-008.
+verus! {
 /// Parse a basename, not an S3 key. Unrelated names return `Ok(None)`.
 /// Conflicting prefix configurations producing distinct successful classifications
 /// return `Ambiguous`; malformed recognized stems are errors rather than ignored.
-pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectName>, NameError> {
-    validate_name_preflight(
+pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> (result: Result<Option<ObjectName>, NameError>)
+{
+    let preflight = validate_name_preflight(
         input,
         config.time_separator,
         config.global_prefix,
@@ -6579,7 +6656,63 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
         config.manifest_prefix,
         config.signature_prefix,
         config.max_name_bytes,
-    )?;
+    );
+    preflight?;
+    proof {
+        reveal(name_preflight_contract_model);
+        assert(name_preflight_contract_model(
+            input@, config.time_separator, config.global_prefix@,
+            config.archive_prefix@, config.manifest_prefix@,
+            config.signature_prefix@, config.max_name_bytes));
+    }
+    parse_name_after_preflight(input, config)
+}
+
+fn parse_name_after_preflight(
+    input: &[u8],
+    config: NameConfig<'_>,
+) -> (result: Result<Option<ObjectName>, NameError>)
+    requires name_preflight_contract_model(
+        input@,
+        config.time_separator,
+        config.global_prefix@,
+        config.archive_prefix@,
+        config.manifest_prefix@,
+        config.signature_prefix@,
+        config.max_name_bytes,
+    ),
+    ensures exists|outcomes: Seq<Option<Result<ObjectName, NameError>>>,
+            candidates: Seq<Option<ObjectName>>|
+            #![trigger parse_name_body_outcomes_model(
+                input@,
+                config.global_prefix@,
+                config.archive_prefix@,
+                config.manifest_prefix@,
+                config.signature_prefix@,
+                config.time_separator,
+                outcomes,
+            ), name_success_candidates_match_model(outcomes, candidates)]
+            parse_name_body_outcomes_model(
+                input@,
+                config.global_prefix@,
+                config.archive_prefix@,
+                config.manifest_prefix@,
+                config.signature_prefix@,
+                config.time_separator,
+                outcomes,
+            )
+                && name_success_candidates_match_model(outcomes, candidates)
+                && result == name_candidate_controller_result_model(
+                    name_candidate_table_has_stem_model(
+                        input@,
+                        config.global_prefix@,
+                        config.archive_prefix@,
+                        config.manifest_prefix@,
+                        config.signature_prefix@,
+                    ),
+                    candidates,
+                ),
+{
     let (candidate_remainders, recognized) = name_candidate_remainders(
         input,
         config.global_prefix,
@@ -6593,7 +6726,55 @@ pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> Result<Option<ObjectN
     //= docs/parsing-requirements.md#parse-name-001
     //= type=implementation
     //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-    finalize_name_candidate_controller(recognized, successful_candidates, result)
+    let result = finalize_name_candidate_controller(recognized, successful_candidates, result);
+    proof {
+        reveal(parse_name_body_outcomes_model);
+        reveal(name_success_candidates_match_model);
+        assert(parse_name_body_outcomes_model(
+            input@,
+            config.global_prefix@,
+            config.archive_prefix@,
+            config.manifest_prefix@,
+            config.signature_prefix@,
+            config.time_separator,
+            body_outcomes@,
+        ));
+        assert(name_success_candidates_match_model(body_outcomes@, successful_candidates@));
+        assert(result == name_candidate_controller_result_model(
+            name_candidate_table_has_stem_model(
+                input@,
+                config.global_prefix@,
+                config.archive_prefix@,
+                config.manifest_prefix@,
+                config.signature_prefix@,
+            ),
+            successful_candidates@,
+        ));
+        assert(exists|outcomes: Seq<Option<Result<ObjectName, NameError>>>,
+            candidates: Seq<Option<ObjectName>>|
+            parse_name_body_outcomes_model(
+                input@,
+                config.global_prefix@,
+                config.archive_prefix@,
+                config.manifest_prefix@,
+                config.signature_prefix@,
+                config.time_separator,
+                outcomes,
+            )
+                && name_success_candidates_match_model(outcomes, candidates)
+                && result == name_candidate_controller_result_model(
+                    name_candidate_table_has_stem_model(
+                        input@,
+                        config.global_prefix@,
+                        config.archive_prefix@,
+                        config.manifest_prefix@,
+                        config.signature_prefix@,
+                    ),
+                    candidates,
+                ));
+    }
+    result
+}
 }
 
 verus! {
@@ -6674,7 +6855,7 @@ fn merge_name_candidate_successes(
 //= docs/parsing-requirements.md#parse-name-001
 //= type=implementation
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
-closed spec fn name_candidate_controller_result_model(
+pub closed spec fn name_candidate_controller_result_model(
     recognized: bool,
     candidates: Seq<Option<ObjectName>>,
 ) -> Result<Option<ObjectName>, NameError> {
@@ -7197,12 +7378,26 @@ mod tests {
     //= docs/parsing-requirements.md#parse-name-001
     //= type=test
     //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-009
+    //= type=test
+    //# Invalid configuration MUST return the configuration error before basename limit or malformed-name errors; valid configuration MUST proceed to the checks in PARSE-NAME-008.
     fn parse_name_final_result_composes_candidate_model() {
         let config = super::NameConfig::default();
         for input in [
             &b"unrelated"[..],
             &b"duplicity-full.bad.vol1.difftar"[..],
             &b"duplicity-full.20231114T221320Z.vol1.difftar"[..],
+            &b"df.1.1.dt"[..],
+            &b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar"[..],
+            &b"di.1.2.1.dt"[..],
+            &b"duplicity-full.20231114T221320Z.manifest"[..],
+            &b"df.1.m"[..],
+            &b"duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest"[..],
+            &b"di.1.2.m"[..],
+            &b"duplicity-full-signatures.20231114T221320Z.sigtar"[..],
+            &b"dfs.1.st"[..],
+            &b"duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar"[..],
+            &b"dns.1.2.st"[..],
         ] {
             let direct = super::parse_name(input, config);
             let (remainders, recognized) = super::name_candidate_remainders(
@@ -7219,6 +7414,18 @@ mod tests {
                 super::finalize_name_candidate_controller(recognized, candidates, accumulated);
             assert_eq!(direct, composed, "input: {:?}", input);
         }
+
+        let invalid_separator = super::NameConfig {
+            time_separator: b'.',
+            ..config
+        };
+        assert_eq!(
+            super::parse_name(
+                b"duplicity-full.20231114T221320Z.vol1.difftar",
+                invalid_separator,
+            ),
+            Err(super::NameError::Configuration)
+        );
     }
 
     #[test]
