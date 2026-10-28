@@ -3337,6 +3337,30 @@ tests = [
   { package = "duplicity-core", name = "global_and_local_pax_resolution_composes_all_supported_fields" }
 ]
 
+[[milestone]]
+id = "name-short-full-manifest-field-success"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Refines a valid short FullManifest field model to the exact successful
+# ObjectName result. The outer raw-body scanner model, other routes, and
+# body-error completeness remain outside this route-level checkpoint.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "short_full_manifest_fields_model" },
+  { path = "crates/core/src/names.rs", symbol = "short_full_manifest_body_fields" }
+]
+proofs = [
+  { id = "name-short-full-manifest-field-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_full_manifest_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::short_full_manifest_body_error_and_success_edge_matrix" }
+]
+
 [[trusted]]
 id = "upstream-verus-vest"
 reviewed = true

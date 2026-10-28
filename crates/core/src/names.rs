@@ -3756,7 +3756,24 @@ fn short_full_manifest_body_fields(
                     && name.short,
             None => false,
         },
-    },
+    }
+        && match short_full_manifest_fields_model(
+            start_field@,
+            trailer@,
+            optional_short_token(first),
+            optional_short_token(second),
+        ) {
+            Some((start, end, envelope, partial)) => result == Ok(ObjectName {
+                kind: ObjectKind::FullManifest,
+                start: Timestamp(start as i128),
+                end: Timestamp(end as i128),
+                volume: None,
+                envelope,
+                partial,
+                short: true,
+            }),
+            None => result == Err(NameError::Malformed),
+        },
 {
     let (start, end) = decode_short_interval(ObjectKind::FullManifest, start_field, None)
         .ok_or(NameError::Malformed)?;
@@ -7922,15 +7939,72 @@ mod tests {
     //= docs/parsing-requirements.md#parse-name-010
     //= type=test
     //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
     fn short_full_manifest_body_error_and_success_edge_matrix() {
-        let valid: [(&[u8], u8); 2] = [
-            (b"1.m", b':'),
+        let valid: [(&[u8], u8, super::ObjectName); 4] = [
+            (
+                b"1.m",
+                b':',
+                super::ObjectName {
+                    kind: super::ObjectKind::FullManifest,
+                    start: super::Timestamp(1),
+                    end: super::Timestamp(1),
+                    volume: None,
+                    envelope: super::Envelope::Plain,
+                    partial: false,
+                    short: true,
+                },
+            ),
             // The short FullManifest grammar does not consume the time separator.
-            (b"1.m", b'\0'),
+            (
+                b"1.m",
+                b'\0',
+                super::ObjectName {
+                    kind: super::ObjectKind::FullManifest,
+                    start: super::Timestamp(1),
+                    end: super::Timestamp(1),
+                    volume: None,
+                    envelope: super::Envelope::Plain,
+                    partial: false,
+                    short: true,
+                },
+            ),
+            (
+                b"z.m.z",
+                b':',
+                super::ObjectName {
+                    kind: super::ObjectKind::FullManifest,
+                    start: super::Timestamp(35),
+                    end: super::Timestamp(35),
+                    volume: None,
+                    envelope: super::Envelope::Gzip,
+                    partial: false,
+                    short: true,
+                },
+            ),
+            (
+                b"2.m.p.g",
+                b':',
+                super::ObjectName {
+                    kind: super::ObjectKind::FullManifest,
+                    start: super::Timestamp(2),
+                    end: super::Timestamp(2),
+                    volume: None,
+                    envelope: super::Envelope::OpenPgp,
+                    partial: true,
+                    short: true,
+                },
+            ),
         ];
-        for (input, separator) in valid {
+        for (input, separator, expected) in valid {
             let result = super::body(input, super::ObjectKind::FullManifest, true, separator);
-            assert!(result.is_ok(), "{input:?} with separator {separator:?}");
+            assert_eq!(
+                result,
+                Ok(expected),
+                "{input:?} with separator {separator:?}"
+            );
         }
 
         let malformed: [(&[u8], u8); 5] = [
