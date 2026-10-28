@@ -2707,10 +2707,14 @@ tested = true
 reviewed = true
 proof_required = true
 # Every present candidate remainder is sent to the matching kind/profile body
-# route. Successful outputs are tied to the shared raw-body semantic model;
-# error completeness and complete parse_name result refinement remain open.
+# route. Successful outputs are tied to the shared raw-body semantic model and
+# errors are restricted by the body's error-domain model. Exact malformed vs
+# configuration error completeness and full parse_name result refinement stay
+# open.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "body_success_result_model" },
+  { path = "crates/core/src/names.rs", symbol = "body_outcome_result_model" },
+  { path = "crates/core/src/names.rs", symbol = "body_error_result_model" },
   { path = "crates/core/src/names.rs", symbol = "body" },
   { path = "crates/core/src/names.rs", symbol = "collect_name_body_outcomes" }
 ]
@@ -2718,7 +2722,8 @@ proofs = [
   { id = "name-body-outcome-refinement", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "collect_name_body_outcomes", kind = "contract" }
 ]
 tests = [
-  { package = "duplicity-core", name = "names::tests::body_outcome_collection_refines_all_kind_profile_routes" }
+  { package = "duplicity-core", name = "names::tests::body_outcome_collection_refines_all_kind_profile_routes" },
+  { package = "duplicity-core", name = "names::tests::body_outcome_collection_refines_twelve_error_slots" }
 ]
 
 [[milestone]]

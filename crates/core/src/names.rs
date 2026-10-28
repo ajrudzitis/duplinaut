@@ -4765,6 +4765,19 @@ closed spec fn body_error_result_model(separator: u8, error: NameError) -> bool 
     }
 }
 
+closed spec fn body_outcome_result_model(
+    input: Seq<u8>,
+    kind: ObjectKind,
+    short: bool,
+    separator: u8,
+    outcome: Result<ObjectName, NameError>,
+) -> bool {
+    match outcome {
+        Ok(name) => body_success_result_model(input, kind, short, separator, name),
+        Err(error) => body_error_result_model(separator, error),
+    }
+}
+
 //= docs/parsing-requirements.md#parse-name-010
 //= type=implementation
 //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
@@ -6703,11 +6716,10 @@ fn collect_name_body_outcomes(
         0 <= index < 12 ==>
         match (remainders@[index], outcomes@[index]) {
             (None, None) => true,
-            (Some(rest), Some(Ok(name))) => {
+            (Some(rest), Some(outcome)) => {
                 let (kind, short) = name_candidate_table_model()[index];
-                body_success_result_model(rest@, kind, short, separator, name)
+                body_outcome_result_model(rest@, kind, short, separator, outcome)
             },
-            (Some(_), Some(Err(_))) => true,
             _ => false,
         },
 {
@@ -6721,11 +6733,10 @@ fn collect_name_body_outcomes(
                 0 <= prior < index as int ==>
                 match (remainders@[prior], outcomes@[prior]) {
                     (None, None) => true,
-                    (Some(rest), Some(Ok(name))) => {
+                    (Some(rest), Some(outcome)) => {
                         let (kind, short) = candidates@[prior];
-                        body_success_result_model(rest@, kind, short, separator, name)
+                        body_outcome_result_model(rest@, kind, short, separator, outcome)
                     },
-                    (Some(_), Some(Err(_))) => true,
                     _ => false,
                 },
         decreases candidates.len() - index,
@@ -6950,6 +6961,73 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-010
+    //= type=test
+    //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+    fn body_outcome_collection_refines_twelve_error_slots() {
+        let malformed = [
+            (
+                super::ObjectKind::FullVolume,
+                false,
+                &b"bad.vol1.difftar"[..],
+            ),
+            (super::ObjectKind::FullVolume, true, &b"!.1.dt"[..]),
+            (
+                super::ObjectKind::IncrementalVolume,
+                false,
+                &b"bad.to.20231115T221320Z.vol1.difftar"[..],
+            ),
+            (super::ObjectKind::IncrementalVolume, true, &b"!.2.1.dt"[..]),
+            (super::ObjectKind::FullManifest, false, &b"bad.manifest"[..]),
+            (super::ObjectKind::FullManifest, true, &b"!.m"[..]),
+            (
+                super::ObjectKind::IncrementalManifest,
+                false,
+                &b"bad.to.20231115T221320Z.manifest"[..],
+            ),
+            (super::ObjectKind::IncrementalManifest, true, &b"!.2.m"[..]),
+            (super::ObjectKind::FullSignatures, false, &b"bad.sigtar"[..]),
+            (super::ObjectKind::FullSignatures, true, &b"!.st"[..]),
+            (
+                super::ObjectKind::IncrementalSignatures,
+                false,
+                &b"bad.to.20231115T221320Z.sigtar"[..],
+            ),
+            (
+                super::ObjectKind::IncrementalSignatures,
+                true,
+                &b"!.2.st"[..],
+            ),
+        ];
+        for (kind, short, input) in malformed {
+            let index = super::name_candidate_table()
+                .iter()
+                .position(|candidate| *candidate == (kind, short))
+                .unwrap();
+            let mut remainders = [None; 12];
+            remainders[index] = Some(input);
+            let outcomes = super::collect_name_body_outcomes(remainders, b':');
+            assert_eq!(outcomes[index], Some(Err(super::NameError::Malformed)));
+            for (other, outcome) in outcomes.iter().enumerate() {
+                if other != index {
+                    assert!(
+                        outcome.is_none(),
+                        "unexpected outcome in candidate slot {other}"
+                    );
+                }
+            }
+        }
+
+        let mut remainders = [None; 12];
+        remainders[0] = Some(&b"20231114T221320Z.vol1.difftar"[..]);
+        let outcomes = super::collect_name_body_outcomes(remainders, b'.');
+        assert_eq!(outcomes[0], Some(Err(super::NameError::Configuration)));
     }
 
     #[test]
