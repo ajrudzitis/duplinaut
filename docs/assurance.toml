@@ -3433,6 +3433,30 @@ tests = [
   { package = "duplicity-core", name = "names::tests::short_incremental_manifest_body_error_and_success_edge_matrix" }
 ]
 
+[[milestone]]
+id = "name-short-incremental-signatures-field-success"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Refines a valid increasing short IncrementalSignatures field model to the
+# exact successful ObjectName. The outer raw-body scanner model, other routes,
+# and body-error completeness remain outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_signatures_fields_model" },
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_signatures_body_fields" }
+]
+proofs = [
+  { id = "name-short-incremental-signatures-field-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_incremental_signatures_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::short_incremental_signatures_body_error_and_success_edge_matrix" }
+]
+
 [[trusted]]
 id = "upstream-verus-vest"
 reviewed = true
