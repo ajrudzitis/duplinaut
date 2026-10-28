@@ -334,13 +334,49 @@ pub fn key_index(input: &[u8]) -> (result: Option<usize>)
     else if bytes_eq(input, b"hdrcharset") { Some(10) }
     else { None }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PaxRecordAdmissionError {
+    UnsupportedKey,
+    Malformed,
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+/// Admit one framed PAX key/value pair into an unoccupied semantic slot.
+pub fn admit_record(key: &[u8], value: &[u8], occupied: bool)
+    -> (result: Result<usize, PaxRecordAdmissionError>)
+    ensures match key_model(key@) {
+        None => result == Err(PaxRecordAdmissionError::UnsupportedKey),
+        Some(index) => if occupied
+            || find(value@, 0, value@.len() as int, 0) is Some {
+                result == Err(PaxRecordAdmissionError::Malformed)
+            } else {
+                result == Ok(index)
+            },
+    },
+{
+    let index = match key_index(key) {
+        Some(index) => index,
+        None => return Err(PaxRecordAdmissionError::UnsupportedKey),
+    };
+    if occupied {
+        return Err(PaxRecordAdmissionError::Malformed);
+    }
+    if find_byte(value, 0, value.len(), 0).is_some() {
+        return Err(PaxRecordAdmissionError::Malformed);
+    }
+    Ok(index)
+}
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        effective_id, effective_link_override, effective_mtime, effective_name_override,
-        effective_optional_time, effective_size, PaxIdError, PaxSizeError, PaxTimeError,
+        admit_record, effective_id, effective_link_override, effective_mtime,
+        effective_name_override, effective_optional_time, effective_size, PaxIdError,
+        PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
     };
 
     #[test]
@@ -387,6 +423,42 @@ mod tests {
         assert_eq!(
             effective_link_override(Some(b"pax"), Some(b"gnu")),
             Some(&b"pax"[..])
+        );
+    }
+
+    #[test]
+    fn pax_record_admission_checks_index_duplicate_nul_and_preserves_empty_values() {
+        let keys: [(&[u8], usize); 11] = [
+            (b"path", 0),
+            (b"linkpath", 1),
+            (b"size", 2),
+            (b"mtime", 3),
+            (b"uid", 4),
+            (b"gid", 5),
+            (b"uname", 6),
+            (b"gname", 7),
+            (b"atime", 8),
+            (b"ctime", 9),
+            (b"hdrcharset", 10),
+        ];
+        for (key, expected_index) in keys {
+            assert_eq!(admit_record(key, b"", false), Ok(expected_index));
+            assert_eq!(
+                admit_record(key, b"value", true),
+                Err(PaxRecordAdmissionError::Malformed)
+            );
+            assert_eq!(
+                admit_record(key, b"value\0tail", false),
+                Err(PaxRecordAdmissionError::Malformed)
+            );
+        }
+        assert_eq!(
+            admit_record(b"unknown", b"", false),
+            Err(PaxRecordAdmissionError::UnsupportedKey)
+        );
+        assert_eq!(
+            admit_record(b"unknown", b"bad\0value", false),
+            Err(PaxRecordAdmissionError::UnsupportedKey)
         );
     }
 

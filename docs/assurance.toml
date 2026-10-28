@@ -3184,6 +3184,32 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-pax-record-admission"
+gate = true
+requirements = ["PARSE-TAR-003"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Admits one already-framed record by known key, unoccupied slot, and NUL-free
+# value. Empty values remain stored. Framing, key/value semantic grammars,
+# complete map accumulation, and controller refinement are outside this task.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "admit_record" },
+  { path = "crates/core/src/tar.rs", symbol = "pax" }
+]
+proofs = [
+  { id = "tar-pax-record-admission", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_pax.rs", symbol = "admit_record", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::pax_record_admission_checks_index_duplicate_nul_and_preserves_empty_values" },
+  { package = "duplicity-core", name = "pax_record_admission_preserves_duplicate_nul_unknown_and_empty_value_behavior" },
+  { package = "duplicity-core", name = "malformed_and_unsupported_pax_are_not_skipped" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

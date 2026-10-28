@@ -113,10 +113,14 @@ fn pax(bytes: &[u8]) -> Result<Pax<'_>, TarError> {
     while cursor < bytes.len() {
         let (end, key, value) =
             crate::verified::tar_pax::record(bytes, cursor).ok_or(TarError::Pax)?;
-        let index = crate::verified::tar_pax::key_index(key).ok_or(TarError::UnsupportedPax)?;
-        if result[index].is_some() || value.contains(&0) {
-            return Err(TarError::Pax);
-        }
+        let key_index = crate::verified::tar_pax::key_index(key).ok_or(TarError::UnsupportedPax)?;
+        let index = crate::verified::tar_pax::admit_record(key, value, result[key_index].is_some())
+            .map_err(|error| match error {
+                crate::verified::tar_pax::PaxRecordAdmissionError::UnsupportedKey => {
+                    TarError::UnsupportedPax
+                }
+                crate::verified::tar_pax::PaxRecordAdmissionError::Malformed => TarError::Pax,
+            })?;
         if !value.is_empty() {
             match index {
                 2 | 4 | 5 => {

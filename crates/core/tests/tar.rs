@@ -798,6 +798,41 @@ fn malformed_and_unsupported_pax_are_not_skipped() {
     assert_eq!(parse(&size).unwrap().entries[0].payload, b"a");
 }
 
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+#[test]
+fn pax_record_admission_preserves_duplicate_nul_unknown_and_empty_value_behavior() {
+    let duplicate = [
+        record(b"path", b"snapshot/first"),
+        record(b"path", b"snapshot/second"),
+    ]
+    .concat();
+    assert_eq!(
+        parse(&member(b"pax", b'x', &duplicate)).unwrap_err(),
+        TarError::Pax
+    );
+
+    let nul_value = member(b"pax", b'x', &record(b"path", b"snapshot/\0bad"));
+    assert_eq!(parse(&nul_value).unwrap_err(), TarError::Pax);
+
+    let unknown_key = member(b"pax", b'x', &record(b"unknown.key", b"value"));
+    assert_eq!(parse(&unknown_key).unwrap_err(), TarError::UnsupportedPax);
+
+    let global = member(b"global", b'g', &record(b"path", b"snapshot/global"));
+    let local_delete = member(b"local", b'x', &record(b"path", b""));
+    let bytes = [
+        global,
+        local_delete,
+        member(b"snapshot/header", b'0', b""),
+        member(b"raw", b'0', b""),
+    ]
+    .concat();
+    let parsed = parse(&bytes).unwrap();
+    assert_eq!(parsed.entries[0].name, b"snapshot/header");
+    assert_eq!(parsed.entries[1].name, b"snapshot/global");
+}
+
 //= docs/parsing-requirements.md#parse-entry-001
 //= type=test
 //# The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
