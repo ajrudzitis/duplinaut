@@ -56,6 +56,27 @@ pub fn checksums(input: &[u8]) -> (sums: (u64, i64))
     (unsigned_sum, signed_sum)
 }
 
+/// Decide whether a decoded tar checksum field matches either supported
+/// unsigned or signed-byte checksum profile for this exact 512-byte header.
+pub fn checksum_matches(input: &[u8], expected: u64) -> (result: bool)
+    requires input.len() == 512,
+    ensures result == (expected as int == checksum_prefix(input@, 512, false)
+        || expected as int == checksum_prefix(input@, 512, true)),
+{
+    let (unsigned_sum, signed_sum) = checksums(input);
+    let unsigned_match = expected == unsigned_sum;
+    let signed_match = expected as i128 == signed_sum as i128;
+    proof {
+        assert(unsigned_sum as int == checksum_prefix(input@, 512, false));
+        assert(signed_sum as int == checksum_prefix(input@, 512, true));
+        assert(unsigned_match == (expected as int == checksum_prefix(input@, 512, false)));
+        assert((expected as i128) as int == expected as int);
+        assert((signed_sum as i128) as int == signed_sum as int);
+        assert(signed_match == (expected as int == checksum_prefix(input@, 512, true)));
+    }
+    unsigned_match || signed_match
+}
+
 pub open spec fn decimal_prefix(input: Seq<u8>, n: int) -> Option<int>
     recommends 0 <= n <= input.len(),
     decreases n,

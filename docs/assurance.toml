@@ -2926,6 +2926,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-checksum-admission"
+gate = true
+requirements = ["PARSE-TAR-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Exact checksum admission for an already-decoded checksum field and a
+# 512-byte header, matching either supported signed-byte profile. This does
+# not refine numeric checksum-field decoding or the whole tar/PAX controller.
+implementations = [
+  { path = "crates/core/src/verified/tar_helpers.rs", symbol = "checksum_matches" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-checksum-admission", requirement = "PARSE-TAR-001", path = "crates/core/src/verified/tar_helpers.rs", symbol = "checksum_matches", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "tar_checksum_admission_accepts_unsigned_signed_and_rejects_mismatch" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

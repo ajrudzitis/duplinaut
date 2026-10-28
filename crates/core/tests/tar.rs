@@ -8,6 +8,20 @@ fn checksum(header: &mut [u8]) {
     let sum: u64 = header.iter().map(|b| u64::from(*b)).sum();
     header[148..156].copy_from_slice(format!("{sum:06o}\0 ").as_bytes());
 }
+fn signed_checksum(header: &mut [u8]) {
+    header[148..156].fill(b' ');
+    let sum: i64 = header
+        .iter()
+        .map(|byte| {
+            if *byte >= 128 {
+                i64::from(*byte) - 256
+            } else {
+                i64::from(*byte)
+            }
+        })
+        .sum();
+    header[148..156].copy_from_slice(format!("{sum:06o}\0 ").as_bytes());
+}
 fn member(name: &[u8], kind: u8, payload: &[u8]) -> Vec<u8> {
     let mut bytes = vec![0; 512];
     bytes[..name.len()].copy_from_slice(name);
@@ -70,6 +84,24 @@ fn complete_entry_extents_padding_and_checksum() {
     }
     bytes[1] ^= 1;
     assert_eq!(parse(&bytes).unwrap_err(), TarError::Checksum);
+}
+
+//= docs/parsing-requirements.md#parse-tar-001
+//= type=test
+//# The tar parser MUST validate each header checksum and payload extent before accepting the entry it describes.
+
+#[test]
+fn tar_checksum_admission_accepts_unsigned_signed_and_rejects_mismatch() {
+    let unsigned_bytes = member(b"snapshot/file", b'0', b"hello");
+    assert!(parse(&unsigned_bytes).is_ok());
+
+    let mut signed_bytes = member(b"snapshot/file", b'0', b"hello");
+    signed_bytes[0] = 0xff;
+    signed_checksum(&mut signed_bytes[..512]);
+    assert!(parse(&signed_bytes).is_ok());
+
+    signed_bytes[0] ^= 1;
+    assert_eq!(parse(&signed_bytes).unwrap_err(), TarError::Checksum);
 }
 
 //= docs/parsing-requirements.md#parse-tar-005

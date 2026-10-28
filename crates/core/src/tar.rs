@@ -240,8 +240,7 @@ impl<'a> TarVolume<'a> {
                 return Err(TarError::Truncated);
             }
             let expected = unsigned(h.checksum)?;
-            let (unsigned_sum, signed_sum) = crate::verified::tar_helpers::checksums(block);
-            if expected != unsigned_sum && i128::from(expected) != i128::from(signed_sum) {
+            if !crate::verified::tar_helpers::checksum_matches(block, expected) {
                 return Err(TarError::Checksum);
             }
             let posix = h.magic_version == *b"ustar\x0000";
