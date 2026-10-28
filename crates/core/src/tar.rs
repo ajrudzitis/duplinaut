@@ -311,7 +311,8 @@ impl<'a> TarVolume<'a> {
             let raw_name = text(h.name);
             let prefix = if posix { text(h.prefix) } else { b"" };
             let name = crate::verified::tar_pax::effective_name_override(values[0], long_name);
-            let link = values[1].or(long_link).unwrap_or(text(h.linkname));
+            let link = crate::verified::tar_pax::effective_link_override(values[1], long_link)
+                .unwrap_or(text(h.linkname));
             let name_length = name.map_or(
                 raw_name.len() + prefix.len() + usize::from(!prefix.is_empty()),
                 |v| v.len(),

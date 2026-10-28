@@ -3156,6 +3156,34 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-pax-linkpath-over-gnu-link"
+gate = true
+requirements = ["PARSE-TAR-003"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Selects an already-resolved PAX linkpath before pending GNU long-link
+# metadata; raw header linkname fallback remains in the native parser.
+# Metadata-loop ordering/controller and complete link decoding are outside
+# this checkpoint.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_link_override" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-pax-linkpath-over-gnu-link", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_link_override", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::effective_link_override_prefers_pax_then_gnu_then_header_fallback" },
+  { package = "duplicity-core", name = "pax_linkpath_precedes_pending_gnu_long_link_in_either_extension_order" },
+  { package = "duplicity-core", name = "empty_local_pax_linkpath_allows_gnu_or_header_link_fallback" },
+  { package = "duplicity-core", name = "gnu_long_name_and_link_require_real_entries" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

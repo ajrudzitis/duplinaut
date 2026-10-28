@@ -37,6 +37,12 @@ fn member(name: &[u8], kind: u8, payload: &[u8]) -> Vec<u8> {
     bytes.resize(bytes.len().next_multiple_of(512), 0);
     bytes
 }
+fn symlink_with_linkname(link: &[u8]) -> Vec<u8> {
+    let mut bytes = member(b"snapshot/link", b'2', b"");
+    bytes[157..157 + link.len()].copy_from_slice(link);
+    checksum(&mut bytes[..512]);
+    bytes
+}
 fn record(key: &[u8], value: &[u8]) -> Vec<u8> {
     let mut length = key.len() + value.len() + 4;
     loop {
@@ -361,6 +367,46 @@ fn empty_local_pax_path_allows_pending_gnu_long_name() {
         let parsed = parse(&bytes).unwrap();
         assert_eq!(parsed.entries[0].name, b"snapshot/gnu-name");
     }
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+#[test]
+fn pax_linkpath_precedes_pending_gnu_long_link_in_either_extension_order() {
+    let gnu = member(b"././@LongLink", b'K', b"target/gnu\0");
+    let pax = member(b"local", b'x', &record(b"linkpath", b"target/pax"));
+    let symlink = symlink_with_linkname(b"target/raw");
+
+    for bytes in [
+        [gnu.clone(), pax.clone(), symlink.clone()].concat(),
+        [pax.clone(), gnu.clone(), symlink.clone()].concat(),
+    ] {
+        let parsed = parse(&bytes).unwrap();
+        assert_eq!(parsed.entries[0].linkname, b"target/pax");
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+#[test]
+fn empty_local_pax_linkpath_allows_gnu_or_header_link_fallback() {
+    let gnu = member(b"././@LongLink", b'K', b"target/gnu\0");
+    let empty_pax_link = member(b"local", b'x', &record(b"linkpath", b""));
+    let symlink = symlink_with_linkname(b"target/raw");
+
+    for bytes in [
+        [gnu.clone(), empty_pax_link.clone(), symlink.clone()].concat(),
+        [empty_pax_link.clone(), gnu.clone(), symlink.clone()].concat(),
+    ] {
+        let parsed = parse(&bytes).unwrap();
+        assert_eq!(parsed.entries[0].linkname, b"target/gnu");
+    }
+
+    let bytes = [empty_pax_link, symlink].concat();
+    let parsed = parse(&bytes).unwrap();
+    assert_eq!(parsed.entries[0].linkname, b"target/raw");
 }
 
 //= docs/parsing-requirements.md#parse-tar-003
