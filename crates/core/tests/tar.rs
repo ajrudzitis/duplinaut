@@ -390,6 +390,30 @@ fn pax_global_local_deletion_binary_and_numeric_overrides() {
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
 #[test]
+fn pax_size_override_controls_payload_and_empty_local_deletion_falls_back() {
+    let global_size = member(b"global", b'g', &record(b"size", b"1"));
+    let local_override = member(b"local", b'x', &record(b"size", b"2"));
+    let local_delete = member(b"local", b'x', &record(b"size", b""));
+    let bytes = [
+        global_size,
+        member(b"snapshot/global", b'0', b"abc"),
+        local_override,
+        member(b"snapshot/local", b'0', b"def"),
+        local_delete,
+        member(b"snapshot/header", b'0', b"ghi"),
+    ]
+    .concat();
+    let parsed = parse(&bytes).unwrap();
+    assert_eq!(parsed.entries[0].payload, b"a");
+    assert_eq!(parsed.entries[1].payload, b"de");
+    assert_eq!(parsed.entries[2].payload, b"ghi");
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+#[test]
 fn official_duplicity_307_pax_path_override_is_applied() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.vol1.difftar.gz");

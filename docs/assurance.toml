@@ -3023,6 +3023,32 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-pax-effective-size"
+gate = true
+requirements = ["PARSE-TAR-003"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Refines the resolved size slot to the exact decimal value or header-size
+# fallback for ordinary entries. Extension sizes and full PAX/tar control flow
+# remain outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_size" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-pax-effective-size", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_size", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::effective_pax_size_selects_override_fallback_and_invalid_values" },
+  { package = "duplicity-core", name = "pax_size_override_controls_payload_and_empty_local_deletion_falls_back" },
+  { package = "duplicity-core", name = "official_duplicity_307_pax_path_override_is_applied" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

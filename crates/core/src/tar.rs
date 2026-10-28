@@ -251,7 +251,8 @@ impl<'a> TarVolume<'a> {
             let size = if extension {
                 raw_size
             } else {
-                values[2].map(decimal).transpose()?.unwrap_or(raw_size)
+                crate::verified::tar_pax::effective_size(values[2], raw_size)
+                    .map_err(|_| TarError::Numeric)?
             };
             let size = usize::try_from(size).map_err(|_| TarError::Limit)?;
             if size > limits.max_entry_bytes {

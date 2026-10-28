@@ -144,6 +144,36 @@ pub fn resolve_value<'a>(global: Option<&'a [u8]>, local: Option<&'a [u8]>)
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PaxSizeError {
+    Invalid,
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+/// Select the resolved PAX size override or retain the raw header size.
+pub fn effective_size(value: Option<&[u8]>, header_size: u64)
+    -> (result: Result<u64, PaxSizeError>)
+    ensures match value {
+        None => result == Ok(header_size),
+        Some(bytes) => match result {
+            Ok(size) => bytes.len() > 0
+                && decimal_prefix(bytes@, bytes.len() as int) == Some(size as int),
+            Err(error) => error == PaxSizeError::Invalid
+                && (bytes.len() == 0 || decimal_prefix(bytes@, bytes.len() as int) is None),
+        },
+    },
+{
+    match value {
+        None => Ok(header_size),
+        Some(bytes) => match decimal(bytes) {
+            Some(size) => Ok(size),
+            None => Err(PaxSizeError::Invalid),
+        },
+    }
+}
+
 pub fn key_index(input: &[u8]) -> (result: Option<usize>)
     ensures result == key_model(input@), result is Some ==> result.unwrap() < 11,
 {
@@ -160,4 +190,22 @@ pub fn key_index(input: &[u8]) -> (result: Option<usize>)
     else if bytes_eq(input, b"hdrcharset") { Some(10) }
     else { None }
 }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{effective_size, PaxSizeError};
+
+    #[test]
+    fn effective_pax_size_selects_override_fallback_and_invalid_values() {
+        assert_eq!(effective_size(None, 17), Ok(17));
+        assert_eq!(effective_size(Some(b"0"), 17), Ok(0));
+        assert_eq!(effective_size(Some(b"123"), 17), Ok(123));
+        assert_eq!(effective_size(Some(b""), 17), Err(PaxSizeError::Invalid));
+        assert_eq!(
+            effective_size(Some(b"18446744073709551616"), 17),
+            Err(PaxSizeError::Invalid)
+        );
+        assert_eq!(effective_size(Some(b"1x"), 17), Err(PaxSizeError::Invalid));
+    }
 }
