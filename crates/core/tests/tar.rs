@@ -389,6 +389,25 @@ fn pax_global_local_deletion_binary_and_numeric_overrides() {
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
+#[test]
+fn official_duplicity_307_pax_path_override_is_applied() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.vol1.difftar.gz");
+    let mut decoded = Vec::new();
+    flate2::read::GzDecoder::new(std::fs::File::open(path).unwrap())
+        .read_to_end(&mut decoded)
+        .unwrap();
+    let parsed = TarVolume::parse(&decoded, Termination::Data, TarLimits::default()).unwrap();
+    assert!(parsed
+        .entries
+        .iter()
+        .any(|entry| entry.name == b"multivol_snapshot/large.bin/1"));
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
 //= docs/parsing-requirements.md#parse-tar-004
 //= type=test
 //# Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.

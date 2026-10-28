@@ -139,9 +139,7 @@ fn pax(bytes: &[u8]) -> Result<Pax<'_>, TarError> {
 fn resolved<'a>(global: Pax<'a>, local: Pax<'a>) -> Pax<'a> {
     let mut result = global;
     for i in 0..11 {
-        if let Some(value) = local[i] {
-            result[i] = if value.is_empty() { None } else { Some(value) };
-        }
+        result[i] = crate::verified::tar_pax::resolve_value(global[i], local[i]);
     }
     result
 }

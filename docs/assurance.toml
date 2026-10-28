@@ -2998,6 +2998,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-pax-slot-precedence"
+gate = true
+requirements = ["PARSE-TAR-003"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves one PAX key's local/global selection rule and wires it into the
+# native resolver. Record iteration, complete PAX semantics, and whole-parser
+# refinement remain outside this milestone.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "resolve_value" },
+  { path = "crates/core/src/tar.rs", symbol = "resolved" }
+]
+proofs = [
+  { id = "tar-pax-slot-precedence", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_pax.rs", symbol = "resolve_value", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "pax_global_local_deletion_binary_and_numeric_overrides" },
+  { package = "duplicity-core", name = "official_duplicity_307_pax_path_override_is_applied" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

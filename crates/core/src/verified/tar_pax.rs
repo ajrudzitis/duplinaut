@@ -116,6 +116,34 @@ pub open spec fn key_model(input: Seq<u8>) -> Option<usize> {
     else if input == b"hdrcharset"@ { Some(10) }
     else { None }
 }
+
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+/// Runtime slot selection used by the native PAX controller.
+pub fn resolve_value<'a>(global: Option<&'a [u8]>, local: Option<&'a [u8]>)
+    -> (result: Option<&'a [u8]>)
+    ensures match local {
+        Some(value) => if value.len() == 0 {
+            result is None
+        } else {
+            match result { Some(actual) => actual@ == value@, None => false }
+        },
+        None => match global {
+            None => result is None,
+            Some(value) => match result {
+                Some(actual) => actual@ == value@,
+                None => false,
+            },
+        },
+    },
+{
+    match local {
+        None => global,
+        Some(value) => if value.is_empty() { None } else { Some(value) },
+    }
+}
+
 pub fn key_index(input: &[u8]) -> (result: Option<usize>)
     ensures result == key_model(input@), result is Some ==> result.unwrap() < 11,
 {
