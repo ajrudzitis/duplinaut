@@ -2135,6 +2135,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-incremental-manifest-field-success"
+gate = true
+requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-006", "PARSE-NAME-007"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# A valid long IncrementalManifest interval/trailer/suffix model refines to the
+# exact successful ObjectName. Tests independently assert 24 canonical/legacy
+# interval and supported suffix-profile cases. Model-None/error outcomes and
+# outer raw-body scanner completeness remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "long_incremental_manifest_fields_model" },
+  { path = "crates/core/src/names.rs", symbol = "long_incremental_manifest_body_fields" }
+]
+proofs = [
+  { id = "name-long-incremental-manifest-field-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "long_incremental_manifest_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::long_incremental_manifest_fields_refine_interval_and_suffix_profiles" }
+]
+
+[[milestone]]
 id = "name-long-full-signatures-body"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-007"]
