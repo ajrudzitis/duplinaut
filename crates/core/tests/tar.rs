@@ -388,6 +388,74 @@ fn pax_global_local_deletion_binary_and_numeric_overrides() {
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+#[test]
+fn pax_uid_gid_global_local_deletion_and_header_fallback_are_exact() {
+    let global = [
+        record(b"uid", b"18446744073709551615"),
+        record(b"gid", b"0"),
+    ]
+    .concat();
+    let local = [
+        record(b"uid", b"0"),
+        record(b"gid", b"18446744073709551615"),
+    ]
+    .concat();
+    let deletion = [record(b"uid", b""), record(b"gid", b"")].concat();
+    let clear_global = [record(b"uid", b""), record(b"gid", b"")].concat();
+
+    let mut raw = member(b"snapshot/raw", b'0', b"");
+    raw[108..116].copy_from_slice(b"0000012\0"); // octal 10
+    raw[116..124].copy_from_slice(b"0000023\0"); // octal 19
+    checksum(&mut raw);
+    let bytes = [
+        member(b"global", b'g', &global),
+        member(b"local", b'x', &local),
+        raw.clone(),
+        member(b"local", b'x', &deletion),
+        raw.clone(),
+        raw.clone(),
+        member(b"global", b'g', &clear_global),
+        raw,
+    ]
+    .concat();
+
+    let parsed = parse(&bytes).unwrap();
+    assert_eq!(
+        (parsed.entries[0].uid, parsed.entries[0].gid),
+        (0, u64::MAX)
+    );
+    assert_eq!((parsed.entries[1].uid, parsed.entries[1].gid), (10, 19));
+    assert_eq!(
+        (parsed.entries[2].uid, parsed.entries[2].gid),
+        (u64::MAX, 0)
+    );
+    assert_eq!((parsed.entries[3].uid, parsed.entries[3].gid), (10, 19));
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+#[test]
+fn invalid_pax_uid_gid_values_are_numeric_errors() {
+    for key in [b"uid" as &[u8], b"gid"] {
+        for value in [b"+1" as &[u8], b"18446744073709551616"] {
+            let bytes = [
+                member(b"local", b'x', &record(key, value)),
+                member(b"snapshot/raw", b'0', b""),
+            ]
+            .concat();
+            assert_eq!(
+                parse(&bytes).unwrap_err(),
+                TarError::Numeric,
+                "{key:?}={value:?}"
+            );
+        }
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
 #[test]
 fn pax_size_override_controls_payload_and_empty_local_deletion_falls_back() {

@@ -237,8 +237,8 @@ impl<'a> TarVolume<'a> {
                 return Err(TarError::UnsupportedHeader);
             }
             let mode = u32::try_from(unsigned(h.mode)?).map_err(|_| TarError::Numeric)?;
-            let mut uid = unsigned(h.uid)?;
-            let mut gid = unsigned(h.gid)?;
+            let header_uid = unsigned(h.uid)?;
+            let header_gid = unsigned(h.gid)?;
             let raw_size = unsigned(h.size)?;
             let header_mtime_seconds =
                 i64::try_from(number(h.mtime)?).map_err(|_| TarError::Numeric)?;
@@ -361,12 +361,10 @@ impl<'a> TarVolume<'a> {
                 seconds: mtime_seconds,
                 nanoseconds: mtime_nanoseconds,
             };
-            if let Some(value) = values[4] {
-                uid = decimal(value)?;
-            }
-            if let Some(value) = values[5] {
-                gid = decimal(value)?;
-            }
+            let uid = crate::verified::tar_pax::effective_id(values[4], header_uid)
+                .map_err(|_| TarError::Numeric)?;
+            let gid = crate::verified::tar_pax::effective_id(values[5], header_gid)
+                .map_err(|_| TarError::Numeric)?;
             let atime = crate::verified::tar_pax::effective_optional_time(values[8])
                 .map_err(|_| TarError::Numeric)?
                 .map(|(seconds, nanoseconds)| TarTime {

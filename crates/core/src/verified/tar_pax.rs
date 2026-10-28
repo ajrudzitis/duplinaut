@@ -178,6 +178,36 @@ pub fn effective_size(value: Option<&[u8]>, header_size: u64)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PaxIdError {
+    Invalid,
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+/// Select a resolved PAX uid/gid override or retain the raw header value.
+pub fn effective_id(value: Option<&[u8]>, header_id: u64)
+    -> (result: Result<u64, PaxIdError>)
+    ensures match value {
+        None => result == Ok(header_id),
+        Some(bytes) => match result {
+            Ok(id) => bytes.len() > 0
+                && decimal_prefix(bytes@, bytes.len() as int) == Some(id as int),
+            Err(error) => error == PaxIdError::Invalid
+                && (bytes.len() == 0 || decimal_prefix(bytes@, bytes.len() as int) is None),
+        },
+    },
+{
+    match value {
+        None => Ok(header_id),
+        Some(bytes) => match decimal(bytes) {
+            Some(id) => Ok(id),
+            None => Err(PaxIdError::Invalid),
+        },
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PaxTimeError {
     Invalid,
 }
@@ -253,7 +283,8 @@ pub fn key_index(input: &[u8]) -> (result: Option<usize>)
 #[cfg(test)]
 mod tests {
     use super::{
-        effective_mtime, effective_optional_time, effective_size, PaxSizeError, PaxTimeError,
+        effective_id, effective_mtime, effective_optional_time, effective_size, PaxIdError,
+        PaxSizeError, PaxTimeError,
     };
 
     #[test]
@@ -267,6 +298,22 @@ mod tests {
             Err(PaxSizeError::Invalid)
         );
         assert_eq!(effective_size(Some(b"1x"), 17), Err(PaxSizeError::Invalid));
+    }
+
+    #[test]
+    fn effective_pax_ids_select_fallback_and_exact_decimal_values() {
+        assert_eq!(effective_id(None, 17), Ok(17));
+        assert_eq!(effective_id(Some(b"0"), 17), Ok(0));
+        assert_eq!(
+            effective_id(Some(b"18446744073709551615"), 17),
+            Ok(u64::MAX)
+        );
+        assert_eq!(effective_id(Some(b""), 17), Err(PaxIdError::Invalid));
+        assert_eq!(effective_id(Some(b"1x"), 17), Err(PaxIdError::Invalid));
+        assert_eq!(
+            effective_id(Some(b"18446744073709551616"), 17),
+            Err(PaxIdError::Invalid)
+        );
     }
 
     #[test]
