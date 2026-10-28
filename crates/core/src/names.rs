@@ -4164,6 +4164,24 @@ fn long_full_signatures_body_fields(
                     && !name.short,
             None => false,
         },
+    } && match long_full_signatures_fields_model(
+        start_field@,
+        separator,
+        trailer@,
+        optional_short_token(first),
+        optional_short_token(second),
+        optional_short_token(third),
+    ) {
+        Some((start, end, envelope, partial)) => result == Ok(ObjectName {
+            kind: ObjectKind::FullSignatures,
+            start: Timestamp(start as i128),
+            end: Timestamp(end as i128),
+            volume: None,
+            envelope,
+            partial,
+            short: false,
+        }),
+        None => true,
     },
 {
     let start = parse_long_timestamp(start_field, separator)?;
@@ -5584,7 +5602,7 @@ fn long_full_manifest_body(
 }
 
 #[verifier::spinoff_prover]
-#[verifier::rlimit(40)]
+#[verifier::rlimit(80)]
 //= docs/parsing-requirements.md#parse-name-010
 //= type=implementation
 //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
@@ -7511,6 +7529,57 @@ mod tests {
                         first,
                         second,
                         None,
+                    ),
+                    Ok(expected),
+                    "{timestamp:?} {first:?} {second:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    fn long_full_signatures_fields_refine_timestamp_and_suffix_profiles() {
+        let timestamps: [(&[u8], u8); 3] = [
+            (b"19700101T000000Z", b':'),
+            (b"1970-01-01T00:00:00Z", b':'),
+            (b"1970-01-01T01_00_00+01_00", b'_'),
+        ];
+        type SignatureSuffixProfile<'a> =
+            (Option<&'a [u8]>, Option<&'a [u8]>, super::Envelope, bool);
+        let profiles: [SignatureSuffixProfile<'_>; 8] = [
+            (None, None, super::Envelope::Plain, false),
+            (Some(b"part"), None, super::Envelope::Plain, true),
+            (Some(b"gz"), None, super::Envelope::Gzip, false),
+            (Some(b"gpg"), None, super::Envelope::OpenPgp, false),
+            (Some(b"p7m"), None, super::Envelope::Pkcs7, false),
+            (Some(b"part"), Some(b"gz"), super::Envelope::Gzip, true),
+            (Some(b"part"), Some(b"gpg"), super::Envelope::OpenPgp, true),
+            (Some(b"part"), Some(b"p7m"), super::Envelope::Pkcs7, true),
+        ];
+
+        for (timestamp, separator) in timestamps {
+            for (first, second, envelope, partial) in profiles {
+                let expected = super::ObjectName {
+                    kind: super::ObjectKind::FullSignatures,
+                    start: super::Timestamp(0),
+                    end: super::Timestamp(0),
+                    volume: None,
+                    envelope,
+                    partial,
+                    short: false,
+                };
+                assert_eq!(
+                    super::long_full_signatures_body_fields(
+                        timestamp, separator, b"sigtar", first, second, None,
                     ),
                     Ok(expected),
                     "{timestamp:?} {first:?} {second:?}"
