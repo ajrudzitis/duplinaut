@@ -4765,6 +4765,80 @@ closed spec fn body_error_result_model(separator: u8, error: NameError) -> bool 
     }
 }
 
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-name-010
+//= type=implementation
+//# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+fn short_full_volume_body(
+    input: &[u8],
+    separator: u8,
+) -> (result: Result<ObjectName, NameError>)
+    ensures match result {
+        Err(error) => error == NameError::Malformed,
+        Ok(name) => body_success_result_model(
+            input@, ObjectKind::FullVolume, true, separator, name,
+        ),
+    },
+{
+    let _ = separator; // Short full-volume bodies do not consume the time separator.
+    let mut fields = Some(input);
+    let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+    let _after_start = fields;
+    let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+    let _after_volume = fields;
+    let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+    let _after_trailer = fields;
+    let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+    if third.is_some() || extra.is_some() || fields.is_some() {
+        return Err(NameError::Malformed);
+    }
+    let result = short_full_volume_body_fields(start_field, volume_field, trailer, first, second);
+    proof {
+        if let Ok(name) = result {
+            reveal(body_success_result_model);
+            reveal(short_full_volume_raw_body_model);
+            reveal(short_full_volume_fields_model);
+            reveal(body_suffix_fields_model);
+            reveal(body_field_split_model);
+            assert(body_field_split_model(
+                Some(input@), Some(start_field@),
+                optional_body_field_model(_after_start),
+            ));
+            assert(body_field_split_model(
+                optional_body_field_model(_after_start), Some(volume_field@),
+                optional_body_field_model(_after_volume),
+            ));
+            assert(body_field_split_model(
+                optional_body_field_model(_after_volume), Some(trailer@),
+                optional_body_field_model(_after_trailer),
+            ));
+            assert(body_suffix_fields_model(
+                optional_body_field_model(_after_trailer),
+                optional_body_field_model(first),
+                optional_body_field_model(second),
+                optional_body_field_model(third),
+                optional_body_field_model(extra),
+                optional_body_field_model(fields),
+            ));
+            assert(name.volume matches Some(_));
+            assert(short_full_volume_raw_body_model(
+                input@,
+                name.start.0 as int,
+                name.end.0 as int,
+                match name.volume {
+                    Some(volume) => volume as int,
+                    None => 0,
+                },
+                name.envelope,
+                name.partial,
+            ));
+        }
+    }
+    result
+}
+
 #[verifier::spinoff_prover]
 #[verifier::rlimit(40)]
 //= docs/parsing-requirements.md#parse-name-010
@@ -5256,53 +5330,7 @@ fn body(
             result
         }
         crate::name_dispatch::BodyRoute::ShortFullVolume => {
-            let mut fields = Some(input);
-            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_start = fields;
-            let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_volume = fields;
-            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_trailer = fields;
-            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-            if third.is_some() || extra.is_some() || fields.is_some() {
-                return Err(NameError::Malformed);
-            }
-            let result = short_full_volume_body_fields(
-                start_field,
-                volume_field,
-                trailer,
-                first,
-                second,
-            );
-            proof {
-                if let Ok(name) = result {
-                    reveal(short_full_volume_raw_body_model);
-                    reveal(short_full_volume_fields_model);
-                    reveal(body_suffix_fields_model);
-                    reveal(body_field_split_model);
-                    assert(body_field_split_model(
-                        Some(input@), Some(start_field@),
-                        optional_body_field_model(_after_start),
-                    ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_start), Some(volume_field@),
-                        optional_body_field_model(_after_volume),
-                    ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_volume), Some(trailer@),
-                        optional_body_field_model(_after_trailer),
-                    ));
-                    assert(body_suffix_fields_model(
-                        optional_body_field_model(_after_trailer),
-                        optional_body_field_model(first),
-                        optional_body_field_model(second),
-                        optional_body_field_model(third),
-                        optional_body_field_model(extra),
-                        optional_body_field_model(fields),
-                    ));
-                }
-            }
-            result
+            short_full_volume_body(input, separator)
         }
         crate::name_dispatch::BodyRoute::LongFullVolume => {
             let mut fields = Some(input);
@@ -7119,6 +7147,39 @@ mod tests {
             let name = super::body(input, kind, short, b':').expect("valid body");
             assert_eq!(name.kind, kind);
             assert_eq!(name.short, short);
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-010
+    //= type=test
+    //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+    fn short_full_volume_body_error_and_success_edge_matrix() {
+        let valid = [
+            (b"1.1.dt" as &[u8], b':'),
+            // The short FullVolume grammar does not consume the time separator.
+            (b"1.1.dt", b'\0'),
+        ];
+        for (input, separator) in valid {
+            let result = super::body(input, super::ObjectKind::FullVolume, true, separator);
+            assert!(result.is_ok(), "{input:?} with separator {separator:?}");
+        }
+
+        let malformed: [(&[u8], u8); 6] = [
+            (b"", b':'),
+            (b"!.1.dt", b':'),
+            (b"1.!.dt", b':'),
+            (b"1.1.bad", b':'),
+            (b"1.1.dt.extra", b':'),
+            // Invalid separator configuration does not affect the short route.
+            (b"1.1.bad", b'\0'),
+        ];
+        for (input, separator) in malformed {
+            assert_eq!(
+                super::body(input, super::ObjectKind::FullVolume, true, separator),
+                Err(super::NameError::Malformed),
+                "{input:?} with separator {separator:?}"
+            );
         }
     }
 
