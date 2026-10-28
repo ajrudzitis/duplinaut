@@ -104,6 +104,38 @@ fn tar_checksum_admission_accepts_unsigned_signed_and_rejects_mismatch() {
     assert_eq!(parse(&signed_bytes).unwrap_err(), TarError::Checksum);
 }
 
+//= docs/parsing-requirements.md#parse-tar-004
+//= type=test
+//# Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.
+
+#[test]
+fn ordinary_tar_entry_type_admission_matrix_is_explicit() {
+    let supported = [
+        (0, EntryType::Regular),
+        (b'0', EntryType::Regular),
+        (b'1', EntryType::Hardlink),
+        (b'2', EntryType::Symlink),
+        (b'3', EntryType::CharacterDevice),
+        (b'4', EntryType::BlockDevice),
+        (b'5', EntryType::Directory),
+        (b'6', EntryType::Fifo),
+    ];
+    for (flag, expected) in supported {
+        let bytes = member(b"snapshot/file", flag, b"");
+        assert_eq!(parse(&bytes).unwrap().entries[0].entry_type, expected);
+    }
+
+    for flag in *b"123456" {
+        let bytes = member(b"snapshot/file", flag, b"x");
+        assert_eq!(parse(&bytes).unwrap_err(), TarError::UnsupportedEntry);
+    }
+
+    for flag in *b"7S" {
+        let bytes = member(b"snapshot/file", flag, b"");
+        assert_eq!(parse(&bytes).unwrap_err(), TarError::UnsupportedEntry);
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-005
 //= type=test
 //# The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.

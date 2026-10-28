@@ -7,16 +7,7 @@ use crate::generated::tar::TarHeaderFmt;
 use crate::path::{BackupPath, PathError};
 use vest_lib::core::exec::parser::Parser;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum EntryType {
-    Regular,
-    Directory,
-    Symlink,
-    Hardlink,
-    CharacterDevice,
-    BlockDevice,
-    Fifo,
-}
+pub use crate::verified::tar_entry::TarEntryType as EntryType;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TarTime {
     pub seconds: i64,
@@ -313,19 +304,8 @@ impl<'a> TarVolume<'a> {
                 }
                 continue;
             }
-            let entry_type = match h.entry_type {
-                0 | b'0' => EntryType::Regular,
-                b'1' => EntryType::Hardlink,
-                b'2' => EntryType::Symlink,
-                b'3' => EntryType::CharacterDevice,
-                b'4' => EntryType::BlockDevice,
-                b'5' => EntryType::Directory,
-                b'6' => EntryType::Fifo,
-                _ => return Err(TarError::UnsupportedEntry),
-            };
-            if entry_type != EntryType::Regular && size != 0 {
-                return Err(TarError::UnsupportedEntry);
-            }
+            let entry_type = crate::verified::tar_entry::classify_entry_type(h.entry_type, size)
+                .ok_or(TarError::UnsupportedEntry)?;
             if entries.len() >= limits.max_entries {
                 return Err(TarError::Limit);
             }
