@@ -3618,9 +3618,11 @@ proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Refines a valid increasing short IncrementalVolume field model to the exact
-# successful ObjectName, including the positive base36 volume. Raw-body
-# scanner completeness, other routes, and body-error completeness remain open.
+# The model-to-exact-success postcondition is verified. The dedicated 18-case
+# result matrix independently covers three increasing base36 intervals, the
+# positive volume value 36 from field `10`, and all six supported suffix
+# profiles. Raw-body scanner completeness, other routes, and body-error
+# completeness remain open.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_fields_model" },
   { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body_fields" }
@@ -3629,7 +3631,7 @@ proofs = [
   { id = "name-short-incremental-volume-field-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body_fields", kind = "contract" }
 ]
 tests = [
-  { package = "duplicity-core", name = "names::tests::short_incremental_volume_success_route_composes_interval_volume_and_trailer" }
+  { package = "duplicity-core", name = "names::tests::short_incremental_volume_fields_refine_interval_volume_and_suffix_profiles" }
 ]
 
 [[trusted]]
