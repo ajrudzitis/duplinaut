@@ -4736,6 +4736,24 @@ fn short_incremental_volume_body_fields(
                     && name.short,
             None => false,
         },
+    } && match short_incremental_volume_fields_model(
+        start_field@,
+        end_field@,
+        volume_field@,
+        trailer@,
+        optional_short_token(first),
+        optional_short_token(second),
+    ) {
+        Some((start, end, volume, envelope, partial)) => result == Ok(ObjectName {
+            kind: ObjectKind::IncrementalVolume,
+            start: Timestamp(start as i128),
+            end: Timestamp(end as i128),
+            volume: Some(volume as u64),
+            envelope,
+            partial,
+            short: true,
+        }),
+        None => result == Err(NameError::Malformed),
     },
 {
     let (start, end) = decode_short_interval(
@@ -8453,36 +8471,99 @@ mod tests {
     //= type=test
     //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
     fn short_incremental_volume_success_route_composes_interval_volume_and_trailer() {
-        let profiles: [(&[u8], super::Envelope, bool); 6] = [
-            (b"1.2.1.dt", super::Envelope::Plain, false),
-            (b"1.2.1.dt.p", super::Envelope::Plain, true),
-            (b"1.2.1.dt.z", super::Envelope::Gzip, false),
-            (b"1.2.1.dt.g", super::Envelope::OpenPgp, false),
-            (b"1.2.1.dt.p.z", super::Envelope::Gzip, true),
-            (b"1.2.1.dt.p.g", super::Envelope::OpenPgp, true),
+        let profiles: [(&[u8], super::ObjectName); 7] = [
+            (
+                b"1.2.1.dt",
+                super::ObjectName {
+                    kind: super::ObjectKind::IncrementalVolume,
+                    start: super::Timestamp(1),
+                    end: super::Timestamp(2),
+                    volume: Some(1),
+                    envelope: super::Envelope::Plain,
+                    partial: false,
+                    short: true,
+                },
+            ),
+            (
+                b"1.2.1.dt.p",
+                super::ObjectName {
+                    kind: super::ObjectKind::IncrementalVolume,
+                    start: super::Timestamp(1),
+                    end: super::Timestamp(2),
+                    volume: Some(1),
+                    envelope: super::Envelope::Plain,
+                    partial: true,
+                    short: true,
+                },
+            ),
+            (
+                b"1.2.1.dt.z",
+                super::ObjectName {
+                    kind: super::ObjectKind::IncrementalVolume,
+                    start: super::Timestamp(1),
+                    end: super::Timestamp(2),
+                    volume: Some(1),
+                    envelope: super::Envelope::Gzip,
+                    partial: false,
+                    short: true,
+                },
+            ),
+            (
+                b"1.2.1.dt.g",
+                super::ObjectName {
+                    kind: super::ObjectKind::IncrementalVolume,
+                    start: super::Timestamp(1),
+                    end: super::Timestamp(2),
+                    volume: Some(1),
+                    envelope: super::Envelope::OpenPgp,
+                    partial: false,
+                    short: true,
+                },
+            ),
+            (
+                b"1.2.1.dt.p.z",
+                super::ObjectName {
+                    kind: super::ObjectKind::IncrementalVolume,
+                    start: super::Timestamp(1),
+                    end: super::Timestamp(2),
+                    volume: Some(1),
+                    envelope: super::Envelope::Gzip,
+                    partial: true,
+                    short: true,
+                },
+            ),
+            (
+                b"1.2.1.dt.p.g",
+                super::ObjectName {
+                    kind: super::ObjectKind::IncrementalVolume,
+                    start: super::Timestamp(1),
+                    end: super::Timestamp(2),
+                    volume: Some(1),
+                    envelope: super::Envelope::OpenPgp,
+                    partial: true,
+                    short: true,
+                },
+            ),
+            (
+                b"2.z.3.dt.p.g",
+                super::ObjectName {
+                    kind: super::ObjectKind::IncrementalVolume,
+                    start: super::Timestamp(2),
+                    end: super::Timestamp(35),
+                    volume: Some(3),
+                    envelope: super::Envelope::OpenPgp,
+                    partial: true,
+                    short: true,
+                },
+            ),
         ];
-        for (input, envelope, partial) in profiles {
-            let name = super::short_incremental_volume_body(input, b':').unwrap();
-            assert_eq!(name.kind, super::ObjectKind::IncrementalVolume, "{input:?}");
-            assert_eq!(name.start, super::Timestamp(1), "{input:?}");
-            assert_eq!(name.end, super::Timestamp(2), "{input:?}");
-            assert_eq!(name.volume, Some(1), "{input:?}");
+        for (input, expected) in profiles {
             assert_eq!(
-                (name.envelope, name.partial),
-                (envelope, partial),
+                super::short_incremental_volume_body(input, b':'),
+                Ok(expected),
                 "{input:?}"
             );
-            assert!(name.short, "{input:?}");
         }
-
-        let nontrivial = super::short_incremental_volume_body(b"2.z.3.dt.p.g", b'\0').unwrap();
-        assert_eq!(nontrivial.kind, super::ObjectKind::IncrementalVolume);
-        assert_eq!(nontrivial.start, super::Timestamp(2));
-        assert_eq!(nontrivial.end, super::Timestamp(35));
-        assert_eq!(nontrivial.volume, Some(3));
-        assert_eq!(nontrivial.envelope, super::Envelope::OpenPgp);
-        assert!(nontrivial.partial);
-        assert!(nontrivial.short);
     }
 
     #[test]
