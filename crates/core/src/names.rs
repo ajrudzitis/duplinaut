@@ -4637,6 +4637,27 @@ fn long_incremental_volume_body_fields(
                     && !name.short,
             None => false,
         },
+    } && match long_incremental_volume_fields_model(
+        start_field@,
+        separator,
+        marker@,
+        end_field@,
+        volume_field@,
+        trailer@,
+        optional_short_token(first),
+        optional_short_token(second),
+        optional_short_token(third),
+    ) {
+        Some((start, end, volume, envelope, partial)) => result == Ok(ObjectName {
+            kind: ObjectKind::IncrementalVolume,
+            start: Timestamp(start as i128),
+            end: Timestamp(end as i128),
+            volume: Some(volume as u64),
+            envelope,
+            partial,
+            short: false,
+        }),
+        None => true,
     },
 {
     let (start, end) = decode_long_interval(
@@ -7644,6 +7665,74 @@ mod tests {
                     ),
                     Ok(expected),
                     "{timestamp:?} {first:?} {second:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    //= docs/parsing-requirements.md#parse-name-006
+    //= type=test
+    //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    //= docs/parsing-requirements.md#parse-gen-003
+    //= type=test
+    //# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
+    fn long_incremental_volume_fields_refine_interval_volume_and_suffix_profiles() {
+        let intervals: [(&[u8], &[u8], u8); 3] = [
+            (b"19700101T000000Z", b"19700101T000001Z", b':'),
+            (b"1970-01-01T00:00:00Z", b"1970-01-01T00:00:01Z", b':'),
+            (
+                b"1970-01-01T01_00_00+01_00",
+                b"1970-01-01T01_00_01+01_00",
+                b'_',
+            ),
+        ];
+        type VolumeSuffixProfile<'a> = (Option<&'a [u8]>, Option<&'a [u8]>, super::Envelope, bool);
+        let profiles: [VolumeSuffixProfile<'_>; 8] = [
+            (None, None, super::Envelope::Plain, false),
+            (Some(b"part"), None, super::Envelope::Plain, true),
+            (Some(b"gz"), None, super::Envelope::Gzip, false),
+            (Some(b"gpg"), None, super::Envelope::OpenPgp, false),
+            (Some(b"p7m"), None, super::Envelope::Pkcs7, false),
+            (Some(b"part"), Some(b"gz"), super::Envelope::Gzip, true),
+            (Some(b"part"), Some(b"gpg"), super::Envelope::OpenPgp, true),
+            (Some(b"part"), Some(b"p7m"), super::Envelope::Pkcs7, true),
+        ];
+
+        for (start_field, end_field, separator) in intervals {
+            for (first, second, envelope, partial) in profiles {
+                let expected = super::ObjectName {
+                    kind: super::ObjectKind::IncrementalVolume,
+                    start: super::Timestamp(0),
+                    end: super::Timestamp(1),
+                    volume: Some(42),
+                    envelope,
+                    partial,
+                    short: false,
+                };
+                assert_eq!(
+                    super::long_incremental_volume_body_fields(
+                        start_field,
+                        separator,
+                        b"to",
+                        end_field,
+                        b"vol42",
+                        b"difftar",
+                        first,
+                        second,
+                        None,
+                    ),
+                    Ok(expected),
+                    "{start_field:?} to {end_field:?} vol42 {first:?} {second:?}"
                 );
             }
         }
