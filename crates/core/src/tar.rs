@@ -324,15 +324,15 @@ impl<'a> TarVolume<'a> {
             if name_length > limits.max_path_bytes || link.len() > limits.max_path_bytes {
                 return Err(TarError::Limit);
             }
-            if values[10] != Some(b"BINARY") {
+            if crate::verified::tar_pax::owner_name_requires_utf8(values[10]) {
                 for i in [0, 1, 6, 7] {
                     if let Some(value) = values[i] {
                         std::str::from_utf8(value).map_err(|_| TarError::TextEncoding)?;
                     }
                 }
             }
-            let uname = values[6].unwrap_or(text(h.uname));
-            let gname = values[7].unwrap_or(text(h.gname));
+            let uname = crate::verified::tar_pax::effective_owner_name(values[6], text(h.uname));
+            let gname = crate::verified::tar_pax::effective_owner_name(values[7], text(h.gname));
             if uname.len() > limits.max_path_bytes || gname.len() > limits.max_path_bytes {
                 return Err(TarError::Limit);
             }

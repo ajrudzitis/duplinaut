@@ -3210,6 +3210,34 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-pax-owner-names"
+gate = true
+requirements = ["PARSE-TAR-003"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Refines PAX owner-name source selection and the BINARY-versus-UTF-8 policy
+# branch before native metadata output. Rust's UTF-8 decoder, header fallback
+# validation, and complete PAX controller are outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_owner_name" },
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "owner_name_requires_utf8" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-pax-owner-names", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_owner_name", kind = "contract" },
+  { id = "tar-pax-owner-charset-policy", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_pax.rs", symbol = "owner_name_requires_utf8", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::effective_owner_name_and_charset_policy_select_exact_sources" },
+  { package = "duplicity-core", name = "pax_owner_names_fallback_override_delete_and_resume_global_values" },
+  { package = "duplicity-core", name = "pax_owner_names_follow_utf8_and_binary_charset_policy" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

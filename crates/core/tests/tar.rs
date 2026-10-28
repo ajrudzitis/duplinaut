@@ -37,6 +37,14 @@ fn member(name: &[u8], kind: u8, payload: &[u8]) -> Vec<u8> {
     bytes.resize(bytes.len().next_multiple_of(512), 0);
     bytes
 }
+fn member_with_owner_names(uname: &[u8], gname: &[u8]) -> Vec<u8> {
+    assert!(uname.len() <= 32 && gname.len() <= 32);
+    let mut bytes = member(b"snapshot/file", b'0', b"");
+    bytes[265..265 + uname.len()].copy_from_slice(uname);
+    bytes[297..297 + gname.len()].copy_from_slice(gname);
+    checksum(&mut bytes[..512]);
+    bytes
+}
 fn symlink_with_linkname(link: &[u8]) -> Vec<u8> {
     let mut bytes = member(b"snapshot/link", b'2', b"");
     bytes[157..157 + link.len()].copy_from_slice(link);
@@ -831,6 +839,99 @@ fn pax_record_admission_preserves_duplicate_nul_unknown_and_empty_value_behavior
     let parsed = parse(&bytes).unwrap();
     assert_eq!(parsed.entries[0].name, b"snapshot/header");
     assert_eq!(parsed.entries[1].name, b"snapshot/global");
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+#[test]
+fn pax_owner_names_fallback_override_delete_and_resume_global_values() {
+    let global = [
+        record(b"uname", b"global-user"),
+        record(b"gname", b"global-group"),
+    ]
+    .concat();
+    let local = [
+        record(b"uname", b"local-user"),
+        record(b"gname", b"local-group"),
+    ]
+    .concat();
+    let deletion = [record(b"uname", b""), record(b"gname", b"")].concat();
+    let clear_global = [record(b"uname", b""), record(b"gname", b"")].concat();
+    let header = member_with_owner_names(b"header-user", b"header-group");
+    let bytes = [
+        member(b"global", b'g', &global),
+        member(b"local", b'x', &local),
+        header.clone(),
+        member(b"local", b'x', &deletion),
+        header.clone(),
+        header.clone(),
+        member(b"global", b'g', &clear_global),
+        header,
+    ]
+    .concat();
+    let parsed = parse(&bytes).unwrap();
+    assert_eq!(parsed.entries[0].uname, b"local-user");
+    assert_eq!(parsed.entries[0].gname, b"local-group");
+    assert_eq!(parsed.entries[1].uname, b"header-user");
+    assert_eq!(parsed.entries[1].gname, b"header-group");
+    assert_eq!(parsed.entries[2].uname, b"global-user");
+    assert_eq!(parsed.entries[2].gname, b"global-group");
+    assert_eq!(parsed.entries[3].uname, b"header-user");
+    assert_eq!(parsed.entries[3].gname, b"header-group");
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+#[test]
+fn pax_owner_names_follow_utf8_and_binary_charset_policy() {
+    let valid_utf8 = [
+        record(b"uname", "José".as_bytes()),
+        record(b"gname", "Grüppe".as_bytes()),
+    ]
+    .concat();
+    let archive = [
+        member(b"local", b'x', &valid_utf8),
+        member_with_owner_names(b"header-user", b"header-group"),
+    ]
+    .concat();
+    let parsed = parse(&archive).unwrap();
+    assert_eq!(parsed.entries[0].uname, "José".as_bytes());
+    assert_eq!(parsed.entries[0].gname, "Grüppe".as_bytes());
+
+    let invalid_utf8 = [
+        record(b"uname", b"user-\xff"),
+        record(b"gname", b"group-\xff"),
+    ]
+    .concat();
+    let archive = [
+        member(b"local", b'x', &invalid_utf8),
+        member(b"snapshot/file", b'0', b""),
+    ]
+    .concat();
+    assert_eq!(parse(&archive).unwrap_err(), TarError::TextEncoding);
+
+    let binary = [
+        record(b"hdrcharset", b"BINARY"),
+        record(b"uname", b"user-\xff"),
+        record(b"gname", b"group-\xff"),
+    ]
+    .concat();
+    let archive = [
+        member(b"local", b'x', &binary),
+        member(b"snapshot/file", b'0', b""),
+    ]
+    .concat();
+    let parsed = parse(&archive).unwrap();
+    assert_eq!(parsed.entries[0].uname, b"user-\xff");
+    assert_eq!(parsed.entries[0].gname, b"group-\xff");
+
+    // Existing header fallback remains byte-preserving and is not PAX-validated.
+    let archive = member_with_owner_names(b"header-\xff", b"group-\xff");
+    let parsed = parse(&archive).unwrap();
+    assert_eq!(parsed.entries[0].uname, b"header-\xff");
+    assert_eq!(parsed.entries[0].gname, b"group-\xff");
 }
 
 //= docs/parsing-requirements.md#parse-entry-001

@@ -203,6 +203,39 @@ pub fn effective_link_override<'a>(
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+/// Select a PAX owner-name override or preserve the raw header owner name.
+pub fn effective_owner_name<'a>(pax_name: Option<&'a [u8]>, header_name: &'a [u8])
+    -> (result: &'a [u8])
+    ensures match pax_name {
+        Some(value) => result@ == value@,
+        None => result@ == header_name@,
+    },
+{
+    match pax_name {
+        Some(value) => value,
+        None => header_name,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+/// Return whether the resolved charset uses the parser's UTF-8 text policy.
+pub fn owner_name_requires_utf8(charset: Option<&[u8]>) -> (result: bool)
+    ensures result == match charset {
+        Some(value) => value@ != b"BINARY"@,
+        None => true,
+    },
+{
+    match charset {
+        Some(value) => !bytes_eq(value, b"BINARY"),
+        None => true,
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PaxSizeError {
     Invalid,
@@ -375,8 +408,8 @@ pub fn admit_record(key: &[u8], value: &[u8], occupied: bool)
 mod tests {
     use super::{
         admit_record, effective_id, effective_link_override, effective_mtime,
-        effective_name_override, effective_optional_time, effective_size, PaxIdError,
-        PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
+        effective_name_override, effective_optional_time, effective_owner_name, effective_size,
+        owner_name_requires_utf8, PaxIdError, PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
     };
 
     #[test]
@@ -424,6 +457,16 @@ mod tests {
             effective_link_override(Some(b"pax"), Some(b"gnu")),
             Some(&b"pax"[..])
         );
+    }
+
+    #[test]
+    fn effective_owner_name_and_charset_policy_select_exact_sources() {
+        assert_eq!(effective_owner_name(None, b"header"), b"header");
+        assert_eq!(effective_owner_name(Some(b"pax"), b"header"), b"pax");
+        assert!(owner_name_requires_utf8(None));
+        assert!(owner_name_requires_utf8(Some(b"UTF-8")));
+        assert!(owner_name_requires_utf8(Some(b"ISO-IR 10646 2000 UTF-8")));
+        assert!(!owner_name_requires_utf8(Some(b"BINARY")));
     }
 
     #[test]
