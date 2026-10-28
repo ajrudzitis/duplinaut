@@ -330,6 +330,42 @@ fn gnu_long_name_and_link_require_real_entries() {
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+#[test]
+fn pax_path_precedes_pending_gnu_long_name_in_either_extension_order() {
+    let gnu = member(b"././@LongLink", b'L', b"snapshot/gnu-name\0");
+    let pax = member(b"local", b'x', &record(b"path", b"snapshot/pax-name"));
+    let ordinary = member(b"raw", b'0', b"");
+
+    for bytes in [
+        [gnu.clone(), pax.clone(), ordinary.clone()].concat(),
+        [pax.clone(), gnu.clone(), ordinary.clone()].concat(),
+    ] {
+        let parsed = parse(&bytes).unwrap();
+        assert_eq!(parsed.entries[0].name, b"snapshot/pax-name");
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+#[test]
+fn empty_local_pax_path_allows_pending_gnu_long_name() {
+    let gnu = member(b"././@LongLink", b'L', b"snapshot/gnu-name\0");
+    let empty_pax_path = member(b"local", b'x', &record(b"path", b""));
+    let ordinary = member(b"raw", b'0', b"");
+
+    for bytes in [
+        [gnu.clone(), empty_pax_path.clone(), ordinary.clone()].concat(),
+        [empty_pax_path.clone(), gnu.clone(), ordinary.clone()].concat(),
+    ] {
+        let parsed = parse(&bytes).unwrap();
+        assert_eq!(parsed.entries[0].name, b"snapshot/gnu-name");
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
 #[test]
 fn pax_global_local_deletion_binary_and_numeric_overrides() {

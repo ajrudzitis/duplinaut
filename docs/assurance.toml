@@ -3129,6 +3129,33 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-pax-path-over-gnu-name"
+gate = true
+requirements = ["PARSE-TAR-003"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Selects an already-resolved PAX path before pending GNU long-name metadata;
+# raw header name/prefix fallback remains in the native parser. Metadata-loop
+# ordering/controller and complete path decoding are outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_name_override" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-pax-path-over-gnu-name", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_name_override", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::effective_name_override_prefers_pax_then_gnu_then_header_fallback" },
+  { package = "duplicity-core", name = "pax_path_precedes_pending_gnu_long_name_in_either_extension_order" },
+  { package = "duplicity-core", name = "empty_local_pax_path_allows_pending_gnu_long_name" },
+  { package = "duplicity-core", name = "official_duplicity_307_pax_path_override_is_applied" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

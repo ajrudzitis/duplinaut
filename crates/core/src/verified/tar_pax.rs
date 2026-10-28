@@ -147,6 +147,34 @@ pub fn resolve_value<'a>(global: Option<&'a [u8]>, local: Option<&'a [u8]>)
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+/// Select the effective PAX path before a pending GNU long-name override.
+pub fn effective_name_override<'a>(
+    pax_path: Option<&'a [u8]>,
+    gnu_long_name: Option<&'a [u8]>,
+) -> (result: Option<&'a [u8]>)
+    ensures match pax_path {
+        Some(value) => match result {
+            Some(actual) => actual@ == value@,
+            None => false,
+        },
+        None => match gnu_long_name {
+            Some(value) => match result {
+                Some(actual) => actual@ == value@,
+                None => false,
+            },
+            None => result is None,
+        },
+    },
+{
+    match pax_path {
+        Some(value) => Some(value),
+        None => gnu_long_name,
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PaxSizeError {
     Invalid,
@@ -283,8 +311,8 @@ pub fn key_index(input: &[u8]) -> (result: Option<usize>)
 #[cfg(test)]
 mod tests {
     use super::{
-        effective_id, effective_mtime, effective_optional_time, effective_size, PaxIdError,
-        PaxSizeError, PaxTimeError,
+        effective_id, effective_mtime, effective_name_override, effective_optional_time,
+        effective_size, PaxIdError, PaxSizeError, PaxTimeError,
     };
 
     #[test]
@@ -298,6 +326,23 @@ mod tests {
             Err(PaxSizeError::Invalid)
         );
         assert_eq!(effective_size(Some(b"1x"), 17), Err(PaxSizeError::Invalid));
+    }
+
+    #[test]
+    fn effective_name_override_prefers_pax_then_gnu_then_header_fallback() {
+        assert_eq!(effective_name_override(None, None), None);
+        assert_eq!(
+            effective_name_override(None, Some(b"gnu")),
+            Some(&b"gnu"[..])
+        );
+        assert_eq!(
+            effective_name_override(Some(b"pax"), None),
+            Some(&b"pax"[..])
+        );
+        assert_eq!(
+            effective_name_override(Some(b"pax"), Some(b"gnu")),
+            Some(&b"pax"[..])
+        );
     }
 
     #[test]
