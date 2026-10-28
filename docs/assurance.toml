@@ -2974,6 +2974,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-entry-extent-admission"
+gate = true
+requirements = ["PARSE-TAR-002"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Exact payload subrange and padded next cursor for a single extent, with
+# overflow/truncation mapped to explicit adapter errors. The outer tar loop,
+# header decoding, and whole-parser refinement are outside this milestone.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry_extent.rs", symbol = "take_entry_payload" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-entry-extent-admission", requirement = "PARSE-TAR-002", path = "crates/core/src/verified/tar_entry_extent.rs", symbol = "take_entry_payload", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "tar_payload_extent_boundaries_preserve_payload_padding_and_truncation_errors" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

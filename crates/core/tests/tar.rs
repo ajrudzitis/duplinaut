@@ -136,6 +136,26 @@ fn ordinary_tar_entry_type_admission_matrix_is_explicit() {
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-002
+//= type=test
+//# The tar parser MUST advance over each payload and its padding to the next 512-byte boundary without arithmetic overflow.
+
+#[test]
+fn tar_payload_extent_boundaries_preserve_payload_padding_and_truncation_errors() {
+    for size in [0usize, 1, 511, 512, 513, 1023, 1024] {
+        let payload = vec![0xa5; size];
+        let bytes = member(b"snapshot/file", b'0', &payload);
+        let parsed = parse(&bytes).unwrap();
+        assert_eq!(parsed.entries[0].payload, payload);
+        let padded_size = size.div_ceil(512) * 512;
+        assert_eq!(parsed.entry_stream_bytes, 512 + padded_size);
+    }
+
+    let mut truncated = member(b"snapshot/file", b'0', &vec![0x5a; 513]);
+    truncated.truncate(512 + 512);
+    assert_eq!(parse(&truncated).unwrap_err(), TarError::Truncated);
+}
+
 //= docs/parsing-requirements.md#parse-tar-005
 //= type=test
 //# The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.

@@ -259,14 +259,16 @@ impl<'a> TarVolume<'a> {
             if size > limits.max_entry_bytes {
                 return Err(TarError::Limit);
             }
-            let (data_start, data_end, next) =
-                crate::verified::tar_helpers::extent(cursor, size, bytes.len()).map_err(
-                    |error| match error {
-                        crate::verified::tar_helpers::ExtentError::Overflow => TarError::Limit,
-                        crate::verified::tar_helpers::ExtentError::Truncated => TarError::Truncated,
-                    },
-                )?;
-            let payload = &bytes[data_start..data_end];
+            let (payload, next) =
+                crate::verified::tar_entry_extent::take_entry_payload(bytes, cursor, size)
+                    .map_err(|error| match error {
+                        crate::verified::tar_entry_extent::EntryExtentError::Limit => {
+                            TarError::Limit
+                        }
+                        crate::verified::tar_entry_extent::EntryExtentError::Truncated => {
+                            TarError::Truncated
+                        }
+                    })?;
             cursor = next;
             if extension {
                 extended = extended.checked_add(1).ok_or(TarError::Limit)?;
