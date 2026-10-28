@@ -3657,7 +3657,7 @@ fn short_full_volume_body_fields(
     second: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => short_full_volume_fields_model(
+        Err(error) => error == NameError::Malformed && short_full_volume_fields_model(
             start_field@,
             volume_field@,
             trailer@,
@@ -3732,7 +3732,7 @@ fn short_full_manifest_body_fields(
     second: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => short_full_manifest_fields_model(
+        Err(error) => error == NameError::Malformed && short_full_manifest_fields_model(
             start_field@,
             trailer@,
             optional_short_token(first),
@@ -3803,7 +3803,7 @@ fn short_full_signatures_body_fields(
     second: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => short_full_signatures_fields_model(
+        Err(error) => error == NameError::Malformed && short_full_signatures_fields_model(
             start_field@,
             trailer@,
             optional_short_token(first),
@@ -3881,7 +3881,7 @@ fn short_incremental_signatures_body_fields(
     second: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => short_incremental_signatures_fields_model(
+        Err(error) => error == NameError::Malformed && short_incremental_signatures_fields_model(
             start_field@,
             end_field@,
             trailer@,
@@ -3966,7 +3966,10 @@ fn long_full_manifest_body_fields(
     third: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => long_full_manifest_fields_model(
+        Err(error) => (error == NameError::Malformed
+            || (error == NameError::Configuration
+                && !time_separator_valid_model(separator)))
+            && long_full_manifest_fields_model(
             start_field@,
             separator,
             trailer@,
@@ -4045,7 +4048,10 @@ fn long_full_signatures_body_fields(
     third: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => long_full_signatures_fields_model(
+        Err(error) => (error == NameError::Malformed
+            || (error == NameError::Configuration
+                && !time_separator_valid_model(separator)))
+            && long_full_signatures_fields_model(
             start_field@,
             separator,
             trailer@,
@@ -4130,7 +4136,10 @@ fn long_incremental_manifest_body_fields(
     third: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => long_incremental_manifest_fields_model(
+        Err(error) => (error == NameError::Malformed
+            || (error == NameError::Configuration
+                && !time_separator_valid_model(separator)))
+            && long_incremental_manifest_fields_model(
             start_field@,
             separator,
             marker@,
@@ -4231,7 +4240,10 @@ fn long_incremental_signatures_body_fields(
     third: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => long_incremental_signatures_fields_model(
+        Err(error) => (error == NameError::Malformed
+            || (error == NameError::Configuration
+                && !time_separator_valid_model(separator)))
+            && long_incremental_signatures_fields_model(
             start_field@,
             separator,
             marker@,
@@ -4330,7 +4342,10 @@ fn long_full_volume_body_fields(
     third: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => long_full_volume_fields_model(
+        Err(error) => (error == NameError::Malformed
+            || (error == NameError::Configuration
+                && !time_separator_valid_model(separator)))
+            && long_full_volume_fields_model(
             start_field@,
             separator,
             volume_field@,
@@ -4423,7 +4438,10 @@ fn long_incremental_volume_body_fields(
     third: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => long_incremental_volume_fields_model(
+        Err(error) => (error == NameError::Malformed
+            || (error == NameError::Configuration
+                && !time_separator_valid_model(separator)))
+            && long_incremental_volume_fields_model(
             start_field@,
             separator,
             marker@,
@@ -4521,7 +4539,7 @@ fn short_incremental_manifest_body_fields(
     second: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => short_incremental_manifest_fields_model(
+        Err(error) => error == NameError::Malformed && short_incremental_manifest_fields_model(
             start_field@,
             end_field@,
             trailer@,
@@ -4606,7 +4624,7 @@ fn short_incremental_volume_body_fields(
     second: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(_) => short_incremental_volume_fields_model(
+        Err(error) => error == NameError::Malformed && short_incremental_volume_fields_model(
             start_field@,
             end_field@,
             volume_field@,
@@ -4736,8 +4754,22 @@ closed spec fn body_success_result_model(
         }
 }
 
+//= docs/parsing-requirements.md#parse-name-010
+//= type=implementation
+//# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+closed spec fn body_error_result_model(separator: u8, error: NameError) -> bool {
+    match error {
+        NameError::Malformed => true,
+        NameError::Configuration => !time_separator_valid_model(separator),
+        NameError::Limit | NameError::Ambiguous => false,
+    }
+}
+
 #[verifier::spinoff_prover]
-#[verifier::rlimit(20)]
+#[verifier::rlimit(40)]
+//= docs/parsing-requirements.md#parse-name-010
+//= type=implementation
+//# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
 fn body(
     input: &[u8],
     kind: ObjectKind,
@@ -4746,7 +4778,7 @@ fn body(
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
         Ok(name) => body_success_result_model(input@, kind, short, separator, name),
-        Err(_) => true,
+        Err(error) => body_error_result_model(separator, error),
     },
 {
     proof {
@@ -6514,6 +6546,94 @@ mod tests {
                         "unexpected successful route {index} for {kind:?}"
                     );
                 }
+            }
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-010
+    //= type=test
+    //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+    fn body_error_matrix_classifies_all_kind_profile_routes() {
+        let malformed = [
+            (
+                super::ObjectKind::FullVolume,
+                false,
+                &b"bad.vol1.difftar"[..],
+            ),
+            (super::ObjectKind::FullVolume, true, &b"!.1.dt"[..]),
+            (
+                super::ObjectKind::IncrementalVolume,
+                false,
+                &b"bad.to.20231115T221320Z.vol1.difftar"[..],
+            ),
+            (super::ObjectKind::IncrementalVolume, true, &b"!.2.1.dt"[..]),
+            (super::ObjectKind::FullManifest, false, &b"bad.manifest"[..]),
+            (super::ObjectKind::FullManifest, true, &b"!.m"[..]),
+            (
+                super::ObjectKind::IncrementalManifest,
+                false,
+                &b"bad.to.20231115T221320Z.manifest"[..],
+            ),
+            (super::ObjectKind::IncrementalManifest, true, &b"!.2.m"[..]),
+            (super::ObjectKind::FullSignatures, false, &b"bad.sigtar"[..]),
+            (super::ObjectKind::FullSignatures, true, &b"!.st"[..]),
+            (
+                super::ObjectKind::IncrementalSignatures,
+                false,
+                &b"bad.to.20231115T221320Z.sigtar"[..],
+            ),
+            (
+                super::ObjectKind::IncrementalSignatures,
+                true,
+                &b"!.2.st"[..],
+            ),
+        ];
+        for (kind, short, input) in malformed {
+            assert_eq!(
+                super::body(input, kind, short, b':'),
+                Err(super::NameError::Malformed),
+                "{kind:?}, short={short}"
+            );
+        }
+
+        for (kind, input) in [
+            (
+                super::ObjectKind::FullVolume,
+                &b"20231114T221320Z.vol1.difftar"[..],
+            ),
+            (
+                super::ObjectKind::IncrementalVolume,
+                &b"20231114T221320Z.to.20231115T221320Z.vol1.difftar"[..],
+            ),
+            (
+                super::ObjectKind::FullManifest,
+                &b"20231114T221320Z.manifest"[..],
+            ),
+            (
+                super::ObjectKind::IncrementalManifest,
+                &b"20231114T221320Z.to.20231115T221320Z.manifest"[..],
+            ),
+            (
+                super::ObjectKind::FullSignatures,
+                &b"20231114T221320Z.sigtar"[..],
+            ),
+            (
+                super::ObjectKind::IncrementalSignatures,
+                &b"20231114T221320Z.to.20231115T221320Z.sigtar"[..],
+            ),
+        ] {
+            assert!(super::body(input, kind, false, b':').is_ok());
+            let result = super::body(input, kind, false, b'.');
+            assert!(
+                matches!(
+                    result,
+                    Err(super::NameError::Configuration | super::NameError::Malformed)
+                ),
+                "unexpected error variant for {kind:?}: {result:?}"
+            );
+            if kind == super::ObjectKind::FullVolume {
+                assert_eq!(result, Err(super::NameError::Configuration));
             }
         }
     }

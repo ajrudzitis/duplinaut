@@ -2696,6 +2696,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-body-error-refinement"
+gate = true
+requirements = ["PARSE-NAME-010"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Route-specific helper contracts restrict short-route failures to Malformed
+# and long-route Configuration to invalid separators. The body controller
+# therefore returns only Malformed under valid separators. This proves the
+# error variant domain, not a raw grammar iff characterization.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "body_error_result_model" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-body-error-refinement", requirement = "PARSE-NAME-010", path = "crates/core/src/names.rs", symbol = "body", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::body_error_matrix_classifies_all_kind_profile_routes" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

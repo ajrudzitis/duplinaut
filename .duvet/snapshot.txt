@@ -49,6 +49,10 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: Configured global, archive, manifest, and signature prefixes MAY be empty and otherwise contain arbitrary bytes, but MUST NOT contain NUL or `/`.
     TEXT[!MUST,implementation,test]: Invalid configuration MUST return the configuration error before basename limit or malformed-name errors; valid configuration MUST proceed to the checks in PARSE-NAME-008.
 
+  SECTION: [PARSE-NAME-010](#parse-name-010)
+    TEXT[!MUST,implementation,test]: The body parser MUST return `Malformed` for body parse failures.
+    TEXT[!MUST,implementation,test]: It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+
   SECTION: [PARSE-NAME-005](#parse-name-005)
     TEXT[!MUST,implementation,test]: Objects marked partial MUST be excluded from completed restore sets.
 

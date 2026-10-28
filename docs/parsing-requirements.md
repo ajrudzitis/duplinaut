@@ -173,6 +173,12 @@ Before checking basename size or bytes, the reader MUST validate the parser conf
 
 Provenance: PARSE-NAME-007 defines the time-separator set. Rejecting NUL and `/` in configured prefixes, and configuration-error precedence over input errors, are POLICY choices.
 
+### PARSE-NAME-010
+
+The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+
+Provenance: POLICY. The body parser receives an already-stem-selected candidate and does not enforce basename limits or resolve conflicts among candidates. Long timestamp helpers may inspect the configured separator; all body syntax and field failures use the malformed-name error.
+
 ### PARSE-NAME-005
 
 Objects marked partial MUST be excluded from completed restore sets.
