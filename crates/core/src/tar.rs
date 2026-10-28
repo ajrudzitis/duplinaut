@@ -367,8 +367,18 @@ impl<'a> TarVolume<'a> {
             if let Some(value) = values[5] {
                 gid = decimal(value)?;
             }
-            let atime = values[8].map(time).transpose()?;
-            let ctime = values[9].map(time).transpose()?;
+            let atime = crate::verified::tar_pax::effective_optional_time(values[8])
+                .map_err(|_| TarError::Numeric)?
+                .map(|(seconds, nanoseconds)| TarTime {
+                    seconds,
+                    nanoseconds,
+                });
+            let ctime = crate::verified::tar_pax::effective_optional_time(values[9])
+                .map_err(|_| TarError::Numeric)?
+                .map(|(seconds, nanoseconds)| TarTime {
+                    seconds,
+                    nanoseconds,
+                });
             entries.push(TarEntry {
                 name,
                 linkname: link.to_vec(),

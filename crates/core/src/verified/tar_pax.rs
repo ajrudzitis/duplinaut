@@ -206,6 +206,32 @@ pub fn effective_mtime(value: Option<&[u8]>, header_seconds: i64)
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+/// Decode an optional PAX time field without inventing a value when absent.
+pub fn effective_optional_time(value: Option<&[u8]>)
+    -> (result: Result<Option<(i64, u32)>, PaxTimeError>)
+    ensures match value {
+        None => result == Ok(None),
+        Some(bytes) => match result {
+            Ok(Some((seconds, nanos))) =>
+                time_model(bytes@) == Some((seconds as int, nanos as int))
+                    && nanos < 1000000000,
+            Ok(None) => false,
+            Err(error) => error == PaxTimeError::Invalid && time_model(bytes@) is None,
+        },
+    },
+{
+    match value {
+        None => Ok(None),
+        Some(bytes) => match time(bytes) {
+            Some(value) => Ok(Some(value)),
+            None => Err(PaxTimeError::Invalid),
+        },
+    }
+}
+
 pub fn key_index(input: &[u8]) -> (result: Option<usize>)
     ensures result == key_model(input@), result is Some ==> result.unwrap() < 11,
 {
@@ -226,7 +252,9 @@ pub fn key_index(input: &[u8]) -> (result: Option<usize>)
 
 #[cfg(test)]
 mod tests {
-    use super::{effective_mtime, effective_size, PaxSizeError, PaxTimeError};
+    use super::{
+        effective_mtime, effective_optional_time, effective_size, PaxSizeError, PaxTimeError,
+    };
 
     #[test]
     fn effective_pax_size_selects_override_fallback_and_invalid_values() {
@@ -259,6 +287,25 @@ mod tests {
             b"-9223372036854775808.000000001",
         ] {
             assert_eq!(effective_mtime(Some(value), 7), Err(PaxTimeError::Invalid));
+        }
+    }
+
+    #[test]
+    fn optional_pax_times_preserve_absence_and_use_verified_time_values() {
+        assert_eq!(effective_optional_time(None), Ok(None));
+        assert_eq!(
+            effective_optional_time(Some(b"-0.000000001")),
+            Ok(Some((-1, 999_999_999)))
+        );
+        assert_eq!(
+            effective_optional_time(Some(b"+0.100000000000")),
+            Ok(Some((0, 100_000_000)))
+        );
+        for value in [b"1.1234567891" as &[u8], b"1.", b"18446744073709551616"] {
+            assert_eq!(
+                effective_optional_time(Some(value)),
+                Err(PaxTimeError::Invalid)
+            );
         }
     }
 }

@@ -453,6 +453,88 @@ fn pax_mtime_global_local_and_empty_local_deletion_resolve_exactly() {
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
 #[test]
+fn pax_atime_ctime_global_local_and_empty_local_deletion_resolve_exactly() {
+    let bytes = [
+        member(
+            b"global",
+            b'g',
+            &[record(b"atime", b"1.125"), record(b"ctime", b"-2.5")].concat(),
+        ),
+        member(b"snapshot/global", b'0', b""),
+        member(
+            b"local",
+            b'x',
+            &[record(b"atime", b"+0.000000001"), record(b"ctime", b"4.5")].concat(),
+        ),
+        member(b"snapshot/local", b'0', b""),
+        member(
+            b"local",
+            b'x',
+            &[record(b"atime", b""), record(b"ctime", b"")].concat(),
+        ),
+        member(b"snapshot/deleted", b'0', b""),
+        member(b"snapshot/global-again", b'0', b""),
+    ]
+    .concat();
+    let parsed = parse(&bytes).unwrap();
+    assert_eq!(
+        parsed.entries[0].atime,
+        Some(TarTime {
+            seconds: 1,
+            nanoseconds: 125_000_000
+        })
+    );
+    assert_eq!(
+        parsed.entries[0].ctime,
+        Some(TarTime {
+            seconds: -3,
+            nanoseconds: 500_000_000
+        })
+    );
+    assert_eq!(
+        parsed.entries[1].atime,
+        Some(TarTime {
+            seconds: 0,
+            nanoseconds: 1
+        })
+    );
+    assert_eq!(
+        parsed.entries[1].ctime,
+        Some(TarTime {
+            seconds: 4,
+            nanoseconds: 500_000_000
+        })
+    );
+    assert_eq!(parsed.entries[2].atime, None);
+    assert_eq!(parsed.entries[2].ctime, None);
+    assert_eq!(parsed.entries[3].atime, parsed.entries[0].atime);
+    assert_eq!(parsed.entries[3].ctime, parsed.entries[0].ctime);
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+#[test]
+fn invalid_pax_atime_and_ctime_values_are_numeric_errors() {
+    for (key, value) in [
+        (b"atime" as &[u8], b"1.1234567891" as &[u8]),
+        (b"ctime", b"-9223372036854775808.000000001"),
+    ] {
+        let bytes = [
+            member(b"pax", b'x', &record(key, value)),
+            member(b"snapshot/file", b'0', b""),
+        ]
+        .concat();
+        assert_eq!(parse(&bytes).unwrap_err(), TarError::Numeric);
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+
+#[test]
 fn official_duplicity_307_pax_path_override_is_applied() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures/duplicity-3.0.7/plain/duplicity-full.20231114T221320Z.vol1.difftar.gz");
@@ -465,6 +547,13 @@ fn official_duplicity_307_pax_path_override_is_applied() {
         .entries
         .iter()
         .any(|entry| entry.name == b"multivol_snapshot/large.bin/1"));
+    let overridden = parsed
+        .entries
+        .iter()
+        .find(|entry| entry.name == b"multivol_snapshot/large.bin/1")
+        .unwrap();
+    assert_eq!(overridden.atime, None);
+    assert_eq!(overridden.ctime, None);
 }
 
 //= docs/parsing-requirements.md#parse-tar-003
