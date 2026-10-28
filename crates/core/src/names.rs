@@ -4398,6 +4398,26 @@ fn long_incremental_signatures_body_fields(
                     && !name.short,
             None => false,
         },
+    } && match long_incremental_signatures_fields_model(
+        start_field@,
+        separator,
+        marker@,
+        end_field@,
+        trailer@,
+        optional_short_token(first),
+        optional_short_token(second),
+        optional_short_token(third),
+    ) {
+        Some((start, end, envelope, partial)) => result == Ok(ObjectName {
+            kind: ObjectKind::IncrementalSignatures,
+            start: Timestamp(start as i128),
+            end: Timestamp(end as i128),
+            volume: None,
+            envelope,
+            partial,
+            short: false,
+        }),
+        None => true,
     },
 {
     let (start, end) = decode_long_interval(
@@ -7734,6 +7754,71 @@ mod tests {
                         b"to",
                         end_field,
                         b"manifest",
+                        first,
+                        second,
+                        None,
+                    ),
+                    Ok(expected),
+                    "{start_field:?} to {end_field:?} {first:?} {second:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    //= docs/parsing-requirements.md#parse-name-006
+    //= type=test
+    //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    fn long_incremental_signatures_fields_refine_interval_and_suffix_profiles() {
+        let intervals: [(&[u8], &[u8], u8); 3] = [
+            (b"19700101T000000Z", b"19700101T000001Z", b':'),
+            (b"1970-01-01T00:00:00Z", b"1970-01-01T00:00:01Z", b':'),
+            (
+                b"1970-01-01T01_00_00+01_00",
+                b"1970-01-01T01_00_01+01_00",
+                b'_',
+            ),
+        ];
+        type SignatureSuffixProfile<'a> =
+            (Option<&'a [u8]>, Option<&'a [u8]>, super::Envelope, bool);
+        let profiles: [SignatureSuffixProfile<'_>; 8] = [
+            (None, None, super::Envelope::Plain, false),
+            (Some(b"part"), None, super::Envelope::Plain, true),
+            (Some(b"gz"), None, super::Envelope::Gzip, false),
+            (Some(b"gpg"), None, super::Envelope::OpenPgp, false),
+            (Some(b"p7m"), None, super::Envelope::Pkcs7, false),
+            (Some(b"part"), Some(b"gz"), super::Envelope::Gzip, true),
+            (Some(b"part"), Some(b"gpg"), super::Envelope::OpenPgp, true),
+            (Some(b"part"), Some(b"p7m"), super::Envelope::Pkcs7, true),
+        ];
+
+        for (start_field, end_field, separator) in intervals {
+            for (first, second, envelope, partial) in profiles {
+                let expected = super::ObjectName {
+                    kind: super::ObjectKind::IncrementalSignatures,
+                    start: super::Timestamp(0),
+                    end: super::Timestamp(1),
+                    volume: None,
+                    envelope,
+                    partial,
+                    short: false,
+                };
+                assert_eq!(
+                    super::long_incremental_signatures_body_fields(
+                        start_field,
+                        separator,
+                        b"to",
+                        end_field,
+                        b"sigtar",
                         first,
                         second,
                         None,
