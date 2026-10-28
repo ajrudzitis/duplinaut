@@ -8900,6 +8900,59 @@ mod tests {
     }
 
     #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-003
+    //= type=test
+    //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    //= docs/parsing-requirements.md#parse-name-006
+    //= type=test
+    //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+    fn short_incremental_signatures_fields_refine_interval_and_suffix_profiles() {
+        let intervals: [(&[u8], &[u8], i128, i128); 3] = [
+            (b"1", b"2", 1, 2),
+            (b"z", b"10", 35, 36),
+            (b"10", b"11", 36, 37),
+        ];
+        type SignatureSuffixProfile<'a> =
+            (Option<&'a [u8]>, Option<&'a [u8]>, super::Envelope, bool);
+        let profiles: [SignatureSuffixProfile<'_>; 6] = [
+            (None, None, super::Envelope::Plain, false),
+            (Some(b"p"), None, super::Envelope::Plain, true),
+            (Some(b"z"), None, super::Envelope::Gzip, false),
+            (Some(b"g"), None, super::Envelope::OpenPgp, false),
+            (Some(b"p"), Some(b"z"), super::Envelope::Gzip, true),
+            (Some(b"p"), Some(b"g"), super::Envelope::OpenPgp, true),
+        ];
+
+        for (start_field, end_field, start, end) in intervals {
+            for (first, second, envelope, partial) in profiles {
+                let expected = super::ObjectName {
+                    kind: super::ObjectKind::IncrementalSignatures,
+                    start: super::Timestamp(start),
+                    end: super::Timestamp(end),
+                    volume: None,
+                    envelope,
+                    partial,
+                    short: true,
+                };
+                assert_eq!(
+                    super::short_incremental_signatures_body_fields(
+                        start_field,
+                        end_field,
+                        b"st",
+                        first,
+                        second,
+                    ),
+                    Ok(expected),
+                    "{start_field:?}.{end_field:?}.st.{first:?}.{second:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
     //= docs/parsing-requirements.md#parse-name-010
     //= type=test
     //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
