@@ -4770,6 +4770,128 @@ closed spec fn body_error_result_model(separator: u8, error: NameError) -> bool 
 //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
 #[verifier::spinoff_prover]
 #[verifier::rlimit(40)]
+fn short_incremental_volume_body(
+    input: &[u8],
+    separator: u8,
+) -> (result: Result<ObjectName, NameError>)
+    ensures match result {
+        Err(error) => error == NameError::Malformed,
+        Ok(name) => name.kind == ObjectKind::IncrementalVolume
+            && name.short
+            && (match name.volume {
+                Some(volume) => short_incremental_volume_raw_body_model(
+                    input@,
+                    name.start.0 as int,
+                    name.end.0 as int,
+                    volume as int,
+                    name.envelope,
+                    name.partial,
+                ),
+                None => false,
+            }),
+    },
+{
+    let _ = separator; // Short incremental-volume bodies do not consume the time separator.
+    let mut fields = Some(input);
+    let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+    let _after_start = fields;
+    let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+    let _after_end = fields;
+    let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+    let _after_volume = fields;
+    let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+    let _after_trailer = fields;
+    let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+    if third.is_some() || extra.is_some() || fields.is_some() {
+        return Err(NameError::Malformed);
+    }
+    let result = short_incremental_volume_body_fields(
+        start_field,
+        end_field,
+        volume_field,
+        trailer,
+        first,
+        second,
+    );
+    proof {
+        if let Ok(name) = result {
+            if let Some(volume) = name.volume {
+                short_incremental_volume_raw_body_from_fields(
+                    input@,
+                    start_field@,
+                    optional_body_field_model(_after_start),
+                    end_field@,
+                    optional_body_field_model(_after_end),
+                    volume_field@,
+                    optional_body_field_model(_after_volume),
+                    trailer@,
+                    optional_body_field_model(_after_trailer),
+                    optional_body_field_model(first),
+                    optional_body_field_model(second),
+                    optional_body_field_model(third),
+                    optional_body_field_model(extra),
+                    optional_body_field_model(fields),
+                    volume,
+                    name,
+                );
+            }
+        }
+    }
+    result
+}
+
+proof fn short_incremental_volume_raw_body_from_fields(
+    input: Seq<u8>,
+    start_field: Seq<u8>,
+    after_start: Option<Seq<u8>>,
+    end_field: Seq<u8>,
+    after_end: Option<Seq<u8>>,
+    volume_field: Seq<u8>,
+    after_volume: Option<Seq<u8>>,
+    trailer: Seq<u8>,
+    after_trailer: Option<Seq<u8>>,
+    first: Option<Seq<u8>>,
+    second: Option<Seq<u8>>,
+    third: Option<Seq<u8>>,
+    extra: Option<Seq<u8>>,
+    fields: Option<Seq<u8>>,
+    volume: u64,
+    name: ObjectName,
+)
+    requires
+        body_field_split_model(Some(input), Some(start_field), after_start),
+        body_field_split_model(after_start, Some(end_field), after_end),
+        body_field_split_model(after_end, Some(volume_field), after_volume),
+        body_field_split_model(after_volume, Some(trailer), after_trailer),
+        body_suffix_fields_model(after_trailer, first, second, third, extra, fields),
+        third.is_none(),
+        extra.is_none(),
+        fields.is_none(),
+        name.volume == Some(volume),
+        short_incremental_volume_fields_model(
+            start_field, end_field, volume_field, trailer, first, second,
+        ) == Some((
+            name.start.0 as int,
+            name.end.0 as int,
+            volume as int,
+            name.envelope,
+            name.partial,
+        )),
+    ensures short_incremental_volume_raw_body_model(
+        input,
+        name.start.0 as int,
+        name.end.0 as int,
+        volume as int,
+        name.envelope,
+        name.partial,
+    )
+{
+    reveal(short_incremental_volume_raw_body_model);
+    reveal(short_incremental_volume_fields_model);
+}
+
+#[verifier::spinoff_prover]
+#[verifier::rlimit(40)]
 fn short_incremental_signatures_body(
     input: &[u8],
     separator: u8,
@@ -5527,56 +5649,14 @@ fn body(
             result
         }
         crate::name_dispatch::BodyRoute::ShortIncrementalVolume => {
-            let mut fields = Some(input);
-            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_start = fields;
-            let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_end = fields;
-            let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_volume = fields;
-            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_trailer = fields;
-            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-            if third.is_some() || extra.is_some() || fields.is_some() {
-                return Err(NameError::Malformed);
-            }
-            let result = short_incremental_volume_body_fields(
-                start_field,
-                end_field,
-                volume_field,
-                trailer,
-                first,
-                second,
-            );
+            let result = short_incremental_volume_body(input, separator);
             proof {
                 if let Ok(name) = result {
-                    reveal(short_incremental_volume_raw_body_model);
-                    reveal(short_incremental_volume_fields_model);
-                    reveal(body_suffix_fields_model);
-                    reveal(body_field_split_model);
-                    assert(body_field_split_model(
-                        Some(input@), Some(start_field@),
-                        optional_body_field_model(_after_start),
-                    ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_start), Some(end_field@),
-                        optional_body_field_model(_after_end),
-                    ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_end), Some(volume_field@),
-                        optional_body_field_model(_after_volume),
-                    ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_volume), Some(trailer@),
-                        optional_body_field_model(_after_trailer),
-                    ));
-                    assert(body_suffix_fields_model(
-                        optional_body_field_model(_after_trailer),
-                        optional_body_field_model(first),
-                        optional_body_field_model(second),
-                        optional_body_field_model(third),
-                        optional_body_field_model(extra),
-                        optional_body_field_model(fields),
+                    reveal(body_success_result_model);
+                    assert(kind == ObjectKind::IncrementalVolume);
+                    assert(short);
+                    assert(body_success_result_model(
+                        input@, kind, short, separator, name,
                     ));
                 }
             }
@@ -7582,6 +7662,41 @@ mod tests {
                     true,
                     separator,
                 ),
+                Err(super::NameError::Malformed),
+                "{input:?} with separator {separator:?}"
+            );
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-010
+    //= type=test
+    //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+    fn short_incremental_volume_body_error_and_success_edge_matrix() {
+        let valid: [(&[u8], u8); 2] = [
+            (b"1.2.1.dt", b':'),
+            // The short IncrementalVolume grammar does not consume the time separator.
+            (b"1.2.1.dt", b'\0'),
+        ];
+        for (input, separator) in valid {
+            let result = super::body(input, super::ObjectKind::IncrementalVolume, true, separator);
+            assert!(result.is_ok(), "{input:?} with separator {separator:?}");
+        }
+
+        let malformed: [(&[u8], u8); 8] = [
+            (b"", b':'),
+            (b"!.2.1.dt", b':'),
+            (b"1.!.1.dt", b':'),
+            (b"1.2.0.dt", b':'),
+            (b"2.1.1.dt", b':'),
+            (b"1.2.1.bad", b':'),
+            (b"1.2.1.dt.extra", b':'),
+            // Invalid separator configuration does not affect the short route.
+            (b"1.2.1.bad", b'\0'),
+        ];
+        for (input, separator) in malformed {
+            assert_eq!(
+                super::body(input, super::ObjectKind::IncrementalVolume, true, separator,),
                 Err(super::NameError::Malformed),
                 "{input:?} with separator {separator:?}"
             );
