@@ -159,4 +159,52 @@ pub fn unsigned(input: &[u8]) -> (result: Option<u64>)
         None => None,
     }
 }
+
+//= docs/parsing-requirements.md#parse-tar-011
+//# Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
+pub fn narrow_mode(value: u64) -> (result: Option<u32>)
+    ensures match result {
+        Some(mode) => mode as u64 == value && value <= u32::MAX as u64,
+        None => value > u32::MAX as u64,
+    },
+{
+    if value > u32::MAX as u64 { None } else { Some(value as u32) }
+}
+
+//= docs/parsing-requirements.md#parse-tar-011
+//# Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
+pub fn narrow_mtime(value: i128) -> (result: Option<i64>)
+    ensures match result {
+        Some(mtime) => mtime as i128 == value
+            && i64::MIN as i128 <= value <= i64::MAX as i128,
+        None => value < i64::MIN as i128 || value > i64::MAX as i128,
+    },
+{
+    if value < i64::MIN as i128 || value > i64::MAX as i128 {
+        None
+    } else {
+        Some(value as i64)
+    }
+}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{narrow_mode, narrow_mtime};
+
+    #[test]
+    fn mode_narrowing_accepts_exact_u32_bounds_and_rejects_overflow() {
+        assert_eq!(narrow_mode(0), Some(0));
+        assert_eq!(narrow_mode(u32::MAX as u64), Some(u32::MAX));
+        assert_eq!(narrow_mode(u32::MAX as u64 + 1), None);
+        assert_eq!(narrow_mode(u64::MAX), None);
+    }
+
+    #[test]
+    fn mtime_narrowing_accepts_exact_i64_bounds_and_rejects_overflow() {
+        assert_eq!(narrow_mtime(i64::MIN as i128), Some(i64::MIN));
+        assert_eq!(narrow_mtime(i64::MAX as i128), Some(i64::MAX));
+        assert_eq!(narrow_mtime(i64::MIN as i128 - 1), None);
+        assert_eq!(narrow_mtime(i64::MAX as i128 + 1), None);
+    }
 }

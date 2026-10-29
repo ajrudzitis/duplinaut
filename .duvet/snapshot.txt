@@ -203,6 +203,9 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
   SECTION: [PARSE-TAR-010](#parse-tar-010)
     TEXT[!MUST,implementation,test]: Raw tar text fields MUST end at the first NUL byte, or use the entire field when no NUL is present.
 
+  SECTION: [PARSE-TAR-011](#parse-tar-011)
+    TEXT[!MUST,implementation,test]: Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

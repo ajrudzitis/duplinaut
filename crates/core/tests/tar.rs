@@ -1504,6 +1504,9 @@ fn encrypted_record_footer_handles_one_block_and_full_record() {
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+//= docs/parsing-requirements.md#parse-tar-011
+//= type=test
+//# Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
 #[test]
 fn numeric_conversion_boundaries_and_interior_padding() {
     fn binary(field: &mut [u8], value: i128) {

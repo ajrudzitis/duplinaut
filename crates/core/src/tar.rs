@@ -207,12 +207,17 @@ impl<'a> TarVolume<'a> {
             if !posix && h.magic_version != *b"ustar  \0" && h.magic_version != [0; 8] {
                 return Err(TarError::UnsupportedHeader);
             }
-            let mode = u32::try_from(unsigned(h.mode)?).map_err(|_| TarError::Numeric)?;
+            //= docs/parsing-requirements.md#parse-tar-011
+            //# Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
+            let mode = crate::verified::tar_number::narrow_mode(unsigned(h.mode)?)
+                .ok_or(TarError::Numeric)?;
             let header_uid = unsigned(h.uid)?;
             let header_gid = unsigned(h.gid)?;
             let raw_size = unsigned(h.size)?;
-            let header_mtime_seconds =
-                i64::try_from(number(h.mtime)?).map_err(|_| TarError::Numeric)?;
+            //= docs/parsing-requirements.md#parse-tar-011
+            //# Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
+            let header_mtime_seconds = crate::verified::tar_number::narrow_mtime(number(h.mtime)?)
+                .ok_or(TarError::Numeric)?;
             let device_major = unsigned(h.device_major)?;
             let device_minor = unsigned(h.device_minor)?;
             let extension = matches!(h.entry_type, b'L' | b'K' | b'x' | b'g');

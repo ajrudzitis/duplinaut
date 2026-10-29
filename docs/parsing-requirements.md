@@ -481,6 +481,12 @@ Raw tar text fields MUST end at the first NUL byte, or use the entire field when
 
 Provenance: DOC-TAR and the reviewed ustar header layout. This is byte truncation only; UTF-8 and path validation are specified separately.
 
+### PARSE-TAR-011
+
+Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
+
+Provenance: SRC-TAR and the public tar header field widths. This narrows the already-decoded numeric values; octal/base-256 field decoding is specified separately.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

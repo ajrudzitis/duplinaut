@@ -3559,6 +3559,34 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-header-narrowing"
+gate = true
+requirements = ["PARSE-TAR-011"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves only the final mode and mtime integer narrowing helpers and wires
+# them into native header parsing. Numeric field decoding and whole-header
+# parser refinement remain outside this milestone.
+implementations = [
+  { path = "crates/core/src/verified/tar_number.rs", symbol = "narrow_mode" },
+  { path = "crates/core/src/verified/tar_number.rs", symbol = "narrow_mtime" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-header-mode-narrowing", requirement = "PARSE-TAR-011", path = "crates/core/src/verified/tar_number.rs", symbol = "narrow_mode", kind = "contract" },
+  { id = "tar-header-mtime-narrowing", requirement = "PARSE-TAR-011", path = "crates/core/src/verified/tar_number.rs", symbol = "narrow_mtime", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_number::tests::mode_narrowing_accepts_exact_u32_bounds_and_rejects_overflow" },
+  { package = "duplicity-core", name = "verified::tar_number::tests::mtime_narrowing_accepts_exact_i64_bounds_and_rejects_overflow" },
+  { package = "duplicity-core", name = "numeric_conversion_boundaries_and_interior_padding" }
+]
+
+[[milestone]]
 id = "tar-pax-effective-size"
 gate = true
 requirements = ["PARSE-TAR-003"]
