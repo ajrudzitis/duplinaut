@@ -2289,7 +2289,11 @@ reviewed = true
 proof_required = true
 # Successful long FullVolume body parsing composes exact raw dot/suffix
 # extraction with canonical/legacy timestamps, positive decimal volume, and
-# volume trailer semantics. Errors and other routes remain outside this scope.
+# volume trailer semantics. A direct 24-case raw-body result matrix exercises
+# canonical, legacy UTC, and legacy explicit-zone spellings with volume 42 and
+# all eight supported suffix profiles. This is regression evidence, not a
+# proof of raw-model-to-parser success because split-model projection remains
+# open; malformed raw-body error completeness and other routes remain outside.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "body" },
   { path = "crates/core/src/names.rs", symbol = "long_full_volume_body_fields" }
@@ -2298,7 +2302,8 @@ proofs = [
   { id = "name-long-full-volume-raw-body-controller", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "body", kind = "contract" }
 ]
 tests = [
-  { package = "duplicity-core", name = "long_full_volume_body_composes_fields_and_rejects_malformed_fields" }
+  { package = "duplicity-core", name = "long_full_volume_body_composes_fields_and_rejects_malformed_fields" },
+  { package = "duplicity-core", name = "names::tests::long_full_volume_body_raw_result_matrix" }
 ]
 
 [[milestone]]
