@@ -3580,7 +3580,7 @@ proofs = [
   { id = "name-short-incremental-manifest-field-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_incremental_manifest_body_fields", kind = "contract" }
 ]
 tests = [
-  { package = "duplicity-core", name = "names::tests::short_incremental_manifest_body_error_and_success_edge_matrix" }
+  { package = "duplicity-core", name = "names::tests::short_incremental_manifest_fields_refine_interval_and_suffix_profiles" }
 ]
 
 [[milestone]]
