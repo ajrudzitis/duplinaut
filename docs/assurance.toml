@@ -1850,9 +1850,12 @@ proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Successful Short IncrementalSignatures body parsing composes exact raw
-# dot/suffix extraction with an increasing short interval and signature
-# trailer model. Errors and other parser routes remain outside this checkpoint.
+# Successful Short IncrementalSignatures body parsing implies exact raw
+# dot/suffix extraction, an increasing short interval, and the signature
+# trailer/suffix model. The direct 18-case raw-body result matrix exercises
+# this parser behavior but does not prove raw-model-to-parser success because
+# split-model projection remains open. Error completeness and other parser
+# routes remain outside this checkpoint.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "body" },
   { path = "crates/core/src/names.rs", symbol = "short_incremental_signatures_body_fields" }
@@ -1861,7 +1864,8 @@ proofs = [
   { id = "name-short-incremental-signatures-raw-body-controller", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "body", kind = "contract" }
 ]
 tests = [
-  { package = "duplicity-core", name = "short_incremental_signatures_body_composes_fields_and_rejects_malformed_fields" }
+  { package = "duplicity-core", name = "short_incremental_signatures_body_composes_fields_and_rejects_malformed_fields" },
+  { package = "duplicity-core", name = "names::tests::short_incremental_signatures_body_raw_result_matrix" }
 ]
 
 [[milestone]]
