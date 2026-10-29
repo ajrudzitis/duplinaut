@@ -1263,9 +1263,9 @@ fn global_pax_size_does_not_change_extension_payload_extent() {
     assert_eq!(parsed.entries[0].payload, b"a");
 }
 
-//= docs/parsing-requirements.md#parse-tar-003
+//= docs/parsing-requirements.md#parse-tar-029
 //= type=test
-//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+//# For each real tar entry, the reader MUST use the effective PAX `mtime` value when present; otherwise it MUST use the decoded raw header mtime seconds with zero nanoseconds. A present but invalid PAX `mtime` MUST produce Numeric and MUST NOT fall back to the raw header timestamp.
 
 #[test]
 fn pax_mtime_global_local_and_empty_local_deletion_resolve_exactly() {
@@ -1300,6 +1300,26 @@ fn pax_mtime_global_local_and_empty_local_deletion_resolve_exactly() {
             nanoseconds: 0
         }
     );
+}
+
+//= docs/parsing-requirements.md#parse-tar-029
+//= type=test
+//# For each real tar entry, the reader MUST use the effective PAX `mtime` value when present; otherwise it MUST use the decoded raw header mtime seconds with zero nanoseconds. A present but invalid PAX `mtime` MUST produce Numeric and MUST NOT fall back to the raw header timestamp.
+#[test]
+fn invalid_pax_mtime_does_not_fall_back_to_valid_raw_header_time() {
+    let mut raw = member(b"snapshot/raw", b'0', b"");
+    raw[136..148].fill(0xff); // GNU signed base-256 mtime -1.
+    checksum(&mut raw[..512]);
+    assert_eq!(
+        parse(&raw).unwrap().entries[0].mtime,
+        TarTime {
+            seconds: -1,
+            nanoseconds: 0
+        }
+    );
+
+    let bytes = [member(b"pax", b'x', &record(b"mtime", b"not-a-time")), raw].concat();
+    assert_eq!(parse(&bytes).unwrap_err(), TarError::Numeric);
 }
 
 //= docs/parsing-requirements.md#parse-tar-003

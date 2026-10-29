@@ -589,6 +589,12 @@ Before comparing a tar header checksum or interpreting magic/version and other n
 
 Provenance: DOC-TAR and SRC-TAR establish the checksum field's numeric encoding; POLICY assigns reader-visible error classification and precedence. This requirement covers checksum-field decoding only; checksum summation and mismatch precedence remain specified by PARSE-TAR-024.
 
+### PARSE-TAR-029
+
+For each real tar entry, the reader MUST use the effective PAX `mtime` value when present; otherwise it MUST use the decoded raw header mtime seconds with zero nanoseconds. A present but invalid PAX `mtime` MUST produce Numeric and MUST NOT fall back to the raw header timestamp.
+
+Provenance: DOC-TAR and SRC-TAR establish PAX mtime override semantics; the reviewed profile defines signed fractional-second decoding. Raw header mtime decoding and `i64` narrowing remain specified by PARSE-TAR-011, PAX value grammar remains separate, and this requirement does not refine extension-state selection or the complete tar controller.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

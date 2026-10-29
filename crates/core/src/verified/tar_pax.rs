@@ -787,6 +787,8 @@ pub enum PaxTimeError {
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
 /// Use the resolved PAX mtime when present; otherwise keep the header seconds.
+//= docs/parsing-requirements.md#parse-tar-029
+//# For each real tar entry, the reader MUST use the effective PAX `mtime` value when present; otherwise it MUST use the decoded raw header mtime seconds with zero nanoseconds. A present but invalid PAX `mtime` MUST produce Numeric and MUST NOT fall back to the raw header timestamp.
 pub fn effective_mtime(value: Option<&[u8]>, header_seconds: i64)
     -> (result: Result<(i64, u32), PaxTimeError>)
     ensures match value {
@@ -1653,6 +1655,9 @@ mod tests {
         );
     }
 
+    //= docs/parsing-requirements.md#parse-tar-029
+    //= type=test
+    //# For each real tar entry, the reader MUST use the effective PAX `mtime` value when present; otherwise it MUST use the decoded raw header mtime seconds with zero nanoseconds. A present but invalid PAX `mtime` MUST produce Numeric and MUST NOT fall back to the raw header timestamp.
     #[test]
     fn effective_pax_mtime_selects_header_fallback_and_verified_time_values() {
         assert_eq!(effective_mtime(None, -7), Ok((-7, 0)));

@@ -271,6 +271,10 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: If the checksum field is malformed, negative, or outside that range, the parser MUST return Numeric.
     TEXT[!MUST,implementation,test]: A successfully decoded checksum that does not match the header MUST continue to return Checksum as specified by PARSE-TAR-024.
 
+  SECTION: [PARSE-TAR-029](#parse-tar-029)
+    TEXT[!MUST,implementation,test]: For each real tar entry, the reader MUST use the effective PAX `mtime` value when present; otherwise it MUST use the decoded raw header mtime seconds with zero nanoseconds.
+    TEXT[!MUST,implementation,test]: A present but invalid PAX `mtime` MUST produce Numeric and MUST NOT fall back to the raw header timestamp.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

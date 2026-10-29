@@ -4527,6 +4527,31 @@ tests = [
   { package = "duplicity-core", name = "invalid_checksum_field_precedes_checksum_comparison_and_header_interpretation" }
 ]
 
+[[milestone]]
+id = "tar-entry-mtime-selection"
+gate = true
+requirements = ["PARSE-TAR-029"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves per-real-entry PAX mtime selection and raw-header fallback; PAX
+# extension-state resolution and complete tar-controller refinement remain separate.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_mtime" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-entry-mtime-selection", requirement = "PARSE-TAR-029", path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_mtime", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::effective_pax_mtime_selects_header_fallback_and_verified_time_values" },
+  { package = "duplicity-core", name = "pax_mtime_global_local_and_empty_local_deletion_resolve_exactly" },
+  { package = "duplicity-core", name = "invalid_pax_mtime_does_not_fall_back_to_valid_raw_header_time" }
+]
+
 [[trusted]]
 id = "upstream-verus-vest"
 reviewed = true
