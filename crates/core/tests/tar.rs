@@ -347,6 +347,20 @@ fn tar_checksum_admission_accepts_unsigned_signed_and_rejects_mismatch() {
     assert_eq!(parse(&signed_bytes).unwrap_err(), TarError::Checksum);
 }
 
+//= docs/parsing-requirements.md#parse-tar-024
+//= type=test
+//# After decoding the checksum field, the parser MUST reject a header whose checksum does not match before interpreting magic/version or any other numeric header field; that mismatch MUST produce Checksum.
+#[test]
+fn checksum_mismatch_precedes_unsupported_magic_and_malformed_numeric_fields() {
+    let mut bad_magic = member(b"snapshot/file", b'0', b"");
+    bad_magic[257..265].copy_from_slice(b"badmagic");
+    assert_eq!(parse(&bad_magic).unwrap_err(), TarError::Checksum);
+
+    let mut bad_mode = member(b"snapshot/file", b'0', b"");
+    bad_mode[100..108].copy_from_slice(b"0000X000");
+    assert_eq!(parse(&bad_mode).unwrap_err(), TarError::Checksum);
+}
+
 //= docs/parsing-requirements.md#parse-tar-004
 //= type=test
 //# Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.

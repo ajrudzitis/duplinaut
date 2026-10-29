@@ -4402,6 +4402,32 @@ tests = [
   { package = "duplicity-core", name = "names::tests::short_incremental_volume_fields_refine_interval_volume_and_suffix_profiles" }
 ]
 
+[[milestone]]
+id = "tar-header-checksum-precedence"
+gate = true
+requirements = ["PARSE-TAR-024"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The checksum admission helper is proved and independently reviewed; native
+# tests establish checksum failure precedence over unsupported magic and
+# malformed numeric fields. This does not refine the full header controller,
+# checksum-field decoding or any post-admission interpretation.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry.rs", symbol = "admit_header_checksum" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-header-checksum-precedence", requirement = "PARSE-TAR-024", path = "crates/core/src/verified/tar_entry.rs", symbol = "admit_header_checksum", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_entry::metadata_charge_tests::header_checksum_gate_admits_only_matching_checksum" },
+  { package = "duplicity-core", name = "checksum_mismatch_precedes_unsupported_magic_and_malformed_numeric_fields" }
+]
+
 [[trusted]]
 id = "upstream-verus-vest"
 reviewed = true

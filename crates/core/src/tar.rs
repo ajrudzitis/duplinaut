@@ -186,7 +186,11 @@ impl<'a> TarVolume<'a> {
                 return Err(TarError::Truncated);
             }
             let expected = unsigned(h.checksum)?;
-            if !crate::verified::tar_helpers::checksum_matches(block, expected) {
+            //= docs/parsing-requirements.md#parse-tar-024
+            //# After decoding the checksum field, the parser MUST reject a header whose checksum does not match before interpreting magic/version or any other numeric header field; that mismatch MUST produce Checksum.
+            if !crate::verified::tar_entry::admit_header_checksum(
+                crate::verified::tar_helpers::checksum_matches(block, expected),
+            ) {
                 return Err(TarError::Checksum);
             }
             let posix = h.magic_version == *b"ustar\x0000";

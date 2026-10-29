@@ -246,6 +246,9 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
   SECTION: [PARSE-TAR-023](#parse-tar-023)
     TEXT[!MUST,implementation,test]: GNU `L` and `K` payloads MUST contain a NUL terminator, all bytes from the first NUL onward MUST be zero, and the selected prefix length MUST NOT exceed `max_path_bytes`.
 
+  SECTION: [PARSE-TAR-024](#parse-tar-024)
+    TEXT[!MUST,implementation,test]: After decoding the checksum field, the parser MUST reject a header whose checksum does not match before interpreting magic/version or any other numeric header field; that mismatch MUST produce Checksum.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

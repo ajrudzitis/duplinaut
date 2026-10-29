@@ -559,6 +559,12 @@ GNU `L` and `K` payloads MUST contain a NUL terminator, all bytes from the first
 
 Provenance: DOC-TAR and SRC-TAR. Missing terminators or nonzero tail bytes are TextEncoding errors; a valid prefix over the configured bound is a Limit error. Complete tar-controller refinement remains separate.
 
+### PARSE-TAR-024
+
+After decoding the checksum field, the parser MUST reject a header whose checksum does not match before interpreting magic/version or any other numeric header field; that mismatch MUST produce Checksum.
+
+Provenance: POLICY. This requirement captures the checksum admission gate and its parser-visible error precedence. Decoding the checksum field itself and refinement of the complete header controller remain separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

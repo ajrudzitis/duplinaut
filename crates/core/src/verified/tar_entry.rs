@@ -19,6 +19,14 @@ pub enum TarLongRecordError {
     Limit,
 }
 
+//= docs/parsing-requirements.md#parse-tar-024
+//# After decoding the checksum field, the parser MUST reject a header whose checksum does not match before interpreting magic/version or any other numeric header field; that mismatch MUST produce Checksum.
+pub fn admit_header_checksum(matches: bool) -> (admitted: bool)
+    ensures admitted == matches,
+{
+    matches
+}
+
 //= docs/parsing-requirements.md#parse-tar-023
 //# GNU `L` and `K` payloads MUST contain a NUL terminator, all bytes from the first NUL onward MUST be zero, and the selected prefix length MUST NOT exceed `max_path_bytes`.
 pub open spec fn gnu_long_record_model(input: Seq<u8>, limit: int)
@@ -268,7 +276,7 @@ mod metadata_charge_tests {
     use super::{
         admit_extension_header_count, admit_extension_metadata_charge,
         admit_metadata_charge, admit_real_entry_count, begin_tar_eof, finish_tar_eof,
-        decode_gnu_long_record, entry_metadata_charge, TarEofError, TarEofState,
+        admit_header_checksum, decode_gnu_long_record, entry_metadata_charge, TarEofError, TarEofState,
         TarLongRecordError,
     };
 
@@ -311,6 +319,15 @@ mod metadata_charge_tests {
         assert!(admit_real_entry_count(0, 1));
         assert!(!admit_real_entry_count(1, 1));
         assert!(!admit_real_entry_count(usize::MAX, usize::MAX));
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-024
+    //= type=test
+    //# After decoding the checksum field, the parser MUST reject a header whose checksum does not match before interpreting magic/version or any other numeric header field; that mismatch MUST produce Checksum.
+    #[test]
+    fn header_checksum_gate_admits_only_matching_checksum() {
+        assert!(admit_header_checksum(true));
+        assert!(!admit_header_checksum(false));
     }
 
     //= docs/parsing-requirements.md#parse-tar-022
