@@ -112,17 +112,10 @@ fn resolved<'a>(global: Pax<'a>, local: Pax<'a>) -> Pax<'a> {
     crate::verified::tar_pax::resolve_values(global, local)
 }
 fn long(bytes: &[u8], limit: usize) -> Result<&[u8], TarError> {
-    let end = bytes
-        .iter()
-        .position(|b| *b == 0)
-        .ok_or(TarError::TextEncoding)?;
-    if bytes[end..].iter().any(|b| *b != 0) {
-        return Err(TarError::TextEncoding);
-    }
-    if end > limit {
-        return Err(TarError::Limit);
-    }
-    Ok(&bytes[..end])
+    crate::verified::tar_entry::decode_gnu_long_record(bytes, limit).map_err(|error| match error {
+        crate::verified::tar_entry::TarLongRecordError::Malformed => TarError::TextEncoding,
+        crate::verified::tar_entry::TarLongRecordError::Limit => TarError::Limit,
+    })
 }
 // Explicit remainders are retained for the forthcoming wire proof.
 #[allow(clippy::manual_is_multiple_of)]

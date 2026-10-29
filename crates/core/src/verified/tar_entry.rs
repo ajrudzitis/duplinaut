@@ -13,6 +13,53 @@ pub enum TarEntryType {
     Fifo,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TarLongRecordError {
+    Malformed,
+    Limit,
+}
+
+//= docs/parsing-requirements.md#parse-tar-023
+//# GNU `L` and `K` payloads MUST contain a NUL terminator, all bytes from the first NUL onward MUST be zero, and the selected prefix length MUST NOT exceed `max_path_bytes`.
+pub open spec fn gnu_long_record_model(input: Seq<u8>, limit: int)
+    -> Result<Seq<u8>, TarLongRecordError>
+{
+    match super::tar_pax::find(input, 0, input.len() as int, 0) {
+        None => Err(TarLongRecordError::Malformed),
+        Some(end) => {
+            if !super::tar_footer::zero_range(input, end, input.len() as int) {
+                Err(TarLongRecordError::Malformed)
+            } else if end > limit {
+                Err(TarLongRecordError::Limit)
+            } else {
+                Ok(input.subrange(0, end))
+            }
+        },
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-023
+//# GNU `L` and `K` payloads MUST contain a NUL terminator, all bytes from the first NUL onward MUST be zero, and the selected prefix length MUST NOT exceed `max_path_bytes`.
+pub fn decode_gnu_long_record(input: &[u8], limit: usize)
+    -> (result: Result<&[u8], TarLongRecordError>)
+    ensures match result {
+        Ok(prefix) => gnu_long_record_model(input@, limit as int) == Ok(prefix@),
+        Err(error) => gnu_long_record_model(input@, limit as int) == Err(error),
+    },
+{
+    let end = match super::tar_pax::find_byte(input, 0, input.len(), 0) {
+        Some(end) => end,
+        None => return Err(TarLongRecordError::Malformed),
+    };
+    if !super::tar_footer::zeros(input, end, input.len()) {
+        return Err(TarLongRecordError::Malformed);
+    }
+    if end > limit {
+        return Err(TarLongRecordError::Limit);
+    }
+    Ok(&input[..end])
+}
+
 pub open spec fn entry_type_model(flag: u8, size: usize) -> Option<TarEntryType> {
     if flag == 0 || flag == b'0' { Some(TarEntryType::Regular) }
     else if size != 0 { None }
@@ -221,7 +268,8 @@ mod metadata_charge_tests {
     use super::{
         admit_extension_header_count, admit_extension_metadata_charge,
         admit_metadata_charge, admit_real_entry_count, begin_tar_eof, finish_tar_eof,
-        entry_metadata_charge, TarEofError, TarEofState,
+        decode_gnu_long_record, entry_metadata_charge, TarEofError, TarEofState,
+        TarLongRecordError,
     };
 
     #[test]
@@ -279,6 +327,19 @@ mod metadata_charge_tests {
         assert_eq!(footer, TarEofState::ValidateFooter);
         assert_eq!(finish_tar_eof(footer, false), Some(TarEofError::Termination));
         assert_eq!(finish_tar_eof(footer, true), None);
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-023
+    //= type=test
+    //# GNU `L` and `K` payloads MUST contain a NUL terminator, all bytes from the first NUL onward MUST be zero, and the selected prefix length MUST NOT exceed `max_path_bytes`.
+    #[test]
+    fn gnu_long_record_requires_zero_terminated_bounded_payload() {
+        assert_eq!(decode_gnu_long_record(b"name\0", 4), Ok(&b"name"[..]));
+        assert_eq!(decode_gnu_long_record(b"name\0\0\0", 4), Ok(&b"name"[..]));
+        assert_eq!(decode_gnu_long_record(b"longer\0\0", 5), Err(TarLongRecordError::Limit));
+        assert_eq!(decode_gnu_long_record(b"missing terminator", 100), Err(TarLongRecordError::Malformed));
+        assert_eq!(decode_gnu_long_record(b"name\0x", 100), Err(TarLongRecordError::Malformed));
+        assert_eq!(decode_gnu_long_record(b"long\0x", 1), Err(TarLongRecordError::Malformed));
     }
 }
 

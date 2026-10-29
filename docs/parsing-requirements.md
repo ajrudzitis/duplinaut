@@ -553,6 +553,12 @@ At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride befor
 
 Provenance: PARSE-TAR-005 and the reviewed envelope termination profiles. This proves the local EOF decision and error precedence; whole tar-controller refinement remains separate.
 
+### PARSE-TAR-023
+
+GNU `L` and `K` payloads MUST contain a NUL terminator, all bytes from the first NUL onward MUST be zero, and the selected prefix length MUST NOT exceed `max_path_bytes`.
+
+Provenance: DOC-TAR and SRC-TAR. Missing terminators or nonzero tail bytes are TextEncoding errors; a valid prefix over the configured bound is a Limit error. Complete tar-controller refinement remains separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

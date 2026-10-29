@@ -809,6 +809,71 @@ fn gnu_long_name_and_link_require_real_entries() {
     .is_err());
 }
 
+//= docs/parsing-requirements.md#parse-tar-023
+//= type=test
+//# GNU `L` and `K` payloads MUST contain a NUL terminator, all bytes from the first NUL onward MUST be zero, and the selected prefix length MUST NOT exceed `max_path_bytes`.
+#[test]
+fn gnu_long_records_enforce_terminator_padding_and_path_bound() {
+    let exact_name = [
+        member(b"././@LongLink", b'L', b"snapshot/f\0\0\0"),
+        member(b"short", b'0', b""),
+    ]
+    .concat();
+    let exact = TarVolume::parse(
+        &exact_name,
+        Termination::Data,
+        TarLimits {
+            max_path_bytes: 10,
+            ..TarLimits::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(exact.entries[0].name, b"snapshot/f");
+
+    let over_limit_name = [
+        member(b"././@LongLink", b'L', b"snapshot/long\0\0"),
+        member(b"short", b'0', b""),
+    ]
+    .concat();
+    assert_eq!(
+        TarVolume::parse(
+            &over_limit_name,
+            Termination::Data,
+            TarLimits {
+                max_path_bytes: 12,
+                ..TarLimits::default()
+            },
+        )
+        .unwrap_err(),
+        TarError::Limit
+    );
+
+    let missing_terminator = [
+        member(b"././@LongLink", b'L', b"snapshot/file"),
+        member(b"short", b'0', b""),
+    ]
+    .concat();
+    assert_eq!(
+        parse(&missing_terminator).unwrap_err(),
+        TarError::TextEncoding
+    );
+
+    let nonzero_tail = [
+        member(b"././@LongLink", b'K', b"target\0x"),
+        member(b"snapshot/link", b'2', b""),
+    ]
+    .concat();
+    assert_eq!(parse(&nonzero_tail).unwrap_err(), TarError::TextEncoding);
+
+    let zero_padded_link = [
+        member(b"././@LongLink", b'K', b"target\0\0\0"),
+        member(b"snapshot/link", b'2', b""),
+    ]
+    .concat();
+    let linked = parse(&zero_padded_link).unwrap();
+    assert_eq!(linked.entries[0].linkname, b"target");
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.

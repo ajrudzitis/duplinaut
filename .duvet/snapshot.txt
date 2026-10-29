@@ -243,6 +243,9 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked.
     TEXT[!MUST,implementation,test]: Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
 
+  SECTION: [PARSE-TAR-023](#parse-tar-023)
+    TEXT[!MUST,implementation,test]: GNU `L` and `K` payloads MUST contain a NUL terminator, all bytes from the first NUL onward MUST be zero, and the selected prefix length MUST NOT exceed `max_path_bytes`.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

@@ -3864,6 +3864,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-gnu-long-record-framing"
+gate = true
+requirements = ["PARSE-TAR-023"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves first-NUL framing, zero-only trailing padding and prefix size
+# admission for borrowed GNU L/K payloads. Whole tar-controller refinement
+# remains outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry.rs", symbol = "decode_gnu_long_record" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-gnu-long-record-framing", requirement = "PARSE-TAR-023", path = "crates/core/src/verified/tar_entry.rs", symbol = "decode_gnu_long_record", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_entry::metadata_charge_tests::gnu_long_record_requires_zero_terminated_bounded_payload" },
+  { package = "duplicity-core", name = "gnu_long_records_enforce_terminator_padding_and_path_bound" }
+]
+
+[[milestone]]
 id = "tar-pax-effective-size"
 gate = true
 requirements = ["PARSE-TAR-003"]
