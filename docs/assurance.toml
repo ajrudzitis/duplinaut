@@ -3097,6 +3097,35 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-public-preflight-result"
+gate = true
+requirements = ["PARSE-NAME-008", "PARSE-NAME-009"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The public parser preserves the ordered preflight outcomes: invalid
+# configuration yields Configuration; with valid configuration, oversized
+# basenames yield Limit before NUL/slash validation, and invalid bytes yield
+# Malformed. A valid basename delegates to the post-preflight parser. Its
+# result is intentionally left abstract here; complete filename error and
+# grammar refinement remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "parse_name" },
+  { path = "crates/core/src/names.rs", symbol = "validate_name_preflight" },
+  { path = "crates/core/src/names.rs", symbol = "parse_name_after_preflight" }
+]
+proofs = [
+  { id = "name-public-preflight-result-limit", requirement = "PARSE-NAME-008", path = "crates/core/src/names.rs", symbol = "parse_name", kind = "contract" },
+  { id = "name-public-preflight-result-configuration", requirement = "PARSE-NAME-009", path = "crates/core/src/names.rs", symbol = "parse_name", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::parse_name_preserves_preflight_results" }
+]
+
+[[milestone]]
 id = "name-final-result-composition"
 gate = true
 requirements = ["PARSE-NAME-001"]

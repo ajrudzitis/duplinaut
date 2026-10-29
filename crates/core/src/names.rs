@@ -6780,6 +6780,35 @@ pub closed spec fn name_preflight_contract_model(
             ==> input[index] != 0 && input[index] != b'/'
 }
 
+/// Public `parse_name` preserves only the preflight error result here.
+/// Successful preflight leaves the downstream parser result unconstrained.
+pub closed spec fn parse_name_preflight_result_model(
+    input: Seq<u8>,
+    separator: u8,
+    global_prefix: Seq<u8>,
+    archive_prefix: Seq<u8>,
+    manifest_prefix: Seq<u8>,
+    signature_prefix: Seq<u8>,
+    max_name_bytes: usize,
+    result: Result<Option<ObjectName>, NameError>,
+) -> bool {
+    if !name_configuration_valid_model(
+        separator,
+        global_prefix,
+        archive_prefix,
+        manifest_prefix,
+        signature_prefix,
+    ) {
+        result == Err(NameError::Configuration)
+    } else if input.len() > max_name_bytes {
+        result == Err(NameError::Limit)
+    } else if !name_basename_bytes_valid_model(input) {
+        result == Err(NameError::Malformed)
+    } else {
+        true
+    }
+}
+
 //= docs/parsing-requirements.md#parse-name-009
 //= type=implementation
 //# The time separator MUST be in the valid set in PARSE-NAME-007.
@@ -6896,6 +6925,9 @@ fn validate_name_preflight(
 }
 }
 
+//= docs/parsing-requirements.md#parse-name-008
+//= type=implementation
+//# For a valid parser configuration, the reader MUST return the name-size limit error when a basename exceeds its configured byte limit, before checking basename contents. At or below that limit, the reader MUST reject a basename containing NUL or `/` with the malformed-name error.
 //= docs/parsing-requirements.md#parse-name-009
 //= type=implementation
 //# Invalid configuration MUST return the configuration error before basename limit or malformed-name errors; valid configuration MUST proceed to the checks in PARSE-NAME-008.
@@ -6904,6 +6936,16 @@ verus! {
 /// Conflicting prefix configurations producing distinct successful classifications
 /// return `Ambiguous`; malformed recognized stems are errors rather than ignored.
 pub fn parse_name(input: &[u8], config: NameConfig<'_>) -> (result: Result<Option<ObjectName>, NameError>)
+    ensures parse_name_preflight_result_model(
+        input@,
+        config.time_separator,
+        config.global_prefix@,
+        config.archive_prefix@,
+        config.manifest_prefix@,
+        config.signature_prefix@,
+        config.max_name_bytes,
+        result,
+    ),
 {
     let preflight = validate_name_preflight(
         input,
@@ -8663,6 +8705,84 @@ mod tests {
             ),
             Err(super::NameError::Configuration)
         );
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-008
+    //= type=test
+    //# For a valid parser configuration, the reader MUST return the name-size limit error when a basename exceeds its configured byte limit, before checking basename contents. At or below that limit, the reader MUST reject a basename containing NUL or `/` with the malformed-name error.
+    //= docs/parsing-requirements.md#parse-name-009
+    //= type=test
+    //# Invalid configuration MUST return the configuration error before basename limit or malformed-name errors; valid configuration MUST proceed to the checks in PARSE-NAME-008.
+    fn parse_name_preserves_preflight_results() {
+        let config = super::NameConfig::default();
+
+        let invalid_separator = super::NameConfig {
+            time_separator: b'.',
+            max_name_bytes: 2,
+            ..config
+        };
+        assert_eq!(
+            super::parse_name(b"/\0oversized", invalid_separator),
+            Err(super::NameError::Configuration),
+            "invalid separator takes precedence over size and basename bytes"
+        );
+
+        let nul_prefix = super::NameConfig {
+            archive_prefix: b"bad\0prefix",
+            max_name_bytes: 2,
+            ..config
+        };
+        assert_eq!(
+            super::parse_name(b"/oversized", nul_prefix),
+            Err(super::NameError::Configuration),
+            "invalid NUL prefix takes precedence over size and slash"
+        );
+
+        let slash_prefix = super::NameConfig {
+            signature_prefix: b"bad/prefix",
+            max_name_bytes: 2,
+            ..config
+        };
+        assert_eq!(
+            super::parse_name(b"\0oversized", slash_prefix),
+            Err(super::NameError::Configuration),
+            "invalid slash prefix takes precedence over size and NUL"
+        );
+
+        let valid_small_limit = super::NameConfig {
+            max_name_bytes: 2,
+            ..config
+        };
+        assert_eq!(
+            super::parse_name(b"/\0x", valid_small_limit),
+            Err(super::NameError::Limit),
+            "valid configuration checks size before basename bytes"
+        );
+        for input in [&b"/"[..], &b"\0"[..]] {
+            assert_eq!(
+                super::parse_name(input, valid_small_limit),
+                Err(super::NameError::Malformed),
+                "valid configuration rejects invalid basename byte {input:?}"
+            );
+        }
+
+        let valid_input = b"duplicity-full.20231114T221320Z.vol1.difftar";
+        assert_eq!(
+            super::validate_name_preflight(
+                valid_input,
+                config.time_separator,
+                config.global_prefix,
+                config.archive_prefix,
+                config.manifest_prefix,
+                config.signature_prefix,
+                config.max_name_bytes,
+            ),
+            Ok(()),
+        );
+        let delegated = super::parse_name_after_preflight(valid_input, config);
+        assert!(matches!(delegated, Ok(Some(_))));
+        assert_eq!(super::parse_name(valid_input, config), delegated);
     }
 
     #[test]
