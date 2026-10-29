@@ -511,6 +511,12 @@ For each accepted tar entry, the output name MUST be the selected PAX path, GNU 
 
 Provenance: SRC-TAR and PARSE-TAR-009/012. This connects the selected source's byte composition to the existing checked length; path validation and complete tar-controller refinement remain separate.
 
+### PARSE-TAR-016
+
+For each accepted tar entry, the output link target MUST equal the selected PAX `linkpath`, GNU long-link, or raw header `linkname` bytes, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
+
+Provenance: SRC-TAR and PARSE-TAR-003/013. This connects the selected borrowed target to the copied entry value; NUL and semantic target validation and complete tar-controller refinement remain separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

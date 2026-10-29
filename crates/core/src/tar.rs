@@ -358,6 +358,9 @@ impl<'a> TarVolume<'a> {
             if name.is_empty() || name.contains(&0) || link.contains(&0) {
                 return Err(TarError::TextEncoding);
             }
+            //= docs/parsing-requirements.md#parse-tar-016
+            //# For each accepted tar entry, the output link target MUST equal the selected PAX `linkpath`, GNU long-link, or raw header `linkname` bytes, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
+            let linkname = crate::verified::tar_pax::copy_effective_link_target(link, link_length);
             let (mtime_seconds, mtime_nanoseconds) =
                 crate::verified::tar_pax::effective_mtime(values[3], header_mtime_seconds)
                     .map_err(|_| TarError::Numeric)?;
@@ -383,7 +386,7 @@ impl<'a> TarVolume<'a> {
                 });
             entries.push(TarEntry {
                 name,
-                linkname: link.to_vec(),
+                linkname,
                 entry_type,
                 mode,
                 uid,

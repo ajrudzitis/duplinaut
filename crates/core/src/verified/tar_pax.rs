@@ -578,6 +578,35 @@ pub fn effective_link_length_and_admission(
     (length, length <= max_path_bytes)
 }
 
+//= docs/parsing-requirements.md#parse-tar-016
+//# For each accepted tar entry, the output link target MUST equal the selected PAX `linkpath`, GNU long-link, or raw header `linkname` bytes, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
+pub open spec fn effective_link_target_model(selected_link: Seq<u8>) -> Seq<u8> {
+    selected_link
+}
+
+//= docs/parsing-requirements.md#parse-tar-016
+//# For each accepted tar entry, the output link target MUST equal the selected PAX `linkpath`, GNU long-link, or raw header `linkname` bytes, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
+pub fn copy_effective_link_target(
+    selected_link: &[u8],
+    expected_length: usize,
+) -> (result: Vec<u8>)
+    requires expected_length == selected_link.len(),
+    ensures result@ == effective_link_target_model(selected_link@)
+        && result.len() == expected_length,
+{
+    let mut result = Vec::with_capacity(expected_length);
+    let mut i = 0;
+    while i < selected_link.len()
+        invariant 0 <= i <= selected_link.len(),
+            result@ == selected_link@.subrange(0, i as int),
+        decreases selected_link.len() - i,
+    {
+        result.push(selected_link[i]);
+        i += 1;
+    }
+    result
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
@@ -1148,7 +1177,7 @@ pub fn ingest<'a>(input: &'a [u8])
 mod tests {
     use super::{
         admit_record, compose_effective_header_name, compose_ustar_header_name,
-        effective_header_name_length_and_admission, effective_id,
+        copy_effective_link_target, effective_header_name_length_and_admission, effective_id,
         effective_link_length_and_admission, effective_link_override, effective_mtime,
         effective_name_override, effective_optional_time, effective_owner_name,
         effective_owner_name_length_and_admission, effective_size, hdrcharset_value_supported,
@@ -1407,6 +1436,22 @@ mod tests {
             b"dir/file"
         );
         assert_eq!(compose_effective_header_name(raw, b"", b"file", 4), b"file");
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-016
+    //= type=test
+    //# For each accepted tar entry, the output link target MUST equal the selected PAX `linkpath`, GNU long-link, or raw header `linkname` bytes, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
+    #[test]
+    fn copied_link_target_matches_selected_pax_gnu_or_header_bytes() {
+        let pax = effective_link_override(Some(b"pax-target"), Some(b"gnu-target"))
+            .unwrap_or(b"raw-target");
+        assert_eq!(copy_effective_link_target(pax, pax.len()), b"pax-target");
+
+        let gnu = effective_link_override(None, Some(b"gnu-target")).unwrap_or(b"raw-target");
+        assert_eq!(copy_effective_link_target(gnu, gnu.len()), b"gnu-target");
+
+        let raw = effective_link_override(None, None).unwrap_or(b"raw-target");
+        assert_eq!(copy_effective_link_target(raw, raw.len()), b"raw-target");
     }
 
     #[test]
