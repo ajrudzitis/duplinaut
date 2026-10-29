@@ -3736,6 +3736,33 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-eof-finalization-precedence"
+gate = true
+requirements = ["PARSE-TAR-022"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Models the pending-override EOF decision before footer-profile validation;
+# successful publication requires no pending override and valid footer bytes.
+# Whole tar-controller refinement remains outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry.rs", symbol = "begin_tar_eof" },
+  { path = "crates/core/src/verified/tar_entry.rs", symbol = "finish_tar_eof" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-eof-finalization-precedence", requirement = "PARSE-TAR-022", path = "crates/core/src/verified/tar_entry.rs", symbol = "begin_tar_eof", kind = "contract" },
+  { id = "tar-eof-footer-finalization", requirement = "PARSE-TAR-022", path = "crates/core/src/verified/tar_entry.rs", symbol = "finish_tar_eof", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_entry::metadata_charge_tests::tar_eof_decision_preserves_dangling_precedence_and_requires_valid_footer" },
+  { package = "duplicity-core", name = "eof_finalization_reports_dangling_override_before_footer_and_publishes_only_valid_volumes" }
+]
+
+[[milestone]]
 id = "tar-extension-header-count"
 gate = true
 requirements = ["PARSE-TAR-020"]

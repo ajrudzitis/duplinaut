@@ -47,6 +47,56 @@ pub fn classify_entry_type(flag: u8, size: usize) -> (result: Option<TarEntryTyp
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-022
+//# At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked. Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TarEofState {
+    RejectDanglingOverride,
+    ValidateFooter,
+}
+
+//= docs/parsing-requirements.md#parse-tar-022
+//# At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked. Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TarEofError {
+    DanglingOverride,
+    Termination,
+}
+
+//= docs/parsing-requirements.md#parse-tar-022
+//# At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked. Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
+pub open spec fn tar_eof_state_model(pending: bool) -> TarEofState {
+    if pending { TarEofState::RejectDanglingOverride } else { TarEofState::ValidateFooter }
+}
+
+//= docs/parsing-requirements.md#parse-tar-022
+//# At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked. Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
+pub fn begin_tar_eof(pending: bool) -> (result: TarEofState)
+    ensures result == tar_eof_state_model(pending),
+{
+    if pending { TarEofState::RejectDanglingOverride } else { TarEofState::ValidateFooter }
+}
+
+//= docs/parsing-requirements.md#parse-tar-022
+//# At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked. Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
+pub open spec fn finish_tar_eof_model(state: TarEofState, footer_valid: bool) -> Option<TarEofError> {
+    match state {
+        TarEofState::RejectDanglingOverride => Some(TarEofError::DanglingOverride),
+        TarEofState::ValidateFooter => if footer_valid { None } else { Some(TarEofError::Termination) },
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-022
+//# At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked. Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
+pub fn finish_tar_eof(state: TarEofState, footer_valid: bool) -> (result: Option<TarEofError>)
+    ensures result == finish_tar_eof_model(state, footer_valid),
+{
+    match state {
+        TarEofState::RejectDanglingOverride => Some(TarEofError::DanglingOverride),
+        TarEofState::ValidateFooter => if footer_valid { None } else { Some(TarEofError::Termination) },
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-018
 //# For each real tar entry, the reader MUST checked-add fixed entry overhead and the exact admitted output name, link-target, `uname`, and `gname` lengths, then charge that amount against the remaining metadata limit before allocating any output fields. Arithmetic overflow or an exceeded limit MUST reject the volume without returning a partial entry list.
 pub open spec fn entry_metadata_charge_model(
@@ -170,7 +220,8 @@ pub fn admit_real_entry_count(current: usize, maximum: usize) -> (result: bool)
 mod metadata_charge_tests {
     use super::{
         admit_extension_header_count, admit_extension_metadata_charge,
-        admit_metadata_charge, admit_real_entry_count, entry_metadata_charge,
+        admit_metadata_charge, admit_real_entry_count, begin_tar_eof, finish_tar_eof,
+        entry_metadata_charge, TarEofError, TarEofState,
     };
 
     #[test]
@@ -212,6 +263,22 @@ mod metadata_charge_tests {
         assert!(admit_real_entry_count(0, 1));
         assert!(!admit_real_entry_count(1, 1));
         assert!(!admit_real_entry_count(usize::MAX, usize::MAX));
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-022
+    //= type=test
+    //# At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked. Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
+    #[test]
+    fn tar_eof_decision_preserves_dangling_precedence_and_requires_valid_footer() {
+        let dangling = begin_tar_eof(true);
+        assert_eq!(dangling, TarEofState::RejectDanglingOverride);
+        assert_eq!(finish_tar_eof(dangling, false), Some(TarEofError::DanglingOverride));
+        assert_eq!(finish_tar_eof(dangling, true), Some(TarEofError::DanglingOverride));
+
+        let footer = begin_tar_eof(false);
+        assert_eq!(footer, TarEofState::ValidateFooter);
+        assert_eq!(finish_tar_eof(footer, false), Some(TarEofError::Termination));
+        assert_eq!(finish_tar_eof(footer, true), None);
     }
 }
 

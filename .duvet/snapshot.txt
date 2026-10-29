@@ -239,6 +239,10 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: Before allocating or retaining output fields for a real tar entry, the parser MUST require the accepted entry count to be below `max_entries`.
     TEXT[!MUST,implementation,test]: If the count equals or exceeds the limit, it MUST return Limit without returning a partial entry list.
 
+  SECTION: [PARSE-TAR-022](#parse-tar-022)
+    TEXT[!MUST,implementation,test]: At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked.
+    TEXT[!MUST,implementation,test]: Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

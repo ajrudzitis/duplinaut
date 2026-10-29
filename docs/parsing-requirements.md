@@ -547,6 +547,12 @@ Before allocating or retaining output fields for a real tar entry, the parser MU
 
 Provenance: POLICY. This proves per-entry count admission before output-field interpretation and allocation; whole tar-loop refinement remains separate.
 
+### PARSE-TAR-022
+
+At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked. Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
+
+Provenance: PARSE-TAR-005 and the reviewed envelope termination profiles. This proves the local EOF decision and error precedence; whole tar-controller refinement remains separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

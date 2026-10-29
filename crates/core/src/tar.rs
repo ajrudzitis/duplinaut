@@ -432,10 +432,23 @@ impl<'a> TarVolume<'a> {
         }
         //= docs/parsing-requirements.md#parse-tar-005
         //# A dangling local PAX or GNU long-name/link override MUST produce `DanglingOverride` at EOF.
-        if crate::verified::tar_pax::dangling_override_at_eof(pending) {
+        //= docs/parsing-requirements.md#parse-tar-022
+        //# At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked. Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
+        let dangling = crate::verified::tar_pax::dangling_override_at_eof(pending);
+        let eof_state = crate::verified::tar_entry::begin_tar_eof(dangling);
+        if eof_state == crate::verified::tar_entry::TarEofState::RejectDanglingOverride {
             return Err(TarError::DanglingOverride);
         }
-        footer(bytes, cursor, profile)?;
+        let footer_valid = footer(bytes, cursor, profile).is_ok();
+        match crate::verified::tar_entry::finish_tar_eof(eof_state, footer_valid) {
+            None => {}
+            Some(crate::verified::tar_entry::TarEofError::DanglingOverride) => {
+                return Err(TarError::DanglingOverride);
+            }
+            Some(crate::verified::tar_entry::TarEofError::Termination) => {
+                return Err(TarError::Termination);
+            }
+        }
         Ok(Self {
             entries,
             entry_stream_bytes: cursor,

@@ -470,6 +470,36 @@ fn footer_profiles_are_explicit() {
     .is_err());
 }
 
+//= docs/parsing-requirements.md#parse-tar-022
+//= type=test
+//# At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked. Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
+#[test]
+fn eof_finalization_reports_dangling_override_before_footer_and_publishes_only_valid_volumes() {
+    let local = member(b"PaxHeader", b'x', &record(b"path", b"snapshot/file"));
+    let dangling_with_bad_footer = [local, vec![0; 512], b"x".to_vec()].concat();
+    assert_eq!(
+        TarVolume::parse(
+            &dangling_with_bad_footer,
+            Termination::Data,
+            TarLimits::default()
+        )
+        .unwrap_err(),
+        TarError::DanglingOverride
+    );
+
+    let entry = member(b"snapshot/file", b'0', b"");
+    let invalid_footer = [entry.clone(), vec![0; 512], b"x".to_vec()].concat();
+    assert_eq!(
+        TarVolume::parse(&invalid_footer, Termination::Data, TarLimits::default()).unwrap_err(),
+        TarError::Termination
+    );
+    assert!(TarVolume::parse(&entry, Termination::Data, TarLimits::default()).is_ok());
+
+    let global = member(b"PaxHeader", b'g', &record(b"path", b"ignored"));
+    let global_only = [global, vec![0; 512]].concat();
+    assert!(TarVolume::parse(&global_only, Termination::Data, TarLimits::default()).is_ok());
+}
+
 //= docs/parsing-requirements.md#parse-tar-001
 //= type=test
 //# The tar parser MUST validate each header checksum and payload extent before accepting the entry it describes.
