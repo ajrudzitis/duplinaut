@@ -431,7 +431,11 @@ The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link 
 
 Provenance: SRC-TAR, SRC-DIFF, DOC-TAR; official 3.0.7 fixtures exercise PAX path and binary path encoding. Historical GNU and additional supported PAX variant tests remain pending; they do not authorize ignoring an override.
 
-For a successful PAX extended-header stream, the reader MUST process records in input order and accumulate each supported, unique, NUL-free key/value pair into its assigned one of the eleven metadata slots. An empty value remains present in its slot as a deletion marker for later global/local resolution. Existing field-specific requirements govern value grammars. This accumulation requirement does not define malformed-input diagnostic precedence or complete tar-controller behavior.
+For a successful PAX extended-header stream, the reader MUST process records in input order and accumulate each supported, unique, NUL-free key/value pair into its assigned one of the eleven metadata slots. An empty value remains present in its slot as a deletion marker for later global/local resolution. Existing field-specific requirements govern value grammars.
+
+For each PAX extended-header stream, the reader MUST process records in input order and report the first failing record's error class using framing before key support, key support before duplicate/NUL admission, and admission before value syntax: malformed framing or duplicate/NUL values for a supported key classify as Pax, unsupported keys (including those with NUL values) and unsupported nonempty hdrcharset values as UnsupportedPax, and invalid decimal/time values as Numeric; empty values are accepted, and no later record changes the first error.
+
+This rule governs only the PAX byte stream passed to ingest; global/local extension timing and complete tar-controller error behavior are specified separately.
 
 ### PARSE-TAR-004
 

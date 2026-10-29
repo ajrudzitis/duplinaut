@@ -969,6 +969,57 @@ fn successful_pax_stream_accumulates_all_eleven_fields_into_native_metadata() {
 
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
+//# For each PAX extended-header stream, the reader MUST process records in input order and report the first failing record's error class using framing before key support, key support before duplicate/NUL admission, and admission before value syntax: malformed framing or duplicate/NUL values for a supported key classify as Pax, unsupported keys (including those with NUL values) and unsupported nonempty hdrcharset values as UnsupportedPax, and invalid decimal/time values as Numeric; empty values are accepted, and no later record changes the first error.
+#[test]
+fn pax_stream_reports_the_first_error_by_record_and_stage() {
+    let cases: [(Vec<u8>, TarError); 9] = [
+        (
+            [record(b"size", b"bad"), record(b"unknown", b"later")].concat(),
+            TarError::Numeric,
+        ),
+        (
+            [
+                record(b"mtime", b"not-a-time"),
+                record(b"unknown", b"later"),
+            ]
+            .concat(),
+            TarError::Numeric,
+        ),
+        (
+            [record(b"unknown", b"value"), b"bad frame".to_vec()].concat(),
+            TarError::UnsupportedPax,
+        ),
+        (
+            [b"bad frame".to_vec(), record(b"unknown", b"later")].concat(),
+            TarError::Pax,
+        ),
+        (
+            [record(b"size", b"1"), record(b"size", b"bad")].concat(),
+            TarError::Pax,
+        ),
+        (
+            [record(b"size", b"1\0"), record(b"path", b"later")].concat(),
+            TarError::Pax,
+        ),
+        (
+            [record(b"hdrcharset", b"unknown"), b"bad frame".to_vec()].concat(),
+            TarError::UnsupportedPax,
+        ),
+        (
+            [record(b"size", b"1"), b"bad frame".to_vec()].concat(),
+            TarError::Pax,
+        ),
+        (record(b"unknown", b"bad\0value"), TarError::UnsupportedPax),
+    ];
+
+    for (stream, expected) in cases {
+        let archive = member(b"local", b'x', &stream);
+        assert_eq!(parse(&archive).unwrap_err(), expected, "{stream:?}");
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 #[test]
 fn pax_record_admission_preserves_duplicate_nul_unknown_and_empty_value_behavior() {

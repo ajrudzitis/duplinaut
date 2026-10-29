@@ -529,20 +529,64 @@ pub open spec fn pax_stream_model(
     }}
 }
 
+/// Classify the first error in a PAX stream suffix. A successful record
+/// advances to the next record with its semantic slot stored; later errors
+/// cannot override an earlier error.
+pub open spec fn pax_first_error_model(
+    input: Seq<u8>,
+    cursor: int,
+    slots: Seq<Option<Seq<u8>>>,
+) -> Option<PaxIngestError>
+    recommends 0 <= cursor <= input.len(), slots.len() == 11,
+    decreases input.len() - cursor,
+{
+    if cursor == input.len() { None }
+    else { match record_model(input, cursor) {
+        None => Some(PaxIngestError::Framing),
+        Some((end, key, value)) => if end <= cursor || end > input.len() {
+            Some(PaxIngestError::Framing)
+        }
+        else { match key_model(key) {
+            None => Some(PaxIngestError::UnsupportedKey),
+            Some(index) => if index >= slots.len() {
+                Some(PaxIngestError::UnsupportedKey)
+            }
+            else if slots[index as int] is Some
+                || find(value, 0, value.len() as int, 0) is Some {
+                Some(PaxIngestError::Malformed)
+            }
+            else if !pax_value_model(index as int, value) {
+                if index == 10 {
+                    Some(PaxIngestError::UnsupportedValue)
+                } else {
+                    Some(PaxIngestError::Numeric)
+                }
+            }
+            else {
+                pax_first_error_model(input, end, slots.update(index as int, Some(value)))
+            },
+        }}
+    }}
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //# For a successful PAX extended-header stream, the reader MUST process records in input order and accumulate each supported, unique, NUL-free key/value pair into its assigned one of the eleven metadata slots.
 
+//= docs/parsing-requirements.md#parse-tar-003
+//# For each PAX extended-header stream, the reader MUST process records in input order and report the first failing record's error class using framing before key support, key support before duplicate/NUL admission, and admission before value syntax: malformed framing or duplicate/NUL values for a supported key classify as Pax, unsupported keys (including those with NUL values) and unsupported nonempty hdrcharset values as UnsupportedPax, and invalid decimal/time values as Numeric; empty values are accepted, and no later record changes the first error.
+
 /// Parse and accumulate a complete PAX stream into its eleven semantic slots.
 /// The success postcondition relates the actual borrowed slot map to the
-/// recursive framing/key/value/uniqueness/NUL model. Existing decimal, time
-/// and hdrcharset validator contracts establish the modeled value predicates.
-/// Error variants are not refined here.
+/// recursive framing/key/value/uniqueness/NUL model and the exact first-error
+/// classifier. Existing decimal, time and hdrcharset validator contracts
+/// establish the modeled value predicates.
 pub fn ingest<'a>(input: &'a [u8])
     -> (result: Result<[Option<&'a [u8]>; 11], PaxIngestError>)
     ensures match result {
         Ok(slots) => pax_stream_model(input@, 0, pax_empty_model())
-            == Some(pax_slots_model(slots@)),
-        Err(_) => true,
+                == Some(pax_slots_model(slots@))
+            && pax_first_error_model(input@, 0, pax_empty_model()) is None,
+        Err(error) => pax_first_error_model(input@, 0, pax_empty_model()) == Some(error),
     },
 {
     let mut slots: [Option<&'a [u8]>; 11] = [None; 11];
@@ -557,31 +601,91 @@ pub fn ingest<'a>(input: &'a [u8])
         invariant cursor <= input.len(),
             pax_stream_model(input@, cursor as int, pax_slots_model(slots@))
                 == whole_model,
+            pax_first_error_model(input@, cursor as int, pax_slots_model(slots@))
+                == pax_first_error_model(input@, 0, pax_empty_model()),
         decreases input.len() - cursor,
     {
-        proof { reveal(pax_stream_model); }
+        proof {
+            reveal(pax_stream_model);
+            reveal(pax_first_error_model);
+        }
         let ghost old_cursor = cursor as int;
         let ghost old_slots = pax_slots_model(slots@);
         let (end, key, value) = match record(input, cursor) {
             Some(record) => record,
-            None => return Err(PaxIngestError::Framing),
+            None => {
+                proof {
+                    assert(pax_first_error_model(
+                        input@,
+                        cursor as int,
+                        pax_slots_model(slots@),
+                    ) == Some(PaxIngestError::Framing));
+                    assert(pax_first_error_model(
+                        input@,
+                        0,
+                        pax_empty_model(),
+                    ) == Some(PaxIngestError::Framing));
+                }
+                return Err(PaxIngestError::Framing);
+            }
         };
         let key_slot = match key_index(key) {
             Some(index) => index,
-            None => return Err(PaxIngestError::UnsupportedKey),
+            None => {
+                proof {
+                    assert(pax_first_error_model(
+                        input@,
+                        cursor as int,
+                        pax_slots_model(slots@),
+                    ) == Some(PaxIngestError::UnsupportedKey));
+                    assert(pax_first_error_model(
+                        input@,
+                        0,
+                        pax_empty_model(),
+                    ) == Some(PaxIngestError::UnsupportedKey));
+                }
+                return Err(PaxIngestError::UnsupportedKey);
+            }
         };
         let index = match admit_record(key, value, slots[key_slot].is_some()) {
             Ok(index) => index,
             Err(PaxRecordAdmissionError::UnsupportedKey) => {
-                return Err(PaxIngestError::UnsupportedKey)
+                proof { assert(false); }
+                return Err(PaxIngestError::UnsupportedKey);
             }
-            Err(PaxRecordAdmissionError::Malformed) => return Err(PaxIngestError::Malformed),
+            Err(PaxRecordAdmissionError::Malformed) => {
+                proof {
+                    assert(pax_first_error_model(
+                        input@,
+                        cursor as int,
+                        pax_slots_model(slots@),
+                    ) == Some(PaxIngestError::Malformed));
+                    assert(pax_first_error_model(
+                        input@,
+                        0,
+                        pax_empty_model(),
+                    ) == Some(PaxIngestError::Malformed));
+                }
+                return Err(PaxIngestError::Malformed);
+            }
         };
         if !value.is_empty() {
             match index {
                 2 | 4 | 5 => {
                     let parsed = super::tar_helpers::decimal(value);
                     if parsed.is_none() {
+                        proof {
+                            assert(pax_first_error_model(
+                                input@,
+                                cursor as int,
+                                pax_slots_model(slots@),
+                            ) == Some(PaxIngestError::Numeric));
+                            assert(pax_first_error_model(
+                                input@,
+                                0,
+                                pax_empty_model(),
+                            ) == Some(PaxIngestError::Numeric));
+                        }
                         return Err(PaxIngestError::Numeric);
                     }
                     proof {
@@ -594,12 +698,36 @@ pub fn ingest<'a>(input: &'a [u8])
                 3 | 8 | 9 => {
                     let parsed = time(value);
                     if parsed.is_none() {
+                        proof {
+                            assert(pax_first_error_model(
+                                input@,
+                                cursor as int,
+                                pax_slots_model(slots@),
+                            ) == Some(PaxIngestError::Numeric));
+                            assert(pax_first_error_model(
+                                input@,
+                                0,
+                                pax_empty_model(),
+                            ) == Some(PaxIngestError::Numeric));
+                        }
                         return Err(PaxIngestError::Numeric);
                     }
                     proof { assert(time_model(value@) is Some); }
                 }
                 10 => {
                     if !hdrcharset_value_supported(value) {
+                        proof {
+                            assert(pax_first_error_model(
+                                input@,
+                                cursor as int,
+                                pax_slots_model(slots@),
+                            ) == Some(PaxIngestError::UnsupportedValue));
+                            assert(pax_first_error_model(
+                                input@,
+                                0,
+                                pax_empty_model(),
+                            ) == Some(PaxIngestError::UnsupportedValue));
+                        }
                         return Err(PaxIngestError::UnsupportedValue);
                     }
                     proof { assert(pax_value_model(10, value@)); }
@@ -609,6 +737,7 @@ pub fn ingest<'a>(input: &'a [u8])
         }
         proof {
             reveal(pax_stream_model);
+            reveal(pax_first_error_model);
             assert(record_model(input@, old_cursor)
                 == Some((end as int, key@, value@)));
             assert(key_slot == index);
@@ -623,6 +752,12 @@ pub fn ingest<'a>(input: &'a [u8])
                     end as int,
                     old_slots.update(index as int, Some(value@)),
                 ));
+            assert(pax_first_error_model(input@, old_cursor, old_slots)
+                == pax_first_error_model(
+                    input@,
+                    end as int,
+                    old_slots.update(index as int, Some(value@)),
+                ));
         }
         slots[index] = Some(value);
         proof {
@@ -632,7 +767,11 @@ pub fn ingest<'a>(input: &'a [u8])
         }
         cursor = end;
     }
-    proof { reveal(pax_stream_model); }
+    proof {
+        reveal(pax_stream_model);
+        reveal(pax_first_error_model);
+        assert(pax_first_error_model(input@, 0, pax_empty_model()) is None);
+    }
     Ok(slots)
 }
 }
@@ -643,7 +782,7 @@ mod tests {
         admit_record, effective_id, effective_link_override, effective_mtime,
         effective_name_override, effective_optional_time, effective_owner_name, effective_size,
         hdrcharset_value_supported, ingest, owner_name_requires_utf8, resolve_values, PaxIdError,
-        PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
+        PaxIngestError, PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
     };
 
     fn framed_record(key: &[u8], value: &[u8]) -> Vec<u8> {
@@ -688,6 +827,71 @@ mod tests {
         let slots = ingest(&stream).expect("all eleven supported records are valid");
         for (index, (_, expected)) in fields.iter().enumerate() {
             assert_eq!(slots[index], Some(*expected), "slot {index}");
+        }
+    }
+
+    #[test]
+    fn ingest_classifies_the_first_error_in_stream_and_record_order() {
+        let cases: [(Vec<u8>, PaxIngestError); 9] = [
+            (
+                [
+                    framed_record(b"size", b"bad"),
+                    framed_record(b"unknown", b"v"),
+                ]
+                .concat(),
+                PaxIngestError::Numeric,
+            ),
+            (
+                [
+                    framed_record(b"mtime", b"not-a-time"),
+                    framed_record(b"unknown", b"v"),
+                ]
+                .concat(),
+                PaxIngestError::Numeric,
+            ),
+            (
+                [framed_record(b"unknown", b"v"), b"bad frame".to_vec()].concat(),
+                PaxIngestError::UnsupportedKey,
+            ),
+            (
+                [
+                    framed_record(b"path", b"value\0tail"),
+                    framed_record(b"size", b"bad"),
+                ]
+                .concat(),
+                PaxIngestError::Malformed,
+            ),
+            (
+                [framed_record(b"size", b"1"), b"bad frame".to_vec()].concat(),
+                PaxIngestError::Framing,
+            ),
+            (
+                [framed_record(b"size", b"1"), framed_record(b"size", b"bad")].concat(),
+                PaxIngestError::Malformed,
+            ),
+            (
+                [
+                    framed_record(b"size", b"1\0"),
+                    framed_record(b"path", b"later"),
+                ]
+                .concat(),
+                PaxIngestError::Malformed,
+            ),
+            (
+                [
+                    framed_record(b"hdrcharset", b"unknown"),
+                    b"bad frame".to_vec(),
+                ]
+                .concat(),
+                PaxIngestError::UnsupportedValue,
+            ),
+            (
+                framed_record(b"unknown", b"bad\0value"),
+                PaxIngestError::UnsupportedKey,
+            ),
+        ];
+        for (stream, expected) in cases {
+            assert_eq!(ingest(&stream), Err(expected), "{stream:?}");
         }
     }
 

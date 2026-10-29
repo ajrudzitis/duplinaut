@@ -3629,8 +3629,9 @@ proof_required = true
 # loop. Its success postcondition relates cursor-ordered framing, key/duplicate/
 # NUL admission, field-specific value models, and slot writes to an 11-slot
 # recursive stream model. Existing decimal/time/hdrcharset validator contracts
-# establish those predicates. Error diagnostics and malformed-input precedence
-# are deliberately not refined by this checkpoint.
+# establish those predicates. The following milestone refines the per-stream
+# first-error class; malformed-stream completeness and extension timing remain
+# outside this checkpoint.
 implementations = [
   { path = "crates/core/src/verified/tar_pax.rs", symbol = "ingest" },
   { path = "crates/core/src/tar.rs", symbol = "pax" }
@@ -3641,6 +3642,32 @@ proofs = [
 tests = [
   { package = "duplicity-core", name = "verified::tar_pax::tests::ingest_accumulates_a_successful_stream_into_all_eleven_slots" },
   { package = "duplicity-core", name = "successful_pax_stream_accumulates_all_eleven_fields_into_native_metadata" }
+]
+
+[[milestone]]
+id = "tar-pax-first-error"
+gate = true
+requirements = ["PARSE-TAR-003"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Models exact left-to-right first-error classification for one PAX stream and
+# its within-record stage order. Successful slot accumulation remains covered
+# by tar-pax-stream-accumulation. Global/local extension timing and whole-tar
+# controller behavior are outside this milestone.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "ingest" },
+  { path = "crates/core/src/tar.rs", symbol = "pax" }
+]
+proofs = [
+  { id = "tar-pax-first-error", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_pax.rs", symbol = "ingest", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::ingest_classifies_the_first_error_in_stream_and_record_order" },
+  { package = "duplicity-core", name = "pax_stream_reports_the_first_error_by_record_and_stage" }
 ]
 
 [[milestone]]
