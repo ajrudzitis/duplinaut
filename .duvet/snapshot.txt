@@ -186,6 +186,10 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: That local state MUST be consumed only after the real entry is accepted.
     TEXT[!MUST,implementation,test]: GNU `L`/`K` and PAX `g` headers MUST NOT consume pending local fields.
 
+  SECTION: [PARSE-TAR-007](#parse-tar-007)
+    TEXT[!MUST,implementation,test]: GNU and PAX extension headers MUST use the raw size in their own tar header to determine their payload extent.
+    TEXT[!MUST,implementation,test]: A real entry MUST use the effective PAX `size` value when present, or its raw tar header size when absent.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

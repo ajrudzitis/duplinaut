@@ -455,6 +455,12 @@ The tar parser MUST apply PAX extension state in header order. Each present fiel
 
 Provenance: DOC-TAR, SRC-TAR and observed GNU/PAX extension ordering. This requirement defines metadata state timing; validation of every possible tar-controller error outcome remains separate.
 
+### PARSE-TAR-007
+
+GNU and PAX extension headers MUST use the raw size in their own tar header to determine their payload extent. A real entry MUST use the effective PAX `size` value when present, or its raw tar header size when absent.
+
+Provenance: DOC-TAR, SRC-TAR. Extension payload framing is independent of metadata overrides carried by preceding headers.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

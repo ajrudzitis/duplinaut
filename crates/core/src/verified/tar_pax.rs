@@ -427,6 +427,28 @@ pub fn effective_size(value: Option<&[u8]>, header_size: u64)
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-007
+//# GNU and PAX extension headers MUST use the raw size in their own tar header to determine their payload extent.
+//# A real entry MUST use the effective PAX `size` value when present, or its raw tar header size when absent.
+pub fn payload_size(is_extension: bool, value: Option<&[u8]>, header_size: u64)
+    -> (result: Result<u64, PaxSizeError>)
+    ensures if is_extension {
+        result == Ok(header_size)
+    } else {
+        match value {
+            None => result == Ok(header_size),
+            Some(bytes) => match result {
+                Ok(size) => bytes.len() > 0
+                    && decimal_prefix(bytes@, bytes.len() as int) == Some(size as int),
+                Err(error) => error == PaxSizeError::Invalid
+                    && (bytes.len() == 0 || decimal_prefix(bytes@, bytes.len() as int) is None),
+            },
+        }
+    },
+{
+    if is_extension { Ok(header_size) } else { effective_size(value, header_size) }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PaxIdError {
     Invalid,
@@ -879,8 +901,8 @@ mod tests {
     use super::{
         admit_record, effective_id, effective_link_override, effective_mtime,
         effective_name_override, effective_optional_time, effective_owner_name, effective_size,
-        hdrcharset_value_supported, ingest, owner_name_requires_utf8, resolve_values, PaxIdError,
-        PaxIngestError, PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
+        hdrcharset_value_supported, ingest, owner_name_requires_utf8, payload_size, resolve_values,
+        PaxIdError, PaxIngestError, PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
     };
 
     fn framed_record(key: &[u8], value: &[u8]) -> Vec<u8> {
@@ -1034,6 +1056,17 @@ mod tests {
             Err(PaxSizeError::Invalid)
         );
         assert_eq!(effective_size(Some(b"1x"), 17), Err(PaxSizeError::Invalid));
+    }
+
+    #[test]
+    fn payload_size_uses_raw_extension_size_and_effective_entry_size() {
+        assert_eq!(payload_size(true, Some(b"1"), 17), Ok(17));
+        assert_eq!(payload_size(false, Some(b"1"), 17), Ok(1));
+        assert_eq!(payload_size(false, None, 17), Ok(17));
+        assert_eq!(
+            payload_size(false, Some(b""), 17),
+            Err(PaxSizeError::Invalid)
+        );
     }
 
     #[test]

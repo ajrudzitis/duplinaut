@@ -219,12 +219,11 @@ impl<'a> TarVolume<'a> {
             //= docs/parsing-requirements.md#parse-tar-006
             //# Local fields MUST override global fields for the next real entry.
             let values = resolved(global, local);
-            let size = if extension {
-                raw_size
-            } else {
-                crate::verified::tar_pax::effective_size(values[2], raw_size)
-                    .map_err(|_| TarError::Numeric)?
-            };
+            //= docs/parsing-requirements.md#parse-tar-007
+            //# GNU and PAX extension headers MUST use the raw size in their own tar header to determine their payload extent.
+            //# A real entry MUST use the effective PAX `size` value when present, or its raw tar header size when absent.
+            let size = crate::verified::tar_pax::payload_size(extension, values[2], raw_size)
+                .map_err(|_| TarError::Numeric)?;
             let size = usize::try_from(size).map_err(|_| TarError::Limit)?;
             if size > limits.max_entry_bytes {
                 return Err(TarError::Limit);

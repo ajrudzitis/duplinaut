@@ -631,6 +631,34 @@ fn pax_size_override_controls_payload_and_empty_local_deletion_falls_back() {
     assert_eq!(parsed.entries[2].payload, b"ghi");
 }
 
+//= docs/parsing-requirements.md#parse-tar-007
+//= type=test
+//# GNU and PAX extension headers MUST use the raw size in their own tar header to determine their payload extent.
+//= docs/parsing-requirements.md#parse-tar-007
+//= type=test
+//# A real entry MUST use the effective PAX `size` value when present, or its raw tar header size when absent.
+#[test]
+fn global_pax_size_does_not_change_extension_payload_extent() {
+    let global_size = member(b"global", b'g', &record(b"size", b"1"));
+    let local_path = member(b"local", b'x', &record(b"path", b"snapshot/file"));
+    let raw_entry = member(b"raw-name", b'0', b"abc");
+    let archive = [global_size, local_path, raw_entry].concat();
+
+    let parsed = parse(&archive).unwrap();
+    assert_eq!(parsed.entries.len(), 1);
+    assert_eq!(parsed.entries[0].name, b"snapshot/file");
+    assert_eq!(parsed.entries[0].payload, b"a");
+
+    let global_size = member(b"global", b'g', &record(b"size", b"1"));
+    let gnu_name = member(b"././@LongLink", b'L', b"snapshot/gnu-long-name\0");
+    let raw_entry = member(b"raw-name", b'0', b"abc");
+    let archive = [global_size, gnu_name, raw_entry].concat();
+    let parsed = parse(&archive).unwrap();
+    assert_eq!(parsed.entries.len(), 1);
+    assert_eq!(parsed.entries[0].name, b"snapshot/gnu-long-name");
+    assert_eq!(parsed.entries[0].payload, b"a");
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.

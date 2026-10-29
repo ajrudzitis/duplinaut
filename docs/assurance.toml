@@ -3428,6 +3428,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-payload-size-dispatch"
+gate = true
+requirements = ["PARSE-TAR-007"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves the extension-versus-real-entry size selection helper wired into the
+# tar parser. The complete header/payload cursor controller remains outside
+# this milestone.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "payload_size" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-payload-size-dispatch", requirement = "PARSE-TAR-007", path = "crates/core/src/verified/tar_pax.rs", symbol = "payload_size", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::payload_size_uses_raw_extension_size_and_effective_entry_size" },
+  { package = "duplicity-core", name = "global_pax_size_does_not_change_extension_payload_extent" }
+]
+
+[[milestone]]
 id = "tar-pax-effective-size"
 gate = true
 requirements = ["PARSE-TAR-003"]
