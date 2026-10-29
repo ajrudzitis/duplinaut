@@ -224,6 +224,10 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
   SECTION: [PARSE-TAR-017](#parse-tar-017)
     TEXT[!MUST,implementation,test]: For each accepted tar entry, output `uname` and `gname` bytes MUST equal their selected PAX override or raw header fallback, and each output length MUST equal the precomputed length used for admission and metadata accounting.
 
+  SECTION: [PARSE-TAR-018](#parse-tar-018)
+    TEXT[!MUST,implementation,test]: For each real tar entry, the reader MUST checked-add fixed entry overhead and the exact admitted output name, link-target, `uname`, and `gname` lengths, then charge that amount against the remaining metadata limit before allocating any output fields.
+    TEXT[!MUST,implementation,test]: Arithmetic overflow or an exceeded limit MUST reject the volume without returning a partial entry list.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

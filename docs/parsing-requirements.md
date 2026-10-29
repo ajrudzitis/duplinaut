@@ -523,6 +523,12 @@ For each accepted tar entry, output `uname` and `gname` bytes MUST equal their s
 
 Provenance: SRC-TAR and PARSE-TAR-003/014. This connects selected borrowed owner-name values to copied entry metadata; charset semantics and complete tar-controller refinement remain separate.
 
+### PARSE-TAR-018
+
+For each real tar entry, the reader MUST checked-add fixed entry overhead and the exact admitted output name, link-target, `uname`, and `gname` lengths, then charge that amount against the remaining metadata limit before allocating any output fields. Arithmetic overflow or an exceeded limit MUST reject the volume without returning a partial entry list.
+
+Provenance: POLICY and PARSE-TAR-012 through PARSE-TAR-017. This proves the per-entry charge formula and admission boundary; cumulative controller refinement and extension-header accounting remain separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

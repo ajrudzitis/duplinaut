@@ -66,6 +66,48 @@ fn parse(bytes: &[u8]) -> Result<TarVolume<'_>, TarError> {
     TarVolume::parse(bytes, Termination::Data, TarLimits::default())
 }
 
+//= docs/parsing-requirements.md#parse-tar-018
+//= type=test
+//# For each real tar entry, the reader MUST checked-add fixed entry overhead and the exact admitted output name, link-target, `uname`, and `gname` lengths, then charge that amount against the remaining metadata limit before allocating any output fields. Arithmetic overflow or an exceeded limit MUST reject the volume without returning a partial entry list.
+#[test]
+fn entry_metadata_charge_exact_limit_and_rejection_are_atomic() {
+    let one = member(b"snapshot/file", b'0', b"");
+    let per_entry =
+        std::mem::size_of::<duplicity_core::tar::TarEntry<'_>>() * 4 + b"snapshot/file".len();
+    let exact = TarLimits {
+        max_metadata_bytes: per_entry,
+        ..TarLimits::default()
+    };
+    assert_eq!(
+        TarVolume::parse(&one, Termination::Data, exact)
+            .unwrap()
+            .entries
+            .len(),
+        1
+    );
+
+    let one_short = TarLimits {
+        max_metadata_bytes: per_entry - 1,
+        ..TarLimits::default()
+    };
+    assert_eq!(
+        TarVolume::parse(&one, Termination::Data, one_short).unwrap_err(),
+        TarError::Limit
+    );
+
+    let two = [one.as_slice(), one.as_slice()].concat();
+    let second_entry_over_limit = TarLimits {
+        max_metadata_bytes: per_entry * 2 - 1,
+        ..TarLimits::default()
+    };
+    // Parsing is atomic: the API returns no TarVolume containing the first
+    // entry when admitting the second entry exceeds the aggregate limit.
+    assert_eq!(
+        TarVolume::parse(&two, Termination::Data, second_entry_over_limit).unwrap_err(),
+        TarError::Limit
+    );
+}
+
 //= docs/parsing-requirements.md#parse-tar-001
 //= type=test
 //# The tar parser MUST validate each header checksum and payload extent before accepting the entry it describes.

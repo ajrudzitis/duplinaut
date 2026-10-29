@@ -339,14 +339,23 @@ impl<'a> TarVolume<'a> {
                 return Err(TarError::Limit);
             }
             // Conservative Vec capacity and entry storage accounting before allocation.
-            let entry_charge = std::mem::size_of::<TarEntry<'_>>()
-                .checked_mul(4)
-                .and_then(|v| v.checked_add(name_length))
-                .and_then(|v| v.checked_add(link_length))
-                .and_then(|v| v.checked_add(uname_length))
-                .and_then(|v| v.checked_add(gname_length))
-                .ok_or(TarError::Limit)?;
-            charge(&mut metadata, entry_charge, limits.max_metadata_bytes)?;
+            //= docs/parsing-requirements.md#parse-tar-018
+            //# For each real tar entry, the reader MUST checked-add fixed entry overhead and the exact admitted output name, link-target, `uname`, and `gname` lengths, then charge that amount against the remaining metadata limit before allocating any output fields. Arithmetic overflow or an exceeded limit MUST reject the volume without returning a partial entry list.
+            let entry_charge = crate::verified::tar_entry::entry_metadata_charge(
+                std::mem::size_of::<TarEntry<'_>>(),
+                4,
+                name_length,
+                link_length,
+                uname_length,
+                gname_length,
+            )
+            .ok_or(TarError::Limit)?;
+            metadata = crate::verified::tar_entry::admit_metadata_charge(
+                metadata,
+                entry_charge,
+                limits.max_metadata_bytes,
+            )
+            .ok_or(TarError::Limit)?;
             //= docs/parsing-requirements.md#parse-tar-015
             //# For each accepted tar entry, the output name MUST be the selected PAX path, GNU long-name, or raw ustar prefix/name, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
             let name = crate::verified::tar_pax::compose_effective_header_name(
