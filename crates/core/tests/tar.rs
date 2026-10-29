@@ -203,6 +203,60 @@ fn extension_metadata_charges_accumulate_across_headers() {
     );
 }
 
+//= docs/parsing-requirements.md#parse-tar-020
+//= type=test
+//# The reader MUST checked-increment the GNU/PAX extension-header count and reject the header if the increment overflows or exceeds `max_extended_headers`, before charging or interpreting extension contents.
+#[test]
+fn extension_header_count_is_bounded_before_content_interpretation() {
+    let payload = record(b"path", b"snapshot/file");
+    let entry = member(b"snapshot/file", b'0', b"");
+    let exactly_one = [member(b"pax", b'x', &payload).as_slice(), entry.as_slice()].concat();
+    assert!(TarVolume::parse(
+        &exactly_one,
+        Termination::Data,
+        TarLimits {
+            max_extended_headers: 1,
+            ..TarLimits::default()
+        },
+    )
+    .is_ok());
+
+    for kind in *b"LKxg" {
+        let malformed = member(b"extension", kind, b"!");
+        assert_eq!(
+            TarVolume::parse(
+                &malformed,
+                Termination::Data,
+                TarLimits {
+                    max_extended_headers: 0,
+                    ..TarLimits::default()
+                },
+            )
+            .unwrap_err(),
+            TarError::Limit,
+            "extension kind {} must be rejected by count before malformed contents are parsed",
+            char::from(kind),
+        );
+    }
+
+    let first = member(b"long-name", b'L', b"snapshot/file\0");
+    let malformed_second = member(b"pax", b'x', b"!");
+    let cumulative = [first.as_slice(), malformed_second.as_slice()].concat();
+    assert_eq!(
+        TarVolume::parse(
+            &cumulative,
+            Termination::Data,
+            TarLimits {
+                max_extended_headers: 1,
+                ..TarLimits::default()
+            },
+        )
+        .unwrap_err(),
+        TarError::Limit,
+        "the cumulative extension count must reject the second malformed header before parsing it",
+    );
+}
+
 //= docs/parsing-requirements.md#parse-tar-001
 //= type=test
 //# The tar parser MUST validate each header checksum and payload extent before accepting the entry it describes.

@@ -3712,6 +3712,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-extension-header-count"
+gate = true
+requirements = ["PARSE-TAR-020"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Verifies checked increment and configured bound admission before extension
+# metadata charging/content parsing; whole tar-loop refinement is separate.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry.rs", symbol = "admit_extension_header_count" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-extension-header-count", requirement = "PARSE-TAR-020", path = "crates/core/src/verified/tar_entry.rs", symbol = "admit_extension_header_count", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_entry::metadata_charge_tests::extension_header_count_checks_increment_and_configured_limit" },
+  { package = "duplicity-core", name = "extension_header_count_is_bounded_before_content_interpretation" }
+]
+
+[[milestone]]
 id = "tar-entry-metadata-charge"
 gate = true
 requirements = ["PARSE-TAR-018"]

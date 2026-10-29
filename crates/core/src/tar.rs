@@ -240,10 +240,13 @@ impl<'a> TarVolume<'a> {
                 })?;
             cursor = next;
             if extension {
-                extended = extended.checked_add(1).ok_or(TarError::Limit)?;
-                if extended > limits.max_extended_headers {
-                    return Err(TarError::Limit);
-                }
+                //= docs/parsing-requirements.md#parse-tar-020
+                //# The reader MUST checked-increment the GNU/PAX extension-header count and reject the header if the increment overflows or exceeds `max_extended_headers`, before charging or interpreting extension contents.
+                extended = crate::verified::tar_entry::admit_extension_header_count(
+                    extended,
+                    limits.max_extended_headers,
+                )
+                .ok_or(TarError::Limit)?;
                 //= docs/parsing-requirements.md#parse-tar-019
                 //# GNU `L`/`K` and PAX `x`/`g` extension headers MUST charge their raw-header payload size against the cumulative metadata limit before interpreting or retaining extension metadata. Arithmetic overflow or an exceeded limit MUST reject the volume without returning partial entries.
                 metadata = crate::verified::tar_entry::admit_extension_metadata_charge(

@@ -232,6 +232,9 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: GNU `L`/`K` and PAX `x`/`g` extension headers MUST charge their raw-header payload size against the cumulative metadata limit before interpreting or retaining extension metadata.
     TEXT[!MUST,implementation,test]: Arithmetic overflow or an exceeded limit MUST reject the volume without returning partial entries.
 
+  SECTION: [PARSE-TAR-020](#parse-tar-020)
+    TEXT[!MUST,implementation,test]: The reader MUST checked-increment the GNU/PAX extension-header count and reject the header if the increment overflows or exceeds `max_extended_headers`, before charging or interpreting extension contents.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

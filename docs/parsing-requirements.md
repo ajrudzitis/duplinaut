@@ -535,6 +535,12 @@ GNU `L`/`K` and PAX `x`/`g` extension headers MUST charge their raw-header paylo
 
 Provenance: POLICY and PARSE-TAR-007/018. The extension charge uses the raw extension-header size, not an effective PAX size; whole-controller accounting remains separate.
 
+### PARSE-TAR-020
+
+The reader MUST checked-increment the GNU/PAX extension-header count and reject the header if the increment overflows or exceeds `max_extended_headers`, before charging or interpreting extension contents.
+
+Provenance: POLICY. This proves the extension-count transition and its parser ordering before extension metadata charging/content interpretation; whole tar-loop refinement remains separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

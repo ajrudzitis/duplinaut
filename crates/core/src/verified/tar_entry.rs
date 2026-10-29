@@ -132,9 +132,32 @@ pub fn admit_extension_metadata_charge(used: usize, raw_header_size: usize, limi
     admit_metadata_charge(used, raw_header_size, limit)
 }
 
+//= docs/parsing-requirements.md#parse-tar-020
+//# The reader MUST checked-increment the GNU/PAX extension-header count and reject the header if the increment overflows or exceeds `max_extended_headers`, before charging or interpreting extension contents.
+pub open spec fn extension_header_count_model(current: int, maximum: int) -> Option<int> {
+    let next = current + 1;
+    if next <= usize::MAX as int && next <= maximum { Some(next) } else { None }
+}
+
+//= docs/parsing-requirements.md#parse-tar-020
+//# The reader MUST checked-increment the GNU/PAX extension-header count and reject the header if the increment overflows or exceeds `max_extended_headers`, before charging or interpreting extension contents.
+pub fn admit_extension_header_count(current: usize, maximum: usize) -> (result: Option<usize>)
+    ensures match result {
+        Some(next) => extension_header_count_model(current as int, maximum as int)
+            == Some(next as int),
+        None => extension_header_count_model(current as int, maximum as int) is None,
+    },
+{
+    let next = current.checked_add(1)?;
+    if next > maximum { None } else { Some(next) }
+}
+
 #[cfg(test)]
 mod metadata_charge_tests {
-    use super::{admit_extension_metadata_charge, admit_metadata_charge, entry_metadata_charge};
+    use super::{
+        admit_extension_header_count, admit_extension_metadata_charge, admit_metadata_charge,
+        entry_metadata_charge,
+    };
 
     #[test]
     fn entry_metadata_charge_checked_formula_and_budget_admission() {
@@ -154,6 +177,17 @@ mod metadata_charge_tests {
         assert_eq!(admit_extension_metadata_charge(12, 7, 19), Some(19));
         assert_eq!(admit_extension_metadata_charge(12, 7, 18), None);
         assert_eq!(admit_extension_metadata_charge(usize::MAX, 1, usize::MAX), None);
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-020
+    //= type=test
+    //# The reader MUST checked-increment the GNU/PAX extension-header count and reject the header if the increment overflows or exceeds `max_extended_headers`, before charging or interpreting extension contents.
+    #[test]
+    fn extension_header_count_checks_increment_and_configured_limit() {
+        assert_eq!(admit_extension_header_count(0, 1), Some(1));
+        assert_eq!(admit_extension_header_count(usize::MAX - 1, usize::MAX), Some(usize::MAX));
+        assert_eq!(admit_extension_header_count(1, 1), None);
+        assert_eq!(admit_extension_header_count(usize::MAX, usize::MAX), None);
     }
 }
 
