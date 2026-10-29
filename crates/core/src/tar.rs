@@ -287,14 +287,22 @@ impl<'a> TarVolume<'a> {
             }
             let raw_name = text(h.name);
             let prefix = if posix { text(h.prefix) } else { b"" };
+            //= docs/parsing-requirements.md#parse-tar-012
+            //# The parser MUST choose PAX `path`, then GNU long-name, then the raw ustar prefix/name; it MUST compute that selected name's exact byte length and reject lengths above `max_path_bytes` before allocating the output name.
             let name = crate::verified::tar_pax::effective_name_override(values[0], long_name);
             let link = crate::verified::tar_pax::effective_link_override(values[1], long_link)
                 .unwrap_or(text(h.linkname));
-            let name_length = name.map_or(
-                raw_name.len() + prefix.len() + usize::from(!prefix.is_empty()),
-                |v| v.len(),
-            );
-            if name_length > limits.max_path_bytes || link.len() > limits.max_path_bytes {
+            //= docs/parsing-requirements.md#parse-tar-012
+            //# The parser MUST choose PAX `path`, then GNU long-name, then the raw ustar prefix/name; it MUST compute that selected name's exact byte length and reject lengths above `max_path_bytes` before allocating the output name.
+            let (name_length, name_admitted) =
+                crate::verified::tar_pax::effective_header_name_length_and_admission(
+                    name,
+                    prefix,
+                    raw_name,
+                    limits.max_path_bytes,
+                )
+                .ok_or(TarError::Limit)?;
+            if !name_admitted || link.len() > limits.max_path_bytes {
                 return Err(TarError::Limit);
             }
             if crate::verified::tar_pax::owner_name_requires_utf8(values[10]) {

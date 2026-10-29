@@ -419,6 +419,64 @@ pub fn compose_ustar_header_name(prefix: &[u8], raw_name: &[u8]) -> (result: Vec
     result
 }
 
+//= docs/parsing-requirements.md#parse-tar-012
+//# The parser MUST choose PAX `path`, then GNU long-name, then the raw ustar prefix/name; it MUST compute that selected name's exact byte length and reject lengths above `max_path_bytes` before allocating the output name.
+pub open spec fn effective_header_name_length_model(
+    selected_override: Option<Seq<u8>>,
+    prefix: Seq<u8>,
+    raw_name: Seq<u8>,
+) -> int {
+    match selected_override {
+        Some(name) => name.len() as int,
+        None => ustar_header_name_model(prefix, raw_name).len() as int,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-012
+//# The parser MUST choose PAX `path`, then GNU long-name, then the raw ustar prefix/name; it MUST compute that selected name's exact byte length and reject lengths above `max_path_bytes` before allocating the output name.
+#[allow(clippy::manual_map)]
+pub fn effective_header_name_length_and_admission(
+    selected_override: Option<&[u8]>,
+    prefix: &[u8],
+    raw_name: &[u8],
+    max_path_bytes: usize,
+) -> (result: Option<(usize, bool)>)
+    ensures match result {
+        None => effective_header_name_length_model(
+            match selected_override {
+                None => None,
+                Some(name) => Some(name@),
+            }, prefix@, raw_name@,
+        ) > usize::MAX as int,
+        Some((length, admitted)) =>
+            length as int == effective_header_name_length_model(
+                match selected_override {
+                    None => None,
+                    Some(name) => Some(name@),
+                }, prefix@, raw_name@,
+            )
+            && admitted == (length <= max_path_bytes),
+    },
+{
+    let length = match selected_override {
+        Some(name) => Some(name.len()),
+        None => {
+            if prefix.is_empty() {
+                Some(raw_name.len())
+            } else {
+                match prefix.len().checked_add(1) {
+                    None => None,
+                    Some(with_separator) => with_separator.checked_add(raw_name.len()),
+                }
+            }
+        },
+    };
+    match length {
+        None => None,
+        Some(length) => Some((length, length <= max_path_bytes)),
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
@@ -997,11 +1055,11 @@ pub fn ingest<'a>(input: &'a [u8])
 #[cfg(test)]
 mod tests {
     use super::{
-        admit_record, compose_ustar_header_name, effective_id, effective_link_override,
-        effective_mtime, effective_name_override, effective_optional_time, effective_owner_name,
-        effective_size, hdrcharset_value_supported, ingest, nul_terminated_prefix,
-        owner_name_requires_utf8, payload_size, resolve_values, PaxIdError, PaxIngestError,
-        PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
+        admit_record, compose_ustar_header_name, effective_header_name_length_and_admission,
+        effective_id, effective_link_override, effective_mtime, effective_name_override,
+        effective_optional_time, effective_owner_name, effective_size, hdrcharset_value_supported,
+        ingest, nul_terminated_prefix, owner_name_requires_utf8, payload_size, resolve_values,
+        PaxIdError, PaxIngestError, PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
     };
 
     fn framed_record(key: &[u8], value: &[u8]) -> Vec<u8> {
@@ -1205,6 +1263,30 @@ mod tests {
         assert_eq!(
             compose_ustar_header_name(b"snapshot/", b"file"),
             b"snapshot//file"
+        );
+    }
+
+    #[test]
+    fn effective_header_name_length_matches_override_or_raw_ustar_and_limit() {
+        assert_eq!(
+            effective_header_name_length_and_admission(Some(b"pax"), b"prefix", b"raw", 3),
+            Some((3, true))
+        );
+        assert_eq!(
+            effective_header_name_length_and_admission(Some(b"gnu-long"), b"prefix", b"raw", 7),
+            Some((8, false))
+        );
+        assert_eq!(
+            effective_header_name_length_and_admission(None, b"dir", b"file", 8),
+            Some((8, true))
+        );
+        assert_eq!(
+            effective_header_name_length_and_admission(None, b"dir", b"file", 7),
+            Some((8, false))
+        );
+        assert_eq!(
+            effective_header_name_length_and_admission(None, b"", b"file", 4),
+            Some((4, true))
         );
     }
 

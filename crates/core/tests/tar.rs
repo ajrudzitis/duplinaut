@@ -338,6 +338,62 @@ fn raw_tar_name_and_link_fields_end_at_first_nul() {
     assert_eq!(parsed.entries[1].linkname, b"target");
 }
 
+//= docs/parsing-requirements.md#parse-tar-012
+//= type=test
+//# The parser MUST choose PAX `path`, then GNU long-name, then the raw ustar prefix/name; it MUST compute that selected name's exact byte length and reject lengths above `max_path_bytes` before allocating the output name.
+#[test]
+fn effective_name_limit_uses_pax_gnu_or_raw_ustar_source_length() {
+    let mut raw = member(b"file", b'0', b"");
+    raw[345..349].copy_from_slice(b"dir/");
+    checksum(&mut raw[..512]);
+    let raw_archive = raw;
+
+    let pax_archive = [
+        member(b"local", b'x', &record(b"path", b"pax-name")),
+        member(b"raw", b'0', b""),
+    ]
+    .concat();
+    let gnu_archive = [
+        member(b"././@LongLink", b'L', b"gnu-name\0"),
+        member(b"raw", b'0', b""),
+    ]
+    .concat();
+
+    for (archive, expected_name) in [
+        (raw_archive.as_slice(), b"dir//file" as &[u8]),
+        (pax_archive.as_slice(), b"pax-name"),
+        (gnu_archive.as_slice(), b"gnu-name"),
+    ] {
+        let exact_limit = expected_name.len();
+        assert_eq!(
+            TarVolume::parse(
+                archive,
+                Termination::Data,
+                TarLimits {
+                    max_path_bytes: exact_limit,
+                    ..TarLimits::default()
+                },
+            )
+            .unwrap()
+            .entries[0]
+                .name,
+            expected_name
+        );
+        assert_eq!(
+            TarVolume::parse(
+                archive,
+                Termination::Data,
+                TarLimits {
+                    max_path_bytes: exact_limit - 1,
+                    ..TarLimits::default()
+                },
+            )
+            .unwrap_err(),
+            TarError::Limit
+        );
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
