@@ -595,6 +595,12 @@ For each real tar entry, the reader MUST use the effective PAX `mtime` value whe
 
 Provenance: DOC-TAR and SRC-TAR establish PAX mtime override semantics; the reviewed profile defines signed fractional-second decoding. Raw header mtime decoding and `i64` narrowing remain specified by PARSE-TAR-011, PAX value grammar remains separate, and this requirement does not refine extension-state selection or the complete tar controller.
 
+### PARSE-TAR-030
+
+For each accepted real tar entry, the reader MUST preserve the decoded raw header `mode` after the `u32` admission required by PARSE-TAR-011. A PAX `mode` key MUST be rejected as UnsupportedPax; it MUST NOT replace the raw header mode.
+
+Provenance: DOC-TAR and SRC-TAR define the raw mode field; the supported PAX key profile and reader policy exclude `mode` as a semantic override. Numeric decoding, mode-width admission, and the complete tar-controller error ordering remain specified separately.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

@@ -4552,6 +4552,29 @@ tests = [
   { package = "duplicity-core", name = "invalid_pax_mtime_does_not_fall_back_to_valid_raw_header_time" }
 ]
 
+[[milestone]]
+id = "tar-entry-mode-retention"
+gate = true
+requirements = ["PARSE-TAR-030"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The existing narrow_mode contract proves the retained raw value fits u32;
+# native tests cover parser publication and reject PAX mode as unsupported.
+implementations = [
+  { path = "crates/core/src/verified/tar_number.rs", symbol = "narrow_mode" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-entry-mode-retention", requirement = "PARSE-TAR-030", path = "crates/core/src/verified/tar_number.rs", symbol = "narrow_mode", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "raw_header_mode_is_retained_and_pax_mode_is_unsupported" }
+]
+
 [[trusted]]
 id = "upstream-verus-vest"
 reviewed = true

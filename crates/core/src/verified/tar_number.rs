@@ -166,6 +166,8 @@ pub fn unsigned(input: &[u8]) -> (result: Option<u64>)
 
 //= docs/parsing-requirements.md#parse-tar-011
 //# Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
+//= docs/parsing-requirements.md#parse-tar-030
+//# For each accepted real tar entry, the reader MUST preserve the decoded raw header `mode` after the `u32` admission required by PARSE-TAR-011. A PAX `mode` key MUST be rejected as UnsupportedPax; it MUST NOT replace the raw header mode.
 pub fn narrow_mode(value: u64) -> (result: Option<u32>)
     ensures match result {
         Some(mode) => mode as u64 == value && value <= u32::MAX as u64,

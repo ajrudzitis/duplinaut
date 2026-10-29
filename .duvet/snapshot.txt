@@ -275,6 +275,10 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: For each real tar entry, the reader MUST use the effective PAX `mtime` value when present; otherwise it MUST use the decoded raw header mtime seconds with zero nanoseconds.
     TEXT[!MUST,implementation,test]: A present but invalid PAX `mtime` MUST produce Numeric and MUST NOT fall back to the raw header timestamp.
 
+  SECTION: [PARSE-TAR-030](#parse-tar-030)
+    TEXT[!MUST,implementation,test]: For each accepted real tar entry, the reader MUST preserve the decoded raw header `mode` after the `u32` admission required by PARSE-TAR-011.
+    TEXT[!MUST,implementation,test]: A PAX `mode` key MUST be rejected as UnsupportedPax; it MUST NOT replace the raw header mode.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

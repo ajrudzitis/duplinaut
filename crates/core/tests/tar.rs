@@ -2159,6 +2159,22 @@ fn numeric_conversion_boundaries_and_interior_padding() {
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-030
+//= type=test
+//# For each accepted real tar entry, the reader MUST preserve the decoded raw header `mode` after the `u32` admission required by PARSE-TAR-011. A PAX `mode` key MUST be rejected as UnsupportedPax; it MUST NOT replace the raw header mode.
+#[test]
+fn raw_header_mode_is_retained_and_pax_mode_is_unsupported() {
+    let mut raw = member(b"snapshot/mode", b'0', b"");
+    raw[100..108].copy_from_slice(b"0000123\0");
+    checksum(&mut raw[..512]);
+    assert_eq!(parse(&raw).unwrap().entries[0].mode, 0o123);
+
+    for kind in *b"xg" {
+        let pax_mode = member(b"pax", kind, &record(b"mode", b"0777"));
+        assert_eq!(parse(&pax_mode).unwrap_err(), TarError::UnsupportedPax);
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
