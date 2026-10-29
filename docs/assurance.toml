@@ -1993,8 +1993,12 @@ reviewed = true
 proof_required = true
 # Successful long IncrementalVolume body parsing composes exact raw
 # start/marker/end/volume/trailer and suffix splits with configured timestamps,
-# the increasing interval, positive volume, and suffix semantics. Errors and
-# other routes remain outside this scope.
+# the increasing interval, positive volume, and suffix semantics. The direct
+# 24-case body-parser result matrix covers three UTC-equivalent increasing
+# interval spellings, raw `vol42.difftar`, and all eight supported suffix
+# profiles. It is regression evidence only; raw-model-to-parser success via
+# split-model projection, malformed raw-body error completeness, and other
+# routes remain open.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "body" },
   { path = "crates/core/src/names.rs", symbol = "long_incremental_volume_body_fields" }
@@ -2003,7 +2007,8 @@ proofs = [
   { id = "name-long-incremental-volume-raw-body-controller", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "body", kind = "contract" }
 ]
 tests = [
-  { package = "duplicity-core", name = "long_incremental_volume_body_composes_fields_and_rejects_malformed_fields" }
+  { package = "duplicity-core", name = "long_incremental_volume_body_composes_fields_and_rejects_malformed_fields" },
+  { package = "duplicity-core", name = "names::tests::long_incremental_volume_body_raw_result_matrix" }
 ]
 
 [[milestone]]
