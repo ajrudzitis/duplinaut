@@ -3662,6 +3662,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-effective-owner-name-copy"
+gate = true
+requirements = ["PARSE-TAR-017"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Ties copied uname/gname bytes and lengths to the already-selected borrowed
+# values and pre-admitted accounting lengths. Charset and whole-controller
+# refinement remain outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "copy_effective_owner_name" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-effective-owner-name-copy", requirement = "PARSE-TAR-017", path = "crates/core/src/verified/tar_pax.rs", symbol = "copy_effective_owner_name", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::copied_owner_name_matches_selected_pax_or_header_bytes_and_length" },
+  { package = "duplicity-core", name = "pax_owner_names_fallback_override_delete_and_resume_global_values" }
+]
+
+[[milestone]]
 id = "tar-effective-name-composition-length"
 gate = true
 requirements = ["PARSE-TAR-015"]

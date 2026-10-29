@@ -643,6 +643,28 @@ pub fn effective_owner_name_length_and_admission(
     (length, length <= max_path_bytes)
 }
 
+//= docs/parsing-requirements.md#parse-tar-017
+//# For each accepted tar entry, output `uname` and `gname` bytes MUST equal their selected PAX override or raw header fallback, and each output length MUST equal the precomputed length used for admission and metadata accounting.
+pub fn copy_effective_owner_name(
+    selected_owner_name: &[u8],
+    expected_length: usize,
+) -> (result: Vec<u8>)
+    requires expected_length == selected_owner_name.len(),
+    ensures result@ == selected_owner_name@ && result.len() == expected_length,
+{
+    let mut result = Vec::with_capacity(expected_length);
+    let mut i = 0;
+    while i < selected_owner_name.len()
+        invariant 0 <= i <= selected_owner_name.len(),
+            result@ == selected_owner_name@.subrange(0, i as int),
+        decreases selected_owner_name.len() - i,
+    {
+        result.push(selected_owner_name[i]);
+        i += 1;
+    }
+    result
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
@@ -1177,7 +1199,8 @@ pub fn ingest<'a>(input: &'a [u8])
 mod tests {
     use super::{
         admit_record, compose_effective_header_name, compose_ustar_header_name,
-        copy_effective_link_target, effective_header_name_length_and_admission, effective_id,
+        copy_effective_link_target, copy_effective_owner_name,
+        effective_header_name_length_and_admission, effective_id,
         effective_link_length_and_admission, effective_link_override, effective_mtime,
         effective_name_override, effective_optional_time, effective_owner_name,
         effective_owner_name_length_and_admission, effective_size, hdrcharset_value_supported,
@@ -1520,6 +1543,25 @@ mod tests {
             effective_owner_name_length_and_admission(b"raw-grp!", 7),
             (8, false)
         );
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-017
+    //= type=test
+    //# For each accepted tar entry, output `uname` and `gname` bytes MUST equal their selected PAX override or raw header fallback, and each output length MUST equal the precomputed length used for admission and metadata accounting.
+    #[test]
+    fn copied_owner_name_matches_selected_pax_or_header_bytes_and_length() {
+        let pax_uname = copy_effective_owner_name(b"pax-user", 8);
+        let header_uname = copy_effective_owner_name(b"header-user", 11);
+        let pax_gname = copy_effective_owner_name(b"pax-group", 9);
+        let header_gname = copy_effective_owner_name(b"header-group", 12);
+        assert_eq!(pax_uname, b"pax-user");
+        assert_eq!(header_uname, b"header-user");
+        assert_eq!(pax_gname, b"pax-group");
+        assert_eq!(header_gname, b"header-group");
+        assert_eq!(pax_uname.len(), 8);
+        assert_eq!(header_uname.len(), 11);
+        assert_eq!(pax_gname.len(), 9);
+        assert_eq!(header_gname.len(), 12);
     }
 
     //= docs/parsing-requirements.md#parse-tar-003

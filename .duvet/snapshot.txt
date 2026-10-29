@@ -221,6 +221,9 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
   SECTION: [PARSE-TAR-016](#parse-tar-016)
     TEXT[!MUST,implementation,test]: For each accepted tar entry, the output link target MUST equal the selected PAX `linkpath`, GNU long-link, or raw header `linkname` bytes, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
 
+  SECTION: [PARSE-TAR-017](#parse-tar-017)
+    TEXT[!MUST,implementation,test]: For each accepted tar entry, output `uname` and `gname` bytes MUST equal their selected PAX override or raw header fallback, and each output length MUST equal the precomputed length used for admission and metadata accounting.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

@@ -392,8 +392,12 @@ impl<'a> TarVolume<'a> {
                 uid,
                 gid,
                 mtime,
-                uname: uname.to_vec(),
-                gname: gname.to_vec(),
+                //= docs/parsing-requirements.md#parse-tar-017
+                //# For each accepted tar entry, output `uname` and `gname` bytes MUST equal their selected PAX override or raw header fallback, and each output length MUST equal the precomputed length used for admission and metadata accounting.
+                uname: crate::verified::tar_pax::copy_effective_owner_name(uname, uname_length),
+                //= docs/parsing-requirements.md#parse-tar-017
+                //# For each accepted tar entry, output `uname` and `gname` bytes MUST equal their selected PAX override or raw header fallback, and each output length MUST equal the precomputed length used for admission and metadata accounting.
+                gname: crate::verified::tar_pax::copy_effective_owner_name(gname, gname_length),
                 atime,
                 ctime,
                 device_major,

@@ -517,6 +517,12 @@ For each accepted tar entry, the output link target MUST equal the selected PAX 
 
 Provenance: SRC-TAR and PARSE-TAR-003/013. This connects the selected borrowed target to the copied entry value; NUL and semantic target validation and complete tar-controller refinement remain separate.
 
+### PARSE-TAR-017
+
+For each accepted tar entry, output `uname` and `gname` bytes MUST equal their selected PAX override or raw header fallback, and each output length MUST equal the precomputed length used for admission and metadata accounting.
+
+Provenance: SRC-TAR and PARSE-TAR-003/014. This connects selected borrowed owner-name values to copied entry metadata; charset semantics and complete tar-controller refinement remain separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
