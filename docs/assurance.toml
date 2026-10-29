@@ -1898,10 +1898,12 @@ proved = true
 tested = true
 reviewed = true
 proof_required = true
-# A successful short IncrementalVolume body result is tied to the exact raw
-# field/suffix decomposition and the semantic interval, positive base36
-# volume, trailer and partial-profile model. This does not prove the reverse
-# implication, error completeness, or the complete filename grammar.
+# A successful short IncrementalVolume body result implies the exact raw field/
+# suffix decomposition and semantic interval, positive base36 volume, trailer
+# and partial-profile model. A direct 18-case raw-body result matrix is tested,
+# but the raw-model-to-parser converse remains open because split-model
+# projection is unproved. Malformed raw-body error completeness and complete
+# filename grammar also remain open.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body" },
   { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body_fields" },
@@ -1911,7 +1913,8 @@ proofs = [
   { id = "name-short-incremental-volume-success-result-refinement", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body", kind = "contract" }
 ]
 tests = [
-  { package = "duplicity-core", name = "names::tests::short_incremental_volume_success_route_composes_interval_volume_and_trailer" }
+  { package = "duplicity-core", name = "names::tests::short_incremental_volume_success_route_composes_interval_volume_and_trailer" },
+  { package = "duplicity-core", name = "names::tests::short_incremental_volume_body_raw_result_matrix" }
 ]
 
 [[milestone]]

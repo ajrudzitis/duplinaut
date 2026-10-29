@@ -9203,6 +9203,58 @@ mod tests {
     //= docs/parsing-requirements.md#parse-name-001
     //= type=test
     //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-003
+    //= type=test
+    //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    //= docs/parsing-requirements.md#parse-name-006
+    //= type=test
+    //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+    fn short_incremental_volume_body_raw_result_matrix() {
+        let intervals: [(&[u8], &[u8], i128, i128); 3] = [
+            (b"1", b"2", 1, 2),
+            (b"z", b"10", 35, 36),
+            (b"10", b"11", 36, 37),
+        ];
+        type RawVolumeProfile<'a> = (&'a [u8], super::Envelope, bool);
+        let profiles: [RawVolumeProfile<'_>; 6] = [
+            (b"", super::Envelope::Plain, false),
+            (b".p", super::Envelope::Plain, true),
+            (b".z", super::Envelope::Gzip, false),
+            (b".g", super::Envelope::OpenPgp, false),
+            (b".p.z", super::Envelope::Gzip, true),
+            (b".p.g", super::Envelope::OpenPgp, true),
+        ];
+
+        for (start_field, end_field, start, end) in intervals {
+            for (suffix, envelope, partial) in profiles {
+                let mut raw = Vec::new();
+                raw.extend_from_slice(start_field);
+                raw.push(b'.');
+                raw.extend_from_slice(end_field);
+                raw.extend_from_slice(b".10.dt");
+                raw.extend_from_slice(suffix);
+
+                assert_eq!(
+                    super::short_incremental_volume_body(&raw, b':'),
+                    Ok(super::ObjectName {
+                        kind: super::ObjectKind::IncrementalVolume,
+                        start: super::Timestamp(start),
+                        end: super::Timestamp(end),
+                        volume: Some(36),
+                        envelope,
+                        partial,
+                        short: true,
+                    }),
+                    "{raw:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
     fn long_incremental_volume_dispatch_selects_only_its_profile() {
         let kinds = [
             super::ObjectKind::FullVolume,
