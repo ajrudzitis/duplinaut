@@ -3453,6 +3453,35 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-dangling-extension-latch"
+gate = true
+requirements = ["PARSE-TAR-005"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves the pending latch for local PAX/GNU extensions, its reset after an
+# accepted entry, and its EOF diagnostic decision. Complete tar-loop
+# refinement remains outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "update_pending_override" },
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "clear_pending_override" },
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "dangling_override_at_eof" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-dangling-pending-update", requirement = "PARSE-TAR-005", path = "crates/core/src/verified/tar_pax.rs", symbol = "update_pending_override", kind = "contract" },
+  { id = "tar-dangling-pending-clear", requirement = "PARSE-TAR-005", path = "crates/core/src/verified/tar_pax.rs", symbol = "clear_pending_override", kind = "contract" },
+  { id = "tar-dangling-eof-decision", requirement = "PARSE-TAR-005", path = "crates/core/src/verified/tar_pax.rs", symbol = "dangling_override_at_eof", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::pending_override_latch_distinguishes_local_extensions_from_global" },
+  { package = "duplicity-core", name = "trailing_global_state_is_valid_but_local_overrides_are_dangling" }
+]
+
+[[milestone]]
 id = "tar-pax-effective-size"
 gate = true
 requirements = ["PARSE-TAR-003"]

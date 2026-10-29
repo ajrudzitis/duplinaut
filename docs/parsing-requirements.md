@@ -447,6 +447,8 @@ Provenance: POLICY. An unknown encoding cannot be skipped by guessing its size o
 
 The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.
 
+A local PAX or GNU long-name/link override MUST require a following real entry, while a global PAX header alone MUST NOT make EOF dangling. A real entry clears pending local PAX or GNU long-name/link override state only after the entry is accepted. A dangling local PAX or GNU long-name/link override MUST produce `DanglingOverride` at EOF.
+
 Provenance: SRC-HASH (`GzipWriteFile`, `GPGWriteFile`), SRC-DIFF, SRC-HIST-321, official 0.8.23/2.1.3/3.0.7/3.2.1 observations. Raw/gzip data volumes accept complete-entry EOF for the inspected older profiles or the exact producer zero footer for 3.2.1. The general compatible zero-terminated input profile accepts one or more complete all-zero 512-byte blocks after complete entries; no nonzero trailing bytes are permitted. Encrypted data volumes require the exact zero footer described above; optional nonfinal top-off is validated as an exact prefix of the original stored ciphertext bytes. Final encrypted volumes permit no top-off. Signature archives accept a standard zero-terminated tar (including empty) or an exactly zero-byte decoded signature stream. Unexpected trailing bytes and dangling extended headers are errors. Any missing required stored volume or incomplete multipart entry remains an error despite valid container EOF.
 
 ### PARSE-TAR-006

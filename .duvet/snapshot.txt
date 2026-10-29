@@ -177,6 +177,9 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
 
   SECTION: [PARSE-TAR-005](#parse-tar-005)
     TEXT[!MUST,implementation,test]: The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.
+    TEXT[!MUST,implementation,test]: A local PAX or GNU long-name/link override MUST require a following real entry, while a global PAX header alone MUST NOT make EOF dangling.
+    TEXT[implementation,test]: A real entry clears pending local PAX or GNU long-name/link override state only after the entry is accepted.
+    TEXT[!MUST,implementation,test]: A dangling local PAX or GNU long-name/link override MUST produce `DanglingOverride` at EOF.
 
   SECTION: [PARSE-TAR-006](#parse-tar-006)
     TEXT[!MUST,implementation,test]: The tar parser MUST apply PAX extension state in header order.

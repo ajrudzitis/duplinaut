@@ -1529,6 +1529,15 @@ fn numeric_conversion_boundaries_and_interior_padding() {
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+//= docs/parsing-requirements.md#parse-tar-005
+//= type=test
+//# A local PAX or GNU long-name/link override MUST require a following real entry, while a global PAX header alone MUST NOT make EOF dangling.
+//= docs/parsing-requirements.md#parse-tar-005
+//= type=test
+//# A real entry clears pending local PAX or GNU long-name/link override state only after the entry is accepted.
+//= docs/parsing-requirements.md#parse-tar-005
+//= type=test
+//# A dangling local PAX or GNU long-name/link override MUST produce `DanglingOverride` at EOF.
 #[test]
 fn trailing_global_state_is_valid_but_local_overrides_are_dangling() {
     let global = member(b"global", b'g', &record(b"uid", b"1"));
@@ -1542,6 +1551,21 @@ fn trailing_global_state_is_valid_but_local_overrides_are_dangling() {
         let with_footer = [bytes, vec![0; 512]].concat();
         assert_eq!(parse(&with_footer).unwrap_err(), TarError::DanglingOverride);
     }
+    let pending_then_global = [
+        member(b"local", b'x', &record(b"uid", b"1")),
+        member(b"global", b'g', &record(b"uid", b"2")),
+    ]
+    .concat();
+    assert_eq!(
+        parse(&pending_then_global).unwrap_err(),
+        TarError::DanglingOverride
+    );
+    let accepted_entry = [
+        member(b"local", b'x', &record(b"uid", b"1")),
+        member(b"snapshot/file", b'0', b""),
+    ]
+    .concat();
+    assert_eq!(parse(&accepted_entry).unwrap().entries.len(), 1);
 }
 
 //= docs/parsing-requirements.md#parse-tar-003

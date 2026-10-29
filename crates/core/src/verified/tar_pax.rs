@@ -293,6 +293,30 @@ pub fn consume_local_update<'a>(
     [None; 11]
 }
 
+//= docs/parsing-requirements.md#parse-tar-005
+//# A local PAX or GNU long-name/link override MUST require a following real entry, while a global PAX header alone MUST NOT make EOF dangling.
+pub fn update_pending_override(pending: bool, header_type: u8) -> (result: bool)
+    ensures result == (pending || header_type == b'x' || header_type == b'L' || header_type == b'K'),
+{
+    pending || header_type == b'x' || header_type == b'L' || header_type == b'K'
+}
+
+//= docs/parsing-requirements.md#parse-tar-005
+//# A local PAX or GNU long-name/link override MUST require a following real entry, while a global PAX header alone MUST NOT make EOF dangling.
+pub fn clear_pending_override(_pending: bool) -> (result: bool)
+    ensures result == false,
+{
+    false
+}
+
+//= docs/parsing-requirements.md#parse-tar-005
+//# A local PAX or GNU long-name/link override MUST require a following real entry, while a global PAX header alone MUST NOT make EOF dangling.
+pub fn dangling_override_at_eof(pending: bool) -> (result: bool)
+    ensures result == pending,
+{
+    pending
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
@@ -978,6 +1002,20 @@ mod tests {
         let after_entry = resolve_values(global, consumed);
         assert_eq!(after_entry[0], Some(&b"global-b"[..]));
         assert_eq!(after_entry[4], None);
+    }
+
+    #[test]
+    fn pending_override_latch_distinguishes_local_extensions_from_global() {
+        for header_type in *b"xLK" {
+            assert!(super::update_pending_override(false, header_type));
+            assert!(super::update_pending_override(true, header_type));
+        }
+        assert!(!super::update_pending_override(false, b'g'));
+        assert!(super::update_pending_override(true, b'g'));
+        assert!(!super::clear_pending_override(true));
+        assert!(!super::clear_pending_override(false));
+        assert!(super::dangling_override_at_eof(true));
+        assert!(!super::dangling_override_at_eof(false));
     }
 
     #[test]

@@ -250,18 +250,15 @@ impl<'a> TarVolume<'a> {
                 match h.entry_type {
                     b'L' => {
                         long_name = Some(long(payload, limits.max_path_bytes)?);
-                        pending = true;
                     }
                     b'K' => {
                         long_link = Some(long(payload, limits.max_path_bytes)?);
-                        pending = true;
                     }
                     b'x' => {
                         let parsed = pax(payload)?;
                         //= docs/parsing-requirements.md#parse-tar-006
                         //# Each present field in a local `x` header replaces the pending local value, including empty values, while omitted local fields persist across later extension headers.
                         local = crate::verified::tar_pax::apply_local_update(local, parsed);
-                        pending = true;
                     }
                     b'g' => {
                         let parsed = pax(payload)?;
@@ -271,6 +268,9 @@ impl<'a> TarVolume<'a> {
                     }
                     _ => unreachable!(),
                 }
+                //= docs/parsing-requirements.md#parse-tar-005
+                //# A local PAX or GNU long-name/link override MUST require a following real entry, while a global PAX header alone MUST NOT make EOF dangling.
+                pending = crate::verified::tar_pax::update_pending_override(pending, h.entry_type);
                 continue;
             }
             let entry_type = crate::verified::tar_entry::classify_entry_type(h.entry_type, size)
@@ -367,11 +367,15 @@ impl<'a> TarVolume<'a> {
             //= docs/parsing-requirements.md#parse-tar-006
             //# That local state MUST be consumed only after the real entry is accepted.
             local = crate::verified::tar_pax::consume_local_update(local);
-            pending = false;
+            //= docs/parsing-requirements.md#parse-tar-005
+            //# A real entry clears pending local PAX or GNU long-name/link override state only after the entry is accepted.
+            pending = crate::verified::tar_pax::clear_pending_override(pending);
             long_name = None;
             long_link = None;
         }
-        if pending {
+        //= docs/parsing-requirements.md#parse-tar-005
+        //# A dangling local PAX or GNU long-name/link override MUST produce `DanglingOverride` at EOF.
+        if crate::verified::tar_pax::dangling_override_at_eof(pending) {
             return Err(TarError::DanglingOverride);
         }
         footer(bytes, cursor, profile)?;
