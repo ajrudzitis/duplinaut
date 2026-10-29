@@ -7627,6 +7627,58 @@ mod tests {
     //= docs/parsing-requirements.md#parse-name-007
     //= type=test
     //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    fn long_full_manifest_body_raw_result_matrix() {
+        let timestamps: [(&[u8], u8); 3] = [
+            (b"19700101T000000Z", b':'),
+            (b"1970-01-01T00:00:00Z", b':'),
+            (b"1970-01-01T01_00_00+01_00", b'_'),
+        ];
+        type RawLongManifestProfile<'a> = (&'a [u8], super::Envelope, bool);
+        let profiles: [RawLongManifestProfile<'_>; 8] = [
+            (b"", super::Envelope::Plain, false),
+            (b".part", super::Envelope::Plain, true),
+            (b".gz", super::Envelope::Gzip, false),
+            (b".gpg", super::Envelope::OpenPgp, false),
+            (b".p7m", super::Envelope::Pkcs7, false),
+            (b".part.gz", super::Envelope::Gzip, true),
+            (b".part.gpg", super::Envelope::OpenPgp, true),
+            (b".part.p7m", super::Envelope::Pkcs7, true),
+        ];
+
+        for (timestamp_field, separator) in timestamps {
+            for (suffix, envelope, partial) in profiles {
+                let mut raw = Vec::new();
+                raw.extend_from_slice(timestamp_field);
+                raw.extend_from_slice(b".manifest");
+                raw.extend_from_slice(suffix);
+
+                assert_eq!(
+                    super::body(&raw, super::ObjectKind::FullManifest, false, separator),
+                    Ok(super::ObjectName {
+                        kind: super::ObjectKind::FullManifest,
+                        start: super::Timestamp(0),
+                        end: super::Timestamp(0),
+                        volume: None,
+                        envelope,
+                        partial,
+                        short: false,
+                    }),
+                    "{raw:?} with separator {separator:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
     //= docs/parsing-requirements.md#parse-gen-003
     //= type=test
     //# A parser MUST validate arithmetic and platform-size conversions before using derived values for indexing, allocation, or I/O.
