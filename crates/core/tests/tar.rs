@@ -1110,6 +1110,9 @@ fn pax_global_and_local_extension_timing_survives_interleaved_metadata() {
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+//= docs/parsing-requirements.md#parse-tar-032
+//= type=test
+//# For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEntry.gid` from the resolved effective PAX `uid` and `gid` values when present; when either effective value is absent, the reader MUST retain that field's decoded raw header value. Invalid present effective values MUST produce Numeric rather than falling back to the raw header value.
 #[test]
 fn pax_uid_gid_global_local_deletion_and_header_fallback_are_exact() {
     let global = [
@@ -1154,9 +1157,37 @@ fn pax_uid_gid_global_local_deletion_and_header_fallback_are_exact() {
     assert_eq!((parsed.entries[3].uid, parsed.entries[3].gid), (10, 19));
 }
 
+//= docs/parsing-requirements.md#parse-tar-032
+//= type=test
+//# For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEntry.gid` from the resolved effective PAX `uid` and `gid` values when present; when either effective value is absent, the reader MUST retain that field's decoded raw header value. Invalid present effective values MUST produce Numeric rather than falling back to the raw header value.
+#[test]
+fn pax_uid_and_gid_overrides_fall_back_independently() {
+    let mut raw = member(b"snapshot/owners", b'0', b"");
+    raw[108..116].copy_from_slice(b"0000012\0"); // octal 10
+    raw[116..124].copy_from_slice(b"0000023\0"); // octal 19
+    checksum(&mut raw);
+    let bytes = [
+        member(b"uid-only", b'x', &record(b"uid", b"0")),
+        raw.clone(),
+        member(b"gid-only", b'x', &record(b"gid", b"18446744073709551615")),
+        raw,
+    ]
+    .concat();
+
+    let parsed = parse(&bytes).unwrap();
+    assert_eq!((parsed.entries[0].uid, parsed.entries[0].gid), (0, 19));
+    assert_eq!(
+        (parsed.entries[1].uid, parsed.entries[1].gid),
+        (10, u64::MAX)
+    );
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+//= docs/parsing-requirements.md#parse-tar-032
+//= type=test
+//# For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEntry.gid` from the resolved effective PAX `uid` and `gid` values when present; when either effective value is absent, the reader MUST retain that field's decoded raw header value. Invalid present effective values MUST produce Numeric rather than falling back to the raw header value.
 #[test]
 fn invalid_pax_uid_gid_values_are_numeric_errors() {
     for key in [b"uid" as &[u8], b"gid"] {

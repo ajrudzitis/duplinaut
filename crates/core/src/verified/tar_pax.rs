@@ -757,6 +757,10 @@ pub enum PaxIdError {
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
 /// Select a resolved PAX uid/gid override or retain the raw header value.
+//= docs/parsing-requirements.md#parse-tar-032
+//# For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEntry.gid` from the resolved effective PAX `uid` and `gid` values when present; when either effective value is absent, the reader MUST retain that field's decoded raw header value. Invalid present effective values MUST produce Numeric rather than falling back to the raw header value.
+//= docs/parsing-requirements.md#parse-tar-003
+//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 pub fn effective_id(value: Option<&[u8]>, header_id: u64)
     -> (result: Result<u64, PaxIdError>)
     ensures match value {
@@ -1639,6 +1643,9 @@ mod tests {
         );
     }
 
+    //= docs/parsing-requirements.md#parse-tar-032
+    //= type=test
+    //# For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEntry.gid` from the resolved effective PAX `uid` and `gid` values when present; when either effective value is absent, the reader MUST retain that field's decoded raw header value. Invalid present effective values MUST produce Numeric rather than falling back to the raw header value.
     #[test]
     fn effective_pax_ids_select_fallback_and_exact_decimal_values() {
         assert_eq!(effective_id(None, 17), Ok(17));

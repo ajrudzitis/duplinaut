@@ -282,6 +282,10 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
   SECTION: [PARSE-TAR-031](#parse-tar-031)
     TEXT[!MUST,implementation,test]: For each accepted character-device or block-device entry, the reader MUST preserve the decoded raw header `device_major` and `device_minor` values in the corresponding `TarEntry` fields without normalization or substitution.
 
+  SECTION: [PARSE-TAR-032](#parse-tar-032)
+    TEXT[!MUST,implementation,test]: For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEntry.gid` from the resolved effective PAX `uid` and `gid` values when present; when either effective value is absent, the reader MUST retain that field's decoded raw header value.
+    TEXT[!MUST,implementation,test]: Invalid present effective values MUST produce Numeric rather than falling back to the raw header value.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

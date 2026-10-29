@@ -607,6 +607,12 @@ For each accepted character-device or block-device entry, the reader MUST preser
 
 Provenance: DOC-TAR defines the public `devmajor` and `devminor` metadata attributes; SRC-TAR confirms their mapping from tar header fields. Numeric decoding and unsigned admission remain specified by PARSE-TAR-026/027. This requirement does not require restoration or creation of special filesystem objects and does not refine whole-entry controller behavior.
 
+### PARSE-TAR-032
+
+For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEntry.gid` from the resolved effective PAX `uid` and `gid` values when present; when either effective value is absent, the reader MUST retain that field's decoded raw header value. Invalid present effective values MUST produce Numeric rather than falling back to the raw header value.
+
+Provenance: DOC-TAR and SRC-TAR establish PAX owner-ID override semantics; the reviewed profile defines local/global resolution and empty-value deletion. Raw header decoding/admission remain specified by PARSE-TAR-026/027, PAX decimal grammar and local/global resolution remain separate, and this requirement does not refine complete header-controller behavior.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

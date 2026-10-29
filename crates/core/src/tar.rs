@@ -396,6 +396,8 @@ impl<'a> TarVolume<'a> {
                 seconds: mtime_seconds,
                 nanoseconds: mtime_nanoseconds,
             };
+            //= docs/parsing-requirements.md#parse-tar-032
+            //# For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEntry.gid` from the resolved effective PAX `uid` and `gid` values when present; when either effective value is absent, the reader MUST retain that field's decoded raw header value. Invalid present effective values MUST produce Numeric rather than falling back to the raw header value.
             let uid = crate::verified::tar_pax::effective_id(values[4], header_uid)
                 .map_err(|_| TarError::Numeric)?;
             let gid = crate::verified::tar_pax::effective_id(values[5], header_gid)
