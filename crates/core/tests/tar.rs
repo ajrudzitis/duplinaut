@@ -382,6 +382,9 @@ fn invalid_checksum_field_precedes_checksum_comparison_and_header_interpretation
 //= docs/parsing-requirements.md#parse-tar-004
 //= type=test
 //# Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.
+//= docs/parsing-requirements.md#parse-tar-033
+//= type=test
+//# For each accepted real tar entry, `TarEntry.entry_type` MUST correspond to its raw type flag: NUL or `0` MUST map to regular, `1` hardlink, `2` symlink, `3` character device, `4` block device, `5` directory, and `6` FIFO. The reader MUST reject a non-regular entry when its effective payload size is greater than zero and MUST reject every other ordinary-entry type flag as `UnsupportedEntry`. GNU/PAX extension type flags are dispatched separately under PARSE-TAR-003/006/007 and are outside this mapping.
 
 #[test]
 fn ordinary_tar_entry_type_admission_matrix_is_explicit() {
@@ -409,6 +412,21 @@ fn ordinary_tar_entry_type_admission_matrix_is_explicit() {
         let bytes = member(b"snapshot/file", flag, b"");
         assert_eq!(parse(&bytes).unwrap_err(), TarError::UnsupportedEntry);
     }
+}
+
+//= docs/parsing-requirements.md#parse-tar-033
+//= type=test
+//# For each accepted real tar entry, `TarEntry.entry_type` MUST correspond to its raw type flag: NUL or `0` MUST map to regular, `1` hardlink, `2` symlink, `3` character device, `4` block device, `5` directory, and `6` FIFO. The reader MUST reject a non-regular entry when its effective payload size is greater than zero and MUST reject every other ordinary-entry type flag as `UnsupportedEntry`. GNU/PAX extension type flags are dispatched separately under PARSE-TAR-003/006/007 and are outside this mapping.
+#[test]
+fn pax_effective_payload_rejects_nonregular_entry() {
+    let pax = member(b"local", b'x', &record(b"size", b"1"));
+    // The raw symlink size is zero, while its effective PAX size selects the
+    // one payload byte that makes this non-regular entry unsupported.
+    let mut symlink = member(b"snapshot/link", b'2', b"x");
+    symlink[124..136].copy_from_slice(b"00000000000\0");
+    checksum(&mut symlink[..512]);
+    let archive = [pax, symlink].concat();
+    assert_eq!(parse(&archive).unwrap_err(), TarError::UnsupportedEntry);
 }
 
 //= docs/parsing-requirements.md#parse-tar-002

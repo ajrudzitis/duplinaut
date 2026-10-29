@@ -613,6 +613,12 @@ For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEnt
 
 Provenance: DOC-TAR and SRC-TAR establish PAX owner-ID override semantics; the reviewed profile defines local/global resolution and empty-value deletion. Raw header decoding/admission remain specified by PARSE-TAR-026/027, PAX decimal grammar and local/global resolution remain separate, and this requirement does not refine complete header-controller behavior.
 
+### PARSE-TAR-033
+
+For each accepted real tar entry, `TarEntry.entry_type` MUST correspond to its raw type flag: NUL or `0` MUST map to regular, `1` hardlink, `2` symlink, `3` character device, `4` block device, `5` directory, and `6` FIFO. The reader MUST reject a non-regular entry when its effective payload size is greater than zero and MUST reject every other ordinary-entry type flag as `UnsupportedEntry`. GNU/PAX extension type flags are dispatched separately under PARSE-TAR-003/006/007 and are outside this mapping.
+
+Provenance: DOC-TAR defines the standard type flags; the reviewed reader profile selects the supported subset and the zero-payload rule for non-regular entries. Complete tar-controller refinement remains separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

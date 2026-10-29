@@ -294,6 +294,8 @@ impl<'a> TarVolume<'a> {
                 pending = crate::verified::tar_pax::update_pending_override(pending, h.entry_type);
                 continue;
             }
+            //= docs/parsing-requirements.md#parse-tar-033
+            //# For each accepted real tar entry, `TarEntry.entry_type` MUST correspond to its raw type flag: NUL or `0` MUST map to regular, `1` hardlink, `2` symlink, `3` character device, `4` block device, `5` directory, and `6` FIFO. The reader MUST reject a non-regular entry when its effective payload size is greater than zero and MUST reject every other ordinary-entry type flag as `UnsupportedEntry`. GNU/PAX extension type flags are dispatched separately under PARSE-TAR-003/006/007 and are outside this mapping.
             let entry_type = crate::verified::tar_entry::classify_entry_type(h.entry_type, size)
                 .ok_or(TarError::UnsupportedEntry)?;
             //= docs/parsing-requirements.md#parse-tar-021
