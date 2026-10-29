@@ -2175,6 +2175,27 @@ fn raw_header_mode_is_retained_and_pax_mode_is_unsupported() {
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-031
+//= type=test
+//# For each accepted character-device or block-device entry, the reader MUST preserve the decoded raw header `device_major` and `device_minor` values in the corresponding `TarEntry` fields without normalization or substitution.
+#[test]
+fn character_and_block_device_numbers_are_retained_from_raw_headers() {
+    for (kind, expected_type) in [
+        (b'3', EntryType::CharacterDevice),
+        (b'4', EntryType::BlockDevice),
+    ] {
+        let mut bytes = member(b"snapshot/device", kind, b"");
+        bytes[329..337].copy_from_slice(b"0000123\0");
+        bytes[337..345].copy_from_slice(b"0000456\0");
+        checksum(&mut bytes[..512]);
+
+        let parsed = parse(&bytes).unwrap();
+        let entry = &parsed.entries[0];
+        assert_eq!(entry.entry_type, expected_type);
+        assert_eq!((entry.device_major, entry.device_minor), (0o123, 0o456));
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.

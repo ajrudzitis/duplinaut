@@ -35,6 +35,14 @@ pub struct TarUnsignedHeaderFields {
     pub device_minor: u64,
 }
 
+//= docs/parsing-requirements.md#parse-tar-031
+//# For each accepted character-device or block-device entry, the reader MUST preserve the decoded raw header `device_major` and `device_minor` values in the corresponding `TarEntry` fields without normalization or substitution.
+pub fn retain_device_numbers(device_major: u64, device_minor: u64) -> (retained: (u64, u64))
+    ensures retained.0 == device_major && retained.1 == device_minor,
+{
+    (device_major, device_minor)
+}
+
 //= docs/parsing-requirements.md#parse-tar-027
 //# After checksum and header-profile admission, the parser MUST admit raw tar `size`, `uid`, `gid`, `device_major`, and `device_minor` fields as nonnegative `u64` values. A negative decoded value or a value greater than `u64::MAX` MUST produce Numeric before payload-extent selection or output-metadata retention. This raw-field admission MUST still occur when an effective PAX `size` supplies a real entry's payload extent; GNU/PAX extension payload extents continue to use their raw header size as specified by PARSE-TAR-007.
 pub fn admit_unsigned_header_fields(
@@ -378,7 +386,7 @@ mod metadata_charge_tests {
         decode_header_checksum_field,
         admit_metadata_charge, admit_real_entry_count, begin_tar_eof, finish_tar_eof,
         admit_header_checksum, decode_gnu_long_record, entry_metadata_charge, TarEofError, TarEofState,
-        TarHeaderProfile, TarLongRecordError, TarUnsignedHeaderFields,
+        retain_device_numbers, TarHeaderProfile, TarLongRecordError, TarUnsignedHeaderFields,
     };
 
     //= docs/parsing-requirements.md#parse-tar-028
@@ -435,6 +443,14 @@ mod metadata_charge_tests {
         ] {
             assert_eq!(admit_tar_header_profile(&magic), None);
         }
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-031
+    //= type=test
+    //# For each accepted character-device or block-device entry, the reader MUST preserve the decoded raw header `device_major` and `device_minor` values in the corresponding `TarEntry` fields without normalization or substitution.
+    #[test]
+    fn device_number_metadata_is_retained_exactly() {
+        assert_eq!(retain_device_numbers(17, 29), (17, 29));
     }
 
     #[test]

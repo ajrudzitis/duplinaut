@@ -601,6 +601,12 @@ For each accepted real tar entry, the reader MUST preserve the decoded raw heade
 
 Provenance: DOC-TAR and SRC-TAR define the raw mode field; the supported PAX key profile and reader policy exclude `mode` as a semantic override. Numeric decoding, mode-width admission, and the complete tar-controller error ordering remain specified separately.
 
+### PARSE-TAR-031
+
+For each accepted character-device or block-device entry, the reader MUST preserve the decoded raw header `device_major` and `device_minor` values in the corresponding `TarEntry` fields without normalization or substitution.
+
+Provenance: DOC-TAR defines the public `devmajor` and `devminor` metadata attributes; SRC-TAR confirms their mapping from tar header fields. Numeric decoding and unsigned admission remain specified by PARSE-TAR-026/027. This requirement does not require restoration or creation of special filesystem objects and does not refine whole-entry controller behavior.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

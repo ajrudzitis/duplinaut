@@ -412,6 +412,10 @@ impl<'a> TarVolume<'a> {
                     seconds,
                     nanoseconds,
                 });
+            //= docs/parsing-requirements.md#parse-tar-031
+            //# For each accepted character-device or block-device entry, the reader MUST preserve the decoded raw header `device_major` and `device_minor` values in the corresponding `TarEntry` fields without normalization or substitution.
+            let (device_major, device_minor) =
+                crate::verified::tar_entry::retain_device_numbers(device_major, device_minor);
             entries.push(TarEntry {
                 name,
                 linkname,

@@ -279,6 +279,9 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: For each accepted real tar entry, the reader MUST preserve the decoded raw header `mode` after the `u32` admission required by PARSE-TAR-011.
     TEXT[!MUST,implementation,test]: A PAX `mode` key MUST be rejected as UnsupportedPax; it MUST NOT replace the raw header mode.
 
+  SECTION: [PARSE-TAR-031](#parse-tar-031)
+    TEXT[!MUST,implementation,test]: For each accepted character-device or block-device entry, the reader MUST preserve the decoded raw header `device_major` and `device_minor` values in the corresponding `TarEntry` fields without normalization or substitution.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

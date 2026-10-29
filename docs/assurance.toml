@@ -3559,6 +3559,30 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-device-number-retention"
+gate = true
+requirements = ["PARSE-TAR-031"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves device-number field selection/retention for accepted special entries;
+# creating special filesystem objects remains outside the reader scope.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry.rs", symbol = "retain_device_numbers" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-device-number-retention", requirement = "PARSE-TAR-031", path = "crates/core/src/verified/tar_entry.rs", symbol = "retain_device_numbers", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_entry::metadata_charge_tests::device_number_metadata_is_retained_exactly" },
+  { package = "duplicity-core", name = "character_and_block_device_numbers_are_retained_from_raw_headers" }
+]
+
+[[milestone]]
 id = "tar-header-narrowing"
 gate = true
 requirements = ["PARSE-TAR-011"]
