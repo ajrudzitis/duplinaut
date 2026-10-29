@@ -197,6 +197,9 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: After selecting the raw or effective PAX size, the reader MUST return exactly that many payload bytes and advance the cursor over the padded extent to the next 512-byte boundary.
     TEXT[!MUST,implementation,test]: It MUST reject configured entry-size excess and truncated extents with explicit errors.
 
+  SECTION: [PARSE-TAR-009](#parse-tar-009)
+    TEXT[!MUST,implementation,test]: When PAX path and GNU long-name overrides are absent, a POSIX ustar header MUST use its raw name field if the prefix is empty and MUST join a nonempty prefix to the raw name with one slash byte.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

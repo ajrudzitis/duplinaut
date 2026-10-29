@@ -3509,6 +3509,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-ustar-header-name"
+gate = true
+requirements = ["PARSE-TAR-009"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves byte composition of the raw POSIX ustar prefix/name fallback and
+# wires it into the native path selection. PAX/GNU override selection,
+# NUL truncation, validation, and whole-loop refinement remain separate.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "compose_ustar_header_name" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-ustar-header-name-compose", requirement = "PARSE-TAR-009", path = "crates/core/src/verified/tar_pax.rs", symbol = "compose_ustar_header_name", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::ustar_header_name_composition_preserves_empty_and_nonempty_prefix_rules" },
+  { package = "duplicity-core", name = "posix_prefix_and_gnu_header_are_distinct" }
+]
+
+[[milestone]]
 id = "tar-pax-effective-size"
 gate = true
 requirements = ["PARSE-TAR-003"]

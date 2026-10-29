@@ -316,13 +316,9 @@ impl<'a> TarVolume<'a> {
             let name = if let Some(value) = name {
                 value.to_vec()
             } else {
-                let mut joined = Vec::with_capacity(name_length);
-                if !prefix.is_empty() {
-                    joined.extend_from_slice(prefix);
-                    joined.push(b'/');
-                }
-                joined.extend_from_slice(raw_name);
-                joined
+                //= docs/parsing-requirements.md#parse-tar-009
+                //# When PAX path and GNU long-name overrides are absent, a POSIX ustar header MUST use its raw name field if the prefix is empty and MUST join a nonempty prefix to the raw name with one slash byte.
+                crate::verified::tar_pax::compose_ustar_header_name(prefix, raw_name)
             };
             if name.is_empty() || name.contains(&0) || link.contains(&0) {
                 return Err(TarError::TextEncoding);

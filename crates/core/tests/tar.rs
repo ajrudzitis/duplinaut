@@ -301,9 +301,14 @@ fn gnu_base256_signed_time_and_signed_checksum() {
 //= type=test
 //# Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.
 
+//= docs/parsing-requirements.md#parse-tar-009
+//= type=test
+//# When PAX path and GNU long-name overrides are absent, a POSIX ustar header MUST use its raw name field if the prefix is empty and MUST join a nonempty prefix to the raw name with one slash byte.
+
 #[test]
 fn posix_prefix_and_gnu_header_are_distinct() {
     let mut bytes = member(b"file", b'0', b"");
+    assert_eq!(parse(&bytes).unwrap().entries[0].name, b"file");
     bytes[345..354].copy_from_slice(b"snapshot/");
     checksum(&mut bytes);
     assert_eq!(parse(&bytes).unwrap().entries[0].name, b"snapshot//file");

@@ -345,6 +345,59 @@ pub fn effective_name_override<'a>(
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-009
+//# When PAX path and GNU long-name overrides are absent, a POSIX ustar header MUST use its raw name field if the prefix is empty and MUST join a nonempty prefix to the raw name with one slash byte.
+pub open spec fn ustar_header_name_model(prefix: Seq<u8>, raw_name: Seq<u8>) -> Seq<u8> {
+    if prefix.len() == 0 { raw_name }
+    else { prefix + seq![b'/'] + raw_name }
+}
+
+pub open spec fn ustar_header_name_prefix_model(
+    prefix: Seq<u8>, raw_name: Seq<u8>, copied: int,
+) -> Seq<u8> {
+    if prefix.len() == 0 { raw_name.subrange(0, copied) }
+    else { prefix + seq![b'/'] + raw_name.subrange(0, copied) }
+}
+
+//= docs/parsing-requirements.md#parse-tar-009
+//# When PAX path and GNU long-name overrides are absent, a POSIX ustar header MUST use its raw name field if the prefix is empty and MUST join a nonempty prefix to the raw name with one slash byte.
+pub fn compose_ustar_header_name(prefix: &[u8], raw_name: &[u8]) -> (result: Vec<u8>)
+    requires (prefix.len() as int) + (raw_name.len() as int)
+        + (if prefix.len() == 0 { 0int } else { 1int }) <= usize::MAX as int,
+    ensures result@ == ustar_header_name_model(prefix@, raw_name@),
+{
+    let capacity = if prefix.is_empty() {
+        raw_name.len()
+    } else {
+        prefix.len() + 1 + raw_name.len()
+    };
+    let mut result = Vec::with_capacity(capacity);
+    let mut i = 0;
+    while i < prefix.len()
+        invariant 0 <= i <= prefix.len(),
+            result@ == prefix@.subrange(0, i as int),
+        decreases prefix.len() - i,
+    {
+        result.push(prefix[i]);
+        i += 1;
+    }
+    if prefix.len() > 0 {
+        result.push(b'/');
+    }
+    let mut i = 0;
+    while i < raw_name.len()
+        invariant 0 <= i <= raw_name.len(),
+            result@ == ustar_header_name_prefix_model(prefix@, raw_name@, i as int),
+        decreases raw_name.len() - i,
+    {
+        result.push(raw_name[i]);
+        i += 1;
+    }
+    assert(ustar_header_name_prefix_model(prefix@, raw_name@, raw_name.len() as int)
+        == ustar_header_name_model(prefix@, raw_name@));
+    result
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
@@ -923,10 +976,11 @@ pub fn ingest<'a>(input: &'a [u8])
 #[cfg(test)]
 mod tests {
     use super::{
-        admit_record, effective_id, effective_link_override, effective_mtime,
-        effective_name_override, effective_optional_time, effective_owner_name, effective_size,
-        hdrcharset_value_supported, ingest, owner_name_requires_utf8, payload_size, resolve_values,
-        PaxIdError, PaxIngestError, PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
+        admit_record, compose_ustar_header_name, effective_id, effective_link_override,
+        effective_mtime, effective_name_override, effective_optional_time, effective_owner_name,
+        effective_size, hdrcharset_value_supported, ingest, owner_name_requires_utf8, payload_size,
+        resolve_values, PaxIdError, PaxIngestError, PaxRecordAdmissionError, PaxSizeError,
+        PaxTimeError,
     };
 
     fn framed_record(key: &[u8], value: &[u8]) -> Vec<u8> {
@@ -1121,6 +1175,15 @@ mod tests {
         assert_eq!(
             effective_name_override(Some(b"pax"), Some(b"gnu")),
             Some(&b"pax"[..])
+        );
+    }
+
+    #[test]
+    fn ustar_header_name_composition_preserves_empty_and_nonempty_prefix_rules() {
+        assert_eq!(compose_ustar_header_name(b"", b"file"), b"file");
+        assert_eq!(
+            compose_ustar_header_name(b"snapshot/", b"file"),
+            b"snapshot//file"
         );
     }
 

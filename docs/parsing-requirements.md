@@ -469,6 +469,12 @@ After selecting the raw or effective PAX size, the reader MUST return exactly th
 
 Provenance: SRC-TAR and PARSE-TAR-002/007. The whole tar loop and its complete error-precedence relation remain separate.
 
+### PARSE-TAR-009
+
+When PAX path and GNU long-name overrides are absent, a POSIX ustar header MUST use its raw name field if the prefix is empty and MUST join a nonempty prefix to the raw name with one slash byte.
+
+Provenance: DOC-TAR and SRC-TAR. This covers fallback header-name byte composition; NUL truncation, validation, and whole-entry controller refinement remain separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
