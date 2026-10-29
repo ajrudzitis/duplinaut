@@ -112,6 +112,8 @@ pub proof fn last_bounds(input: Seq<u8>, i: int)
 {
     if i > 0 && pad(input[i - 1]) { last_bounds(input, i - 1); }
 }
+//= docs/parsing-requirements.md#parse-tar-026
+//# The reader MUST decode a tar numeric field as either padded ASCII octal or the reviewed GNU base-256 profile. For octal, it MUST trim only leading and trailing NUL or ASCII-space padding, interpret an all-padding field as zero, and accept only bytes `0` through `7` in the remaining digits. For base-256, it MUST recognize only a first byte of `0x80` (initial accumulator zero) or `0xff` (initial accumulator negative one), then fold each following byte in big-endian base 256. Every multiply and addition MUST be checked against the `i128` range; unsupported markers, invalid octal digits, or overflow MUST produce Numeric. Fields used as unsigned values MUST additionally reject negative results and results greater than `u64::MAX`; signed mtime narrowing remains governed by PARSE-TAR-011.
 pub fn number(input: &[u8]) -> (result: Option<i128>)
     ensures match result {
         Some(v) => number_model(input@) == Some(v as int),
@@ -148,6 +150,8 @@ pub open spec fn unsigned_model(input: Seq<u8>) -> Option<int> {
         None => None,
     }
 }
+//= docs/parsing-requirements.md#parse-tar-026
+//# The reader MUST decode a tar numeric field as either padded ASCII octal or the reviewed GNU base-256 profile. For octal, it MUST trim only leading and trailing NUL or ASCII-space padding, interpret an all-padding field as zero, and accept only bytes `0` through `7` in the remaining digits. For base-256, it MUST recognize only a first byte of `0x80` (initial accumulator zero) or `0xff` (initial accumulator negative one), then fold each following byte in big-endian base 256. Every multiply and addition MUST be checked against the `i128` range; unsupported markers, invalid octal digits, or overflow MUST produce Numeric. Fields used as unsigned values MUST additionally reject negative results and results greater than `u64::MAX`; signed mtime narrowing remains governed by PARSE-TAR-011.
 pub fn unsigned(input: &[u8]) -> (result: Option<u64>)
     ensures match result {
         Some(v) => unsigned_model(input@) == Some(v as int),
@@ -190,7 +194,56 @@ pub fn narrow_mtime(value: i128) -> (result: Option<i64>)
 
 #[cfg(test)]
 mod tests {
-    use super::{narrow_mode, narrow_mtime};
+    use super::{narrow_mode, narrow_mtime, number, unsigned};
+
+    //= docs/parsing-requirements.md#parse-tar-026
+    //= type=test
+    //# The reader MUST decode a tar numeric field as either padded ASCII octal or the reviewed GNU base-256 profile. For octal, it MUST trim only leading and trailing NUL or ASCII-space padding, interpret an all-padding field as zero, and accept only bytes `0` through `7` in the remaining digits. For base-256, it MUST recognize only a first byte of `0x80` (initial accumulator zero) or `0xff` (initial accumulator negative one), then fold each following byte in big-endian base 256. Every multiply and addition MUST be checked against the `i128` range; unsupported markers, invalid octal digits, or overflow MUST produce Numeric. Fields used as unsigned values MUST additionally reject negative results and results greater than `u64::MAX`; signed mtime narrowing remains governed by PARSE-TAR-011.
+    #[test]
+    fn numeric_byte_decoding_matches_profile_boundaries() {
+        assert_eq!(number(b""), Some(0));
+        assert_eq!(number(b" \0 17\0 "), Some(15));
+        assert_eq!(number(b"0007\0"), Some(7));
+        assert_eq!(number(&[0x80, 0x01, 0x02]), Some(258));
+        assert_eq!(number(&[0xff, 0xff, 0xfe]), Some(-2));
+        assert_eq!(number(&[0xff]), Some(-1));
+
+        for invalid in [
+            &b"8"[..],
+            &b"19"[..],
+            &[b'1', 0, b'2'][..],
+            &b"1 2"[..],
+            &[0x81, b'0'][..],
+            &[0x7f, b'0'][..],
+            &[0x90, 0, 0][..],
+        ] {
+            assert_eq!(number(invalid), None, "accepted {invalid:?}");
+        }
+
+        let mut positive_overflow = vec![0x80];
+        positive_overflow.extend([0xff; 17]);
+        assert_eq!(number(&positive_overflow), None);
+        let mut negative_overflow = vec![0xff];
+        negative_overflow.extend([0x00; 17]);
+        assert_eq!(number(&negative_overflow), None);
+        assert_eq!(number(&[b'7'; 50]), None);
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-026
+    //= type=test
+    //# The reader MUST decode a tar numeric field as either padded ASCII octal or the reviewed GNU base-256 profile. For octal, it MUST trim only leading and trailing NUL or ASCII-space padding, interpret an all-padding field as zero, and accept only bytes `0` through `7` in the remaining digits. For base-256, it MUST recognize only a first byte of `0x80` (initial accumulator zero) or `0xff` (initial accumulator negative one), then fold each following byte in big-endian base 256. Every multiply and addition MUST be checked against the `i128` range; unsupported markers, invalid octal digits, or overflow MUST produce Numeric. Fields used as unsigned values MUST additionally reject negative results and results greater than `u64::MAX`; signed mtime narrowing remains governed by PARSE-TAR-011.
+    #[test]
+    fn unsigned_numeric_admission_is_bounded_by_u64() {
+        let max_octal = format!("{:o}", u64::MAX);
+        assert_eq!(unsigned(max_octal.as_bytes()), Some(u64::MAX));
+        assert_eq!(
+            unsigned(&[0x80, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
+            Some(u64::MAX)
+        );
+        assert_eq!(unsigned(&[0x80, 1, 0, 0, 0, 0, 0, 0, 0, 0]), None);
+        assert_eq!(unsigned(&[0xff]), None);
+        assert_eq!(unsigned(b"20000000000000000000000"), None);
+    }
 
     #[test]
     fn mode_narrowing_accepts_exact_u32_bounds_and_rejects_overflow() {

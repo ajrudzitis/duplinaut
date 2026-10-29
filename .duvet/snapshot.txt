@@ -254,6 +254,13 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: Any other magic/version byte sequence MUST produce UnsupportedHeader.
     TEXT[!MUST,implementation,test]: Only POSIX ustar headers may interpret bytes 345 through 499 as a path prefix; old GNU and V7 headers MUST NOT use those bytes as a prefix.
 
+  SECTION: [PARSE-TAR-026](#parse-tar-026)
+    TEXT[!MUST,implementation,test]: The reader MUST decode a tar numeric field as either padded ASCII octal or the reviewed GNU base-256 profile.
+    TEXT[!MUST,implementation,test]: For octal, it MUST trim only leading and trailing NUL or ASCII-space padding, interpret an all-padding field as zero, and accept only bytes `0` through `7` in the remaining digits.
+    TEXT[!MUST,implementation,test]: For base-256, it MUST recognize only a first byte of `0x80` (initial accumulator zero) or `0xff` (initial accumulator negative one), then fold each following byte in big-endian base 256.
+    TEXT[!MUST,implementation,test]: Every multiply and addition MUST be checked against the `i128` range; unsupported markers, invalid octal digits, or overflow MUST produce Numeric.
+    TEXT[!MUST,implementation,test]: Fields used as unsigned values MUST additionally reject negative results and results greater than `u64::MAX`; signed mtime narrowing remains governed by PARSE-TAR-011.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

@@ -571,6 +571,12 @@ After checksum admission, the parser MUST accept a header only when its eight ma
 
 Provenance: DOC-TAR and the reviewed tar header profile. This requirement fixes the accepted magic/version profiles and prefix interpretation gate; header checksum/value decoding and the remaining header-field interpretation are specified separately.
 
+### PARSE-TAR-026
+
+The reader MUST decode a tar numeric field as either padded ASCII octal or the reviewed GNU base-256 profile. For octal, it MUST trim only leading and trailing NUL or ASCII-space padding, interpret an all-padding field as zero, and accept only bytes `0` through `7` in the remaining digits. For base-256, it MUST recognize only a first byte of `0x80` (initial accumulator zero) or `0xff` (initial accumulator negative one), then fold each following byte in big-endian base 256. Every multiply and addition MUST be checked against the `i128` range; unsupported markers, invalid octal digits, or overflow MUST produce Numeric. Fields used as unsigned values MUST additionally reject negative results and results greater than `u64::MAX`; signed mtime narrowing remains governed by PARSE-TAR-011.
+
+Provenance: DOC-TAR and SRC-TAR, with the project’s explicitly reviewed numeric compatibility profile above. This requirement covers scalar byte decoding and unsigned admission; it does not broaden the GNU base-256 marker set, define field-specific narrowing, or refine full header error ordering.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

@@ -4429,6 +4429,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-numeric-byte-decoding"
+gate = true
+requirements = ["PARSE-TAR-026"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The scalar number decoder and unsigned range adapter have exact contracts;
+# the tar header controller and field-specific narrowing remain separate.
+implementations = [
+  { path = "crates/core/src/verified/tar_number.rs", symbol = "number" },
+  { path = "crates/core/src/verified/tar_number.rs", symbol = "unsigned" }
+]
+proofs = [
+  { id = "tar-numeric-byte-decoding", requirement = "PARSE-TAR-026", path = "crates/core/src/verified/tar_number.rs", symbol = "number", kind = "contract" },
+  { id = "tar-unsigned-range-admission", requirement = "PARSE-TAR-026", path = "crates/core/src/verified/tar_number.rs", symbol = "unsigned", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_number::tests::numeric_byte_decoding_matches_profile_boundaries" },
+  { package = "duplicity-core", name = "verified::tar_number::tests::unsigned_numeric_admission_is_bounded_by_u64" }
+]
+
+[[milestone]]
 id = "tar-header-profile-admission"
 gate = true
 requirements = ["PARSE-TAR-025"]
