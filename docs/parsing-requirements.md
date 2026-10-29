@@ -463,6 +463,12 @@ GNU and PAX extension headers MUST use the raw size in their own tar header to d
 
 Provenance: DOC-TAR, SRC-TAR. Extension payload framing is independent of metadata overrides carried by preceding headers.
 
+### PARSE-TAR-008
+
+After selecting the raw or effective PAX size, the reader MUST return exactly that many payload bytes and advance the cursor over the padded extent to the next 512-byte boundary. It MUST reject configured entry-size excess and truncated extents with explicit errors.
+
+Provenance: SRC-TAR and PARSE-TAR-002/007. The whole tar loop and its complete error-precedence relation remain separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

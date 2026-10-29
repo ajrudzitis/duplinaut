@@ -73,6 +73,12 @@ fn parse(bytes: &[u8]) -> Result<TarVolume<'_>, TarError> {
 //= docs/parsing-requirements.md#parse-tar-002
 //= type=test
 //# The tar parser MUST advance over each payload and its padding to the next 512-byte boundary without arithmetic overflow.
+//= docs/parsing-requirements.md#parse-tar-008
+//= type=test
+//# After selecting the raw or effective PAX size, the reader MUST return exactly that many payload bytes and advance the cursor over the padded extent to the next 512-byte boundary.
+//= docs/parsing-requirements.md#parse-tar-008
+//= type=test
+//# It MUST reject configured entry-size excess and truncated extents with explicit errors.
 
 #[test]
 fn complete_entry_extents_padding_and_checksum() {
@@ -248,6 +254,9 @@ fn footer_profiles_are_explicit() {
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+//= docs/parsing-requirements.md#parse-tar-008
+//= type=test
+//# After selecting the raw or effective PAX size, the reader MUST return exactly that many payload bytes and advance the cursor over the padded extent to the next 512-byte boundary.
 
 #[test]
 fn gnu_base256_signed_time_and_signed_checksum() {
@@ -637,6 +646,9 @@ fn pax_size_override_controls_payload_and_empty_local_deletion_falls_back() {
 //= docs/parsing-requirements.md#parse-tar-007
 //= type=test
 //# A real entry MUST use the effective PAX `size` value when present, or its raw tar header size when absent.
+//= docs/parsing-requirements.md#parse-tar-008
+//= type=test
+//# After selecting the raw or effective PAX size, the reader MUST return exactly that many payload bytes and advance the cursor over the padded extent to the next 512-byte boundary.
 #[test]
 fn global_pax_size_does_not_change_extension_payload_extent() {
     let global_size = member(b"global", b'g', &record(b"size", b"1"));
@@ -1249,6 +1261,9 @@ fn pax_owner_names_follow_utf8_and_binary_charset_policy() {
 //= docs/parsing-requirements.md#parse-entry-003
 //= type=test
 //# The reader MUST reject an unrecognized duplicity operation prefix in an otherwise recognized data or signature archive.
+//= docs/parsing-requirements.md#parse-tar-008
+//= type=test
+//# It MUST reject configured entry-size excess and truncated extents with explicit errors.
 
 #[test]
 fn entry_classification_and_limits() {

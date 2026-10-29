@@ -193,6 +193,10 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: GNU and PAX extension headers MUST use the raw size in their own tar header to determine their payload extent.
     TEXT[!MUST,implementation,test]: A real entry MUST use the effective PAX `size` value when present, or its raw tar header size when absent.
 
+  SECTION: [PARSE-TAR-008](#parse-tar-008)
+    TEXT[!MUST,implementation,test]: After selecting the raw or effective PAX size, the reader MUST return exactly that many payload bytes and advance the cursor over the padded extent to the next 512-byte boundary.
+    TEXT[!MUST,implementation,test]: It MUST reject configured entry-size excess and truncated extents with explicit errors.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

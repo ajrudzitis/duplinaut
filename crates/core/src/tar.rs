@@ -222,22 +222,24 @@ impl<'a> TarVolume<'a> {
             //= docs/parsing-requirements.md#parse-tar-007
             //# GNU and PAX extension headers MUST use the raw size in their own tar header to determine their payload extent.
             //# A real entry MUST use the effective PAX `size` value when present, or its raw tar header size when absent.
-            let size = crate::verified::tar_pax::payload_size(extension, values[2], raw_size)
-                .map_err(|_| TarError::Numeric)?;
-            let size = usize::try_from(size).map_err(|_| TarError::Limit)?;
-            if size > limits.max_entry_bytes {
-                return Err(TarError::Limit);
-            }
-            let (payload, next) =
-                crate::verified::tar_entry_extent::take_entry_payload(bytes, cursor, size)
-                    .map_err(|error| match error {
-                        crate::verified::tar_entry_extent::EntryExtentError::Limit => {
-                            TarError::Limit
-                        }
-                        crate::verified::tar_entry_extent::EntryExtentError::Truncated => {
-                            TarError::Truncated
-                        }
-                    })?;
+            //= docs/parsing-requirements.md#parse-tar-008
+            //# After selecting the raw or effective PAX size, the reader MUST return exactly that many payload bytes and advance the cursor over the padded extent to the next 512-byte boundary.
+            let (size, payload, next) =
+                crate::verified::tar_entry_extent::take_selected_entry_payload(
+                    bytes,
+                    cursor,
+                    crate::verified::tar_pax::payload_size(extension, values[2], raw_size),
+                    limits.max_entry_bytes,
+                )
+                .map_err(|error| match error {
+                    crate::verified::tar_entry_extent::SelectedEntryError::Numeric => {
+                        TarError::Numeric
+                    }
+                    crate::verified::tar_entry_extent::SelectedEntryError::Limit => TarError::Limit,
+                    crate::verified::tar_entry_extent::SelectedEntryError::Truncated => {
+                        TarError::Truncated
+                    }
+                })?;
             cursor = next;
             if extension {
                 extended = extended.checked_add(1).ok_or(TarError::Limit)?;

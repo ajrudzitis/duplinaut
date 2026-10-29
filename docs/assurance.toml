@@ -3482,6 +3482,33 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-selected-payload-extent"
+gate = true
+requirements = ["PARSE-TAR-008"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Composes selected PAX/raw size, configured entry-size admission and the
+# exact payload/padding cursor adapter. Whole tar-loop refinement remains
+# outside this milestone.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry_extent.rs", symbol = "take_selected_entry_payload" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-selected-payload-extent", requirement = "PARSE-TAR-008", path = "crates/core/src/verified/tar_entry_extent.rs", symbol = "take_selected_entry_payload", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "complete_entry_extents_padding_and_checksum" },
+  { package = "duplicity-core", name = "entry_classification_and_limits" },
+  { package = "duplicity-core", name = "pax_size_override_controls_payload_and_empty_local_deletion_falls_back" },
+  { package = "duplicity-core", name = "global_pax_size_does_not_change_extension_payload_extent" }
+]
+
+[[milestone]]
 id = "tar-pax-effective-size"
 gate = true
 requirements = ["PARSE-TAR-003"]
