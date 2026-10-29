@@ -46,4 +46,89 @@ pub fn classify_entry_type(flag: u8, size: usize) -> (result: Option<TarEntryTyp
         }
     }
 }
+
+//= docs/parsing-requirements.md#parse-tar-018
+//# For each real tar entry, the reader MUST checked-add fixed entry overhead and the exact admitted output name, link-target, `uname`, and `gname` lengths, then charge that amount against the remaining metadata limit before allocating any output fields. Arithmetic overflow or an exceeded limit MUST reject the volume without returning a partial entry list.
+pub open spec fn entry_metadata_charge_model(
+    entry_size: int,
+    copies: int,
+    name_length: int,
+    link_length: int,
+    uname_length: int,
+    gname_length: int,
+) -> int {
+    entry_size * copies + name_length + link_length + uname_length + gname_length
+}
+
+//= docs/parsing-requirements.md#parse-tar-018
+//# For each real tar entry, the reader MUST checked-add fixed entry overhead and the exact admitted output name, link-target, `uname`, and `gname` lengths, then charge that amount against the remaining metadata limit before allocating any output fields. Arithmetic overflow or an exceeded limit MUST reject the volume without returning a partial entry list.
+pub fn entry_metadata_charge(
+    entry_size: usize,
+    copies: usize,
+    name_length: usize,
+    link_length: usize,
+    uname_length: usize,
+    gname_length: usize,
+) -> (result: Option<usize>)
+    ensures match result {
+        Some(amount) => amount as int == entry_metadata_charge_model(
+            entry_size as int, copies as int, name_length as int,
+            link_length as int, uname_length as int, gname_length as int,
+        ),
+        None => entry_metadata_charge_model(
+            entry_size as int, copies as int, name_length as int,
+            link_length as int, uname_length as int, gname_length as int,
+        ) > usize::MAX as int,
+    },
+{
+    let fixed = entry_size.checked_mul(copies)?;
+    let with_name = fixed.checked_add(name_length)?;
+    let with_link = with_name.checked_add(link_length)?;
+    let with_uname = with_link.checked_add(uname_length)?;
+    with_uname.checked_add(gname_length)
+}
+
+//= docs/parsing-requirements.md#parse-tar-018
+//# For each real tar entry, the reader MUST checked-add fixed entry overhead and the exact admitted output name, link-target, `uname`, and `gname` lengths, then charge that amount against the remaining metadata limit before allocating any output fields. Arithmetic overflow or an exceeded limit MUST reject the volume without returning a partial entry list.
+pub open spec fn metadata_charge_admission_model(
+    used: int,
+    amount: int,
+    limit: int,
+) -> Option<int> {
+    let next = used + amount;
+    if next <= usize::MAX as int && next <= limit { Some(next) } else { None }
+}
+
+//= docs/parsing-requirements.md#parse-tar-018
+//# For each real tar entry, the reader MUST checked-add fixed entry overhead and the exact admitted output name, link-target, `uname`, and `gname` lengths, then charge that amount against the remaining metadata limit before allocating any output fields. Arithmetic overflow or an exceeded limit MUST reject the volume without returning a partial entry list.
+pub fn admit_metadata_charge(used: usize, amount: usize, limit: usize)
+    -> (result: Option<usize>)
+    ensures match result {
+        Some(next) => metadata_charge_admission_model(
+            used as int, amount as int, limit as int,
+        ) == Some(next as int),
+        None => metadata_charge_admission_model(
+            used as int, amount as int, limit as int,
+        ) is None,
+    },
+{
+    let next = used.checked_add(amount)?;
+    if next > limit { None } else { Some(next) }
+}
+
+#[cfg(test)]
+mod metadata_charge_tests {
+    use super::{admit_metadata_charge, entry_metadata_charge};
+
+    #[test]
+    fn entry_metadata_charge_checked_formula_and_budget_admission() {
+        assert_eq!(entry_metadata_charge(8, 4, 3, 2, 1, 4), Some(42));
+        assert_eq!(entry_metadata_charge(usize::MAX, 2, 0, 0, 0, 0), None);
+        assert_eq!(entry_metadata_charge(0, 1, usize::MAX, 1, 0, 0), None);
+        assert_eq!(admit_metadata_charge(10, 32, 42), Some(42));
+        assert_eq!(admit_metadata_charge(10, 32, 41), None);
+        assert_eq!(admit_metadata_charge(usize::MAX, 1, usize::MAX), None);
+    }
+}
+
 }
