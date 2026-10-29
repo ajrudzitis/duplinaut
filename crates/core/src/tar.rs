@@ -285,7 +285,12 @@ impl<'a> TarVolume<'a> {
             }
             let entry_type = crate::verified::tar_entry::classify_entry_type(h.entry_type, size)
                 .ok_or(TarError::UnsupportedEntry)?;
-            if entries.len() >= limits.max_entries {
+            //= docs/parsing-requirements.md#parse-tar-021
+            //# Before allocating or retaining output fields for a real tar entry, the parser MUST require the accepted entry count to be below `max_entries`. If the count equals or exceeds the limit, it MUST return Limit without returning a partial entry list.
+            if !crate::verified::tar_entry::admit_real_entry_count(
+                entries.len(),
+                limits.max_entries,
+            ) {
                 return Err(TarError::Limit);
             }
             let raw_name = text(h.name);

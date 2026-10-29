@@ -541,6 +541,12 @@ The reader MUST checked-increment the GNU/PAX extension-header count and reject 
 
 Provenance: POLICY. This proves the extension-count transition and its parser ordering before extension metadata charging/content interpretation; whole tar-loop refinement remains separate.
 
+### PARSE-TAR-021
+
+Before allocating or retaining output fields for a real tar entry, the parser MUST require the accepted entry count to be below `max_entries`. If the count equals or exceeds the limit, it MUST return Limit without returning a partial entry list.
+
+Provenance: POLICY. This proves per-entry count admission before output-field interpretation and allocation; whole tar-loop refinement remains separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

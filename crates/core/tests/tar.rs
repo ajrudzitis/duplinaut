@@ -257,6 +257,38 @@ fn extension_header_count_is_bounded_before_content_interpretation() {
     );
 }
 
+//= docs/parsing-requirements.md#parse-tar-021
+//= type=test
+//# Before allocating or retaining output fields for a real tar entry, the parser MUST require the accepted entry count to be below `max_entries`. If the count equals or exceeds the limit, it MUST return Limit without returning a partial entry list.
+#[test]
+fn real_entry_count_is_bounded_before_output_field_interpretation() {
+    let first = member(b"snapshot/first", b'0', b"");
+    let malformed_second = member(b"", b'0', b"");
+    let archive = [first, malformed_second].concat();
+    let one_entry = TarLimits {
+        max_entries: 1,
+        ..TarLimits::default()
+    };
+    assert_eq!(
+        TarVolume::parse(&archive, Termination::Data, one_entry).unwrap_err(),
+        TarError::Limit
+    );
+
+    let zero_entries = TarLimits {
+        max_entries: 0,
+        ..TarLimits::default()
+    };
+    assert_eq!(
+        TarVolume::parse(
+            &member(b"snapshot/file", b'0', b""),
+            Termination::Data,
+            zero_entries
+        )
+        .unwrap_err(),
+        TarError::Limit
+    );
+}
+
 //= docs/parsing-requirements.md#parse-tar-001
 //= type=test
 //# The tar parser MUST validate each header checksum and payload extent before accepting the entry it describes.

@@ -152,11 +152,25 @@ pub fn admit_extension_header_count(current: usize, maximum: usize) -> (result: 
     if next > maximum { None } else { Some(next) }
 }
 
+//= docs/parsing-requirements.md#parse-tar-021
+//# Before allocating or retaining output fields for a real tar entry, the parser MUST require the accepted entry count to be below `max_entries`. If the count equals or exceeds the limit, it MUST return Limit without returning a partial entry list.
+pub open spec fn real_entry_count_admission_model(current: int, maximum: int) -> bool {
+    current < maximum
+}
+
+//= docs/parsing-requirements.md#parse-tar-021
+//# Before allocating or retaining output fields for a real tar entry, the parser MUST require the accepted entry count to be below `max_entries`. If the count equals or exceeds the limit, it MUST return Limit without returning a partial entry list.
+pub fn admit_real_entry_count(current: usize, maximum: usize) -> (result: bool)
+    ensures result == real_entry_count_admission_model(current as int, maximum as int),
+{
+    current < maximum
+}
+
 #[cfg(test)]
 mod metadata_charge_tests {
     use super::{
-        admit_extension_header_count, admit_extension_metadata_charge, admit_metadata_charge,
-        entry_metadata_charge,
+        admit_extension_header_count, admit_extension_metadata_charge,
+        admit_metadata_charge, admit_real_entry_count, entry_metadata_charge,
     };
 
     #[test]
@@ -188,6 +202,16 @@ mod metadata_charge_tests {
         assert_eq!(admit_extension_header_count(usize::MAX - 1, usize::MAX), Some(usize::MAX));
         assert_eq!(admit_extension_header_count(1, 1), None);
         assert_eq!(admit_extension_header_count(usize::MAX, usize::MAX), None);
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-021
+    //= type=test
+    //# Before allocating or retaining output fields for a real tar entry, the parser MUST require the accepted entry count to be below `max_entries`. If the count equals or exceeds the limit, it MUST return Limit without returning a partial entry list.
+    #[test]
+    fn real_entry_count_admission_checks_below_limit() {
+        assert!(admit_real_entry_count(0, 1));
+        assert!(!admit_real_entry_count(1, 1));
+        assert!(!admit_real_entry_count(usize::MAX, usize::MAX));
     }
 }
 
