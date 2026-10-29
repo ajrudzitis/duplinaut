@@ -323,6 +323,21 @@ fn posix_prefix_and_gnu_header_are_distinct() {
     assert_eq!(parse(&bytes).unwrap_err(), TarError::UnsupportedHeader);
 }
 
+//= docs/parsing-requirements.md#parse-tar-010
+//= type=test
+//# Raw tar text fields MUST end at the first NUL byte, or use the entire field when no NUL is present.
+#[test]
+fn raw_tar_name_and_link_fields_end_at_first_nul() {
+    let bytes = [
+        member(b"snapshot\0ignored", b'0', b""),
+        symlink_with_linkname(b"target\0ignored"),
+    ]
+    .concat();
+    let parsed = parse(&bytes).unwrap();
+    assert_eq!(parsed.entries[0].name, b"snapshot");
+    assert_eq!(parsed.entries[1].linkname, b"target");
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.

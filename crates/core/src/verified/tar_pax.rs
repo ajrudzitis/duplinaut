@@ -53,6 +53,27 @@ pub fn find_byte(input: &[u8], begin: usize, end: usize, byte: u8) -> (result: O
     }
     None
 }
+
+//= docs/parsing-requirements.md#parse-tar-010
+//# Raw tar text fields MUST end at the first NUL byte, or use the entire field when no NUL is present.
+pub open spec fn nul_terminated_prefix_model(input: Seq<u8>) -> Seq<u8> {
+    match find(input, 0, input.len() as int, 0) {
+        Some(end) => input.subrange(0, end),
+        None => input,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-010
+//# Raw tar text fields MUST end at the first NUL byte, or use the entire field when no NUL is present.
+pub fn nul_terminated_prefix<'a>(input: &'a [u8]) -> (result: &'a [u8])
+    ensures result@ == nul_terminated_prefix_model(input@),
+{
+    match find_byte(input, 0, input.len(), 0) {
+        Some(end) => &input[..end],
+        None => input,
+    }
+}
+
 pub open spec fn record_model(input: Seq<u8>, cursor: int) -> Option<(int, Seq<u8>, Seq<u8>)> {
     if !(0 <= cursor < input.len()) { None }
     else { match find(input, cursor, input.len() as int, b' ') {
@@ -978,9 +999,9 @@ mod tests {
     use super::{
         admit_record, compose_ustar_header_name, effective_id, effective_link_override,
         effective_mtime, effective_name_override, effective_optional_time, effective_owner_name,
-        effective_size, hdrcharset_value_supported, ingest, owner_name_requires_utf8, payload_size,
-        resolve_values, PaxIdError, PaxIngestError, PaxRecordAdmissionError, PaxSizeError,
-        PaxTimeError,
+        effective_size, hdrcharset_value_supported, ingest, nul_terminated_prefix,
+        owner_name_requires_utf8, payload_size, resolve_values, PaxIdError, PaxIngestError,
+        PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
     };
 
     fn framed_record(key: &[u8], value: &[u8]) -> Vec<u8> {
@@ -1185,6 +1206,14 @@ mod tests {
             compose_ustar_header_name(b"snapshot/", b"file"),
             b"snapshot//file"
         );
+    }
+
+    #[test]
+    fn nul_terminated_prefix_uses_first_zero_or_full_input() {
+        assert_eq!(nul_terminated_prefix(b"text\0ignored"), b"text");
+        assert_eq!(nul_terminated_prefix(b"text"), b"text");
+        assert_eq!(nul_terminated_prefix(b"\0text"), b"");
+        assert_eq!(nul_terminated_prefix(b""), b"");
     }
 
     #[test]

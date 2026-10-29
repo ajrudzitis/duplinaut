@@ -475,6 +475,12 @@ When PAX path and GNU long-name overrides are absent, a POSIX ustar header MUST 
 
 Provenance: DOC-TAR and SRC-TAR. This covers fallback header-name byte composition; NUL truncation, validation, and whole-entry controller refinement remain separate.
 
+### PARSE-TAR-010
+
+Raw tar text fields MUST end at the first NUL byte, or use the entire field when no NUL is present.
+
+Provenance: DOC-TAR and the reviewed ustar header layout. This is byte truncation only; UTF-8 and path validation are specified separately.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

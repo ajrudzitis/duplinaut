@@ -87,7 +87,7 @@ pub struct TarVolume<'a> {
 }
 
 fn text(bytes: &[u8]) -> &[u8] {
-    &bytes[..bytes.iter().position(|b| *b == 0).unwrap_or(bytes.len())]
+    crate::verified::tar_pax::nul_terminated_prefix(bytes)
 }
 fn number(bytes: &[u8]) -> Result<i128, TarError> {
     crate::verified::tar_number::number(bytes).ok_or(TarError::Numeric)

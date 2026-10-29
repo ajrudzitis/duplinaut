@@ -3534,6 +3534,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-text-nul-prefix"
+gate = true
+requirements = ["PARSE-TAR-010"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves byte-prefix extraction through the first NUL and wires it into the
+# native tar text adapter. UTF-8, path validation and controller behavior
+# remain outside this milestone.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "nul_terminated_prefix" },
+  { path = "crates/core/src/tar.rs", symbol = "text" }
+]
+proofs = [
+  { id = "tar-text-nul-prefix", requirement = "PARSE-TAR-010", path = "crates/core/src/verified/tar_pax.rs", symbol = "nul_terminated_prefix", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::nul_terminated_prefix_uses_first_zero_or_full_input" },
+  { package = "duplicity-core", name = "raw_tar_name_and_link_fields_end_at_first_nul" }
+]
+
+[[milestone]]
 id = "tar-pax-effective-size"
 gate = true
 requirements = ["PARSE-TAR-003"]
