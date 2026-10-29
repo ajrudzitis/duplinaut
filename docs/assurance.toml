@@ -2218,6 +2218,34 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-incremental-manifest-field-error-refinement"
+gate = true
+requirements = ["PARSE-NAME-010"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Exact outcomes for the long IncrementalManifest field parser: invalid
+# separator configuration produces Configuration; with valid configuration,
+# malformed endpoints, non-increasing intervals, or an invalid trailer produce
+# Malformed exactly when the field model is None. The success model continues
+# to refine to the exact ObjectName. Tests exercise complete body field
+# structure; earlier scanner failures, raw-model converse, and full filename
+# error completeness remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "long_incremental_manifest_body_fields" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-long-incremental-manifest-field-error-refinement", requirement = "PARSE-NAME-010", path = "crates/core/src/names.rs", symbol = "long_incremental_manifest_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::long_incremental_manifest_body_exact_error_edge_matrix" }
+]
+
+[[milestone]]
 id = "name-long-full-signatures-body"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-007"]
