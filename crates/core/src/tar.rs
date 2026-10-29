@@ -322,7 +322,19 @@ impl<'a> TarVolume<'a> {
             }
             let uname = crate::verified::tar_pax::effective_owner_name(values[6], text(h.uname));
             let gname = crate::verified::tar_pax::effective_owner_name(values[7], text(h.gname));
-            if uname.len() > limits.max_path_bytes || gname.len() > limits.max_path_bytes {
+            //= docs/parsing-requirements.md#parse-tar-014
+            //# The parser MUST compute the exact byte lengths of the selected PAX `uname` and `gname` values, or their raw header fallbacks, and reject values above `max_path_bytes` before allocating the output owner names.
+            let (uname_length, uname_admitted) =
+                crate::verified::tar_pax::effective_owner_name_length_and_admission(
+                    uname,
+                    limits.max_path_bytes,
+                );
+            let (gname_length, gname_admitted) =
+                crate::verified::tar_pax::effective_owner_name_length_and_admission(
+                    gname,
+                    limits.max_path_bytes,
+                );
+            if !uname_admitted || !gname_admitted {
                 return Err(TarError::Limit);
             }
             // Conservative Vec capacity and entry storage accounting before allocation.
@@ -330,8 +342,8 @@ impl<'a> TarVolume<'a> {
                 .checked_mul(4)
                 .and_then(|v| v.checked_add(name_length))
                 .and_then(|v| v.checked_add(link_length))
-                .and_then(|v| v.checked_add(uname.len()))
-                .and_then(|v| v.checked_add(gname.len()))
+                .and_then(|v| v.checked_add(uname_length))
+                .and_then(|v| v.checked_add(gname_length))
                 .ok_or(TarError::Limit)?;
             charge(&mut metadata, entry_charge, limits.max_metadata_bytes)?;
             let name = if let Some(value) = name {

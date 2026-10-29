@@ -3637,6 +3637,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-owner-name-length-limit"
+gate = true
+requirements = ["PARSE-TAR-014"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves exact lengths and max-path admission for the selected PAX/header
+# owner-name slices before native output allocation. Charset handling and
+# whole tar parser refinement remain outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_owner_name_length_and_admission" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-owner-name-length-limit", requirement = "PARSE-TAR-014", path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_owner_name_length_and_admission", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::effective_owner_name_length_matches_selected_value_and_limit" },
+  { package = "duplicity-core", name = "owner_name_limit_uses_pax_override_or_raw_header_fallback" }
+]
+
+[[milestone]]
 id = "tar-pax-effective-size"
 gate = true
 requirements = ["PARSE-TAR-003"]

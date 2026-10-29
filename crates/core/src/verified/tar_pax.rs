@@ -543,6 +543,25 @@ pub fn effective_owner_name<'a>(pax_name: Option<&'a [u8]>, header_name: &'a [u8
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-014
+//# The parser MUST compute the exact byte lengths of the selected PAX `uname` and `gname` values, or their raw header fallbacks, and reject values above `max_path_bytes` before allocating the output owner names.
+pub open spec fn effective_owner_name_length_model(selected_owner_name: Seq<u8>) -> int {
+    selected_owner_name.len() as int
+}
+
+//= docs/parsing-requirements.md#parse-tar-014
+//# The parser MUST compute the exact byte lengths of the selected PAX `uname` and `gname` values, or their raw header fallbacks, and reject values above `max_path_bytes` before allocating the output owner names.
+pub fn effective_owner_name_length_and_admission(
+    selected_owner_name: &[u8],
+    max_path_bytes: usize,
+) -> (result: (usize, bool))
+    ensures result.0 as int == effective_owner_name_length_model(selected_owner_name@)
+        && result.1 == (result.0 <= max_path_bytes),
+{
+    let length = selected_owner_name.len();
+    (length, length <= max_path_bytes)
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
@@ -1079,9 +1098,9 @@ mod tests {
         admit_record, compose_ustar_header_name, effective_header_name_length_and_admission,
         effective_id, effective_link_length_and_admission, effective_link_override,
         effective_mtime, effective_name_override, effective_optional_time, effective_owner_name,
-        effective_size, hdrcharset_value_supported, ingest, nul_terminated_prefix,
-        owner_name_requires_utf8, payload_size, resolve_values, PaxIdError, PaxIngestError,
-        PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
+        effective_owner_name_length_and_admission, effective_size, hdrcharset_value_supported,
+        ingest, nul_terminated_prefix, owner_name_requires_utf8, payload_size, resolve_values,
+        PaxIdError, PaxIngestError, PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
     };
 
     fn framed_record(key: &[u8], value: &[u8]) -> Vec<u8> {
@@ -1359,6 +1378,25 @@ mod tests {
         assert!(owner_name_requires_utf8(Some(b"UTF-8")));
         assert!(owner_name_requires_utf8(Some(b"ISO-IR 10646 2000 UTF-8")));
         assert!(!owner_name_requires_utf8(Some(b"BINARY")));
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-014
+    //= type=test
+    //# The parser MUST compute the exact byte lengths of the selected PAX `uname` and `gname` values, or their raw header fallbacks, and reject values above `max_path_bytes` before allocating the output owner names.
+    #[test]
+    fn effective_owner_name_length_matches_selected_value_and_limit() {
+        assert_eq!(
+            effective_owner_name_length_and_admission(b"pax-user", 8),
+            (8, true)
+        );
+        assert_eq!(
+            effective_owner_name_length_and_admission(b"header", 6),
+            (6, true)
+        );
+        assert_eq!(
+            effective_owner_name_length_and_admission(b"raw-grp!", 7),
+            (8, false)
+        );
     }
 
     //= docs/parsing-requirements.md#parse-tar-003

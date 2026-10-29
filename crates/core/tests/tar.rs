@@ -452,6 +452,78 @@ fn effective_link_limit_uses_pax_gnu_or_raw_header_source_length() {
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-014
+//= type=test
+//# The parser MUST compute the exact byte lengths of the selected PAX `uname` and `gname` values, or their raw header fallbacks, and reject values above `max_path_bytes` before allocating the output owner names.
+#[test]
+fn owner_name_limit_uses_pax_override_or_raw_header_fallback() {
+    let cases = [
+        (
+            Some((b"uname" as &[u8], b"pax-user" as &[u8])),
+            b"raw" as &[u8],
+            b"grp" as &[u8],
+            b"pax-user" as &[u8],
+            b"grp" as &[u8],
+        ),
+        (
+            Some((b"gname" as &[u8], b"pax-grp!" as &[u8])),
+            b"raw" as &[u8],
+            b"grp" as &[u8],
+            b"raw" as &[u8],
+            b"pax-grp!" as &[u8],
+        ),
+        (
+            None,
+            b"raw-user" as &[u8],
+            b"grp" as &[u8],
+            b"raw-user" as &[u8],
+            b"grp" as &[u8],
+        ),
+        (
+            None,
+            b"raw" as &[u8],
+            b"raw-grp!" as &[u8],
+            b"raw" as &[u8],
+            b"raw-grp!" as &[u8],
+        ),
+    ];
+
+    for (override_field, uname, gname, expected_uname, expected_gname) in cases {
+        let limit = expected_uname.len().max(expected_gname.len());
+        let mut header = member_with_owner_names(uname, gname);
+        header[..100].fill(0);
+        header[0] = b'f';
+        checksum(&mut header[..512]);
+        let archive = match override_field {
+            Some((key, value)) => [member(b"l", b'x', &record(key, value)), header].concat(),
+            None => header,
+        };
+        let parsed = TarVolume::parse(
+            &archive,
+            Termination::Data,
+            TarLimits {
+                max_path_bytes: limit,
+                ..TarLimits::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(parsed.entries[0].uname, expected_uname);
+        assert_eq!(parsed.entries[0].gname, expected_gname);
+        assert_eq!(
+            TarVolume::parse(
+                &archive,
+                Termination::Data,
+                TarLimits {
+                    max_path_bytes: limit - 1,
+                    ..TarLimits::default()
+                },
+            )
+            .unwrap_err(),
+            TarError::Limit
+        );
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.

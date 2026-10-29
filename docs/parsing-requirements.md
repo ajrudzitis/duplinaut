@@ -499,6 +499,12 @@ The parser MUST choose PAX `linkpath`, then GNU long-link, then the raw header l
 
 Provenance: SRC-TAR and PARSE-TAR-003. This covers link-target source precedence, length, and allocation admission; path/name selection, target-byte validation, and whole tar-controller refinement are specified separately.
 
+### PARSE-TAR-014
+
+The parser MUST compute the exact byte lengths of the selected PAX `uname` and `gname` values, or their raw header fallbacks, and reject values above `max_path_bytes` before allocating the output owner names.
+
+Provenance: SRC-TAR and PARSE-TAR-003. This covers the selected borrowed values' length and allocation admission; charset validation and whole tar-controller refinement are specified separately.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
