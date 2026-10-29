@@ -26,6 +26,46 @@ pub enum TarHeaderProfile {
     V7,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TarUnsignedHeaderFields {
+    pub raw_size: u64,
+    pub uid: u64,
+    pub gid: u64,
+    pub device_major: u64,
+    pub device_minor: u64,
+}
+
+//= docs/parsing-requirements.md#parse-tar-027
+//# After checksum and header-profile admission, the parser MUST admit raw tar `size`, `uid`, `gid`, `device_major`, and `device_minor` fields as nonnegative `u64` values. A negative decoded value or a value greater than `u64::MAX` MUST produce Numeric before payload-extent selection or output-metadata retention. This raw-field admission MUST still occur when an effective PAX `size` supplies a real entry's payload extent; GNU/PAX extension payload extents continue to use their raw header size as specified by PARSE-TAR-007.
+pub fn admit_unsigned_header_fields(
+    raw_size: &[u8],
+    uid: &[u8],
+    gid: &[u8],
+    device_major: &[u8],
+    device_minor: &[u8],
+) -> (result: Option<TarUnsignedHeaderFields>)
+    ensures match result {
+        Some(fields) =>
+            super::tar_number::unsigned_model(raw_size@) == Some(fields.raw_size as int)
+            && super::tar_number::unsigned_model(uid@) == Some(fields.uid as int)
+            && super::tar_number::unsigned_model(gid@) == Some(fields.gid as int)
+            && super::tar_number::unsigned_model(device_major@) == Some(fields.device_major as int)
+            && super::tar_number::unsigned_model(device_minor@) == Some(fields.device_minor as int),
+        None => super::tar_number::unsigned_model(raw_size@) is None
+            || super::tar_number::unsigned_model(uid@) is None
+            || super::tar_number::unsigned_model(gid@) is None
+            || super::tar_number::unsigned_model(device_major@) is None
+            || super::tar_number::unsigned_model(device_minor@) is None,
+    },
+{
+    let raw_size = super::tar_number::unsigned(raw_size)?;
+    let uid = super::tar_number::unsigned(uid)?;
+    let gid = super::tar_number::unsigned(gid)?;
+    let device_major = super::tar_number::unsigned(device_major)?;
+    let device_minor = super::tar_number::unsigned(device_minor)?;
+    Some(TarUnsignedHeaderFields { raw_size, uid, gid, device_major, device_minor })
+}
+
 pub open spec fn tar_header_profile_model(magic: Seq<u8>) -> Option<TarHeaderProfile> {
     if magic.len() == 8 && magic[0] == b'u' && magic[1] == b's'
         && magic[2] == b't' && magic[3] == b'a' && magic[4] == b'r'
@@ -323,10 +363,34 @@ pub fn admit_real_entry_count(current: usize, maximum: usize) -> (result: bool)
 mod metadata_charge_tests {
     use super::{
         admit_extension_header_count, admit_extension_metadata_charge, admit_tar_header_profile,
+        admit_unsigned_header_fields,
         admit_metadata_charge, admit_real_entry_count, begin_tar_eof, finish_tar_eof,
         admit_header_checksum, decode_gnu_long_record, entry_metadata_charge, TarEofError, TarEofState,
-        TarHeaderProfile, TarLongRecordError,
+        TarHeaderProfile, TarLongRecordError, TarUnsignedHeaderFields,
     };
+
+    //= docs/parsing-requirements.md#parse-tar-027
+    //= type=test
+    //# After checksum and header-profile admission, the parser MUST admit raw tar `size`, `uid`, `gid`, `device_major`, and `device_minor` fields as nonnegative `u64` values. A negative decoded value or a value greater than `u64::MAX` MUST produce Numeric before payload-extent selection or output-metadata retention. This raw-field admission MUST still occur when an effective PAX `size` supplies a real entry's payload extent; GNU/PAX extension payload extents continue to use their raw header size as specified by PARSE-TAR-007.
+    #[test]
+    fn unsigned_header_field_adapter_admits_all_fields_or_none() {
+        assert_eq!(
+            admit_unsigned_header_fields(b"0000001", b"2", b"3", b"4", b"5"),
+            Some(TarUnsignedHeaderFields {
+                raw_size: 1,
+                uid: 2,
+                gid: 3,
+                device_major: 4,
+                device_minor: 5,
+            })
+        );
+        let invalid: &[u8] = &[0xff, 0xff];
+        assert_eq!(admit_unsigned_header_fields(invalid, b"2", b"3", b"4", b"5"), None);
+        assert_eq!(admit_unsigned_header_fields(b"1", invalid, b"3", b"4", b"5"), None);
+        assert_eq!(admit_unsigned_header_fields(b"1", b"2", invalid, b"4", b"5"), None);
+        assert_eq!(admit_unsigned_header_fields(b"1", b"2", b"3", invalid, b"5"), None);
+        assert_eq!(admit_unsigned_header_fields(b"1", b"2", b"3", b"4", invalid), None);
+    }
 
     //= docs/parsing-requirements.md#parse-tar-025
     //= type=test

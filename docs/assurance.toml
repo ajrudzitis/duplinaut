@@ -4477,6 +4477,31 @@ tests = [
   { package = "duplicity-core", name = "posix_prefix_and_gnu_header_are_distinct" }
 ]
 
+[[milestone]]
+id = "tar-unsigned-header-fields"
+gate = true
+requirements = ["PARSE-TAR-027"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Formalizes the all-or-nothing unsigned admission of raw header fields before
+# extent selection. The surrounding tar header controller remains separate.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry.rs", symbol = "admit_unsigned_header_fields" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-unsigned-header-fields", requirement = "PARSE-TAR-027", path = "crates/core/src/verified/tar_entry.rs", symbol = "admit_unsigned_header_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_entry::metadata_charge_tests::unsigned_header_field_adapter_admits_all_fields_or_none" },
+  { package = "duplicity-core", name = "negative_raw_owner_and_device_fields_are_numeric" },
+  { package = "duplicity-core", name = "raw_size_is_admitted_even_when_pax_supplies_the_extent" }
+]
+
 [[trusted]]
 id = "upstream-verus-vest"
 reviewed = true

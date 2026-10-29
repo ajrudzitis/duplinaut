@@ -261,6 +261,11 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: Every multiply and addition MUST be checked against the `i128` range; unsupported markers, invalid octal digits, or overflow MUST produce Numeric.
     TEXT[!MUST,implementation,test]: Fields used as unsigned values MUST additionally reject negative results and results greater than `u64::MAX`; signed mtime narrowing remains governed by PARSE-TAR-011.
 
+  SECTION: [PARSE-TAR-027](#parse-tar-027)
+    TEXT[!MUST,implementation,test]: After checksum and header-profile admission, the parser MUST admit raw tar `size`, `uid`, `gid`, `device_major`, and `device_minor` fields as nonnegative `u64` values.
+    TEXT[!MUST,implementation,test]: A negative decoded value or a value greater than `u64::MAX` MUST produce Numeric before payload-extent selection or output-metadata retention.
+    TEXT[!MUST,implementation,test]: This raw-field admission MUST still occur when an effective PAX `size` supplies a real entry's payload extent; GNU/PAX extension payload extents continue to use their raw header size as specified by PARSE-TAR-007.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

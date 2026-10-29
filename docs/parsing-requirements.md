@@ -577,6 +577,12 @@ The reader MUST decode a tar numeric field as either padded ASCII octal or the r
 
 Provenance: DOC-TAR and SRC-TAR, with the project’s explicitly reviewed numeric compatibility profile above. This requirement covers scalar byte decoding and unsigned admission; it does not broaden the GNU base-256 marker set, define field-specific narrowing, or refine full header error ordering.
 
+### PARSE-TAR-027
+
+After checksum and header-profile admission, the parser MUST admit raw tar `size`, `uid`, `gid`, `device_major`, and `device_minor` fields as nonnegative `u64` values. A negative decoded value or a value greater than `u64::MAX` MUST produce Numeric before payload-extent selection or output-metadata retention. This raw-field admission MUST still occur when an effective PAX `size` supplies a real entry's payload extent; GNU/PAX extension payload extents continue to use their raw header size as specified by PARSE-TAR-007.
+
+Provenance: DOC-TAR, SRC-TAR, and the reviewed tar header profile above. The public format defines these numeric header fields and PAX size replacement; the official reader profile decodes and admits raw header values before applying semantic overrides. Mode/mtime narrowing, PAX value decoding, and complete header-controller error ordering remain separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

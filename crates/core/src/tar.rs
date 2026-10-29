@@ -202,15 +202,25 @@ impl<'a> TarVolume<'a> {
             //# Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
             let mode = crate::verified::tar_number::narrow_mode(unsigned(h.mode)?)
                 .ok_or(TarError::Numeric)?;
-            let header_uid = unsigned(h.uid)?;
-            let header_gid = unsigned(h.gid)?;
-            let raw_size = unsigned(h.size)?;
+            //= docs/parsing-requirements.md#parse-tar-027
+            //# After checksum and header-profile admission, the parser MUST admit raw tar `size`, `uid`, `gid`, `device_major`, and `device_minor` fields as nonnegative `u64` values. A negative decoded value or a value greater than `u64::MAX` MUST produce Numeric before payload-extent selection or output-metadata retention. This raw-field admission MUST still occur when an effective PAX `size` supplies a real entry's payload extent; GNU/PAX extension payload extents continue to use their raw header size as specified by PARSE-TAR-007.
+            let raw_fields = crate::verified::tar_entry::admit_unsigned_header_fields(
+                h.size,
+                h.uid,
+                h.gid,
+                h.device_major,
+                h.device_minor,
+            )
+            .ok_or(TarError::Numeric)?;
+            let header_uid = raw_fields.uid;
+            let header_gid = raw_fields.gid;
+            let raw_size = raw_fields.raw_size;
             //= docs/parsing-requirements.md#parse-tar-011
             //# Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
             let header_mtime_seconds = crate::verified::tar_number::narrow_mtime(number(h.mtime)?)
                 .ok_or(TarError::Numeric)?;
-            let device_major = unsigned(h.device_major)?;
-            let device_minor = unsigned(h.device_minor)?;
+            let device_major = raw_fields.device_major;
+            let device_minor = raw_fields.device_minor;
             let extension = matches!(h.entry_type, b'L' | b'K' | b'x' | b'g');
             //= docs/parsing-requirements.md#parse-tar-006
             //# Local fields MUST override global fields for the next real entry.

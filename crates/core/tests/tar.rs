@@ -1157,6 +1157,39 @@ fn invalid_pax_uid_gid_values_are_numeric_errors() {
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-027
+//= type=test
+//# After checksum and header-profile admission, the parser MUST admit raw tar `size`, `uid`, `gid`, `device_major`, and `device_minor` fields as nonnegative `u64` values. A negative decoded value or a value greater than `u64::MAX` MUST produce Numeric before payload-extent selection or output-metadata retention. This raw-field admission MUST still occur when an effective PAX `size` supplies a real entry's payload extent; GNU/PAX extension payload extents continue to use their raw header size as specified by PARSE-TAR-007.
+#[test]
+fn negative_raw_owner_and_device_fields_are_numeric() {
+    for range in [108..116, 116..124, 329..337, 337..345] {
+        let mut bytes = member(b"snapshot/raw", b'0', b"");
+        bytes[range].fill(0xff); // GNU negative base-256 value -1.
+        checksum(&mut bytes[..512]);
+        assert_eq!(parse(&bytes).unwrap_err(), TarError::Numeric);
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-027
+//= type=test
+//# After checksum and header-profile admission, the parser MUST admit raw tar `size`, `uid`, `gid`, `device_major`, and `device_minor` fields as nonnegative `u64` values. A negative decoded value or a value greater than `u64::MAX` MUST produce Numeric before payload-extent selection or output-metadata retention. This raw-field admission MUST still occur when an effective PAX `size` supplies a real entry's payload extent; GNU/PAX extension payload extents continue to use their raw header size as specified by PARSE-TAR-007.
+#[test]
+fn raw_size_is_admitted_even_when_pax_supplies_the_extent() {
+    let pax_size = member(b"local", b'x', &record(b"size", b"1"));
+    let mut negative_size = member(b"snapshot/raw", b'0', b"x");
+    negative_size[124..136].fill(0xff);
+    checksum(&mut negative_size[..512]);
+    let archive = [pax_size.as_slice(), negative_size.as_slice()].concat();
+    assert_eq!(parse(&archive).unwrap_err(), TarError::Numeric);
+
+    let mut oversized_size = member(b"snapshot/raw", b'0', b"x");
+    oversized_size[124..136].fill(0xff);
+    oversized_size[124] = 0x80; // Positive base-256, larger than u64::MAX.
+    checksum(&mut oversized_size[..512]);
+    let archive = [pax_size.as_slice(), oversized_size.as_slice()].concat();
+    assert_eq!(parse(&archive).unwrap_err(), TarError::Numeric);
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
