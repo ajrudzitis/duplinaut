@@ -432,6 +432,58 @@ pub open spec fn effective_header_name_length_model(
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-015
+//# For each accepted tar entry, the output name MUST be the selected PAX path, GNU long-name, or raw ustar prefix/name, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
+pub open spec fn effective_header_name_model(
+    selected_override: Option<Seq<u8>>,
+    prefix: Seq<u8>,
+    raw_name: Seq<u8>,
+) -> Seq<u8> {
+    match selected_override {
+        Some(name) => name,
+        None => ustar_header_name_model(prefix, raw_name),
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-015
+//# For each accepted tar entry, the output name MUST be the selected PAX path, GNU long-name, or raw ustar prefix/name, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
+pub fn compose_effective_header_name(
+    selected_override: Option<&[u8]>,
+    prefix: &[u8],
+    raw_name: &[u8],
+    expected_length: usize,
+) -> (result: Vec<u8>)
+    requires expected_length as int == effective_header_name_length_model(
+        match selected_override {
+            None => None,
+            Some(name) => Some(name@),
+        }, prefix@, raw_name@,
+    ),
+    ensures result@ == effective_header_name_model(
+        match selected_override {
+            None => None,
+            Some(name) => Some(name@),
+        }, prefix@, raw_name@,
+    ) && result.len() == expected_length,
+{
+    match selected_override {
+        Some(name) => {
+            let mut result = Vec::with_capacity(expected_length);
+            let mut i = 0;
+            while i < name.len()
+                invariant 0 <= i <= name.len(),
+                    result@ == name@.subrange(0, i as int),
+                decreases name.len() - i,
+            {
+                result.push(name[i]);
+                i += 1;
+            }
+            result
+        },
+        None => compose_ustar_header_name(prefix, raw_name),
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-012
 //# The parser MUST choose PAX `path`, then GNU long-name, then the raw ustar prefix/name; it MUST compute that selected name's exact byte length and reject lengths above `max_path_bytes` before allocating the output name.
 #[allow(clippy::manual_map)]
@@ -1095,9 +1147,10 @@ pub fn ingest<'a>(input: &'a [u8])
 #[cfg(test)]
 mod tests {
     use super::{
-        admit_record, compose_ustar_header_name, effective_header_name_length_and_admission,
-        effective_id, effective_link_length_and_admission, effective_link_override,
-        effective_mtime, effective_name_override, effective_optional_time, effective_owner_name,
+        admit_record, compose_effective_header_name, compose_ustar_header_name,
+        effective_header_name_length_and_admission, effective_id,
+        effective_link_length_and_admission, effective_link_override, effective_mtime,
+        effective_name_override, effective_optional_time, effective_owner_name,
         effective_owner_name_length_and_admission, effective_size, hdrcharset_value_supported,
         ingest, nul_terminated_prefix, owner_name_requires_utf8, payload_size, resolve_values,
         PaxIdError, PaxIngestError, PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
@@ -1329,6 +1382,31 @@ mod tests {
             effective_header_name_length_and_admission(None, b"", b"file", 4),
             Some((4, true))
         );
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-015
+    //= type=test
+    //# For each accepted tar entry, the output name MUST be the selected PAX path, GNU long-name, or raw ustar prefix/name, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
+    #[test]
+    fn effective_header_name_composition_matches_selected_source_and_length() {
+        let pax = effective_name_override(Some(b"pax-path"), Some(b"gnu-path"));
+        assert_eq!(
+            compose_effective_header_name(pax, b"prefix", b"raw", 8),
+            b"pax-path"
+        );
+
+        let gnu = effective_name_override(None, Some(b"gnu-path"));
+        assert_eq!(
+            compose_effective_header_name(gnu, b"prefix", b"raw", 8),
+            b"gnu-path"
+        );
+
+        let raw = effective_name_override(None, None);
+        assert_eq!(
+            compose_effective_header_name(raw, b"dir", b"file", 8),
+            b"dir/file"
+        );
+        assert_eq!(compose_effective_header_name(raw, b"", b"file", 4), b"file");
     }
 
     #[test]

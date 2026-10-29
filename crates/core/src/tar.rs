@@ -289,7 +289,8 @@ impl<'a> TarVolume<'a> {
             let prefix = if posix { text(h.prefix) } else { b"" };
             //= docs/parsing-requirements.md#parse-tar-012
             //# The parser MUST choose PAX `path`, then GNU long-name, then the raw ustar prefix/name; it MUST compute that selected name's exact byte length and reject lengths above `max_path_bytes` before allocating the output name.
-            let name = crate::verified::tar_pax::effective_name_override(values[0], long_name);
+            let selected_name =
+                crate::verified::tar_pax::effective_name_override(values[0], long_name);
             let header_link = text(h.linkname);
             let link = crate::verified::tar_pax::effective_link_override(values[1], long_link)
                 .unwrap_or(header_link);
@@ -297,7 +298,7 @@ impl<'a> TarVolume<'a> {
             //# The parser MUST choose PAX `path`, then GNU long-name, then the raw ustar prefix/name; it MUST compute that selected name's exact byte length and reject lengths above `max_path_bytes` before allocating the output name.
             let (name_length, name_admitted) =
                 crate::verified::tar_pax::effective_header_name_length_and_admission(
-                    name,
+                    selected_name,
                     prefix,
                     raw_name,
                     limits.max_path_bytes,
@@ -346,13 +347,14 @@ impl<'a> TarVolume<'a> {
                 .and_then(|v| v.checked_add(gname_length))
                 .ok_or(TarError::Limit)?;
             charge(&mut metadata, entry_charge, limits.max_metadata_bytes)?;
-            let name = if let Some(value) = name {
-                value.to_vec()
-            } else {
-                //= docs/parsing-requirements.md#parse-tar-009
-                //# When PAX path and GNU long-name overrides are absent, a POSIX ustar header MUST use its raw name field if the prefix is empty and MUST join a nonempty prefix to the raw name with one slash byte.
-                crate::verified::tar_pax::compose_ustar_header_name(prefix, raw_name)
-            };
+            //= docs/parsing-requirements.md#parse-tar-015
+            //# For each accepted tar entry, the output name MUST be the selected PAX path, GNU long-name, or raw ustar prefix/name, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
+            let name = crate::verified::tar_pax::compose_effective_header_name(
+                selected_name,
+                prefix,
+                raw_name,
+                name_length,
+            );
             if name.is_empty() || name.contains(&0) || link.contains(&0) {
                 return Err(TarError::TextEncoding);
             }

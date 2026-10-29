@@ -215,6 +215,9 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
   SECTION: [PARSE-TAR-014](#parse-tar-014)
     TEXT[!MUST,implementation,test]: The parser MUST compute the exact byte lengths of the selected PAX `uname` and `gname` values, or their raw header fallbacks, and reject values above `max_path_bytes` before allocating the output owner names.
 
+  SECTION: [PARSE-TAR-015](#parse-tar-015)
+    TEXT[!MUST,implementation,test]: For each accepted tar entry, the output name MUST be the selected PAX path, GNU long-name, or raw ustar prefix/name, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

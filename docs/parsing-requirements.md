@@ -505,6 +505,12 @@ The parser MUST compute the exact byte lengths of the selected PAX `uname` and `
 
 Provenance: SRC-TAR and PARSE-TAR-003. This covers the selected borrowed values' length and allocation admission; charset validation and whole tar-controller refinement are specified separately.
 
+### PARSE-TAR-015
+
+For each accepted tar entry, the output name MUST be the selected PAX path, GNU long-name, or raw ustar prefix/name, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
+
+Provenance: SRC-TAR and PARSE-TAR-009/012. This connects the selected source's byte composition to the existing checked length; path validation and complete tar-controller refinement remain separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

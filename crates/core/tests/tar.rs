@@ -1002,6 +1002,9 @@ fn invalid_pax_atime_and_ctime_values_are_numeric_errors() {
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
+//= docs/parsing-requirements.md#parse-tar-015
+//= type=test
+//# For each accepted tar entry, the output name MUST be the selected PAX path, GNU long-name, or raw ustar prefix/name, and its byte length MUST equal the precomputed length used for admission and metadata accounting.
 #[test]
 fn official_duplicity_307_pax_path_override_is_applied() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
