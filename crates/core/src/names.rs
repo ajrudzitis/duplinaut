@@ -8698,6 +8698,49 @@ mod tests {
     }
 
     #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-003
+    //= type=test
+    //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
+    fn short_full_manifest_body_raw_result_matrix() {
+        let timestamps: [(&[u8], i128); 3] = [(b"1", 1), (b"z", 35), (b"10", 36)];
+        type RawManifestProfile<'a> = (&'a [u8], super::Envelope, bool);
+        let profiles: [RawManifestProfile<'_>; 6] = [
+            (b"", super::Envelope::Plain, false),
+            (b".p", super::Envelope::Plain, true),
+            (b".z", super::Envelope::Gzip, false),
+            (b".g", super::Envelope::OpenPgp, false),
+            (b".p.z", super::Envelope::Gzip, true),
+            (b".p.g", super::Envelope::OpenPgp, true),
+        ];
+
+        for (timestamp_field, timestamp) in timestamps {
+            for (suffix, envelope, partial) in profiles {
+                let mut raw = Vec::new();
+                raw.extend_from_slice(timestamp_field);
+                raw.extend_from_slice(b".m");
+                raw.extend_from_slice(suffix);
+
+                assert_eq!(
+                    super::short_full_manifest_body(&raw, b':'),
+                    Ok(super::ObjectName {
+                        kind: super::ObjectKind::FullManifest,
+                        start: super::Timestamp(timestamp),
+                        end: super::Timestamp(timestamp),
+                        volume: None,
+                        envelope,
+                        partial,
+                        short: true,
+                    }),
+                    "{raw:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
     //= docs/parsing-requirements.md#parse-name-010
     //= type=test
     //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.

@@ -2787,8 +2787,11 @@ proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Successful Short FullManifest body parsing composes exact dot/suffix field
-# extraction with the existing semantic field model. Error outcomes and the
+# Successful Short FullManifest body parsing implies exact dot/suffix field
+# extraction and the existing semantic field model. A direct 18-case raw-body
+# result matrix exercises timestamps `1`, `z`, and `10` across six suffix
+# profiles, but does not prove raw-model-to-parser success because split-model
+# projection remains open. Malformed raw-body error completeness and the
 # surrounding parse_name stem/configuration controller remain outside.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "body" },
@@ -2798,7 +2801,8 @@ proofs = [
   { id = "name-short-full-manifest-raw-body-controller", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "body", kind = "contract" }
 ]
 tests = [
-  { package = "duplicity-core", name = "short_full_manifest_body_composes_fields_and_rejects_malformed_fields" }
+  { package = "duplicity-core", name = "short_full_manifest_body_composes_fields_and_rejects_malformed_fields" },
+  { package = "duplicity-core", name = "names::tests::short_full_manifest_body_raw_result_matrix" }
 ]
 
 [[milestone]]
