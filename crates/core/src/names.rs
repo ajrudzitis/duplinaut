@@ -8156,6 +8156,80 @@ mod tests {
     //= docs/parsing-requirements.md#parse-name-001
     //= type=test
     //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+    //= docs/parsing-requirements.md#parse-name-004
+    //= type=test
+    //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
+    //= docs/parsing-requirements.md#parse-name-006
+    //= type=test
+    //# An incremental set MUST have an end timestamp strictly later than its start timestamp.
+    //= docs/parsing-requirements.md#parse-name-007
+    //= type=test
+    //# The long timestamp parser MUST support legacy explicit-zone `YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS±HH:MM` timestamps with the configured single-byte time separator in place of colons.
+    fn long_incremental_signatures_body_raw_result_matrix() {
+        let intervals: [(&[u8], &[u8], u8); 3] = [
+            (b"19700101T000000Z", b"19700101T000001Z", b':'),
+            (b"1970-01-01T00:00:00Z", b"1970-01-01T00:00:01Z", b':'),
+            (
+                b"1970-01-01T01_00_00+01_00",
+                b"1970-01-01T01_00_01+01_00",
+                b'_',
+            ),
+        ];
+        type SignatureSuffixProfile<'a> =
+            (Option<&'a [u8]>, Option<&'a [u8]>, super::Envelope, bool);
+        let profiles: [SignatureSuffixProfile<'_>; 8] = [
+            (None, None, super::Envelope::Plain, false),
+            (Some(b"part"), None, super::Envelope::Plain, true),
+            (Some(b"gz"), None, super::Envelope::Gzip, false),
+            (Some(b"gpg"), None, super::Envelope::OpenPgp, false),
+            (Some(b"p7m"), None, super::Envelope::Pkcs7, false),
+            (Some(b"part"), Some(b"gz"), super::Envelope::Gzip, true),
+            (Some(b"part"), Some(b"gpg"), super::Envelope::OpenPgp, true),
+            (Some(b"part"), Some(b"p7m"), super::Envelope::Pkcs7, true),
+        ];
+
+        for (start_field, end_field, separator) in intervals {
+            for (first, second, envelope, partial) in profiles {
+                let mut raw = Vec::new();
+                raw.extend_from_slice(start_field);
+                raw.extend_from_slice(b".to.");
+                raw.extend_from_slice(end_field);
+                raw.extend_from_slice(b".sigtar");
+                if let Some(first) = first {
+                    raw.push(b'.');
+                    raw.extend_from_slice(first);
+                }
+                if let Some(second) = second {
+                    raw.push(b'.');
+                    raw.extend_from_slice(second);
+                }
+
+                assert_eq!(
+                    super::body(
+                        &raw,
+                        super::ObjectKind::IncrementalSignatures,
+                        false,
+                        separator,
+                    ),
+                    Ok(super::ObjectName {
+                        kind: super::ObjectKind::IncrementalSignatures,
+                        start: super::Timestamp(0),
+                        end: super::Timestamp(1),
+                        volume: None,
+                        envelope,
+                        partial,
+                        short: false,
+                    }),
+                    "{raw:?} with separator {separator:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-001
+    //= type=test
+    //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
     fn body_candidate_accumulation_ignores_errors_and_merges_successes_in_order() {
         let mut remainders: [Option<&[u8]>; 12] = [None; 12];
         remainders[0] = Some(b"malformed");
