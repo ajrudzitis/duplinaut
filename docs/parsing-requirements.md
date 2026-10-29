@@ -565,6 +565,12 @@ After decoding the checksum field, the parser MUST reject a header whose checksu
 
 Provenance: POLICY. This requirement captures the checksum admission gate and its parser-visible error precedence. Decoding the checksum field itself and refinement of the complete header controller remain separate.
 
+### PARSE-TAR-025
+
+After checksum admission, the parser MUST accept a header only when its eight magic/version bytes are exactly POSIX ustar (`ustar\0` followed by `00`), old GNU (`ustar ` followed by ` \0`), or eight zero bytes for V7. Any other magic/version byte sequence MUST produce UnsupportedHeader. Only POSIX ustar headers may interpret bytes 345 through 499 as a path prefix; old GNU and V7 headers MUST NOT use those bytes as a prefix.
+
+Provenance: DOC-TAR and the reviewed tar header profile. This requirement fixes the accepted magic/version profiles and prefix interpretation gate; header checksum/value decoding and the remaining header-field interpretation are specified separately.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

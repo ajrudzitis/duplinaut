@@ -249,6 +249,11 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
   SECTION: [PARSE-TAR-024](#parse-tar-024)
     TEXT[!MUST,implementation,test]: After decoding the checksum field, the parser MUST reject a header whose checksum does not match before interpreting magic/version or any other numeric header field; that mismatch MUST produce Checksum.
 
+  SECTION: [PARSE-TAR-025](#parse-tar-025)
+    TEXT[!MUST,implementation,test]: After checksum admission, the parser MUST accept a header only when its eight magic/version bytes are exactly POSIX ustar (`ustar\0` followed by `00`), old GNU (`ustar ` followed by ` \0`), or eight zero bytes for V7.
+    TEXT[!MUST,implementation,test]: Any other magic/version byte sequence MUST produce UnsupportedHeader.
+    TEXT[!MUST,implementation,test]: Only POSIX ustar headers may interpret bytes 345 through 499 as a path prefix; old GNU and V7 headers MUST NOT use those bytes as a prefix.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

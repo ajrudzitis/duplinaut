@@ -571,6 +571,9 @@ fn gnu_base256_signed_time_and_signed_checksum() {
 //= docs/parsing-requirements.md#parse-tar-009
 //= type=test
 //# When PAX path and GNU long-name overrides are absent, a POSIX ustar header MUST use its raw name field if the prefix is empty and MUST join a nonempty prefix to the raw name with one slash byte.
+//= docs/parsing-requirements.md#parse-tar-025
+//= type=test
+//# After checksum admission, the parser MUST accept a header only when its eight magic/version bytes are exactly POSIX ustar (`ustar\0` followed by `00`), old GNU (`ustar ` followed by ` \0`), or eight zero bytes for V7. Any other magic/version byte sequence MUST produce UnsupportedHeader. Only POSIX ustar headers may interpret bytes 345 through 499 as a path prefix; old GNU and V7 headers MUST NOT use those bytes as a prefix.
 
 #[test]
 fn posix_prefix_and_gnu_header_are_distinct() {

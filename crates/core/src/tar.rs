@@ -193,10 +193,11 @@ impl<'a> TarVolume<'a> {
             ) {
                 return Err(TarError::Checksum);
             }
-            let posix = h.magic_version == *b"ustar\x0000";
-            if !posix && h.magic_version != *b"ustar  \0" && h.magic_version != [0; 8] {
-                return Err(TarError::UnsupportedHeader);
-            }
+            //= docs/parsing-requirements.md#parse-tar-025
+            //# After checksum admission, the parser MUST accept a header only when its eight magic/version bytes are exactly POSIX ustar (`ustar\0` followed by `00`), old GNU (`ustar ` followed by ` \0`), or eight zero bytes for V7. Any other magic/version byte sequence MUST produce UnsupportedHeader. Only POSIX ustar headers may interpret bytes 345 through 499 as a path prefix; old GNU and V7 headers MUST NOT use those bytes as a prefix.
+            let profile = crate::verified::tar_entry::admit_tar_header_profile(h.magic_version)
+                .ok_or(TarError::UnsupportedHeader)?;
+            let posix = profile == crate::verified::tar_entry::TarHeaderProfile::PosixUstar;
             //= docs/parsing-requirements.md#parse-tar-011
             //# Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
             let mode = crate::verified::tar_number::narrow_mode(unsigned(h.mode)?)

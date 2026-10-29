@@ -19,6 +19,54 @@ pub enum TarLongRecordError {
     Limit,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TarHeaderProfile {
+    PosixUstar,
+    Gnu,
+    V7,
+}
+
+pub open spec fn tar_header_profile_model(magic: Seq<u8>) -> Option<TarHeaderProfile> {
+    if magic.len() == 8 && magic[0] == b'u' && magic[1] == b's'
+        && magic[2] == b't' && magic[3] == b'a' && magic[4] == b'r'
+        && magic[5] == 0 && magic[6] == b'0' && magic[7] == b'0'
+    { Some(TarHeaderProfile::PosixUstar) }
+    else if magic.len() == 8 && magic[0] == b'u' && magic[1] == b's'
+        && magic[2] == b't' && magic[3] == b'a' && magic[4] == b'r'
+        && magic[5] == b' ' && magic[6] == b' ' && magic[7] == 0
+    { Some(TarHeaderProfile::Gnu) }
+    else if magic.len() == 8 && magic[0] == 0 && magic[1] == 0
+        && magic[2] == 0 && magic[3] == 0 && magic[4] == 0 && magic[5] == 0
+        && magic[6] == 0 && magic[7] == 0
+    { Some(TarHeaderProfile::V7) }
+    else { None }
+}
+
+//= docs/parsing-requirements.md#parse-tar-025
+//# After checksum admission, the parser MUST accept a header only when its eight magic/version bytes are exactly POSIX ustar (`ustar\0` followed by `00`), old GNU (`ustar ` followed by ` \0`), or eight zero bytes for V7. Any other magic/version byte sequence MUST produce UnsupportedHeader. Only POSIX ustar headers may interpret bytes 345 through 499 as a path prefix; old GNU and V7 headers MUST NOT use those bytes as a prefix.
+pub fn admit_tar_header_profile(magic: &[u8]) -> (profile: Option<TarHeaderProfile>)
+    ensures profile == tar_header_profile_model(magic@),
+{
+    if magic.len() == 8 && magic[0] == b'u' && magic[1] == b's'
+        && magic[2] == b't' && magic[3] == b'a' && magic[4] == b'r'
+        && magic[5] == 0 && magic[6] == b'0' && magic[7] == b'0'
+    {
+        Some(TarHeaderProfile::PosixUstar)
+    } else if magic.len() == 8 && magic[0] == b'u' && magic[1] == b's'
+        && magic[2] == b't' && magic[3] == b'a' && magic[4] == b'r'
+        && magic[5] == b' ' && magic[6] == b' ' && magic[7] == 0
+    {
+        Some(TarHeaderProfile::Gnu)
+    } else if magic.len() == 8 && magic[0] == 0 && magic[1] == 0
+        && magic[2] == 0 && magic[3] == 0 && magic[4] == 0 && magic[5] == 0
+        && magic[6] == 0 && magic[7] == 0
+    {
+        Some(TarHeaderProfile::V7)
+    } else {
+        None
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-024
 //# After decoding the checksum field, the parser MUST reject a header whose checksum does not match before interpreting magic/version or any other numeric header field; that mismatch MUST produce Checksum.
 pub fn admit_header_checksum(matches: bool) -> (admitted: bool)
@@ -274,11 +322,30 @@ pub fn admit_real_entry_count(current: usize, maximum: usize) -> (result: bool)
 #[cfg(test)]
 mod metadata_charge_tests {
     use super::{
-        admit_extension_header_count, admit_extension_metadata_charge,
+        admit_extension_header_count, admit_extension_metadata_charge, admit_tar_header_profile,
         admit_metadata_charge, admit_real_entry_count, begin_tar_eof, finish_tar_eof,
         admit_header_checksum, decode_gnu_long_record, entry_metadata_charge, TarEofError, TarEofState,
-        TarLongRecordError,
+        TarHeaderProfile, TarLongRecordError,
     };
+
+    //= docs/parsing-requirements.md#parse-tar-025
+    //= type=test
+    //# After checksum admission, the parser MUST accept a header only when its eight magic/version bytes are exactly POSIX ustar (`ustar\0` followed by `00`), old GNU (`ustar ` followed by ` \0`), or eight zero bytes for V7. Any other magic/version byte sequence MUST produce UnsupportedHeader. Only POSIX ustar headers may interpret bytes 345 through 499 as a path prefix; old GNU and V7 headers MUST NOT use those bytes as a prefix.
+    #[test]
+    fn header_profile_admission_is_exact() {
+        assert_eq!(admit_tar_header_profile(b"ustar\x0000"), Some(TarHeaderProfile::PosixUstar));
+        assert_eq!(admit_tar_header_profile(b"ustar  \0"), Some(TarHeaderProfile::Gnu));
+        assert_eq!(admit_tar_header_profile(&[0; 8]), Some(TarHeaderProfile::V7));
+        for magic in [
+            *b"ustar\x0001",
+            *b"ustar\x0100",
+            *b"ustar  0",
+            *b"ustar   ",
+            *b"USTAR\x0000",
+        ] {
+            assert_eq!(admit_tar_header_profile(&magic), None);
+        }
+    }
 
     #[test]
     fn entry_metadata_charge_checked_formula_and_budget_admission() {
