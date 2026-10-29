@@ -4380,9 +4380,11 @@ fn long_incremental_signatures_body_fields(
     third: Option<&[u8]>,
 ) -> (result: Result<ObjectName, NameError>)
     ensures match result {
-        Err(error) => (error == NameError::Malformed
-            || (error == NameError::Configuration
-                && !time_separator_valid_model(separator)))
+        Err(error) => error == (if time_separator_valid_model(separator) {
+            NameError::Malformed
+        } else {
+            NameError::Configuration
+        })
             && long_incremental_signatures_fields_model(
             start_field@,
             separator,
@@ -4432,9 +4434,16 @@ fn long_incremental_signatures_body_fields(
             partial,
             short: false,
         }),
-        None => true,
+        None => result == Err(if time_separator_valid_model(separator) {
+            NameError::Malformed
+        } else {
+            NameError::Configuration
+        }),
     },
 {
+    if !time_separator_valid(separator) {
+        return Err(NameError::Configuration);
+    }
     let (start, end) = decode_long_interval(
         ObjectKind::IncrementalSignatures,
         start_field,
@@ -8455,6 +8464,58 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-name-010
+    //= type=test
+    //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+    fn long_incremental_signatures_body_exact_error_edge_matrix() {
+        let kind = super::ObjectKind::IncrementalSignatures;
+
+        // Complete four-field names reach timestamp policy with an invalid
+        // separator, which takes precedence over interval and trailer errors.
+        for raw in [
+            &b"19700101T000000Z.to.19700101T000001Z.sigtar"[..],
+            &b"bad.to.19700101T000001Z.wrong"[..],
+        ] {
+            assert_eq!(
+                super::body(raw, kind, false, b'.'),
+                Err(super::NameError::Configuration),
+                "{raw:?} with invalid separator"
+            );
+        }
+
+        for raw in [
+            &b"bad.to.19700101T000001Z.sigtar"[..],
+            &b"19700101T000000Z.to.19700101T000000Z.sigtar"[..],
+            &b"19700101T000001Z.to.19700101T000000Z.sigtar"[..],
+            &b"19700101T000000Z.to.19700101T000001Z.wrong"[..],
+        ] {
+            assert_eq!(
+                super::body(raw, kind, false, b':'),
+                Err(super::NameError::Malformed),
+                "{raw:?} with valid separator"
+            );
+        }
+
+        assert_eq!(
+            super::body(
+                b"19700101T000000Z.to.19700101T000001Z.sigtar",
+                kind,
+                false,
+                b':',
+            ),
+            Ok(super::ObjectName {
+                kind,
+                start: super::Timestamp(0),
+                end: super::Timestamp(1),
+                volume: None,
+                envelope: super::Envelope::Plain,
+                partial: false,
+                short: false,
+            }),
+        );
     }
 
     #[test]
