@@ -169,6 +169,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
 
   SECTION: [PARSE-TAR-003](#parse-tar-003)
     TEXT[!MUST,implementation,test]: The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+    TEXT[!MUST,implementation,test]: For a successful PAX extended-header stream, the reader MUST process records in input order and accumulate each supported, unique, NUL-free key/value pair into its assigned one of the eleven metadata slots.
 
   SECTION: [PARSE-TAR-004](#parse-tar-004)
     TEXT[!MUST,implementation,test]: Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.

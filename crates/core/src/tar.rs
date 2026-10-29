@@ -98,47 +98,15 @@ fn unsigned(bytes: &[u8]) -> Result<u64, TarError> {
 fn decimal(bytes: &[u8]) -> Result<u64, TarError> {
     crate::verified::tar_helpers::decimal(bytes).ok_or(TarError::Numeric)
 }
-fn time(bytes: &[u8]) -> Result<TarTime, TarError> {
-    crate::verified::tar_time::time(bytes)
-        .map(|(seconds, nanoseconds)| TarTime {
-            seconds,
-            nanoseconds,
-        })
-        .ok_or(TarError::Numeric)
-}
 type Pax<'a> = [Option<&'a [u8]>; 11];
 fn pax(bytes: &[u8]) -> Result<Pax<'_>, TarError> {
-    let mut result = [None; 11];
-    let mut cursor = 0;
-    while cursor < bytes.len() {
-        let (end, key, value) =
-            crate::verified::tar_pax::record(bytes, cursor).ok_or(TarError::Pax)?;
-        let key_index = crate::verified::tar_pax::key_index(key).ok_or(TarError::UnsupportedPax)?;
-        let index = crate::verified::tar_pax::admit_record(key, value, result[key_index].is_some())
-            .map_err(|error| match error {
-                crate::verified::tar_pax::PaxRecordAdmissionError::UnsupportedKey => {
-                    TarError::UnsupportedPax
-                }
-                crate::verified::tar_pax::PaxRecordAdmissionError::Malformed => TarError::Pax,
-            })?;
-        if !value.is_empty() {
-            match index {
-                2 | 4 | 5 => {
-                    decimal(value)?;
-                }
-                3 | 8 | 9 => {
-                    time(value)?;
-                }
-                10 if !crate::verified::tar_pax::hdrcharset_value_supported(value) => {
-                    return Err(TarError::UnsupportedPax)
-                }
-                _ => {}
-            }
-        }
-        result[index] = Some(value);
-        cursor = end;
-    }
-    Ok(result)
+    crate::verified::tar_pax::ingest(bytes).map_err(|error| match error {
+        crate::verified::tar_pax::PaxIngestError::Framing
+        | crate::verified::tar_pax::PaxIngestError::Malformed => TarError::Pax,
+        crate::verified::tar_pax::PaxIngestError::UnsupportedKey
+        | crate::verified::tar_pax::PaxIngestError::UnsupportedValue => TarError::UnsupportedPax,
+        crate::verified::tar_pax::PaxIngestError::Numeric => TarError::Numeric,
+    })
 }
 fn resolved<'a>(global: Pax<'a>, local: Pax<'a>) -> Pax<'a> {
     crate::verified::tar_pax::resolve_values(global, local)

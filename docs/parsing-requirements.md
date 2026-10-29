@@ -431,6 +431,8 @@ The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link 
 
 Provenance: SRC-TAR, SRC-DIFF, DOC-TAR; official 3.0.7 fixtures exercise PAX path and binary path encoding. Historical GNU and additional supported PAX variant tests remain pending; they do not authorize ignoring an override.
 
+For a successful PAX extended-header stream, the reader MUST process records in input order and accumulate each supported, unique, NUL-free key/value pair into its assigned one of the eleven metadata slots. An empty value remains present in its slot as a deletion marker for later global/local resolution. Existing field-specific requirements govern value grammars. This accumulation requirement does not define malformed-input diagnostic precedence or complete tar-controller behavior.
+
 ### PARSE-TAR-004
 
 Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.

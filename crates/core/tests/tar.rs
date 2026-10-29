@@ -911,6 +911,64 @@ fn global_and_local_pax_resolution_composes_all_supported_fields() {
 
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
+//# For a successful PAX extended-header stream, the reader MUST process records in input order and accumulate each supported, unique, NUL-free key/value pair into its assigned one of the eleven metadata slots.
+#[test]
+fn successful_pax_stream_accumulates_all_eleven_fields_into_native_metadata() {
+    let pax_stream = [
+        record(b"path", b"snapshot/accumulated"),
+        record(b"linkpath", b""),
+        record(b"size", b"3"),
+        record(b"mtime", b"13.25"),
+        record(b"uid", b"11"),
+        record(b"gid", b"12"),
+        record(b"uname", b"user"),
+        record(b"gname", b"group"),
+        record(b"atime", b"14"),
+        record(b"ctime", b"15"),
+        record(b"hdrcharset", b"UTF-8"),
+    ]
+    .concat();
+    let global = member(b"global", b'g', &record(b"linkpath", b"global-target"));
+    let mut raw_entry = member(b"snapshot/header", b'0', b"abc");
+    raw_entry[157..157 + b"header-target".len()].copy_from_slice(b"header-target");
+    checksum(&mut raw_entry[..512]);
+    let archive = [global, member(b"local", b'x', &pax_stream), raw_entry].concat();
+
+    let parsed = parse(&archive).expect("valid multi-record PAX stream");
+    assert_eq!(parsed.entries.len(), 1);
+    let entry = &parsed.entries[0];
+    assert_eq!(entry.name, b"snapshot/accumulated");
+    assert_eq!(entry.linkname, b"header-target");
+    assert_eq!(entry.payload, b"abc");
+    assert_eq!(entry.uid, 11);
+    assert_eq!(entry.gid, 12);
+    assert_eq!(entry.uname, b"user");
+    assert_eq!(entry.gname, b"group");
+    assert_eq!(
+        entry.mtime,
+        TarTime {
+            seconds: 13,
+            nanoseconds: 250_000_000
+        }
+    );
+    assert_eq!(
+        entry.atime,
+        Some(TarTime {
+            seconds: 14,
+            nanoseconds: 0
+        })
+    );
+    assert_eq!(
+        entry.ctime,
+        Some(TarTime {
+            seconds: 15,
+            nanoseconds: 0
+        })
+    );
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 #[test]
 fn pax_record_admission_preserves_duplicate_nul_unknown_and_empty_value_behavior() {

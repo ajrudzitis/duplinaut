@@ -3412,8 +3412,9 @@ tested = true
 reviewed = true
 proof_required = true
 # Proves one PAX key's local/global selection rule and wires it into the
-# native resolver. Record iteration, complete PAX semantics, and whole-parser
-# refinement remain outside this milestone.
+# native resolver. Successful record-stream accumulation is tracked separately;
+# extension timing, malformed-input behavior and whole-parser refinement remain
+# outside this milestone.
 implementations = [
   { path = "crates/core/src/verified/tar_pax.rs", symbol = "resolve_value" },
   { path = "crates/core/src/tar.rs", symbol = "resolved" }
@@ -3598,8 +3599,9 @@ tested = true
 reviewed = true
 proof_required = true
 # Admits one already-framed record by known key, unoccupied slot, and NUL-free
-# value. Empty values remain stored. Framing, key/value semantic grammars,
-# complete map accumulation, and controller refinement are outside this task.
+# value. Empty values remain stored. Stream accumulation is tracked separately;
+# malformed-stream behavior and whole-parser controller refinement are outside
+# this single-record admission task.
 implementations = [
   { path = "crates/core/src/verified/tar_pax.rs", symbol = "admit_record" },
   { path = "crates/core/src/tar.rs", symbol = "pax" }
@@ -3611,6 +3613,34 @@ tests = [
   { package = "duplicity-core", name = "verified::tar_pax::tests::pax_record_admission_checks_index_duplicate_nul_and_preserves_empty_values" },
   { package = "duplicity-core", name = "pax_record_admission_preserves_duplicate_nul_unknown_and_empty_value_behavior" },
   { package = "duplicity-core", name = "malformed_and_unsupported_pax_are_not_skipped" }
+]
+
+[[milestone]]
+id = "tar-pax-stream-accumulation"
+gate = true
+requirements = ["PARSE-TAR-003"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The actual native PAX entry path delegates to this verified record-stream
+# loop. Its success postcondition relates cursor-ordered framing, key/duplicate/
+# NUL admission, field-specific value models, and slot writes to an 11-slot
+# recursive stream model. Existing decimal/time/hdrcharset validator contracts
+# establish those predicates. Error diagnostics and malformed-input precedence
+# are deliberately not refined by this checkpoint.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "ingest" },
+  { path = "crates/core/src/tar.rs", symbol = "pax" }
+]
+proofs = [
+  { id = "tar-pax-stream-accumulation", requirement = "PARSE-TAR-003", path = "crates/core/src/verified/tar_pax.rs", symbol = "ingest", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::ingest_accumulates_a_successful_stream_into_all_eleven_slots" },
+  { package = "duplicity-core", name = "successful_pax_stream_accumulates_all_eleven_fields_into_native_metadata" }
 ]
 
 [[milestone]]
@@ -3667,7 +3697,8 @@ reviewed = true
 proof_required = true
 # Refines the finite nonempty hdrcharset token whitelist and its native
 # UnsupportedPax mapping. Empty values continue through existing deletion
-# semantics; record iteration and complete PAX control flow remain open.
+# semantics; malformed-stream diagnostics, extension timing and complete PAX
+# control flow remain open.
 implementations = [
   { path = "crates/core/src/verified/tar_pax.rs", symbol = "hdrcharset_value_supported" },
   { path = "crates/core/src/tar.rs", symbol = "pax" }
@@ -3692,8 +3723,9 @@ tested = true
 reviewed = true
 proof_required = true
 # Composes the verified per-slot local/global rule across all eleven supported
-# keys. Record framing, map ingestion, extension timing and whole-tar parsing
-# remain outside this milestone.
+# keys. Malformed-stream diagnostics, extension timing and whole-tar parsing
+# remain outside this milestone; successful stream ingestion is tracked
+# separately.
 implementations = [
   { path = "crates/core/src/verified/tar_pax.rs", symbol = "resolve_values" },
   { path = "crates/core/src/tar.rs", symbol = "resolved" }

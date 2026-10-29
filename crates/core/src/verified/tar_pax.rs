@@ -465,6 +465,176 @@ pub fn admit_record(key: &[u8], value: &[u8], occupied: bool)
     }
     Ok(index)
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PaxIngestError {
+    Framing,
+    UnsupportedKey,
+    Malformed,
+    Numeric,
+    UnsupportedValue,
+}
+
+pub open spec fn pax_slots_model(slots: Seq<Option<&[u8]>>) -> Seq<Option<Seq<u8>>> {
+    Seq::new(slots.len(), |i: int| match slots[i] {
+        None => None,
+        Some(value) => Some(value@),
+    })
+}
+
+pub open spec fn pax_empty_model() -> Seq<Option<Seq<u8>>> {
+    Seq::new(11, |_i: int| None)
+}
+
+pub open spec fn pax_value_model(index: int, value: Seq<u8>) -> bool {
+    if value.len() == 0 { true }
+    else if index == 2 || index == 4 || index == 5 {
+        decimal_prefix(value, value.len() as int) is Some
+    }
+    else if index == 3 || index == 8 || index == 9 {
+        time_model(value) is Some
+    }
+    else if index == 10 {
+        value == b"BINARY"@ || value == b"UTF-8"@
+            || value == b"ISO-IR 10646 2000 UTF-8"@
+    }
+    else { true }
+}
+
+/// Model the successful suffix of a framed PAX byte stream from its current
+/// cursor and current slot map. Errors are intentionally represented as None;
+/// this model does not specify which diagnostic malformed input produces.
+pub open spec fn pax_stream_model(
+    input: Seq<u8>,
+    cursor: int,
+    slots: Seq<Option<Seq<u8>>>,
+) -> Option<Seq<Option<Seq<u8>>>>
+    recommends 0 <= cursor <= input.len(), slots.len() == 11,
+    decreases input.len() - cursor,
+{
+    if cursor == input.len() { Some(slots) }
+    else { match record_model(input, cursor) {
+        None => None,
+        Some((end, key, value)) => if end <= cursor || end > input.len() { None }
+        else { match key_model(key) {
+            None => None,
+            Some(index) => if index >= slots.len() { None }
+            else if slots[index as int] is Some
+                || find(value, 0, value.len() as int, 0) is Some
+                || !pax_value_model(index as int, value) { None }
+            else {
+                pax_stream_model(input, end, slots.update(index as int, Some(value)))
+            },
+        }},
+    }}
+}
+
+//= docs/parsing-requirements.md#parse-tar-003
+//# For a successful PAX extended-header stream, the reader MUST process records in input order and accumulate each supported, unique, NUL-free key/value pair into its assigned one of the eleven metadata slots.
+
+/// Parse and accumulate a complete PAX stream into its eleven semantic slots.
+/// The success postcondition relates the actual borrowed slot map to the
+/// recursive framing/key/value/uniqueness/NUL model. Existing decimal, time
+/// and hdrcharset validator contracts establish the modeled value predicates.
+/// Error variants are not refined here.
+pub fn ingest<'a>(input: &'a [u8])
+    -> (result: Result<[Option<&'a [u8]>; 11], PaxIngestError>)
+    ensures match result {
+        Ok(slots) => pax_stream_model(input@, 0, pax_empty_model())
+            == Some(pax_slots_model(slots@)),
+        Err(_) => true,
+    },
+{
+    let mut slots: [Option<&'a [u8]>; 11] = [None; 11];
+    let mut cursor = 0usize;
+    let ghost whole_model = pax_stream_model(input@, 0, pax_empty_model());
+    proof {
+        reveal(pax_slots_model);
+        reveal(pax_empty_model);
+        assert(pax_slots_model(slots@) == pax_empty_model());
+    }
+    while cursor < input.len()
+        invariant cursor <= input.len(),
+            pax_stream_model(input@, cursor as int, pax_slots_model(slots@))
+                == whole_model,
+        decreases input.len() - cursor,
+    {
+        proof { reveal(pax_stream_model); }
+        let ghost old_cursor = cursor as int;
+        let ghost old_slots = pax_slots_model(slots@);
+        let (end, key, value) = match record(input, cursor) {
+            Some(record) => record,
+            None => return Err(PaxIngestError::Framing),
+        };
+        let key_slot = match key_index(key) {
+            Some(index) => index,
+            None => return Err(PaxIngestError::UnsupportedKey),
+        };
+        let index = match admit_record(key, value, slots[key_slot].is_some()) {
+            Ok(index) => index,
+            Err(PaxRecordAdmissionError::UnsupportedKey) => {
+                return Err(PaxIngestError::UnsupportedKey)
+            }
+            Err(PaxRecordAdmissionError::Malformed) => return Err(PaxIngestError::Malformed),
+        };
+        if !value.is_empty() {
+            match index {
+                2 | 4 | 5 => {
+                    let parsed = super::tar_helpers::decimal(value);
+                    if parsed.is_none() {
+                        return Err(PaxIngestError::Numeric);
+                    }
+                    proof {
+                        assert(super::tar_helpers::decimal_prefix(
+                            value@,
+                            value.len() as int,
+                        ) is Some);
+                    }
+                }
+                3 | 8 | 9 => {
+                    let parsed = time(value);
+                    if parsed.is_none() {
+                        return Err(PaxIngestError::Numeric);
+                    }
+                    proof { assert(time_model(value@) is Some); }
+                }
+                10 => {
+                    if !hdrcharset_value_supported(value) {
+                        return Err(PaxIngestError::UnsupportedValue);
+                    }
+                    proof { assert(pax_value_model(10, value@)); }
+                }
+                _ => {}
+            }
+        }
+        proof {
+            reveal(pax_stream_model);
+            assert(record_model(input@, old_cursor)
+                == Some((end as int, key@, value@)));
+            assert(key_slot == index);
+            assert(key_model(key@) == Some(index));
+            assert(index < 11);
+            assert(old_slots[index as int] is None);
+            assert(find(value@, 0, value.len() as int, 0) is None);
+            assert(pax_value_model(index as int, value@));
+            assert(pax_stream_model(input@, old_cursor, old_slots)
+                == pax_stream_model(
+                    input@,
+                    end as int,
+                    old_slots.update(index as int, Some(value@)),
+                ));
+        }
+        slots[index] = Some(value);
+        proof {
+            reveal(pax_slots_model);
+            assert(pax_slots_model(slots@)
+                == old_slots.update(index as int, Some(value@)));
+        }
+        cursor = end;
+    }
+    proof { reveal(pax_stream_model); }
+    Ok(slots)
+}
 }
 
 #[cfg(test)]
@@ -472,9 +642,54 @@ mod tests {
     use super::{
         admit_record, effective_id, effective_link_override, effective_mtime,
         effective_name_override, effective_optional_time, effective_owner_name, effective_size,
-        hdrcharset_value_supported, owner_name_requires_utf8, resolve_values, PaxIdError,
+        hdrcharset_value_supported, ingest, owner_name_requires_utf8, resolve_values, PaxIdError,
         PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
     };
+
+    fn framed_record(key: &[u8], value: &[u8]) -> Vec<u8> {
+        let mut body = Vec::new();
+        body.extend_from_slice(key);
+        body.push(b'=');
+        body.extend_from_slice(value);
+        body.push(b'\n');
+        let mut size = body.len() + 2;
+        loop {
+            let next = body.len() + size.to_string().len() + 1;
+            if next == size {
+                break;
+            }
+            size = next;
+        }
+        let mut encoded = size.to_string().into_bytes();
+        encoded.push(b' ');
+        encoded.extend_from_slice(&body);
+        encoded
+    }
+
+    #[test]
+    fn ingest_accumulates_a_successful_stream_into_all_eleven_slots() {
+        let fields: [(&[u8], &[u8]); 11] = [
+            (b"path", b"snapshot/file"),
+            (b"linkpath", b""),
+            (b"size", b"3"),
+            (b"mtime", b"13.25"),
+            (b"uid", b"11"),
+            (b"gid", b"12"),
+            (b"uname", b"user"),
+            (b"gname", b"group"),
+            (b"atime", b"14"),
+            (b"ctime", b"15"),
+            (b"hdrcharset", b"UTF-8"),
+        ];
+        let mut stream = Vec::new();
+        for (key, value) in fields {
+            stream.extend_from_slice(&framed_record(key, value));
+        }
+        let slots = ingest(&stream).expect("all eleven supported records are valid");
+        for (index, (_, expected)) in fields.iter().enumerate() {
+            assert_eq!(slots[index], Some(*expected), "slot {index}");
+        }
+    }
 
     #[test]
     fn effective_pax_size_selects_override_fallback_and_invalid_values() {
