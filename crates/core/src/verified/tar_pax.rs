@@ -505,6 +505,27 @@ pub fn effective_link_override<'a>(
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-013
+//# The parser MUST choose PAX `linkpath`, then GNU long-link, then the raw header linkname; it MUST compute that selected target's exact byte length and reject lengths above `max_path_bytes` before allocating the output link target.
+pub open spec fn effective_link_length_model(
+    selected_link: Seq<u8>,
+) -> int {
+    selected_link.len() as int
+}
+
+//= docs/parsing-requirements.md#parse-tar-013
+//# The parser MUST choose PAX `linkpath`, then GNU long-link, then the raw header linkname; it MUST compute that selected target's exact byte length and reject lengths above `max_path_bytes` before allocating the output link target.
+pub fn effective_link_length_and_admission(
+    selected_link: &[u8],
+    max_path_bytes: usize,
+) -> (result: (usize, bool))
+    ensures result.0 as int == effective_link_length_model(selected_link@)
+        && result.1 == (result.0 <= max_path_bytes),
+{
+    let length = selected_link.len();
+    (length, length <= max_path_bytes)
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
@@ -1056,10 +1077,11 @@ pub fn ingest<'a>(input: &'a [u8])
 mod tests {
     use super::{
         admit_record, compose_ustar_header_name, effective_header_name_length_and_admission,
-        effective_id, effective_link_override, effective_mtime, effective_name_override,
-        effective_optional_time, effective_owner_name, effective_size, hdrcharset_value_supported,
-        ingest, nul_terminated_prefix, owner_name_requires_utf8, payload_size, resolve_values,
-        PaxIdError, PaxIngestError, PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
+        effective_id, effective_link_length_and_admission, effective_link_override,
+        effective_mtime, effective_name_override, effective_optional_time, effective_owner_name,
+        effective_size, hdrcharset_value_supported, ingest, nul_terminated_prefix,
+        owner_name_requires_utf8, payload_size, resolve_values, PaxIdError, PaxIngestError,
+        PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
     };
 
     fn framed_record(key: &[u8], value: &[u8]) -> Vec<u8> {
@@ -1313,6 +1335,20 @@ mod tests {
             effective_link_override(Some(b"pax"), Some(b"gnu")),
             Some(&b"pax"[..])
         );
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-013
+    //= type=test
+    //# The parser MUST choose PAX `linkpath`, then GNU long-link, then the raw header linkname; it MUST compute that selected target's exact byte length and reject lengths above `max_path_bytes` before allocating the output link target.
+    #[test]
+    fn effective_link_length_matches_selected_source_and_limit() {
+        assert_eq!(effective_link_length_and_admission(b"pax", 3), (3, true));
+        assert_eq!(
+            effective_link_length_and_admission(b"gnu-long", 7),
+            (8, false)
+        );
+        assert_eq!(effective_link_length_and_admission(b"raw", 3), (3, true));
+        assert_eq!(effective_link_length_and_admission(b"raw", 2), (3, false));
     }
 
     #[test]

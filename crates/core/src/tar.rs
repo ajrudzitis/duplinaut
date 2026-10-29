@@ -290,8 +290,9 @@ impl<'a> TarVolume<'a> {
             //= docs/parsing-requirements.md#parse-tar-012
             //# The parser MUST choose PAX `path`, then GNU long-name, then the raw ustar prefix/name; it MUST compute that selected name's exact byte length and reject lengths above `max_path_bytes` before allocating the output name.
             let name = crate::verified::tar_pax::effective_name_override(values[0], long_name);
+            let header_link = text(h.linkname);
             let link = crate::verified::tar_pax::effective_link_override(values[1], long_link)
-                .unwrap_or(text(h.linkname));
+                .unwrap_or(header_link);
             //= docs/parsing-requirements.md#parse-tar-012
             //# The parser MUST choose PAX `path`, then GNU long-name, then the raw ustar prefix/name; it MUST compute that selected name's exact byte length and reject lengths above `max_path_bytes` before allocating the output name.
             let (name_length, name_admitted) =
@@ -302,7 +303,14 @@ impl<'a> TarVolume<'a> {
                     limits.max_path_bytes,
                 )
                 .ok_or(TarError::Limit)?;
-            if !name_admitted || link.len() > limits.max_path_bytes {
+            //= docs/parsing-requirements.md#parse-tar-013
+            //# The parser MUST choose PAX `linkpath`, then GNU long-link, then the raw header linkname; it MUST compute that selected target's exact byte length and reject lengths above `max_path_bytes` before allocating the output link target.
+            let (link_length, link_admitted) =
+                crate::verified::tar_pax::effective_link_length_and_admission(
+                    link,
+                    limits.max_path_bytes,
+                );
+            if !name_admitted || !link_admitted {
                 return Err(TarError::Limit);
             }
             if crate::verified::tar_pax::owner_name_requires_utf8(values[10]) {
@@ -321,7 +329,7 @@ impl<'a> TarVolume<'a> {
             let entry_charge = std::mem::size_of::<TarEntry<'_>>()
                 .checked_mul(4)
                 .and_then(|v| v.checked_add(name_length))
-                .and_then(|v| v.checked_add(link.len()))
+                .and_then(|v| v.checked_add(link_length))
                 .and_then(|v| v.checked_add(uname.len()))
                 .and_then(|v| v.checked_add(gname.len()))
                 .ok_or(TarError::Limit)?;

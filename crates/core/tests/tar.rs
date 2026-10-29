@@ -394,6 +394,64 @@ fn effective_name_limit_uses_pax_gnu_or_raw_ustar_source_length() {
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-013
+//= type=test
+//# The parser MUST choose PAX `linkpath`, then GNU long-link, then the raw header linkname; it MUST compute that selected target's exact byte length and reject lengths above `max_path_bytes` before allocating the output link target.
+#[test]
+fn effective_link_limit_uses_pax_gnu_or_raw_header_source_length() {
+    let symlink = |target: &[u8]| {
+        let mut header = member(b"file", b'2', b"");
+        header[157..157 + target.len()].copy_from_slice(target);
+        checksum(&mut header[..512]);
+        header
+    };
+    let pax_archive = [
+        member(b"local", b'x', &record(b"linkpath", b"pax-target")),
+        symlink(b"raw"),
+    ]
+    .concat();
+    let gnu_archive = [
+        member(b"././@LongLink", b'K', b"gnu-target\0"),
+        symlink(b"raw"),
+    ]
+    .concat();
+    let raw_archive = symlink(b"raw-target");
+
+    for (archive, expected_target) in [
+        (pax_archive.as_slice(), b"pax-target" as &[u8]),
+        (gnu_archive.as_slice(), b"gnu-target"),
+        (raw_archive.as_slice(), b"raw-target"),
+    ] {
+        let exact_limit = expected_target.len();
+        assert_eq!(
+            TarVolume::parse(
+                archive,
+                Termination::Data,
+                TarLimits {
+                    max_path_bytes: exact_limit,
+                    ..TarLimits::default()
+                },
+            )
+            .unwrap()
+            .entries[0]
+                .linkname,
+            expected_target
+        );
+        assert_eq!(
+            TarVolume::parse(
+                archive,
+                Termination::Data,
+                TarLimits {
+                    max_path_bytes: exact_limit - 1,
+                    ..TarLimits::default()
+                },
+            )
+            .unwrap_err(),
+            TarError::Limit
+        );
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
