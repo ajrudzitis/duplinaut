@@ -266,6 +266,11 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: A negative decoded value or a value greater than `u64::MAX` MUST produce Numeric before payload-extent selection or output-metadata retention.
     TEXT[!MUST,implementation,test]: This raw-field admission MUST still occur when an effective PAX `size` supplies a real entry's payload extent; GNU/PAX extension payload extents continue to use their raw header size as specified by PARSE-TAR-007.
 
+  SECTION: [PARSE-TAR-028](#parse-tar-028)
+    TEXT[!MUST,implementation,test]: Before comparing a tar header checksum or interpreting magic/version and other numeric header fields, the parser MUST decode the checksum field using the numeric profile in PARSE-TAR-026 as a nonnegative `u64`.
+    TEXT[!MUST,implementation,test]: If the checksum field is malformed, negative, or outside that range, the parser MUST return Numeric.
+    TEXT[!MUST,implementation,test]: A successfully decoded checksum that does not match the header MUST continue to return Checksum as specified by PARSE-TAR-024.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

@@ -361,6 +361,24 @@ fn checksum_mismatch_precedes_unsupported_magic_and_malformed_numeric_fields() {
     assert_eq!(parse(&bad_mode).unwrap_err(), TarError::Checksum);
 }
 
+//= docs/parsing-requirements.md#parse-tar-028
+//= type=test
+//# Before comparing a tar header checksum or interpreting magic/version and other numeric header fields, the parser MUST decode the checksum field using the numeric profile in PARSE-TAR-026 as a nonnegative `u64`. If the checksum field is malformed, negative, or outside that range, the parser MUST return Numeric. A successfully decoded checksum that does not match the header MUST continue to return Checksum as specified by PARSE-TAR-024.
+#[test]
+fn invalid_checksum_field_precedes_checksum_comparison_and_header_interpretation() {
+    let mut malformed = member(b"snapshot/file", b'0', b"");
+    malformed[148..156].copy_from_slice(b"00000008");
+    malformed[257..265].copy_from_slice(b"badmagic");
+    malformed[100..108].copy_from_slice(b"0000X000");
+    assert_eq!(parse(&malformed).unwrap_err(), TarError::Numeric);
+
+    let mut negative = member(b"snapshot/file", b'0', b"");
+    negative[148..156].fill(0xff); // GNU negative base-256 checksum value.
+    negative[257..265].copy_from_slice(b"badmagic");
+    negative[100..108].copy_from_slice(b"0000X000");
+    assert_eq!(parse(&negative).unwrap_err(), TarError::Numeric);
+}
+
 //= docs/parsing-requirements.md#parse-tar-004
 //= type=test
 //# Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.

@@ -4502,6 +4502,31 @@ tests = [
   { package = "duplicity-core", name = "raw_size_is_admitted_even_when_pax_supplies_the_extent" }
 ]
 
+[[milestone]]
+id = "tar-checksum-field-decode-precedence"
+gate = true
+requirements = ["PARSE-TAR-028"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The checksum field uses the verified unsigned numeric decoder before
+# checksum summation; mismatch precedence and the wider header controller
+# remain separate checkpoints.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry.rs", symbol = "decode_header_checksum_field" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-checksum-field-decode", requirement = "PARSE-TAR-028", path = "crates/core/src/verified/tar_entry.rs", symbol = "decode_header_checksum_field", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_entry::metadata_charge_tests::header_checksum_field_requires_unsigned_numeric_decode" },
+  { package = "duplicity-core", name = "invalid_checksum_field_precedes_checksum_comparison_and_header_interpretation" }
+]
+
 [[trusted]]
 id = "upstream-verus-vest"
 reviewed = true

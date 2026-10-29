@@ -185,7 +185,10 @@ impl<'a> TarVolume<'a> {
             if consumed != 512 {
                 return Err(TarError::Truncated);
             }
-            let expected = unsigned(h.checksum)?;
+            //= docs/parsing-requirements.md#parse-tar-028
+            //# Before comparing a tar header checksum or interpreting magic/version and other numeric header fields, the parser MUST decode the checksum field using the numeric profile in PARSE-TAR-026 as a nonnegative `u64`. If the checksum field is malformed, negative, or outside that range, the parser MUST return Numeric. A successfully decoded checksum that does not match the header MUST continue to return Checksum as specified by PARSE-TAR-024.
+            let expected = crate::verified::tar_entry::decode_header_checksum_field(h.checksum)
+                .ok_or(TarError::Numeric)?;
             //= docs/parsing-requirements.md#parse-tar-024
             //# After decoding the checksum field, the parser MUST reject a header whose checksum does not match before interpreting magic/version or any other numeric header field; that mismatch MUST produce Checksum.
             if !crate::verified::tar_entry::admit_header_checksum(

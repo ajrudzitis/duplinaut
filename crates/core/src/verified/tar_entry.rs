@@ -115,6 +115,17 @@ pub fn admit_header_checksum(matches: bool) -> (admitted: bool)
     matches
 }
 
+//= docs/parsing-requirements.md#parse-tar-028
+//# Before comparing a tar header checksum or interpreting magic/version and other numeric header fields, the parser MUST decode the checksum field using the numeric profile in PARSE-TAR-026 as a nonnegative `u64`. If the checksum field is malformed, negative, or outside that range, the parser MUST return Numeric. A successfully decoded checksum that does not match the header MUST continue to return Checksum as specified by PARSE-TAR-024.
+pub fn decode_header_checksum_field(field: &[u8]) -> (result: Option<u64>)
+    ensures match result {
+        Some(value) => super::tar_number::unsigned_model(field@) == Some(value as int),
+        None => super::tar_number::unsigned_model(field@) is None,
+    },
+{
+    super::tar_number::unsigned(field)
+}
+
 //= docs/parsing-requirements.md#parse-tar-023
 //# GNU `L` and `K` payloads MUST contain a NUL terminator, all bytes from the first NUL onward MUST be zero, and the selected prefix length MUST NOT exceed `max_path_bytes`.
 pub open spec fn gnu_long_record_model(input: Seq<u8>, limit: int)
@@ -364,10 +375,25 @@ mod metadata_charge_tests {
     use super::{
         admit_extension_header_count, admit_extension_metadata_charge, admit_tar_header_profile,
         admit_unsigned_header_fields,
+        decode_header_checksum_field,
         admit_metadata_charge, admit_real_entry_count, begin_tar_eof, finish_tar_eof,
         admit_header_checksum, decode_gnu_long_record, entry_metadata_charge, TarEofError, TarEofState,
         TarHeaderProfile, TarLongRecordError, TarUnsignedHeaderFields,
     };
+
+    //= docs/parsing-requirements.md#parse-tar-028
+    //= type=test
+    //# Before comparing a tar header checksum or interpreting magic/version and other numeric header fields, the parser MUST decode the checksum field using the numeric profile in PARSE-TAR-026 as a nonnegative `u64`. If the checksum field is malformed, negative, or outside that range, the parser MUST return Numeric. A successfully decoded checksum that does not match the header MUST continue to return Checksum as specified by PARSE-TAR-024.
+    #[test]
+    fn header_checksum_field_requires_unsigned_numeric_decode() {
+        assert_eq!(decode_header_checksum_field(b"0000123\0"), Some(83));
+        assert_eq!(decode_header_checksum_field(&[0xff; 8]), None);
+        assert_eq!(decode_header_checksum_field(b"00000008"), None);
+        assert_eq!(
+            decode_header_checksum_field(&[0x80, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
+            None
+        );
+    }
 
     //= docs/parsing-requirements.md#parse-tar-027
     //= type=test

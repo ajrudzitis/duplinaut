@@ -583,6 +583,12 @@ After checksum and header-profile admission, the parser MUST admit raw tar `size
 
 Provenance: DOC-TAR, SRC-TAR, and the reviewed tar header profile above. The public format defines these numeric header fields and PAX size replacement; the official reader profile decodes and admits raw header values before applying semantic overrides. Mode/mtime narrowing, PAX value decoding, and complete header-controller error ordering remain separate.
 
+### PARSE-TAR-028
+
+Before comparing a tar header checksum or interpreting magic/version and other numeric header fields, the parser MUST decode the checksum field using the numeric profile in PARSE-TAR-026 as a nonnegative `u64`. If the checksum field is malformed, negative, or outside that range, the parser MUST return Numeric. A successfully decoded checksum that does not match the header MUST continue to return Checksum as specified by PARSE-TAR-024.
+
+Provenance: DOC-TAR and SRC-TAR establish the checksum field's numeric encoding; POLICY assigns reader-visible error classification and precedence. This requirement covers checksum-field decoding only; checksum summation and mismatch precedence remain specified by PARSE-TAR-024.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
