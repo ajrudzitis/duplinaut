@@ -116,9 +116,25 @@ pub fn admit_metadata_charge(used: usize, amount: usize, limit: usize)
     if next > limit { None } else { Some(next) }
 }
 
+//= docs/parsing-requirements.md#parse-tar-019
+//# GNU `L`/`K` and PAX `x`/`g` extension headers MUST charge their raw-header payload size against the cumulative metadata limit before interpreting or retaining extension metadata. Arithmetic overflow or an exceeded limit MUST reject the volume without returning partial entries.
+pub fn admit_extension_metadata_charge(used: usize, raw_header_size: usize, limit: usize)
+    -> (result: Option<usize>)
+    ensures match result {
+        Some(next) => metadata_charge_admission_model(
+            used as int, raw_header_size as int, limit as int,
+        ) == Some(next as int),
+        None => metadata_charge_admission_model(
+            used as int, raw_header_size as int, limit as int,
+        ) is None,
+    },
+{
+    admit_metadata_charge(used, raw_header_size, limit)
+}
+
 #[cfg(test)]
 mod metadata_charge_tests {
-    use super::{admit_metadata_charge, entry_metadata_charge};
+    use super::{admit_extension_metadata_charge, admit_metadata_charge, entry_metadata_charge};
 
     #[test]
     fn entry_metadata_charge_checked_formula_and_budget_admission() {
@@ -128,6 +144,16 @@ mod metadata_charge_tests {
         assert_eq!(admit_metadata_charge(10, 32, 42), Some(42));
         assert_eq!(admit_metadata_charge(10, 32, 41), None);
         assert_eq!(admit_metadata_charge(usize::MAX, 1, usize::MAX), None);
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-019
+    //= type=test
+    //# GNU `L`/`K` and PAX `x`/`g` extension headers MUST charge their raw-header payload size against the cumulative metadata limit before interpreting or retaining extension metadata. Arithmetic overflow or an exceeded limit MUST reject the volume without returning partial entries.
+    #[test]
+    fn extension_metadata_charge_uses_raw_size_and_remaining_limit() {
+        assert_eq!(admit_extension_metadata_charge(12, 7, 19), Some(19));
+        assert_eq!(admit_extension_metadata_charge(12, 7, 18), None);
+        assert_eq!(admit_extension_metadata_charge(usize::MAX, 1, usize::MAX), None);
     }
 }
 

@@ -3687,6 +3687,31 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-extension-metadata-charge"
+gate = true
+requirements = ["PARSE-TAR-019"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Admits raw GNU/PAX extension payload sizes against the cumulative metadata
+# budget before extension-content parsing or retention. Whole-loop accounting
+# remains outside this checkpoint.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry.rs", symbol = "admit_extension_metadata_charge" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-extension-metadata-charge", requirement = "PARSE-TAR-019", path = "crates/core/src/verified/tar_entry.rs", symbol = "admit_extension_metadata_charge", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_entry::metadata_charge_tests::extension_metadata_charge_uses_raw_size_and_remaining_limit" },
+  { package = "duplicity-core", name = "extension_metadata_limits_are_charged_before_interpreting_each_extension_kind" }
+]
+
+[[milestone]]
 id = "tar-entry-metadata-charge"
 gate = true
 requirements = ["PARSE-TAR-018"]

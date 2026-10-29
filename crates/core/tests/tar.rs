@@ -108,6 +108,101 @@ fn entry_metadata_charge_exact_limit_and_rejection_are_atomic() {
     );
 }
 
+//= docs/parsing-requirements.md#parse-tar-019
+//= type=test
+//# GNU `L`/`K` and PAX `x`/`g` extension headers MUST charge their raw-header payload size against the cumulative metadata limit before interpreting or retaining extension metadata. Arithmetic overflow or an exceeded limit MUST reject the volume without returning partial entries.
+#[test]
+fn extension_metadata_limits_are_charged_before_interpreting_each_extension_kind() {
+    let raw_entry = member(b"snapshot/file", b'0', b"");
+    let pax_path = record(b"path", b"snapshot/file");
+    let cases: [(u8, &[u8], usize, usize); 4] = [
+        (b'L', b"snapshot/file\0", b"snapshot/file".len(), 0),
+        (b'K', b"target\0", b"snapshot/file".len(), b"target".len()),
+        (b'x', &pax_path, b"snapshot/file".len(), 0),
+        (b'g', &pax_path, b"snapshot/file".len(), 0),
+    ];
+
+    for (kind, payload, name_length, link_length) in cases {
+        let extension = member(b"extension", kind, payload);
+        let archive = [extension.as_slice(), raw_entry.as_slice()].concat();
+        let entry_charge = std::mem::size_of::<duplicity_core::tar::TarEntry<'_>>() * 4
+            + name_length
+            + link_length;
+        let exact = TarLimits {
+            max_metadata_bytes: payload.len() + entry_charge,
+            ..TarLimits::default()
+        };
+        assert!(
+            TarVolume::parse(&archive, Termination::Data, exact).is_ok(),
+            "extension kind {} must fit its exact raw-size charge",
+            char::from(kind)
+        );
+        let one_short = TarLimits {
+            max_metadata_bytes: payload.len() + entry_charge - 1,
+            ..TarLimits::default()
+        };
+        assert_eq!(
+            TarVolume::parse(&archive, Termination::Data, one_short).unwrap_err(),
+            TarError::Limit,
+            "extension kind {} must fail one byte below its cumulative charge",
+            char::from(kind)
+        );
+
+        // Invalid payload syntax distinguishes the charge check from PAX or
+        // GNU content interpretation: the exhausted budget wins first.
+        let malformed_payload = b"!";
+        let malformed = member(b"extension", kind, malformed_payload);
+        let no_extension_budget = TarLimits {
+            max_metadata_bytes: malformed_payload.len() - 1,
+            ..TarLimits::default()
+        };
+        assert_eq!(
+            TarVolume::parse(&malformed, Termination::Data, no_extension_budget).unwrap_err(),
+            TarError::Limit,
+            "extension kind {} must be charged before content interpretation",
+            char::from(kind)
+        );
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-019
+//= type=test
+//# GNU `L`/`K` and PAX `x`/`g` extension headers MUST charge their raw-header payload size against the cumulative metadata limit before interpreting or retaining extension metadata. Arithmetic overflow or an exceeded limit MUST reject the volume without returning partial entries.
+#[test]
+fn extension_metadata_charges_accumulate_across_headers() {
+    let first_record = record(b"path", b"snapshot/file");
+    let second_record = record(b"path", b"snapshot/other");
+    let first = member(b"x1", b'x', &first_record);
+    let second = member(b"x2", b'x', &second_record);
+    let entry = member(b"snapshot/file", b'0', b"");
+    let archive = [first.as_slice(), second.as_slice(), entry.as_slice()].concat();
+    let entry_charge =
+        std::mem::size_of::<duplicity_core::tar::TarEntry<'_>>() * 4 + b"snapshot/other".len();
+    let exact_charge = first_record.len() + second_record.len() + entry_charge;
+
+    assert!(TarVolume::parse(
+        &archive,
+        Termination::Data,
+        TarLimits {
+            max_metadata_bytes: exact_charge,
+            ..TarLimits::default()
+        },
+    )
+    .is_ok());
+    assert_eq!(
+        TarVolume::parse(
+            &archive,
+            Termination::Data,
+            TarLimits {
+                max_metadata_bytes: exact_charge - 1,
+                ..TarLimits::default()
+            },
+        )
+        .unwrap_err(),
+        TarError::Limit
+    );
+}
+
 //= docs/parsing-requirements.md#parse-tar-001
 //= type=test
 //# The tar parser MUST validate each header checksum and payload extent before accepting the entry it describes.

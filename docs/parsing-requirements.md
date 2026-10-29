@@ -529,6 +529,12 @@ For each real tar entry, the reader MUST checked-add fixed entry overhead and th
 
 Provenance: POLICY and PARSE-TAR-012 through PARSE-TAR-017. This proves the per-entry charge formula and admission boundary; cumulative controller refinement and extension-header accounting remain separate.
 
+### PARSE-TAR-019
+
+GNU `L`/`K` and PAX `x`/`g` extension headers MUST charge their raw-header payload size against the cumulative metadata limit before interpreting or retaining extension metadata. Arithmetic overflow or an exceeded limit MUST reject the volume without returning partial entries.
+
+Provenance: POLICY and PARSE-TAR-007/018. The extension charge uses the raw extension-header size, not an effective PAX size; whole-controller accounting remains separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

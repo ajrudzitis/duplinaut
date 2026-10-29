@@ -111,13 +111,6 @@ fn pax(bytes: &[u8]) -> Result<Pax<'_>, TarError> {
 fn resolved<'a>(global: Pax<'a>, local: Pax<'a>) -> Pax<'a> {
     crate::verified::tar_pax::resolve_values(global, local)
 }
-fn charge(used: &mut usize, amount: usize, limit: usize) -> Result<(), TarError> {
-    *used = used.checked_add(amount).ok_or(TarError::Limit)?;
-    if *used > limit {
-        return Err(TarError::Limit);
-    }
-    Ok(())
-}
 fn long(bytes: &[u8], limit: usize) -> Result<&[u8], TarError> {
     let end = bytes
         .iter()
@@ -251,7 +244,14 @@ impl<'a> TarVolume<'a> {
                 if extended > limits.max_extended_headers {
                     return Err(TarError::Limit);
                 }
-                charge(&mut metadata, size, limits.max_metadata_bytes)?;
+                //= docs/parsing-requirements.md#parse-tar-019
+                //# GNU `L`/`K` and PAX `x`/`g` extension headers MUST charge their raw-header payload size against the cumulative metadata limit before interpreting or retaining extension metadata. Arithmetic overflow or an exceeded limit MUST reject the volume without returning partial entries.
+                metadata = crate::verified::tar_entry::admit_extension_metadata_charge(
+                    metadata,
+                    size,
+                    limits.max_metadata_bytes,
+                )
+                .ok_or(TarError::Limit)?;
                 //= docs/parsing-requirements.md#parse-tar-006
                 //# GNU `L`/`K` and PAX `g` headers MUST NOT consume pending local fields.
                 match h.entry_type {
