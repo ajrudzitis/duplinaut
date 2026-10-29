@@ -165,6 +165,9 @@ impl<'a> TarVolume<'a> {
     //= docs/parsing-requirements.md#parse-tar-005
     //# The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.
 
+    //= docs/parsing-requirements.md#parse-tar-006
+    //# The tar parser MUST apply PAX extension state in header order.
+
     pub fn parse(
         bytes: &'a [u8],
         profile: Termination<'_>,
@@ -213,6 +216,8 @@ impl<'a> TarVolume<'a> {
             let device_major = unsigned(h.device_major)?;
             let device_minor = unsigned(h.device_minor)?;
             let extension = matches!(h.entry_type, b'L' | b'K' | b'x' | b'g');
+            //= docs/parsing-requirements.md#parse-tar-006
+            //# Local fields MUST override global fields for the next real entry.
             let values = resolved(global, local);
             let size = if extension {
                 raw_size
@@ -241,6 +246,8 @@ impl<'a> TarVolume<'a> {
                     return Err(TarError::Limit);
                 }
                 charge(&mut metadata, size, limits.max_metadata_bytes)?;
+                //= docs/parsing-requirements.md#parse-tar-006
+                //# GNU `L`/`K` and PAX `g` headers MUST NOT consume pending local fields.
                 match h.entry_type {
                     b'L' => {
                         long_name = Some(long(payload, limits.max_path_bytes)?);
@@ -252,20 +259,16 @@ impl<'a> TarVolume<'a> {
                     }
                     b'x' => {
                         let parsed = pax(payload)?;
-                        for i in 0..11 {
-                            if parsed[i].is_some() {
-                                local[i] = parsed[i];
-                            }
-                        }
+                        //= docs/parsing-requirements.md#parse-tar-006
+                        //# Each present field in a local `x` header replaces the pending local value, including empty values, while omitted local fields persist across later extension headers.
+                        local = crate::verified::tar_pax::apply_local_update(local, parsed);
                         pending = true;
                     }
                     b'g' => {
                         let parsed = pax(payload)?;
-                        for i in 0..11 {
-                            if let Some(value) = parsed[i] {
-                                global[i] = if value.is_empty() { None } else { Some(value) };
-                            }
-                        }
+                        //= docs/parsing-requirements.md#parse-tar-006
+                        //# Each present field in a global `g` header replaces the prior global value, an empty global value deletes it, and omitted global fields persist.
+                        global = crate::verified::tar_pax::apply_global_update(global, parsed);
                     }
                     _ => unreachable!(),
                 }
@@ -362,7 +365,9 @@ impl<'a> TarVolume<'a> {
                 device_minor,
                 payload,
             });
-            local = [None; 11];
+            //= docs/parsing-requirements.md#parse-tar-006
+            //# That local state MUST be consumed only after the real entry is accepted.
+            local = crate::verified::tar_pax::consume_local_update(local);
             pending = false;
             long_name = None;
             long_link = None;

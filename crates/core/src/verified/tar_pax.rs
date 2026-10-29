@@ -168,6 +168,8 @@ pub fn resolve_value<'a>(global: Option<&'a [u8]>, local: Option<&'a [u8]>)
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
 /// Resolve every supported PAX slot using the existing per-slot rule.
+//= docs/parsing-requirements.md#parse-tar-006
+//# Local fields MUST override global fields for the next real entry.
 pub fn resolve_values<'a>(
     global: [Option<&'a [u8]>; 11],
     local: [Option<&'a [u8]>; 11],
@@ -193,6 +195,102 @@ pub fn resolve_values<'a>(
         i += 1;
     }
     result
+}
+
+//= docs/parsing-requirements.md#parse-tar-006
+//# Each present field in a global `g` header replaces the prior global value, an empty global value deletes it, and omitted global fields persist.
+pub open spec fn global_update_model(
+    previous: Option<&[u8]>,
+    update: Option<&[u8]>,
+) -> Option<Seq<u8>> {
+    match update {
+        None => match previous { None => None, Some(value) => Some(value@) },
+        Some(value) => if value.len() == 0 { None } else { Some(value@) },
+    }
+}
+
+pub open spec fn local_update_model(
+    previous: Option<&[u8]>,
+    update: Option<&[u8]>,
+) -> Option<Seq<u8>> {
+    match update {
+        None => match previous { None => None, Some(value) => Some(value@) },
+        Some(value) => Some(value@),
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-006
+//# Each present field in a global `g` header replaces the prior global value, an empty global value deletes it, and omitted global fields persist.
+pub fn apply_global_update<'a>(
+    previous: [Option<&'a [u8]>; 11],
+    update: [Option<&'a [u8]>; 11],
+) -> (result: [Option<&'a [u8]>; 11])
+    ensures forall|i: int| 0 <= i < 11 ==>
+        global_update_model(previous[i], update[i]) == match result[i] {
+            None => None,
+            Some(value) => Some(value@),
+        },
+{
+    let mut result = previous;
+    let mut i = 0;
+    while i < 11
+        invariant 0 <= i <= 11,
+            forall|j: int| 0 <= j < i ==>
+                global_update_model(previous[j], update[j]) == match result[j] {
+                    None => None,
+                    Some(value) => Some(value@),
+                },
+        decreases 11 - i,
+    {
+        result[i] = match update[i] {
+            None => previous[i],
+            Some(value) => if value.is_empty() { None } else { Some(value) },
+        };
+        i += 1;
+    }
+    result
+}
+
+//= docs/parsing-requirements.md#parse-tar-006
+//# Each present field in a local `x` header replaces the pending local value, including empty values, while omitted local fields persist across later extension headers.
+pub fn apply_local_update<'a>(
+    previous: [Option<&'a [u8]>; 11],
+    update: [Option<&'a [u8]>; 11],
+) -> (result: [Option<&'a [u8]>; 11])
+    ensures forall|i: int| 0 <= i < 11 ==>
+        local_update_model(previous[i], update[i]) == match result[i] {
+            None => None,
+            Some(value) => Some(value@),
+        },
+{
+    let mut result = previous;
+    let mut i = 0;
+    while i < 11
+        invariant 0 <= i <= 11,
+            forall|j: int| 0 <= j < i ==>
+                local_update_model(previous[j], update[j]) == match result[j] {
+                    None => None,
+                    Some(value) => Some(value@),
+                },
+        decreases 11 - i,
+    {
+        result[i] = match update[i] {
+            None => previous[i],
+            Some(_) => update[i],
+        };
+        i += 1;
+    }
+    result
+}
+
+//= docs/parsing-requirements.md#parse-tar-006
+//# That local state MUST be consumed only after the real entry is accepted.
+pub fn consume_local_update<'a>(
+    _previous: [Option<&'a [u8]>; 11],
+) -> (result: [Option<&'a [u8]>; 11])
+    ensures forall|i: int| 0 <= i < 11 ==> result[i] is None,
+{
+    [None; 11]
 }
 
 //= docs/parsing-requirements.md#parse-tar-003
@@ -828,6 +926,36 @@ mod tests {
         for (index, (_, expected)) in fields.iter().enumerate() {
             assert_eq!(slots[index], Some(*expected), "slot {index}");
         }
+    }
+
+    #[test]
+    fn extension_state_updates_preserve_persistence_merge_and_consumption_semantics() {
+        let absent = [None; 11];
+        let mut global_update = [None; 11];
+        global_update[0] = Some(&b"global-a"[..]);
+        global_update[4] = Some(&b"99"[..]);
+        let global = super::apply_global_update(absent, global_update);
+        let mut local_update = [None; 11];
+        local_update[0] = Some(&b"local"[..]);
+        local_update[4] = Some(&b""[..]);
+        let local = super::apply_local_update(absent, local_update);
+
+        let mut second_global_update = [None; 11];
+        second_global_update[0] = Some(&b"global-b"[..]);
+        second_global_update[4] = Some(&b""[..]);
+        let global = super::apply_global_update(global, second_global_update);
+
+        let effective = resolve_values(global, local);
+        assert_eq!(effective[0], Some(&b"local"[..]));
+        assert_eq!(effective[4], None);
+        assert_eq!(global[0], Some(&b"global-b"[..]));
+        assert_eq!(global[4], None);
+
+        let consumed = super::consume_local_update(local);
+        assert_eq!(consumed, [None; 11]);
+        let after_entry = resolve_values(global, consumed);
+        assert_eq!(after_entry[0], Some(&b"global-b"[..]));
+        assert_eq!(after_entry[4], None);
     }
 
     #[test]

@@ -178,6 +178,14 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
   SECTION: [PARSE-TAR-005](#parse-tar-005)
     TEXT[!MUST,implementation,test]: The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.
 
+  SECTION: [PARSE-TAR-006](#parse-tar-006)
+    TEXT[!MUST,implementation,test]: The tar parser MUST apply PAX extension state in header order.
+    TEXT[implementation,test]: Each present field in a global `g` header replaces the prior global value, an empty global value deletes it, and omitted global fields persist.
+    TEXT[implementation,test]: Each present field in a local `x` header replaces the pending local value, including empty values, while omitted local fields persist across later extension headers.
+    TEXT[!MUST,implementation,test]: Local fields MUST override global fields for the next real entry.
+    TEXT[!MUST,implementation,test]: That local state MUST be consumed only after the real entry is accepted.
+    TEXT[!MUST,implementation,test]: GNU `L`/`K` and PAX `g` headers MUST NOT consume pending local fields.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

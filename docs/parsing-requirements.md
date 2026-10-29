@@ -449,6 +449,12 @@ The tar parser MUST enforce the supported envelope-specific termination profile 
 
 Provenance: SRC-HASH (`GzipWriteFile`, `GPGWriteFile`), SRC-DIFF, SRC-HIST-321, official 0.8.23/2.1.3/3.0.7/3.2.1 observations. Raw/gzip data volumes accept complete-entry EOF for the inspected older profiles or the exact producer zero footer for 3.2.1. The general compatible zero-terminated input profile accepts one or more complete all-zero 512-byte blocks after complete entries; no nonzero trailing bytes are permitted. Encrypted data volumes require the exact zero footer described above; optional nonfinal top-off is validated as an exact prefix of the original stored ciphertext bytes. Final encrypted volumes permit no top-off. Signature archives accept a standard zero-terminated tar (including empty) or an exactly zero-byte decoded signature stream. Unexpected trailing bytes and dangling extended headers are errors. Any missing required stored volume or incomplete multipart entry remains an error despite valid container EOF.
 
+### PARSE-TAR-006
+
+The tar parser MUST apply PAX extension state in header order. Each present field in a global `g` header replaces the prior global value, an empty global value deletes it, and omitted global fields persist. Each present field in a local `x` header replaces the pending local value, including empty values, while omitted local fields persist across later extension headers. Local fields MUST override global fields for the next real entry. That local state MUST be consumed only after the real entry is accepted. GNU `L`/`K` and PAX `g` headers MUST NOT consume pending local fields.
+
+Provenance: DOC-TAR, SRC-TAR and observed GNU/PAX extension ordering. This requirement defines metadata state timing; validation of every possible tar-controller error outcome remains separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

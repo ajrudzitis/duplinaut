@@ -3671,6 +3671,35 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-pax-extension-timing"
+gate = true
+requirements = ["PARSE-TAR-006"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves the per-slot global replacement/deletion, local merge, and local
+# consumption helpers wired into the native extension loop. Whole tar-loop
+# error refinement remains outside this milestone.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "apply_global_update" },
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "apply_local_update" },
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "consume_local_update" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-pax-global-update", requirement = "PARSE-TAR-006", path = "crates/core/src/verified/tar_pax.rs", symbol = "apply_global_update", kind = "contract" },
+  { id = "tar-pax-local-update", requirement = "PARSE-TAR-006", path = "crates/core/src/verified/tar_pax.rs", symbol = "apply_local_update", kind = "contract" },
+  { id = "tar-pax-local-consume", requirement = "PARSE-TAR-006", path = "crates/core/src/verified/tar_pax.rs", symbol = "consume_local_update", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::extension_state_updates_preserve_persistence_merge_and_consumption_semantics" },
+  { package = "duplicity-core", name = "pax_global_and_local_extension_timing_survives_interleaved_metadata" }
+]
+
+[[milestone]]
 id = "tar-pax-owner-names"
 gate = true
 requirements = ["PARSE-TAR-003"]

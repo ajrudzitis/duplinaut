@@ -475,6 +475,70 @@ fn pax_global_local_deletion_binary_and_numeric_overrides() {
     assert_eq!(parsed.entries[2].uid, 99);
 }
 
+//= docs/parsing-requirements.md#parse-tar-006
+//= type=test
+//# Local fields MUST override global fields for the next real entry.
+//= docs/parsing-requirements.md#parse-tar-006
+//= type=test
+//# That local state MUST be consumed only after the real entry is accepted.
+//= docs/parsing-requirements.md#parse-tar-006
+//= type=test
+//# The tar parser MUST apply PAX extension state in header order.
+//= docs/parsing-requirements.md#parse-tar-006
+//= type=test
+//# Each present field in a global `g` header replaces the prior global value, an empty global value deletes it, and omitted global fields persist.
+//= docs/parsing-requirements.md#parse-tar-006
+//= type=test
+//# Each present field in a local `x` header replaces the pending local value, including empty values, while omitted local fields persist across later extension headers.
+//= docs/parsing-requirements.md#parse-tar-006
+//= type=test
+//# GNU `L`/`K` and PAX `g` headers MUST NOT consume pending local fields.
+#[test]
+fn pax_global_and_local_extension_timing_survives_interleaved_metadata() {
+    let global_before = [
+        record(b"path", b"snapshot/global-before"),
+        record(b"uid", b"99"),
+    ]
+    .concat();
+    let local = [record(b"path", b"snapshot/local"), record(b"uid", b"")].concat();
+    let later_local = record(b"gname", b"local-group");
+    let gnu_name = member(b"././@LongLink", b'L', b"snapshot/gnu-name\0");
+    let gnu_link = member(b"././@LongLink", b'K', b"target/gnu-link\0");
+    let global_after = [
+        record(b"path", b"snapshot/global-after"),
+        record(b"uid", b""),
+    ]
+    .concat();
+    let first = symlink_with_linkname(b"target/header-link");
+    let second = member(b"raw-second", b'0', b"");
+    let archive = [
+        member(b"global-before", b'g', &global_before),
+        member(b"local", b'x', &local),
+        member(b"local-later", b'x', &later_local),
+        gnu_name,
+        gnu_link,
+        member(b"global-after", b'g', &global_after),
+        first,
+        second,
+    ]
+    .concat();
+
+    let parsed = parse(&archive).unwrap();
+    assert_eq!(parsed.entries.len(), 2);
+    assert_eq!(parsed.entries[0].name, b"snapshot/local");
+    assert_eq!(parsed.entries[0].linkname, b"target/gnu-link");
+    assert_eq!(parsed.entries[0].gname, b"local-group");
+    assert_eq!(
+        parsed.entries[0].uid, 0,
+        "empty local value suppresses inherited global uid"
+    );
+    assert_eq!(parsed.entries[1].name, b"snapshot/global-after");
+    assert_eq!(
+        parsed.entries[1].uid, 0,
+        "empty global update removes the old uid"
+    );
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
