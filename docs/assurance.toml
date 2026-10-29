@@ -2297,6 +2297,33 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-full-signatures-field-error-refinement"
+gate = true
+requirements = ["PARSE-NAME-010"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Exact outcomes for the long FullSignatures field parser: an invalid
+# configured separator produces Configuration before timestamp/trailer
+# decoding; with a valid separator, malformed fields produce Malformed exactly
+# when the field model is None. Tests exercise complete body field structure.
+# Earlier scanner failures, raw-model converse, and complete filename error
+# refinement remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "long_full_signatures_body_fields" },
+  { path = "crates/core/src/names.rs", symbol = "body" }
+]
+proofs = [
+  { id = "name-long-full-signatures-field-error-refinement", requirement = "PARSE-NAME-010", path = "crates/core/src/names.rs", symbol = "long_full_signatures_body_fields", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::long_full_signatures_body_exact_error_edge_matrix" }
+]
+
+[[milestone]]
 id = "name-long-full-volume-raw-body-controller"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-004", "PARSE-NAME-007", "PARSE-GEN-003"]
