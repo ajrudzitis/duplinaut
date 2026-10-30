@@ -705,6 +705,8 @@ pub enum PaxSizeError {
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
 /// Select the resolved PAX size override or retain the raw header size.
+//= docs/parsing-requirements.md#parse-tar-036
+//# After PAX global/local state resolution, an effective `size`, `uid`, or `gid` override MUST be a nonempty sequence of ASCII decimal digits representing a value in `0..=u64::MAX`; leading zeroes and zero MUST be accepted. A selected nonempty value containing signs, whitespace, nondigits, or exceeding `u64::MAX` MUST produce Numeric and MUST NOT fall back to the raw header field. An empty PAX record value remains a deletion marker under PARSE-TAR-006; when deletion leaves no effective override, the parser MUST use the raw header fallback. GNU/PAX extension payloads MUST continue to use their raw header size.
 pub fn effective_size(value: Option<&[u8]>, header_size: u64)
     -> (result: Result<u64, PaxSizeError>)
     ensures match value {
@@ -757,6 +759,8 @@ pub enum PaxIdError {
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
 /// Select a resolved PAX uid/gid override or retain the raw header value.
+//= docs/parsing-requirements.md#parse-tar-036
+//# After PAX global/local state resolution, an effective `size`, `uid`, or `gid` override MUST be a nonempty sequence of ASCII decimal digits representing a value in `0..=u64::MAX`; leading zeroes and zero MUST be accepted. A selected nonempty value containing signs, whitespace, nondigits, or exceeding `u64::MAX` MUST produce Numeric and MUST NOT fall back to the raw header field. An empty PAX record value remains a deletion marker under PARSE-TAR-006; when deletion leaves no effective override, the parser MUST use the raw header fallback. GNU/PAX extension payloads MUST continue to use their raw header size.
 //= docs/parsing-requirements.md#parse-tar-032
 //# For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEntry.gid` from the resolved effective PAX `uid` and `gid` values when present; when either effective value is absent, the reader MUST retain that field's decoded raw header value. Invalid present effective values MUST produce Numeric rather than falling back to the raw header value.
 //= docs/parsing-requirements.md#parse-tar-003
@@ -1418,6 +1422,9 @@ mod tests {
     }
 
     #[test]
+    //= docs/parsing-requirements.md#parse-tar-036
+    //= type=test
+    //# After PAX global/local state resolution, an effective `size`, `uid`, or `gid` override MUST be a nonempty sequence of ASCII decimal digits representing a value in `0..=u64::MAX`; leading zeroes and zero MUST be accepted. A selected nonempty value containing signs, whitespace, nondigits, or exceeding `u64::MAX` MUST produce Numeric and MUST NOT fall back to the raw header field. An empty PAX record value remains a deletion marker under PARSE-TAR-006; when deletion leaves no effective override, the parser MUST use the raw header fallback. GNU/PAX extension payloads MUST continue to use their raw header size.
     fn effective_pax_size_selects_override_fallback_and_invalid_values() {
         assert_eq!(effective_size(None, 17), Ok(17));
         assert_eq!(effective_size(Some(b"0"), 17), Ok(0));
@@ -1695,6 +1702,9 @@ mod tests {
     //= docs/parsing-requirements.md#parse-tar-032
     //= type=test
     //# For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEntry.gid` from the resolved effective PAX `uid` and `gid` values when present; when either effective value is absent, the reader MUST retain that field's decoded raw header value. Invalid present effective values MUST produce Numeric rather than falling back to the raw header value.
+    //= docs/parsing-requirements.md#parse-tar-036
+    //= type=test
+    //# After PAX global/local state resolution, an effective `size`, `uid`, or `gid` override MUST be a nonempty sequence of ASCII decimal digits representing a value in `0..=u64::MAX`; leading zeroes and zero MUST be accepted. A selected nonempty value containing signs, whitespace, nondigits, or exceeding `u64::MAX` MUST produce Numeric and MUST NOT fall back to the raw header field. An empty PAX record value remains a deletion marker under PARSE-TAR-006; when deletion leaves no effective override, the parser MUST use the raw header fallback. GNU/PAX extension payloads MUST continue to use their raw header size.
     #[test]
     fn effective_pax_ids_select_fallback_and_exact_decimal_values() {
         assert_eq!(effective_id(None, 17), Ok(17));

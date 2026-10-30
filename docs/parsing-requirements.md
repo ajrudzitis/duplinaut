@@ -631,6 +631,12 @@ For each real tar entry, the reader MUST set `TarEntry.atime` and `TarEntry.ctim
 
 Provenance: DOC-TAR, SRC-TAR, and the reviewed PAX profile above. PAX timestamp grammar and global/local state resolution remain specified separately; this requirement covers only output metadata selection and conversion, not extension-state timing or full tar-controller refinement.
 
+### PARSE-TAR-036
+
+After PAX global/local state resolution, an effective `size`, `uid`, or `gid` override MUST be a nonempty sequence of ASCII decimal digits representing a value in `0..=u64::MAX`; leading zeroes and zero MUST be accepted. A selected nonempty value containing signs, whitespace, nondigits, or exceeding `u64::MAX` MUST produce Numeric and MUST NOT fall back to the raw header field. An empty PAX record value remains a deletion marker under PARSE-TAR-006; when deletion leaves no effective override, the parser MUST use the raw header fallback. GNU/PAX extension payloads MUST continue to use their raw header size.
+
+Provenance: DOC-TAR and SRC-TAR define these PAX fields as nonnegative decimal values; the reviewed reader profile and POLICY require checked `u64` admission and an explicit Numeric diagnostic. PAX record framing and global/local state selection remain specified by PARSE-TAR-003/006, and raw tar numeric decoding remains specified by PARSE-TAR-026/027. This requirement covers decimal conversion after effective-state resolution and real-entry fallback behavior, not extension-state timing or full tar-controller refinement.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

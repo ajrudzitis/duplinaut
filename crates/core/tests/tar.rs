@@ -1248,6 +1248,9 @@ fn pax_uid_and_gid_overrides_fall_back_independently() {
 //= docs/parsing-requirements.md#parse-tar-032
 //= type=test
 //# For each accepted real tar entry, the reader MUST set `TarEntry.uid` and `TarEntry.gid` from the resolved effective PAX `uid` and `gid` values when present; when either effective value is absent, the reader MUST retain that field's decoded raw header value. Invalid present effective values MUST produce Numeric rather than falling back to the raw header value.
+//= docs/parsing-requirements.md#parse-tar-036
+//= type=test
+//# After PAX global/local state resolution, an effective `size`, `uid`, or `gid` override MUST be a nonempty sequence of ASCII decimal digits representing a value in `0..=u64::MAX`; leading zeroes and zero MUST be accepted. A selected nonempty value containing signs, whitespace, nondigits, or exceeding `u64::MAX` MUST produce Numeric and MUST NOT fall back to the raw header field. An empty PAX record value remains a deletion marker under PARSE-TAR-006; when deletion leaves no effective override, the parser MUST use the raw header fallback. GNU/PAX extension payloads MUST continue to use their raw header size.
 #[test]
 fn invalid_pax_uid_gid_values_are_numeric_errors() {
     for key in [b"uid" as &[u8], b"gid"] {

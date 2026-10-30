@@ -302,6 +302,12 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: A present but invalid timestamp MUST produce Numeric; it MUST NOT be treated as absent.
     TEXT[!MUST,implementation,test]: An empty local value MUST delete the corresponding inherited global value, so that field MUST be `None` for the next real entry.
 
+  SECTION: [PARSE-TAR-036](#parse-tar-036)
+    TEXT[!MUST,implementation,test]: After PAX global/local state resolution, an effective `size`, `uid`, or `gid` override MUST be a nonempty sequence of ASCII decimal digits representing a value in `0..=u64::MAX`; leading zeroes and zero MUST be accepted.
+    TEXT[!MUST,implementation,test]: A selected nonempty value containing signs, whitespace, nondigits, or exceeding `u64::MAX` MUST produce Numeric and MUST NOT fall back to the raw header field.
+    TEXT[!MUST,implementation,test]: An empty PAX record value remains a deletion marker under PARSE-TAR-006; when deletion leaves no effective override, the parser MUST use the raw header fallback.
+    TEXT[!MUST,implementation,test]: GNU/PAX extension payloads MUST continue to use their raw header size.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 
