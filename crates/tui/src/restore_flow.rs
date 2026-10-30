@@ -101,6 +101,11 @@ pub struct Preview {
     pub frozen: Frozen,
     pub text: String,
 }
+fn within_comparison_budget(state_count: usize, root_count: usize) -> bool {
+    state_count
+        .checked_mul(root_count.max(1))
+        .is_some_and(|comparisons| comparisons <= COMPARISONS)
+}
 fn plan(request: &Frozen) -> Result<RestorePlan<'_>, Error> {
     let limits = duplicity_core::restore_plan::RestorePlanLimits {
         max_roots: ROOTS,
@@ -132,14 +137,7 @@ pub fn copy_roots(
     snapshot: &ValidatedSnapshot,
     marked: &[usize],
 ) -> Result<Vec<BackupPath>, Error> {
-    if marked.len() > ROOTS
-        || snapshot
-            .state()
-            .len()
-            .checked_mul(marked.len().max(1))
-            .filter(|n| *n <= COMPARISONS)
-            .is_none()
-    {
+    if marked.len() > ROOTS || !within_comparison_budget(snapshot.state().len(), marked.len()) {
         return Err(Error::Limit);
     }
     if marked.iter().any(|i| *i >= snapshot.state().len()) {
@@ -193,14 +191,7 @@ pub fn prepare(
     if cancel.is_cancelled() {
         return Err(Error::Cancelled);
     }
-    if marked.len() > ROOTS
-        || snapshot
-            .state()
-            .len()
-            .checked_mul(marked.len().max(1))
-            .filter(|n| *n <= COMPARISONS)
-            .is_none()
-    {
+    if marked.len() > ROOTS || !within_comparison_budget(snapshot.state().len(), marked.len()) {
         return Err(Error::Limit);
     }
     marked.sort_unstable();
@@ -374,6 +365,16 @@ impl Acknowledgment {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-011
+    //= type=test
+    //# The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
+    fn comparison_budget_checks_limit_and_multiplication_overflow() {
+        assert!(within_comparison_budget(COMPARISONS, 1));
+        assert!(!within_comparison_budget(COMPARISONS + 1, 1));
+        assert!(!within_comparison_budget(usize::MAX, 2));
+    }
+
     #[test]
     fn acknowledgment_is_fixed_ascii_empty_on_reset() {
         let mut a = Acknowledgment::default();
