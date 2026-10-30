@@ -502,7 +502,7 @@ pub(crate) fn operation_payload_allowed(
     ensures result == operation_payload_allowed_model(operation, payload.len() == 0),
 {
     match operation {
-        LogicalOperation::Deleted => payload.len() == 0,
+        LogicalOperation::Deleted => payload.is_empty(),
         LogicalOperation::Snapshot | LogicalOperation::Diff => true,
     }
 }
