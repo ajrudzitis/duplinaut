@@ -787,6 +787,9 @@ pub enum PaxTimeError {
     Invalid,
 }
 
+pub type OptionalPaxTime = Option<(i64, u32)>;
+pub type EntryOptionalPaxTimes = (OptionalPaxTime, OptionalPaxTime);
+
 //= docs/parsing-requirements.md#parse-tar-003
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
 
@@ -835,6 +838,52 @@ pub fn effective_optional_time(value: Option<&[u8]>)
         Some(bytes) => match time(bytes) {
             Some(value) => Ok(Some(value)),
             None => Err(PaxTimeError::Invalid),
+        },
+    }
+}
+
+//= docs/parsing-requirements.md#parse-tar-035
+//# For each real tar entry, the reader MUST set `TarEntry.atime` and `TarEntry.ctime` from their respective resolved effective PAX values when present, using the reviewed signed PAX timestamp profile. When an effective value is absent, the corresponding output field MUST be `None`. A present but invalid timestamp MUST produce Numeric; it MUST NOT be treated as absent. An empty local value MUST delete the corresponding inherited global value, so that field MUST be `None` for the next real entry.
+pub fn effective_entry_optional_times(
+    atime: Option<&[u8]>,
+    ctime: Option<&[u8]>,
+) -> (result: Result<EntryOptionalPaxTimes, PaxTimeError>)
+    ensures match result {
+        Ok((effective_atime, effective_ctime)) =>
+            optional_time_matches(atime, effective_atime)
+                && optional_time_matches(ctime, effective_ctime),
+        Err(error) => error == PaxTimeError::Invalid
+            && (match atime {
+                None => false,
+                Some(bytes) => time_model(bytes@) is None,
+            } || match ctime {
+                None => false,
+                Some(bytes) => time_model(bytes@) is None,
+            }),
+    },
+{
+    let effective_atime = match effective_optional_time(atime) {
+        Ok(value) => value,
+        Err(error) => return Err(error),
+    };
+    let effective_ctime = match effective_optional_time(ctime) {
+        Ok(value) => value,
+        Err(error) => return Err(error),
+    };
+    Ok((effective_atime, effective_ctime))
+}
+
+pub open spec fn optional_time_matches(
+    input: Option<&[u8]>,
+    output: OptionalPaxTime,
+) -> bool {
+    match input {
+        None => output is None,
+        Some(bytes) => match output {
+            None => false,
+            Some((seconds, nanoseconds)) =>
+                time_model(bytes@) == Some((seconds as int, nanoseconds as int))
+                    && nanoseconds < 1000000000,
         },
     }
 }
@@ -1205,7 +1254,7 @@ pub fn ingest<'a>(input: &'a [u8])
 mod tests {
     use super::{
         admit_record, compose_effective_header_name, compose_ustar_header_name,
-        copy_effective_link_target, copy_effective_owner_name,
+        copy_effective_link_target, copy_effective_owner_name, effective_entry_optional_times,
         effective_header_name_length_and_admission, effective_id,
         effective_link_length_and_admission, effective_link_override, effective_mtime,
         effective_name_override, effective_optional_time, effective_owner_name,
@@ -1703,5 +1752,28 @@ mod tests {
                 Err(PaxTimeError::Invalid)
             );
         }
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-035
+    //= type=test
+    //# For each real tar entry, the reader MUST set `TarEntry.atime` and `TarEntry.ctime` from their respective resolved effective PAX values when present, using the reviewed signed PAX timestamp profile. When an effective value is absent, the corresponding output field MUST be `None`. A present but invalid timestamp MUST produce Numeric; it MUST NOT be treated as absent. An empty local value MUST delete the corresponding inherited global value, so that field MUST be `None` for the next real entry.
+    #[test]
+    fn effective_entry_times_keep_slots_distinct_and_reject_invalid_values() {
+        assert_eq!(
+            effective_entry_optional_times(Some(b"-0.000000001"), Some(b"+2.25")),
+            Ok((Some((-1, 999_999_999)), Some((2, 250_000_000))))
+        );
+        assert_eq!(
+            effective_entry_optional_times(None, Some(b"3")),
+            Ok((None, Some((3, 0))))
+        );
+        assert_eq!(
+            effective_entry_optional_times(Some(b""), None),
+            Err(PaxTimeError::Invalid)
+        );
+        assert_eq!(
+            effective_entry_optional_times(None, Some(b"bad")),
+            Err(PaxTimeError::Invalid)
+        );
     }
 }

@@ -425,18 +425,19 @@ impl<'a> TarVolume<'a> {
                 .map_err(|_| TarError::Numeric)?;
             let gid = crate::verified::tar_pax::effective_id(values[5], header_gid)
                 .map_err(|_| TarError::Numeric)?;
-            let atime = crate::verified::tar_pax::effective_optional_time(values[8])
-                .map_err(|_| TarError::Numeric)?
-                .map(|(seconds, nanoseconds)| TarTime {
-                    seconds,
-                    nanoseconds,
-                });
-            let ctime = crate::verified::tar_pax::effective_optional_time(values[9])
-                .map_err(|_| TarError::Numeric)?
-                .map(|(seconds, nanoseconds)| TarTime {
-                    seconds,
-                    nanoseconds,
-                });
+            //= docs/parsing-requirements.md#parse-tar-035
+            //# For each real tar entry, the reader MUST set `TarEntry.atime` and `TarEntry.ctime` from their respective resolved effective PAX values when present, using the reviewed signed PAX timestamp profile. When an effective value is absent, the corresponding output field MUST be `None`. A present but invalid timestamp MUST produce Numeric; it MUST NOT be treated as absent. An empty local value MUST delete the corresponding inherited global value, so that field MUST be `None` for the next real entry.
+            let (atime_value, ctime_value) =
+                crate::verified::tar_pax::effective_entry_optional_times(values[8], values[9])
+                    .map_err(|_| TarError::Numeric)?;
+            let atime = atime_value.map(|(seconds, nanoseconds)| TarTime {
+                seconds,
+                nanoseconds,
+            });
+            let ctime = ctime_value.map(|(seconds, nanoseconds)| TarTime {
+                seconds,
+                nanoseconds,
+            });
             //= docs/parsing-requirements.md#parse-tar-031
             //# For each accepted character-device or block-device entry, the reader MUST preserve the decoded raw header `device_major` and `device_minor` values in the corresponding `TarEntry` fields without normalization or substitution.
             let (device_major, device_minor) =
