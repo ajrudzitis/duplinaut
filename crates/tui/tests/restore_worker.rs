@@ -112,6 +112,19 @@ fn official_three_dates_pass_through_frozen_frontend_worker_and_source_oracles()
             Reply::Snapshot { value, .. } => value,
             _ => panic!("scan"),
         };
+        let expected = oracle["snapshots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["mode"] == "plain" && r["index"] == day as u64)
+            .unwrap()["entries"]
+            .as_array()
+            .unwrap();
+        let expected_payload = expected
+            .iter()
+            .filter(|entry| entry["kind"] == "file")
+            .map(|entry| entry["size"].as_u64().unwrap())
+            .sum::<u64>();
         let name = format!("restored{day}").into_bytes();
         let destination = Arc::new(Destination {
             parent: temp.0.clone(),
@@ -137,8 +150,37 @@ fn official_three_dates_pass_through_frozen_frontend_worker_and_source_oracles()
             .0
             .join(std::ffi::OsString::from_vec(name.clone()))
             .exists());
-        assert!(preview.text.contains("Requested parent:"));
-        assert!(preview.text.contains("whole snapshot"));
+        assert!(preview
+            .text
+            .contains(&format!("Snapshot target: {}\n", 1700000000 + day * 86400)));
+        assert!(preview.text.contains("Scope: whole snapshot (no marks)\n"));
+        assert!(preview
+            .text
+            .contains("Include exact source directory ancestors; no flattening."));
+        assert!(preview
+            .text
+            .contains(&format!("Entries: {}\n", expected.len())));
+        assert!(preview
+            .text
+            .contains(&format!("Regular payload bytes: {expected_payload}\n")));
+        assert!(preview
+            .text
+            .contains(&format!("Requested parent: {}\n", temp.0.display())));
+        assert!(preview
+            .text
+            .contains(&format!("New destination leaf: restored{day}\n")));
+        assert!(preview.text.contains(
+            "Atomic no-replacement publication; existing destinations are never overwritten."
+        ));
+        assert!(preview.text.contains(
+            "Preserves ordinary modes, supported exact modification times and raw symlink target bytes."
+        ));
+        assert!(preview
+            .text
+            .contains("Ownership, source ACLs/xattrs and crash durability are excluded."));
+        assert!(preview.text.contains(
+            "Backend checks parent policy/filesystem, automatic profile and exact metadata after acknowledgment, before staging."
+        ));
         id += 1;
         worker
             .send(Command::Execute {
@@ -155,14 +197,6 @@ fn official_three_dates_pass_through_frozen_frontend_worker_and_source_oracles()
         };
         assert!(matches!(result, RestoreOutcome::Published(_)));
         assert!(!restore_flow::retry_allowed(&result));
-        let expected = oracle["snapshots"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|r| r["mode"] == "plain" && r["index"] == day as u64)
-            .unwrap()["entries"]
-            .as_array()
-            .unwrap();
         assert_eq!(expected.len(), snapshot.state().len());
         for (path, entry) in snapshot.state().entries() {
             let mut actual = temp.0.join(std::ffi::OsString::from_vec(name.clone()));
@@ -210,6 +244,7 @@ fn official_three_dates_pass_through_frozen_frontend_worker_and_source_oracles()
     }
     worker.shutdown(&Cancellation::default(), |_| {}).unwrap();
 }
+
 #[test]
 //= docs/parsing-requirements.md#restore-ui-006
 //= type=test

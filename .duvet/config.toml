@@ -41,6 +41,10 @@ pattern = "crates/tui/src/**/*.rs"
 type = "implementation"
 
 [[source]]
+pattern = "crates/tui/tests/**/*.rs"
+type = "test"
+
+[[source]]
 pattern = "xtask/src/*.rs"
 type = "implementation"
 

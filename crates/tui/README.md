@@ -45,12 +45,13 @@ anchor choice.
 
 | Component | Specification review | Implementation | Proof | Integration tests | Independent acceptance |
 | --- | --- | --- | --- | --- | --- |
-| Browser and restore flow | Browse requirements written; restore interaction adopted before implementation | Read-only browsing and native Linux restore work; acceptance pending | Component proofs remain separate; display/I/O trusted | Escaping/CLI tests and manual official-chain PTY smoke pass | Pending |
+| Browser and restore flow | Browse requirements written; restore interaction adopted before implementation | Read-only browsing and native Linux restore work; acceptance pending | Component proofs remain separate; display/I/O trusted | Escaping/CLI tests, official worker preview checks and manual official-chain PTY smoke pass | Pending |
 
 - [x] Create the executable crate with no unsupported feature claims.
 - [x] Escape terminal controls, non-ASCII bytes and literal escapes while retaining original path identity; native tests pass.
 - [x] Implement metadata history, explicit anchors/dates, volume-scan disclosure and byte-preserving snapshot navigation.
 - [x] Implement byte-preserving selection and bounded restore previews; independently review the read-only flow.
+- [x] Add focused official-fixture worker checks for RESTORE-UI-003 whole-snapshot and marked-preview details; the marked case only prepares a preview and does not publish. Broader frontend acceptance remains pending.
 - [x] Connect explicitly acknowledged selection to native Linux publication; use the existing SDK credential provider.
 - [ ] Test display escaping, errors and interaction flows.
 - [ ] Automate terminal interaction, cancellation, resize and S3 frontend tests.
