@@ -1116,6 +1116,9 @@ fn empty_local_pax_linkpath_allows_gnu_or_header_link_fallback() {
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+//= docs/parsing-requirements.md#parse-tar-042
+//= type=test
+//# For a real entry, each nonempty resolved PAX `path` and `linkpath` value MUST be validated as UTF-8 when the effective `hdrcharset` is absent or selects a supported UTF-8 token (`UTF-8` or `ISO-IR 10646 2000 UTF-8`). Invalid bytes MUST produce `TextEncoding`. When the effective `hdrcharset` is `BINARY`, selected PAX `path` and `linkpath` values MUST be retained byte-for-byte without UTF-8 validation. When a resolved PAX path or link override is absent, including after an empty-value deletion, the next selection source (GNU long-name/long-link or raw header field) MUST remain byte-preserving and MUST NOT be validated under the PAX charset. This requirement does not relax NUL rejection for PAX records.
 
 #[test]
 fn pax_global_local_deletion_binary_and_numeric_overrides() {
@@ -1681,6 +1684,9 @@ fn official_duplicity_307_pax_path_preserves_header_mtime() {
 //= docs/parsing-requirements.md#parse-tar-004
 //= type=test
 //# Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.
+//= docs/parsing-requirements.md#parse-tar-042
+//= type=test
+//# For a real entry, each nonempty resolved PAX `path` and `linkpath` value MUST be validated as UTF-8 when the effective `hdrcharset` is absent or selects a supported UTF-8 token (`UTF-8` or `ISO-IR 10646 2000 UTF-8`). Invalid bytes MUST produce `TextEncoding`. When the effective `hdrcharset` is `BINARY`, selected PAX `path` and `linkpath` values MUST be retained byte-for-byte without UTF-8 validation. When a resolved PAX path or link override is absent, including after an empty-value deletion, the next selection source (GNU long-name/long-link or raw header field) MUST remain byte-preserving and MUST NOT be validated under the PAX charset. This requirement does not relax NUL rejection for PAX records.
 
 #[test]
 fn malformed_and_unsupported_pax_are_not_skipped() {

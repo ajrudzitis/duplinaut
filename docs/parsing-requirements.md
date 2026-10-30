@@ -668,6 +668,12 @@ For a real entry, each present resolved PAX `uname` and `gname` value MUST be va
 
 Provenance: DOC-PAX, PARSE-TAR-003/004/017, and POLICY. This covers charset validation of resolved PAX owner-name values and raw-header fallback; owner-name selection/length, supported charset-token admission, empty-value deletion, and global/local timing remain separately specified.
 
+### PARSE-TAR-042
+
+For a real entry, each nonempty resolved PAX `path` and `linkpath` value MUST be validated as UTF-8 when the effective `hdrcharset` is absent or selects a supported UTF-8 token (`UTF-8` or `ISO-IR 10646 2000 UTF-8`). Invalid bytes MUST produce `TextEncoding`. When the effective `hdrcharset` is `BINARY`, selected PAX `path` and `linkpath` values MUST be retained byte-for-byte without UTF-8 validation. When a resolved PAX path or link override is absent, including after an empty-value deletion, the next selection source (GNU long-name/long-link or raw header field) MUST remain byte-preserving and MUST NOT be validated under the PAX charset. This requirement does not relax NUL rejection for PAX records.
+
+Provenance: DOC-PAX, PARSE-TAR-003/006/009/010/012/013, and POLICY. This specifies charset treatment only; path/link selection, length admission, NUL rejection, PAX deletion timing, and GNU/PAX extension ordering remain governed separately. Existing integration evidence directly exercises PAX `path` under UTF-8 and BINARY policies; direct `linkpath` charset and invalid raw/GNU fallback cases remain to be added.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

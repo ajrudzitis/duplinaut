@@ -675,6 +675,8 @@ pub fn copy_effective_owner_name(
 /// Return whether the resolved charset uses the parser's UTF-8 text policy.
 //= docs/parsing-requirements.md#parse-tar-041
 //# For a real entry, each present resolved PAX `uname` and `gname` value MUST be validated as UTF-8 when the effective `hdrcharset` is absent or selects a supported UTF-8 token (`UTF-8` or `ISO-IR 10646 2000 UTF-8`). Invalid bytes MUST produce TextEncoding. When the effective `hdrcharset` is `BINARY`, PAX owner-name values MUST be preserved byte-for-byte without UTF-8 validation. When a resolved PAX owner-name value is absent, the corresponding raw-header fallback MUST be preserved byte-for-byte and MUST NOT be validated under the PAX charset.
+//= docs/parsing-requirements.md#parse-tar-042
+//# For a real entry, each nonempty resolved PAX `path` and `linkpath` value MUST be validated as UTF-8 when the effective `hdrcharset` is absent or selects a supported UTF-8 token (`UTF-8` or `ISO-IR 10646 2000 UTF-8`). Invalid bytes MUST produce `TextEncoding`. When the effective `hdrcharset` is `BINARY`, selected PAX `path` and `linkpath` values MUST be retained byte-for-byte without UTF-8 validation. When a resolved PAX path or link override is absent, including after an empty-value deletion, the next selection source (GNU long-name/long-link or raw header field) MUST remain byte-preserving and MUST NOT be validated under the PAX charset. This requirement does not relax NUL rejection for PAX records.
 pub fn owner_name_requires_utf8(charset: Option<&[u8]>) -> (result: bool)
     ensures result == match charset {
         Some(value) => value@ != b"BINARY"@,
