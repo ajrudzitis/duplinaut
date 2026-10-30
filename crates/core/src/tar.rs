@@ -233,14 +233,14 @@ impl<'a> TarVolume<'a> {
             //# A real entry MUST use the effective PAX `size` value when present, or its raw tar header size when absent.
             //= docs/parsing-requirements.md#parse-tar-008
             //# After selecting the raw or effective PAX size, the reader MUST return exactly that many payload bytes and advance the cursor over the padded extent to the next 512-byte boundary.
-            let (size, payload, next) =
-                crate::verified::tar_entry_extent::take_selected_entry_payload(
-                    bytes,
-                    cursor,
-                    crate::verified::tar_pax::payload_size(extension, values[2], raw_size),
-                    limits.max_entry_bytes,
-                )
-                .map_err(|error| match error {
+            let selected_extent = crate::verified::tar_entry_extent::take_selected_entry_payload(
+                bytes,
+                cursor,
+                crate::verified::tar_pax::payload_size(extension, values[2], raw_size),
+                limits.max_entry_bytes,
+            );
+            if extension {
+                let (size, payload, next) = selected_extent.map_err(|error| match error {
                     crate::verified::tar_entry_extent::SelectedEntryError::Numeric => {
                         TarError::Numeric
                     }
@@ -249,8 +249,7 @@ impl<'a> TarVolume<'a> {
                         TarError::Truncated
                     }
                 })?;
-            cursor = next;
-            if extension {
+                cursor = next;
                 //= docs/parsing-requirements.md#parse-tar-020
                 //# The reader MUST checked-increment the GNU/PAX extension-header count and reject the header if the increment overflows or exceeds `max_extended_headers`, before charging or interpreting extension contents.
                 extended = crate::verified::tar_entry::admit_extension_header_count(
@@ -294,10 +293,32 @@ impl<'a> TarVolume<'a> {
                 pending = crate::verified::tar_pax::update_pending_override(pending, h.entry_type);
                 continue;
             }
-            //= docs/parsing-requirements.md#parse-tar-033
-            //# For each accepted real tar entry, `TarEntry.entry_type` MUST correspond to its raw type flag: NUL or `0` MUST map to regular, `1` hardlink, `2` symlink, `3` character device, `4` block device, `5` directory, and `6` FIFO. The reader MUST reject a non-regular entry when its effective payload size is greater than zero and MUST reject every other ordinary-entry type flag as `UnsupportedEntry`. GNU/PAX extension type flags are dispatched separately under PARSE-TAR-003/006/007 and are outside this mapping.
-            let entry_type = crate::verified::tar_entry::classify_entry_type(h.entry_type, size)
-                .ok_or(TarError::UnsupportedEntry)?;
+            //= docs/parsing-requirements.md#parse-tar-034
+            //# After numeric decoding and raw/effective payload-size selection for an ordinary entry, the parser MUST validate the bounded payload extent before classifying its type flag. If the extent exceeds `max_entry_bytes` or is truncated, the parser MUST return `Limit` or `Truncated`, respectively, even when later classification would reject the flag or its nonempty payload as `UnsupportedEntry`. Type classification MUST occur only after the selected extent is valid.
+            let entry_type = crate::verified::tar_entry::classify_ordinary_entry_after_extent(
+                &selected_extent,
+                h.entry_type,
+            )
+            .map_err(|error| match error {
+                crate::verified::tar_entry::OrdinaryEntryAdmissionError::Numeric => {
+                    TarError::Numeric
+                }
+                crate::verified::tar_entry::OrdinaryEntryAdmissionError::Limit => TarError::Limit,
+                crate::verified::tar_entry::OrdinaryEntryAdmissionError::Truncated => {
+                    TarError::Truncated
+                }
+                crate::verified::tar_entry::OrdinaryEntryAdmissionError::UnsupportedEntry => {
+                    TarError::UnsupportedEntry
+                }
+            })?;
+            let (_size, payload, next) = selected_extent.map_err(|error| match error {
+                crate::verified::tar_entry_extent::SelectedEntryError::Numeric => TarError::Numeric,
+                crate::verified::tar_entry_extent::SelectedEntryError::Limit => TarError::Limit,
+                crate::verified::tar_entry_extent::SelectedEntryError::Truncated => {
+                    TarError::Truncated
+                }
+            })?;
+            cursor = next;
             //= docs/parsing-requirements.md#parse-tar-021
             //# Before allocating or retaining output fields for a real tar entry, the parser MUST require the accepted entry count to be below `max_entries`. If the count equals or exceeds the limit, it MUST return Limit without returning a partial entry list.
             if !crate::verified::tar_entry::admit_real_entry_count(

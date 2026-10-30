@@ -211,6 +211,51 @@ pub fn classify_entry_type(flag: u8, size: usize) -> (result: Option<TarEntryTyp
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OrdinaryEntryAdmissionError {
+    Numeric,
+    Limit,
+    Truncated,
+    UnsupportedEntry,
+}
+
+//= docs/parsing-requirements.md#parse-tar-034
+//# After numeric decoding and raw/effective payload-size selection for an ordinary entry, the parser MUST validate the bounded payload extent before classifying its type flag. If the extent exceeds `max_entry_bytes` or is truncated, the parser MUST return `Limit` or `Truncated`, respectively, even when later classification would reject the flag or its nonempty payload as `UnsupportedEntry`. Type classification MUST occur only after the selected extent is valid.
+pub fn classify_ordinary_entry_after_extent(
+    extent: &super::tar_entry_extent::SelectedEntryExtentResult<'_>,
+    flag: u8,
+) -> (result: Result<TarEntryType, OrdinaryEntryAdmissionError>)
+    ensures match *extent {
+        Err(super::tar_entry_extent::SelectedEntryError::Numeric) =>
+            result == Err(OrdinaryEntryAdmissionError::Numeric),
+        Err(super::tar_entry_extent::SelectedEntryError::Limit) =>
+            result == Err(OrdinaryEntryAdmissionError::Limit),
+        Err(super::tar_entry_extent::SelectedEntryError::Truncated) =>
+            result == Err(OrdinaryEntryAdmissionError::Truncated),
+        Ok((size, _, _)) => match entry_type_model(flag, size) {
+            Some(entry_type) => result == Ok(entry_type),
+            None => result == Err(OrdinaryEntryAdmissionError::UnsupportedEntry),
+        },
+    },
+{
+    let size = match extent {
+        Ok((size, _, _)) => *size,
+        Err(super::tar_entry_extent::SelectedEntryError::Numeric) => {
+            return Err(OrdinaryEntryAdmissionError::Numeric);
+        }
+        Err(super::tar_entry_extent::SelectedEntryError::Limit) => {
+            return Err(OrdinaryEntryAdmissionError::Limit);
+        }
+        Err(super::tar_entry_extent::SelectedEntryError::Truncated) => {
+            return Err(OrdinaryEntryAdmissionError::Truncated);
+        }
+    };
+    match classify_entry_type(flag, size) {
+        Some(entry_type) => Ok(entry_type),
+        None => Err(OrdinaryEntryAdmissionError::UnsupportedEntry),
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-022
 //# At tar EOF, a pending local PAX/GNU override MUST produce DanglingOverride before the footer profile is checked. Otherwise, an invalid footer MUST produce Termination, and the parser MUST publish a TarVolume only when both checks succeed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -388,8 +433,32 @@ mod metadata_charge_tests {
         decode_header_checksum_field,
         admit_metadata_charge, admit_real_entry_count, begin_tar_eof, finish_tar_eof,
         admit_header_checksum, decode_gnu_long_record, entry_metadata_charge, TarEofError, TarEofState,
+        classify_ordinary_entry_after_extent, OrdinaryEntryAdmissionError,
         retain_device_numbers, TarHeaderProfile, TarLongRecordError, TarUnsignedHeaderFields,
     };
+    use super::super::tar_entry_extent::SelectedEntryError;
+
+    //= docs/parsing-requirements.md#parse-tar-034
+    //= type=test
+    //# After numeric decoding and raw/effective payload-size selection for an ordinary entry, the parser MUST validate the bounded payload extent before classifying its type flag. If the extent exceeds `max_entry_bytes` or is truncated, the parser MUST return `Limit` or `Truncated`, respectively, even when later classification would reject the flag or its nonempty payload as `UnsupportedEntry`. Type classification MUST occur only after the selected extent is valid.
+    #[test]
+    fn ordinary_type_classification_preserves_prior_extent_errors() {
+        assert_eq!(
+            classify_ordinary_entry_after_extent(&Err(SelectedEntryError::Limit), b'7'),
+            Err(OrdinaryEntryAdmissionError::Limit),
+        );
+        assert_eq!(
+            classify_ordinary_entry_after_extent(&Err(SelectedEntryError::Truncated), b'7'),
+            Err(OrdinaryEntryAdmissionError::Truncated),
+        );
+        assert_eq!(
+            classify_ordinary_entry_after_extent(
+                &Ok((0, b"" as &[u8], 512)),
+                b'7',
+            ),
+            Err(OrdinaryEntryAdmissionError::UnsupportedEntry),
+        );
+    }
 
     //= docs/parsing-requirements.md#parse-tar-028
     //= type=test

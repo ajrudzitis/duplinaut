@@ -619,6 +619,12 @@ For each accepted real tar entry, `TarEntry.entry_type` MUST correspond to its r
 
 Provenance: DOC-TAR defines the standard type flags; the reviewed reader profile selects the supported subset and the zero-payload rule for non-regular entries. Complete tar-controller refinement remains separate.
 
+### PARSE-TAR-034
+
+After numeric decoding and raw/effective payload-size selection for an ordinary entry, the parser MUST validate the bounded payload extent before classifying its type flag. If the extent exceeds `max_entry_bytes` or is truncated, the parser MUST return `Limit` or `Truncated`, respectively, even when later classification would reject the flag or its nonempty payload as `UnsupportedEntry`. Type classification MUST occur only after the selected extent is valid.
+
+Provenance: PARSE-TAR-001/007/008 and POLICY. This fixes reader-visible precedence between ordinary-entry extent admission and type admission; prior checksum/header/numeric validation and GNU/PAX extension dispatch remain separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

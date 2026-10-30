@@ -291,6 +291,11 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The reader MUST reject a non-regular entry when its effective payload size is greater than zero and MUST reject every other ordinary-entry type flag as `UnsupportedEntry`.
     TEXT[implementation,test]:  GNU/PAX extension type flags are dispatched separately under PARSE-TAR-003/006/007 and are outside this mapping.
 
+  SECTION: [PARSE-TAR-034](#parse-tar-034)
+    TEXT[!MUST,implementation,test]: After numeric decoding and raw/effective payload-size selection for an ordinary entry, the parser MUST validate the bounded payload extent before classifying its type flag.
+    TEXT[!MUST,implementation,test]: If the extent exceeds `max_entry_bytes` or is truncated, the parser MUST return `Limit` or `Truncated`, respectively, even when later classification would reject the flag or its nonempty payload as `UnsupportedEntry`.
+    TEXT[!MUST,implementation,test]: Type classification MUST occur only after the selected extent is valid.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

@@ -429,6 +429,48 @@ fn pax_effective_payload_rejects_nonregular_entry() {
     assert_eq!(parse(&archive).unwrap_err(), TarError::UnsupportedEntry);
 }
 
+//= docs/parsing-requirements.md#parse-tar-034
+//= type=test
+//# After numeric decoding and raw/effective payload-size selection for an ordinary entry, the parser MUST validate the bounded payload extent before classifying its type flag. If the extent exceeds `max_entry_bytes` or is truncated, the parser MUST return `Limit` or `Truncated`, respectively, even when later classification would reject the flag or its nonempty payload as `UnsupportedEntry`. Type classification MUST occur only after the selected extent is valid.
+#[test]
+fn ordinary_payload_extent_errors_precede_unsupported_type_classification() {
+    let mut truncated_unsupported = member(b"snapshot/file", b'7', b"x");
+    truncated_unsupported.truncate(512);
+    checksum(&mut truncated_unsupported);
+    assert_eq!(
+        parse(&truncated_unsupported).unwrap_err(),
+        TarError::Truncated
+    );
+
+    let too_large_unsupported = member(b"snapshot/file", b'7', b"x");
+    let too_small = TarLimits {
+        max_entry_bytes: 0,
+        ..TarLimits::default()
+    };
+    assert_eq!(
+        TarVolume::parse(&too_large_unsupported, Termination::Data, too_small).unwrap_err(),
+        TarError::Limit,
+    );
+
+    let pax = member(b"local", b'x', &record(b"size", b"1"));
+    let symlink = member(b"snapshot/link", b'2', b"");
+    let archive = [pax.as_slice(), symlink.as_slice()].concat();
+    let mut truncated_effective_payload = archive;
+    // Keep the complete PAX record and symlink header, but omit the one byte
+    // selected by PAX size. Raw symlink size is zero.
+    truncated_effective_payload.truncate(pax.len() + 512);
+    assert_eq!(
+        parse(&truncated_effective_payload).unwrap_err(),
+        TarError::Truncated,
+    );
+
+    let valid_extent_unsupported = member(b"snapshot/file", b'7', b"");
+    assert_eq!(
+        parse(&valid_extent_unsupported).unwrap_err(),
+        TarError::UnsupportedEntry,
+    );
+}
+
 //= docs/parsing-requirements.md#parse-tar-002
 //= type=test
 //# The tar parser MUST advance over each payload and its padding to the next 512-byte boundary without arithmetic overflow.

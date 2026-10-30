@@ -18,6 +18,9 @@ pub enum SelectedEntryError {
     Truncated,
 }
 
+pub type SelectedEntryExtent<'a> = (usize, &'a [u8], usize);
+pub type SelectedEntryExtentResult<'a> = Result<SelectedEntryExtent<'a>, SelectedEntryError>;
+
 pub open spec fn entry_extent_model(cursor: int, size: int, total: int)
     -> Result<(int, int, int), EntryExtentError>
 {
