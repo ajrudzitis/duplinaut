@@ -119,7 +119,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Specify and verify PAX `path`/`linkpath` UTF-8 validation, BINARY byte preservation, and raw/GNU fallback behavior (PARSE-TAR-042).
 - [x] Specify and verify the exact supported PAX key set and key-to-semantic-field mapping; reject other keys as UnsupportedPax (PARSE-TAR-043).
 - [x] Specify and verify exact `hdrcharset` token admission, byte-exact matching, unsupported-token diagnostics, and empty-value deletion semantics (PARSE-TAR-044).
-- [ ] Specify and verify raw extension payload-extent errors precede extension-count admission, which precedes metadata charging and content interpretation (PARSE-TAR-045).
+- [x] Specify and verify raw extension payload-extent errors precede extension-count admission, which precedes metadata charging and content interpretation (PARSE-TAR-045).
 - [x] Verify malformed or out-of-range raw header mtime is rejected even when a valid PAX mtime would override the output timestamp (PARSE-TAR-046). Independent review and fresh macOS full CI pass (6,493 Verus obligations, zero errors); tests cover malformed octal, out-of-range base-256, and the valid boundary. Complete tar-controller refinement remains open.
 - [x] Accept delta, manifest-token, byte-path, signatures and manifest-record components with exact contracts, fresh full verification, official tests and independent review.
 - [x] Contract-refine the typed `body()` handler selection for all six object kinds and both name profiles; per-handler field parsing and complete filename classification remain open.
