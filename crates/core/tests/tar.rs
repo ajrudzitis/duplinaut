@@ -2078,6 +2078,21 @@ fn pax_owner_names_follow_utf8_and_binary_charset_policy() {
     assert_eq!(parsed.entries[0].uname, "José".as_bytes());
     assert_eq!(parsed.entries[0].gname, "Grüppe".as_bytes());
 
+    let explicit_utf8 = [
+        record(b"hdrcharset", b"UTF-8"),
+        record(b"uname", "Renée".as_bytes()),
+        record(b"gname", "Équipe".as_bytes()),
+    ]
+    .concat();
+    let archive = [
+        member(b"local", b'x', &explicit_utf8),
+        member_with_owner_names(b"header-user", b"header-group"),
+    ]
+    .concat();
+    let parsed = parse(&archive).unwrap();
+    assert_eq!(parsed.entries[0].uname, "Renée".as_bytes());
+    assert_eq!(parsed.entries[0].gname, "Équipe".as_bytes());
+
     let invalid_utf8 = [
         record(b"uname", b"user-\xff"),
         record(b"gname", b"group-\xff"),
@@ -2089,6 +2104,26 @@ fn pax_owner_names_follow_utf8_and_binary_charset_policy() {
     ]
     .concat();
     assert_eq!(parse(&archive).unwrap_err(), TarError::TextEncoding);
+
+    for charset in [b"UTF-8" as &[u8], b"ISO-IR 10646 2000 UTF-8"] {
+        for invalid_key in [b"uname" as &[u8], b"gname"] {
+            let invalid_owner = [
+                record(b"hdrcharset", charset),
+                record(invalid_key, b"owner-\xff"),
+            ]
+            .concat();
+            let archive = [
+                member(b"local", b'x', &invalid_owner),
+                member(b"snapshot/file", b'0', b""),
+            ]
+            .concat();
+            assert_eq!(
+                parse(&archive).unwrap_err(),
+                TarError::TextEncoding,
+                "invalid {invalid_key:?} under {charset:?}"
+            );
+        }
+    }
 
     let binary = [
         record(b"hdrcharset", b"BINARY"),
@@ -2105,8 +2140,13 @@ fn pax_owner_names_follow_utf8_and_binary_charset_policy() {
     assert_eq!(parsed.entries[0].uname, b"user-\xff");
     assert_eq!(parsed.entries[0].gname, b"group-\xff");
 
-    // Existing header fallback remains byte-preserving and is not PAX-validated.
-    let archive = member_with_owner_names(b"header-\xff", b"group-\xff");
+    // An active PAX UTF-8 policy does not validate raw-header fallbacks.
+    let utf8_charset = member(b"local", b'x', &record(b"hdrcharset", b"UTF-8"));
+    let archive = [
+        utf8_charset,
+        member_with_owner_names(b"header-\xff", b"group-\xff"),
+    ]
+    .concat();
     let parsed = parse(&archive).unwrap();
     assert_eq!(parsed.entries[0].uname, b"header-\xff");
     assert_eq!(parsed.entries[0].gname, b"group-\xff");
