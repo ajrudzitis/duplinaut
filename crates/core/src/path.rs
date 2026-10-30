@@ -18,6 +18,110 @@ pub open spec fn components_less(left: Seq<Seq<u8>>, right: Seq<Seq<u8>>) -> boo
         && left.take(i) == right.take(i) && bytes_less(left[i], right[i])
 }
 
+proof fn bytes_less_is_asymmetric(left: Seq<u8>, right: Seq<u8>)
+    requires bytes_less(left, right),
+    ensures !bytes_less(right, left),
+{
+    reveal(bytes_less);
+    if left.len() < right.len() && left == right.take(left.len() as int) {
+        assert(!bytes_less(right, left)) by {
+            reveal(bytes_less);
+            assert(!(right.len() < left.len()));
+            assert forall|i: int| 0 <= i < right.len() && i < left.len()
+                implies !(right.take(i) == left.take(i) && right[i] < left[i]) by {
+                assert(right[i] == left[i]);
+            }
+        }
+    } else {
+        assert(exists|i: int| 0 <= i < left.len() && i < right.len()
+            && left.take(i) == right.take(i) && left[i] < right[i]);
+        let first = choose|i: int| 0 <= i < left.len() && i < right.len()
+            && left.take(i) == right.take(i) && left[i] < right[i];
+        assert(!bytes_less(right, left)) by {
+            reveal(bytes_less);
+            assert(!(right.len() < left.len()
+                && right == left.take(right.len() as int))) by {
+                if right.len() < left.len() && right == left.take(right.len() as int) {
+                    assert(left.take(right.len() as int)[first] == left[first]);
+                    assert(left.take(right.len() as int)[first]
+                        == right.take(right.len() as int)[first]);
+                    assert(right.take(right.len() as int)[first] == right[first]);
+                    assert(right[first] == left[first]);
+                    assert(left[first] < right[first]);
+                }
+            }
+            assert forall|i: int| 0 <= i < right.len() && i < left.len()
+                implies !(right.take(i) == left.take(i) && right[i] < left[i]) by {
+                if i < first {
+                    assert(left.take(first)[i] == left[i]);
+                    assert(left.take(first)[i] == right.take(first)[i]);
+                    assert(right.take(first)[i] == right[i]);
+                    assert(left[i] == right[i]);
+                } else if i == first {
+                    assert(left[i] < right[i]);
+                } else {
+                    assert(left.take(i) != right.take(i)) by {
+                        assert(left.take(i)[first] == left[first]);
+                        assert(right.take(i)[first] == right[first]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+proof fn components_less_is_asymmetric(left: Seq<Seq<u8>>, right: Seq<Seq<u8>>)
+    requires components_less(left, right),
+    ensures !components_less(right, left),
+{
+    reveal(components_less);
+    if left.len() < right.len() && left == right.take(left.len() as int) {
+        assert(!components_less(right, left)) by {
+            reveal(components_less);
+            assert(!(right.len() < left.len()));
+            assert forall|i: int| 0 <= i < right.len() && i < left.len()
+                implies !(right.take(i) == left.take(i) && bytes_less(right[i], left[i])) by {
+                assert(right[i] == left[i]);
+            }
+        }
+    } else {
+        assert(exists|i: int| 0 <= i < left.len() && i < right.len()
+            && left.take(i) == right.take(i) && bytes_less(left[i], right[i]));
+        let first = choose|i: int| 0 <= i < left.len() && i < right.len()
+            && left.take(i) == right.take(i) && bytes_less(left[i], right[i]);
+        bytes_less_is_asymmetric(left[first], right[first]);
+        assert(!components_less(right, left)) by {
+            reveal(components_less);
+            assert(!(right.len() < left.len()
+                && right == left.take(right.len() as int))) by {
+                if right.len() < left.len() && right == left.take(right.len() as int) {
+                    assert(left.take(right.len() as int)[first] == left[first]);
+                    assert(left.take(right.len() as int)[first]
+                        == right.take(right.len() as int)[first]);
+                    assert(right.take(right.len() as int)[first] == right[first]);
+                    assert(left[first] != right[first]);
+                }
+            }
+            assert forall|i: int| 0 <= i < right.len() && i < left.len()
+                implies !(right.take(i) == left.take(i) && bytes_less(right[i], left[i])) by {
+                if i < first {
+                    assert(left.take(first)[i] == left[i]);
+                    assert(left.take(first)[i] == right.take(first)[i]);
+                    assert(right.take(first)[i] == right[i]);
+                    assert(left[i] == right[i]);
+                } else if i == first {
+                    assert(!bytes_less(right[i], left[i]));
+                } else {
+                    assert(left.take(i) != right.take(i)) by {
+                        assert(left.take(i)[first] == left[first]);
+                        assert(right.take(i)[first] == right[first]);
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// True when `prefix` is the same component sequence as `path` or an ancestor.
 /// Component equality preserves boundaries: `a` is not a prefix of `a-`.
 pub open spec fn component_prefix(prefix: Seq<Seq<u8>>, path: Seq<Seq<u8>>) -> bool {
@@ -268,12 +372,18 @@ impl BackupPath {
 
     /// Compare byte-component sequences, independently of terminal rendering.
     /// Returns -1, 0, or 1. This kernel supplies manifest range comparisons.
+    //= docs/parsing-requirements.md#parse-state-003
+    //= type=implementation
+    //# `SnapshotState::entries()` MUST enumerate retained entries in bytewise lexicographic order of their backup-relative path components. Each component MUST be compared as an unsigned byte sequence using lexicographic byte order, with a proper prefix ordered before the longer sequence. Paths MUST be compared as sequences of components using the same lexicographic rule, with a proper component-sequence prefix ordered before the longer path. Component boundaries MUST remain significant; the ordering MUST NOT be derived by comparing slash-joined or rendered path strings.
     pub fn compare(&self, other: &Self) -> (result: i8)
         ensures
             result == -1 || result == 0 || result == 1,
             result == -1 ==> components_less(self@, other@),
             result == 0 ==> self@ == other@,
             result == 1 ==> components_less(other@, self@),
+            components_less(self@, other@) ==> result == -1,
+            self@ == other@ ==> result == 0,
+            components_less(other@, self@) ==> result == 1,
     {
         reveal(BackupPath::view);
         let mut component_index = 0;
@@ -299,8 +409,56 @@ impl BackupPath {
                     left@.take(byte_index as int) == right@.take(byte_index as int),
                 decreases left.len() - byte_index,
             {
-                if left[byte_index] < right[byte_index] { return -1; }
-                if left[byte_index] > right[byte_index] { return 1; }
+                if left[byte_index] < right[byte_index] {
+                    proof {
+                        assert(bytes_less(left@, right@)) by {
+                            reveal(bytes_less);
+                            assert(exists|i: int| 0 <= i < left@.len() && i < right@.len()
+                                && left@.take(i) == right@.take(i) && left@[i] < right@[i]) by {
+                                assert(left@.take(byte_index as int)
+                                    == right@.take(byte_index as int));
+                            }
+                        }
+                        assert(components_less(self@, other@)) by {
+                            reveal(components_less);
+                            assert(exists|i: int| 0 <= i < self@.len() && i < other@.len()
+                                && self@.take(i) == other@.take(i)
+                                && bytes_less(self@[i], other@[i])) by {
+                                assert(self@.take(component_index as int)
+                                    == other@.take(component_index as int));
+                                assert(self@[component_index as int] == left@);
+                                assert(other@[component_index as int] == right@);
+                            }
+                        }
+                        components_less_is_asymmetric(self@, other@);
+                    }
+                    return -1;
+                }
+                if left[byte_index] > right[byte_index] {
+                    proof {
+                        assert(bytes_less(right@, left@)) by {
+                            reveal(bytes_less);
+                            assert(exists|i: int| 0 <= i < right@.len() && i < left@.len()
+                                && right@.take(i) == left@.take(i) && right@[i] < left@[i]) by {
+                                assert(right@.take(byte_index as int)
+                                    == left@.take(byte_index as int));
+                            }
+                        }
+                        assert(components_less(other@, self@)) by {
+                            reveal(components_less);
+                            assert(exists|i: int| 0 <= i < other@.len() && i < self@.len()
+                                && other@.take(i) == self@.take(i)
+                                && bytes_less(other@[i], self@[i])) by {
+                                assert(other@.take(component_index as int)
+                                    == self@.take(component_index as int));
+                                assert(other@[component_index as int] == right@);
+                                assert(self@[component_index as int] == left@);
+                            }
+                        }
+                        components_less_is_asymmetric(other@, self@);
+                    }
+                    return 1;
+                }
                 proof {
                     assert(left@.take(byte_index as int + 1) =~= right@.take(byte_index as int + 1));
                 }
@@ -313,6 +471,7 @@ impl BackupPath {
                     assert(components_less(self@, other@)) by {
                         assert(self@.take(component_index as int) == other@.take(component_index as int));
                     }
+                    components_less_is_asymmetric(self@, other@);
                 }
                 return -1;
             }
@@ -321,6 +480,7 @@ impl BackupPath {
                     assert(right@.take(right@.len() as int) =~= right@);
                     assert(bytes_less(right@, left@));
                     assert(components_less(other@, self@));
+                    components_less_is_asymmetric(other@, self@);
                 }
                 return 1;
             }
@@ -340,9 +500,25 @@ impl BackupPath {
                 assert(other@.take(component_index as int) =~= other@);
             }
         }
-        if self.components.len() < other.components.len() { -1 }
-        else if self.components.len() > other.components.len() { 1 }
-        else { 0 }
+        if self.components.len() < other.components.len() {
+            proof {
+                assert(self@.len() < other@.len());
+                assert(self@ == other@.take(self@.len() as int));
+                assert(components_less(self@, other@));
+                components_less_is_asymmetric(self@, other@);
+            }
+            -1
+        } else if self.components.len() > other.components.len() {
+            proof {
+                assert(other@.len() < self@.len());
+                assert(other@ == self@.take(other@.len() as int));
+                assert(components_less(other@, self@));
+                components_less_is_asymmetric(other@, self@);
+            }
+            1
+        } else {
+            0
+        }
     }
 }
 }

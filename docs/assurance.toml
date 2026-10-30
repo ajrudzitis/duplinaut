@@ -5002,6 +5002,30 @@ tests = [
   { package = "duplicity-core", name = "raw_header_mode_is_retained_and_pax_mode_is_unsupported" }
 ]
 
+[[milestone]]
+id = "snapshot-entry-order"
+gate = false
+requirements = ["PARSE-STATE-003"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = false
+proof_required = true
+# Verus proves the project's component comparator agrees exactly with the
+# bytewise lexicographic model. Native tests exercise BTreeMap iteration;
+# Rust's standard-library map internals remain a trusted boundary.
+implementations = [
+  { path = "crates/core/src/path.rs", symbol = "compare" },
+  { path = "crates/core/src/state.rs", symbol = "entries" }
+]
+proofs = [
+  { id = "snapshot-entry-component-order", requirement = "PARSE-STATE-003", path = "crates/core/src/path.rs", symbol = "compare", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "snapshot_entries_use_bytewise_component_lexicographic_order" }
+]
+
 [[trusted]]
 id = "upstream-verus-vest"
 reviewed = true

@@ -128,6 +128,9 @@ pub struct SnapshotState {
     metadata_bytes: usize,
 }
 impl SnapshotState {
+    //= docs/parsing-requirements.md#parse-state-003
+    //= type=implementation
+    //# `SnapshotState::entries()` MUST enumerate retained entries in bytewise lexicographic order of their backup-relative path components. Each component MUST be compared as an unsigned byte sequence using lexicographic byte order, with a proper prefix ordered before the longer sequence. Paths MUST be compared as sequences of components using the same lexicographic rule, with a proper component-sequence prefix ordered before the longer path. Component boundaries MUST remain significant; the ordering MUST NOT be derived by comparing slash-joined or rendered path strings.
     pub fn entries(&self) -> impl Iterator<Item = (&BackupPath, &SnapshotEntry)> {
         self.entries
             .iter()

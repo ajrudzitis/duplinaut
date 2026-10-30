@@ -800,3 +800,80 @@ fn restore_plan_distinguishes_byte_paths_and_component_prefix_siblings() {
     assert_eq!(directory.entries()[1].path(), &path(b"a"));
     assert_eq!(directory.entries()[2].path(), &path(b"a/child"));
 }
+
+//= docs/parsing-requirements.md#parse-state-003
+//= type=test
+//# `SnapshotState::entries()` MUST enumerate retained entries in bytewise lexicographic order of their backup-relative path components. Each component MUST be compared as an unsigned byte sequence using lexicographic byte order, with a proper prefix ordered before the longer sequence. Paths MUST be compared as sequences of components using the same lexicographic rule, with a proper component-sequence prefix ordered before the longer path. Component boundaries MUST remain significant; the ordering MUST NOT be derived by comparing slash-joined or rendered path strings.
+#[test]
+fn snapshot_entries_use_bytewise_component_lexicographic_order() {
+    let mut raw_member = member("snapshot/x", b'0', b"raw byte");
+    raw_member[9] = 0xff;
+    raw_member[148..156].fill(b' ');
+    let checksum: u64 = raw_member[..512].iter().map(|byte| u64::from(*byte)).sum();
+    raw_member[148..156].copy_from_slice(format!("{checksum:06o}\0 ").as_bytes());
+
+    let stored = [
+        member("snapshot/.", b'5', b""),
+        member("snapshot/a", b'5', b""),
+        member("snapshot/a/child", b'0', b"a child"),
+        member("snapshot/a-", b'5', b""),
+        member("snapshot/a-/child", b'0', b"a-dash child"),
+        member("snapshot/a0", b'5', b""),
+        member("snapshot/a0/child", b'0', b"a-zero child"),
+        member("snapshot/aa", b'0', b"aa file"),
+        raw_member,
+    ]
+    .concat();
+    let hash: String = sha1::Sha1::digest(&stored)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let manifest = Manifest::parse(
+        format!("Volume 1:\n StartingPath .\n EndingPath \"\\xff\"\n Hash SHA1 {hash}\n")
+            .as_bytes(),
+        ManifestLimits::default(),
+    )
+    .unwrap();
+    let mut assembler = MultipartAssembler::new(&manifest, AssemblyLimits::default()).unwrap();
+    assembler
+        .push_stored_volume(1, &stored, Envelope::Plain)
+        .unwrap();
+    let state =
+        SnapshotState::from_full(&assembler.finish().unwrap(), StateLimits::default()).unwrap();
+
+    let expected = [
+        path(b"."),
+        path(b"a"),
+        path(b"a/child"),
+        path(b"a-"),
+        path(b"a-/child"),
+        path(b"a0"),
+        path(b"a0/child"),
+        path(b"aa"),
+        path(&[0xff]),
+    ];
+    let actual: Vec<_> = state
+        .entries()
+        .map(|(entry_path, _)| entry_path.clone())
+        .collect();
+    assert_eq!(actual, expected);
+
+    // In particular, component order puts `a/child` before `a-/child`; a
+    // slash-joined byte comparison would reverse these two paths.
+    for (left_index, left) in expected.iter().enumerate() {
+        for (right_index, right) in expected.iter().enumerate() {
+            let expected_order = if left_index < right_index {
+                -1
+            } else if left_index > right_index {
+                1
+            } else {
+                0
+            };
+            assert_eq!(
+                left.compare(right),
+                expected_order,
+                "left={left:?}, right={right:?}"
+            );
+        }
+    }
+}
