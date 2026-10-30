@@ -1413,9 +1413,9 @@ fn invalid_pax_mtime_does_not_fall_back_to_valid_raw_header_time() {
     assert_eq!(parse(&bytes).unwrap_err(), TarError::Numeric);
 }
 
-//= docs/parsing-requirements.md#parse-tar-003
+//= docs/parsing-requirements.md#parse-tar-035
 //= type=test
-//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+//# For each real tar entry, the reader MUST set `TarEntry.atime` and `TarEntry.ctime` from their respective resolved effective PAX values when present, using the reviewed signed PAX timestamp profile. When an effective value is absent, the corresponding output field MUST be `None`. A present but invalid timestamp MUST produce Numeric; it MUST NOT be treated as absent. An empty local value MUST delete the corresponding inherited global value, so that field MUST be `None` for the next real entry.
 
 #[test]
 fn pax_atime_ctime_global_local_and_empty_local_deletion_resolve_exactly() {
@@ -1476,9 +1476,9 @@ fn pax_atime_ctime_global_local_and_empty_local_deletion_resolve_exactly() {
     assert_eq!(parsed.entries[3].ctime, parsed.entries[0].ctime);
 }
 
-//= docs/parsing-requirements.md#parse-tar-003
+//= docs/parsing-requirements.md#parse-tar-035
 //= type=test
-//# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+//# For each real tar entry, the reader MUST set `TarEntry.atime` and `TarEntry.ctime` from their respective resolved effective PAX values when present, using the reviewed signed PAX timestamp profile. When an effective value is absent, the corresponding output field MUST be `None`. A present but invalid timestamp MUST produce Numeric; it MUST NOT be treated as absent. An empty local value MUST delete the corresponding inherited global value, so that field MUST be `None` for the next real entry.
 
 #[test]
 fn invalid_pax_atime_and_ctime_values_are_numeric_errors() {

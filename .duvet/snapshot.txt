@@ -296,6 +296,12 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: If the extent exceeds `max_entry_bytes` or is truncated, the parser MUST return `Limit` or `Truncated`, respectively, even when later classification would reject the flag or its nonempty payload as `UnsupportedEntry`.
     TEXT[!MUST,implementation,test]: Type classification MUST occur only after the selected extent is valid.
 
+  SECTION: [PARSE-TAR-035](#parse-tar-035)
+    TEXT[!MUST,test]: For each real tar entry, the reader MUST set `TarEntry.atime` and `TarEntry.ctime` from their respective resolved effective PAX values when present, using the reviewed signed PAX timestamp profile.
+    TEXT[!MUST,test]: When an effective value is absent, the corresponding output field MUST be `None`.
+    TEXT[!MUST,test]: A present but invalid timestamp MUST produce Numeric; it MUST NOT be treated as absent.
+    TEXT[!MUST,test]: An empty local value MUST delete the corresponding inherited global value, so that field MUST be `None` for the next real entry.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

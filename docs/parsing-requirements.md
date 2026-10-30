@@ -625,6 +625,12 @@ After numeric decoding and raw/effective payload-size selection for an ordinary 
 
 Provenance: PARSE-TAR-001/007/008 and POLICY. This fixes reader-visible precedence between ordinary-entry extent admission and type admission; prior checksum/header/numeric validation and GNU/PAX extension dispatch remain separate.
 
+### PARSE-TAR-035
+
+For each real tar entry, the reader MUST set `TarEntry.atime` and `TarEntry.ctime` from their respective resolved effective PAX values when present, using the reviewed signed PAX timestamp profile. When an effective value is absent, the corresponding output field MUST be `None`. A present but invalid timestamp MUST produce Numeric; it MUST NOT be treated as absent. An empty local value MUST delete the corresponding inherited global value, so that field MUST be `None` for the next real entry.
+
+Provenance: DOC-TAR, SRC-TAR, and the reviewed PAX profile above. PAX timestamp grammar and global/local state resolution remain specified separately; this requirement covers only output metadata selection and conversion, not extension-state timing or full tar-controller refinement.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
