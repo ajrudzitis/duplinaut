@@ -76,6 +76,63 @@ fn copy_delta() -> Vec<u8> {
     vec![0x72, 0x73, 0x02, 0x36, 0x45, 0, 3, 0]
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct EntryObservation {
+    path: Vec<Vec<u8>>,
+    entry_type: EntryType,
+    mode: u32,
+    uid: u64,
+    gid: u64,
+    mtime: duplicity_core::tar::TarTime,
+    atime: Option<duplicity_core::tar::TarTime>,
+    ctime: Option<duplicity_core::tar::TarTime>,
+    linkname: Vec<u8>,
+    uname: Vec<u8>,
+    gname: Vec<u8>,
+    device_major: u64,
+    device_minor: u64,
+    content: Option<Vec<u8>>,
+    supported_restore_type: bool,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct StateObservation {
+    len: usize,
+    is_empty: bool,
+    payload_bytes: usize,
+    metadata_bytes: usize,
+    entries: Vec<EntryObservation>,
+}
+
+fn observe_state(state: &SnapshotState) -> StateObservation {
+    StateObservation {
+        len: state.len(),
+        is_empty: state.is_empty(),
+        payload_bytes: state.payload_bytes(),
+        metadata_bytes: state.metadata_bytes(),
+        entries: state
+            .entries()
+            .map(|(path, entry)| EntryObservation {
+                path: path.components().clone(),
+                entry_type: entry.entry_type(),
+                mode: entry.mode(),
+                uid: entry.uid(),
+                gid: entry.gid(),
+                mtime: entry.mtime(),
+                atime: entry.atime(),
+                ctime: entry.ctime(),
+                linkname: entry.linkname().to_vec(),
+                uname: entry.uname().to_vec(),
+                gname: entry.gname().to_vec(),
+                device_major: entry.device_major(),
+                device_minor: entry.device_minor(),
+                content: entry.content().map(<[u8]>::to_vec),
+                supported_restore_type: entry.supported_restore_type(),
+            })
+            .collect(),
+    }
+}
+
 //= docs/parsing-requirements.md#parse-state-002
 //= type=test
 //# A delta entry MUST use the reconstructed regular-file content for that same path from the preceding state as its basis.
@@ -118,6 +175,27 @@ fn immutable_preceding_set_basis_and_transactional_failure() {
         previous.apply_incremental(&bad, StateLimits::default()),
         Err(StateError::Delta(_))
     ));
+}
+
+//= docs/parsing-requirements.md#parse-state-007
+//= type=test
+//# Applying an incremental set MUST be transactional with respect to its preceding `SnapshotState`: if application returns an error for any reason, the preceding state MUST remain observably unchanged and no partially applied successor state may be returned.
+#[test]
+fn failed_incremental_application_preserves_all_observable_preceding_state() {
+    let previous = initial();
+    let before = observe_state(&previous);
+
+    // The first operation is a valid replacement and mutates the private
+    // provisional map. The later diff fails because its preceding basis is absent.
+    let changes = archive(&[
+        ("snapshot/file", b'0', b"replacement"),
+        ("diff/missing", b'0', &copy_delta()),
+    ]);
+    assert!(matches!(
+        previous.apply_incremental(&changes, StateLimits::default()),
+        Err(StateError::MissingBasis)
+    ));
+    assert_eq!(observe_state(&previous), before);
 }
 
 //= docs/parsing-requirements.md#parse-state-001

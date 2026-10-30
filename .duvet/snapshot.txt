@@ -458,7 +458,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: If it carries any payload bytes, the reader MUST reject the incremental set rather than apply the deletion and discard those bytes.
 
   SECTION: [PARSE-STATE-007](#parse-state-007)
-    TEXT[!MUST]: Applying an incremental set MUST be transactional with respect to its preceding `SnapshotState`: if application returns an error for any reason, the preceding state MUST remain observably unchanged and no partially applied successor state may be returned.
+    TEXT[!MUST,implementation,test]: Applying an incremental set MUST be transactional with respect to its preceding `SnapshotState`: if application returns an error for any reason, the preceding state MUST remain observably unchanged and no partially applied successor state may be returned.
 
   SECTION: [PARSE-BROWSE-001](#parse-browse-001)
     TEXT[!MUST]: Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.

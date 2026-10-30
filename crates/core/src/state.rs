@@ -163,6 +163,9 @@ impl SnapshotState {
         };
         previous.apply(archive, limits, true)
     }
+    //= docs/parsing-requirements.md#parse-state-007
+    //= type=implementation
+    //# Applying an incremental set MUST be transactional with respect to its preceding `SnapshotState`: if application returns an error for any reason, the preceding state MUST remain observably unchanged and no partially applied successor state may be returned.
     pub fn apply_incremental(
         &self,
         archive: &AssembledArchive,
