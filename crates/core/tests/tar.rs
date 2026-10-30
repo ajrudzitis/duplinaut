@@ -1454,6 +1454,9 @@ fn invalid_pax_mtime_does_not_fall_back_to_valid_raw_header_time() {
 //= docs/parsing-requirements.md#parse-tar-035
 //= type=test
 //# For each real tar entry, the reader MUST set `TarEntry.atime` and `TarEntry.ctime` from their respective resolved effective PAX values when present, using the reviewed signed PAX timestamp profile. When an effective value is absent, the corresponding output field MUST be `None`. A present but invalid timestamp MUST produce Numeric; it MUST NOT be treated as absent. An empty local value MUST delete the corresponding inherited global value, so that field MUST be `None` for the next real entry.
+//= docs/parsing-requirements.md#parse-tar-037
+//= type=test
+//# Each resolved nonempty PAX `mtime`, `atime`, or `ctime` value MUST consist of an optional single `+` or `-`, one or more ASCII decimal integer digits, and an optional `.` followed by one or more ASCII decimal fraction digits. The integer magnitude MUST fit in `u64`. A fraction with at most nine digits MUST be interpreted exactly as nanoseconds by right-padding with zeroes; additional fraction digits MUST all be zero, or parsing MUST fail rather than lose precision. The sign MUST apply to the complete value, which MUST be normalized to `(seconds: i64, nanoseconds: u32)` with `0 <= nanoseconds < 1,000,000,000`; values outside that normalized range MUST produce Numeric. Empty integer/fraction components, malformed bytes, multiple signs or dots, and numeric overflow MUST produce Numeric.
 
 #[test]
 fn pax_atime_ctime_global_local_and_empty_local_deletion_resolve_exactly() {
@@ -1517,6 +1520,9 @@ fn pax_atime_ctime_global_local_and_empty_local_deletion_resolve_exactly() {
 //= docs/parsing-requirements.md#parse-tar-035
 //= type=test
 //# For each real tar entry, the reader MUST set `TarEntry.atime` and `TarEntry.ctime` from their respective resolved effective PAX values when present, using the reviewed signed PAX timestamp profile. When an effective value is absent, the corresponding output field MUST be `None`. A present but invalid timestamp MUST produce Numeric; it MUST NOT be treated as absent. An empty local value MUST delete the corresponding inherited global value, so that field MUST be `None` for the next real entry.
+//= docs/parsing-requirements.md#parse-tar-037
+//= type=test
+//# Each resolved nonempty PAX `mtime`, `atime`, or `ctime` value MUST consist of an optional single `+` or `-`, one or more ASCII decimal integer digits, and an optional `.` followed by one or more ASCII decimal fraction digits. The integer magnitude MUST fit in `u64`. A fraction with at most nine digits MUST be interpreted exactly as nanoseconds by right-padding with zeroes; additional fraction digits MUST all be zero, or parsing MUST fail rather than lose precision. The sign MUST apply to the complete value, which MUST be normalized to `(seconds: i64, nanoseconds: u32)` with `0 <= nanoseconds < 1,000,000,000`; values outside that normalized range MUST produce Numeric. Empty integer/fraction components, malformed bytes, multiple signs or dots, and numeric overflow MUST produce Numeric.
 
 #[test]
 fn invalid_pax_atime_and_ctime_values_are_numeric_errors() {
@@ -2408,8 +2414,10 @@ fn pax_timestamp_precision_and_signed_extremes() {
         b".1",
         b"1.2.3",
         b"--1",
+        b"+-1",
         b"+",
         b"1.000000000x",
+        b"1.\xff",
     ] {
         let bytes = [
             member(b"pax", b'x', &record(b"mtime", text)),

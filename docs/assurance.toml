@@ -4710,6 +4710,35 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-pax-time-grammar-and-normalization"
+gate = true
+requirements = ["PARSE-TAR-037"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Verifies PAX timestamp byte grammar and mathematical normalization. Field
+# selection and global/local state timing remain separately specified.
+implementations = [
+  { path = "crates/core/src/verified/tar_time.rs", symbol = "time" },
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_mtime" },
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_optional_time" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-pax-time-grammar-and-normalization", requirement = "PARSE-TAR-037", path = "crates/core/src/verified/tar_time.rs", symbol = "time", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::effective_pax_mtime_selects_header_fallback_and_verified_time_values" },
+  { package = "duplicity-core", name = "verified::tar_pax::tests::optional_pax_times_preserve_absence_and_use_verified_time_values" },
+  { package = "duplicity-core", name = "pax_timestamp_precision_and_signed_extremes" },
+  { package = "duplicity-core", name = "pax_atime_ctime_global_local_and_empty_local_deletion_resolve_exactly" },
+  { package = "duplicity-core", name = "invalid_pax_atime_and_ctime_values_are_numeric_errors" }
+]
+
+[[milestone]]
 id = "tar-entry-mode-retention"
 gate = true
 requirements = ["PARSE-TAR-030"]
