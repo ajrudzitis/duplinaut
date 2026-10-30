@@ -34,10 +34,14 @@ snapshot rendering formats only visible rows. Core limits independently apply.
 Terminal/backend allocation and rendering remain trusted infrastructure. Very
 large trees can require linear traversal to reach a visible row.
 
-Native escaping and CLI tests pass. A real PTY smoke run loaded the official
-3.0.7 plain fixture through full plus two incremental sets, displayed 21 entries
-and 2,621,564 payload bytes, and restored terminal state on exit. This does not
-establish automated interaction coverage, live S3 acceptance or a frontend proof.
+Native escaping and CLI tests pass. An automated Unix PTY acceptance test loads
+the official 3.0.7 plain fixture, waits for a rendered manifest row, sends `q`,
+and verifies successful exit, raw-mode entry/restoration, alternate-screen
+teardown, unchanged source contents, and an empty working directory. The earlier
+manual PTY smoke loaded the full plus two incremental sets, displayed 21 entries
+and 2,621,564 payload bytes, and restored terminal state on exit. This automated
+case covers history startup and quit only; it does not establish live S3
+acceptance or a frontend proof.
 An additional terminal run marked `a/b/child.txt` and previewed exactly four
 entries: the file and its three source directory ancestors. Independent source
 review accepted the read-only flow after fixing confirmation reset on an invalid
@@ -45,7 +49,7 @@ anchor choice.
 
 | Component | Specification review | Implementation | Proof | Integration tests | Independent acceptance |
 | --- | --- | --- | --- | --- | --- |
-| Browser and restore flow | Browse requirements written; restore interaction adopted before implementation | Read-only browsing and native Linux restore work; acceptance pending | Component proofs remain separate; display/I/O trusted | Escaping/CLI tests, official worker preview checks and manual official-chain PTY smoke pass | Pending |
+| Browser and restore flow | Browse requirements written; restore interaction adopted before implementation | Read-only browsing and native Linux restore work; acceptance pending | Component proofs remain separate; display/I/O trusted | Escaping/CLI tests, official worker preview checks, manual official-chain PTY smoke, and automated Unix PTY history/quit test pass | Pending |
 
 - [x] Create the executable crate with no unsupported feature claims.
 - [x] Escape terminal controls, non-ASCII bytes and literal escapes while retaining original path identity; native tests pass.
@@ -57,6 +61,7 @@ anchor choice.
 - [x] Test the configured 20 MiB preview-text cap at the exact boundary: exact-limit appends succeed, and a one-byte overflow is rejected without changing the existing text; independent review and full macOS CI passed. This covers preview-text growth only.
 - [x] Test the RESTORE-UI-011 candidate-comparison budget arithmetic at exactly 16,000,000, above the cap, and multiplication overflow; independent review and full macOS CI passed. Both root-copy and preview preparation use this shared checked predicate. This tests budget arithmetic only, without snapshot candidate traversal.
 - [x] Test RESTORE-UI-004 key-kind normalization: reported Repeat/Release `r` and Enter events are ignored, while Press `restore` plus Press Enter satisfy the existing acknowledgment policy; independent review and full macOS CI passed. This is a pure key-event test; it does not establish physical-key origin, since legacy terminals may report repeats as Press.
+- [x] Add a Unix PTY acceptance test for local fixture history: wait for a rendered manifest row, send `q`, require successful exit, compare raw terminal attributes before/during/after, verify alternate-screen teardown, and confirm the source fingerprint and empty working directory are unchanged. This does not cover preview, acknowledgment, restoration, cancellation, resize, terminal failure or S3.
 - [x] Test one-shot RESTORE-UI-004 confirmation: the first Press Enter consumes and clears the armed acknowledgment, and a second Enter cannot confirm again; independent review and full macOS CI passed. This exercises the pure confirmation helper only; it does not test worker execution.
 - [x] Verify on macOS that ordinary local and S3 CLI configurations parse without a restore destination while native restore flags remain rejected; independent review and full CI passed. This is CLI parsing coverage only.
 - [x] Connect explicitly acknowledged selection to native Linux publication; use the existing SDK credential provider.

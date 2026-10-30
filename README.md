@@ -98,6 +98,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Implement a local read-only source with anchored identity checks; test actual files and official three-date reconstruction.
 - [x] Build read-only terminal history and snapshot browsing; exercise an official chain in a real terminal.
 - [x] Add bounded restore previews, frozen confirmation and worker-owned publication; independently review the terminal lifecycle, run 22 tests and verify a real PTY restore.
+- [x] Automate Unix PTY acceptance for local history startup and quit; independently reviewed, verifies raw-mode and alternate-screen restoration, and passes full macOS CI. This is a narrow terminal acceptance case; resize, cancellation, restore interaction, output faults and S3 remain open.
 - [x] Specify checksum-error precedence and verify the admission gate; implementation, focused adversarial tests, proof, and independent review pass.
 - [x] Specify and verify exact tar magic/version admission and POSIX prefix gating; the accepted profile set and exclusions are recorded in PARSE-TAR-025.
 - [x] Specify and verify the exact tar numeric byte decoding profile for padded octal, supported GNU base-256 fields, checked arithmetic, and unsigned range admission (PARSE-TAR-026).

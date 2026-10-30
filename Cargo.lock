@@ -1401,6 +1401,7 @@ dependencies = [
  "crossterm",
  "duplicity-core",
  "duplicity-s3",
+ "nix 0.29.0",
  "ratatui",
  "rustix",
  "serde_json",
