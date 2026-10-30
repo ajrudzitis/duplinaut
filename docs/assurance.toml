@@ -4454,6 +4454,33 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-pax-key-profile"
+gate = true
+requirements = ["PARSE-TAR-043"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The exact byte-key selector and ordered PAX slot model are contract-refined;
+# native tests cover the full slot matrix and out-of-profile key diagnostics.
+# Duplicate/NUL admission and value interpretation remain separately scoped.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "key_index" },
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "ingest" },
+  { path = "crates/core/src/tar.rs", symbol = "pax" }
+]
+proofs = [
+  { id = "tar-pax-key-profile-index", requirement = "PARSE-TAR-043", path = "crates/core/src/verified/tar_pax.rs", symbol = "key_index", kind = "contract" },
+  { id = "tar-pax-key-profile-ingest", requirement = "PARSE-TAR-043", path = "crates/core/src/verified/tar_pax.rs", symbol = "ingest", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::ingest_accumulates_a_successful_stream_into_all_eleven_slots" },
+  { package = "duplicity-core", name = "nonprofile_pax_keys_are_unsupported_without_key_normalization" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []
