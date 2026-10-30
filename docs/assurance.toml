@@ -5118,13 +5118,13 @@ tests = [{ package = "duplicity-core", name = "incremental_deleted_entries_requi
 
 [[milestone]]
 id = "snapshot-incremental-transition-atomicity"
-gate = false
+gate = true
 requirements = ["PARSE-STATE-007"]
 specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = false
 proof_rationale = "The Verus state model does not refine the native BTreeMap transition controller or its SnapshotState representation. Evidence is scoped to apply_incremental taking shared &self, Rust safe typing with no interior mutability in SnapshotState, and a regression that observes all public state fields and charges after a later failure; this is not a formal controller proof."
 implementations = [{ path = "crates/core/src/state.rs", symbol = "apply_incremental" }]
