@@ -220,6 +220,8 @@ impl<'a> TarVolume<'a> {
             let raw_size = raw_fields.raw_size;
             //= docs/parsing-requirements.md#parse-tar-011
             //# Tar header mode MUST fit in `u32`, and header mtime MUST fit in `i64`; out-of-range values MUST be rejected as Numeric.
+            //= docs/parsing-requirements.md#parse-tar-046
+            //# After checksum and header-profile admission, the parser MUST decode and admit the raw tar header `mtime` as a signed `i64` even when an effective PAX `mtime` supplies the real entry's output timestamp. A malformed raw numeric field or a decoded value outside the `i64` range MUST produce Numeric; a valid PAX override MUST NOT mask that raw-header error. This requirement does not change which timestamp is selected for output under PARSE-TAR-029.
             let header_mtime_seconds = crate::verified::tar_number::narrow_mtime(number(h.mtime)?)
                 .ok_or(TarError::Numeric)?;
             let device_major = raw_fields.device_major;

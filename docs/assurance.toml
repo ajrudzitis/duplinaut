@@ -3938,6 +3938,26 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-header-mtime-admission-under-pax-override"
+gate = false
+requirements = ["PARSE-TAR-046"]
+specified = true
+implemented = false
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+# The parser currently narrows raw header mtime before resolving semantic
+# PAX mtime, but there is no direct regression test for an invalid raw mtime
+# paired with a valid PAX override. Keep this milestone ungated until that
+# behavior is explicitly tested and its proof scope is reviewed.
+implementations = [
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = []
+tests = []
+
+[[milestone]]
 id = "tar-entry-metadata-charge"
 gate = true
 requirements = ["PARSE-TAR-018"]

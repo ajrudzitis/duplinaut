@@ -120,6 +120,7 @@ Tasks are checked only when their stated evidence passes. Each completed step ge
 - [x] Specify and verify the exact supported PAX key set and key-to-semantic-field mapping; reject other keys as UnsupportedPax (PARSE-TAR-043).
 - [x] Specify and verify exact `hdrcharset` token admission, byte-exact matching, unsupported-token diagnostics, and empty-value deletion semantics (PARSE-TAR-044).
 - [ ] Specify and verify raw extension payload-extent errors precede extension-count admission, which precedes metadata charging and content interpretation (PARSE-TAR-045).
+- [ ] Verify malformed or out-of-range raw header mtime is rejected even when a valid PAX mtime would override the output timestamp (PARSE-TAR-046). Spec and trace mapping are added; implementation evidence and a direct regression test are pending.
 - [x] Accept delta, manifest-token, byte-path, signatures and manifest-record components with exact contracts, fresh full verification, official tests and independent review.
 - [x] Contract-refine the typed `body()` handler selection for all six object kinds and both name profiles; per-handler field parsing and complete filename classification remain open.
 - [x] Prove successful `body()` results preserve the selected object kind and short/long profile across all twelve routes; route-wide body-field composition and outer classification remain open.

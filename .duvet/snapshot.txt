@@ -362,6 +362,11 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: A truncated extension payload MUST therefore produce `Truncated` even when the configured extension count is already exhausted; an extent exceeding `max_entry_bytes` MUST produce `Limit`.
     TEXT[!MUST,implementation,test]: Once the complete bounded extent is admitted, the parser MUST enforce the cumulative extension count before metadata charging or interpreting extension contents.
 
+  SECTION: [PARSE-TAR-046](#parse-tar-046)
+    TEXT[!MUST,implementation]: After checksum and header-profile admission, the parser MUST decode and admit the raw tar header `mtime` as a signed `i64` even when an effective PAX `mtime` supplies the real entry's output timestamp.
+    TEXT[!MUST,implementation]: A malformed raw numeric field or a decoded value outside the `i64` range MUST produce Numeric; a valid PAX override MUST NOT mask that raw-header error.
+    TEXT[implementation]:  This requirement does not change which timestamp is selected for output under PARSE-TAR-029.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

@@ -692,6 +692,12 @@ For each GNU L/K or PAX x/g extension header, after checksum, header-profile, an
 
 Provenance: POLICY and PARSE-TAR-007/008/020. This specifies the relative order of raw extension extent, extension-count, metadata-charge, and content admission; it does not alter the error classes for those stages or refine the complete tar controller.
 
+### PARSE-TAR-046
+
+After checksum and header-profile admission, the parser MUST decode and admit the raw tar header `mtime` as a signed `i64` even when an effective PAX `mtime` supplies the real entry's output timestamp. A malformed raw numeric field or a decoded value outside the `i64` range MUST produce Numeric; a valid PAX override MUST NOT mask that raw-header error. This requirement does not change which timestamp is selected for output under PARSE-TAR-029.
+
+Provenance: DOC-TAR, SRC-TAR, and the reviewed tar header profile. The raw header remains a numeric tar header field independently of the semantic PAX override. PARSE-TAR-011 specifies signed narrowing and PARSE-TAR-029 specifies output selection; this requirement explicitly covers raw-field admission under override. It does not refine error ordering among other malformed header fields or the complete tar controller.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
