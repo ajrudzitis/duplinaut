@@ -680,6 +680,12 @@ The reader MUST recognize exactly these PAX key byte strings and map them to the
 
 Provenance: DOC-PAX, PARSE-TAR-003/006, and POLICY. This fixes the accepted key-to-field map and unsupported-key outcome; record framing, duplicate handling, and value interpretation remain separately specified.
 
+### PARSE-TAR-044
+
+Each nonempty PAX `hdrcharset` record value MUST exactly equal one of the ASCII byte strings `BINARY`, `UTF-8`, or `ISO-IR 10646 2000 UTF-8`. Any other nonempty value MUST produce `UnsupportedPax`; matching MUST be byte-exact and MUST NOT trim, case-fold, or otherwise normalize the value. An empty `hdrcharset` value remains a deletion marker under PARSE-TAR-006 and MUST NOT be rejected as an unsupported token.
+
+Provenance: DOC-PAX, PARSE-TAR-003/006, and POLICY. This defines token admission for nonempty `hdrcharset` values; global/local selection, deletion timing, and the charset behavior applied to owner/path/link values remain specified separately.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

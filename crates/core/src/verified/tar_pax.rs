@@ -696,6 +696,8 @@ pub fn owner_name_requires_utf8(charset: Option<&[u8]>) -> (result: bool)
 //# Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.
 
 /// Recognize exactly the PAX header charset tokens supported by the native parser.
+//= docs/parsing-requirements.md#parse-tar-044
+//# Each nonempty PAX `hdrcharset` record value MUST exactly equal one of the ASCII byte strings `BINARY`, `UTF-8`, or `ISO-IR 10646 2000 UTF-8`. Any other nonempty value MUST produce `UnsupportedPax`; matching MUST be byte-exact and MUST NOT trim, case-fold, or otherwise normalize the value. An empty `hdrcharset` value remains a deletion marker under PARSE-TAR-006 and MUST NOT be rejected as an unsupported token.
 pub fn hdrcharset_value_supported(value: &[u8]) -> (result: bool)
     ensures result == (value@ == b"BINARY"@ || value@ == b"UTF-8"@
         || value@ == b"ISO-IR 10646 2000 UTF-8"@),
@@ -1723,6 +1725,9 @@ mod tests {
     //= docs/parsing-requirements.md#parse-tar-003
     //= type=test
     //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+    //= docs/parsing-requirements.md#parse-tar-044
+    //= type=test
+    //# Each nonempty PAX `hdrcharset` record value MUST exactly equal one of the ASCII byte strings `BINARY`, `UTF-8`, or `ISO-IR 10646 2000 UTF-8`. Any other nonempty value MUST produce `UnsupportedPax`; matching MUST be byte-exact and MUST NOT trim, case-fold, or otherwise normalize the value. An empty `hdrcharset` value remains a deletion marker under PARSE-TAR-006 and MUST NOT be rejected as an unsupported token.
     #[test]
     fn hdrcharset_value_admission_matches_exact_supported_tokens() {
         for value in [b"BINARY" as &[u8], b"UTF-8", b"ISO-IR 10646 2000 UTF-8"] {

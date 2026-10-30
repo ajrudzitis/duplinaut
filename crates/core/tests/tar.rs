@@ -1816,6 +1816,9 @@ fn malformed_and_unsupported_pax_are_not_skipped() {
 //= docs/parsing-requirements.md#parse-tar-004
 //= type=test
 //# Unsupported tar extensions or entry encodings that affect interpretation MUST produce an explicit diagnostic.
+//= docs/parsing-requirements.md#parse-tar-044
+//= type=test
+//# Each nonempty PAX `hdrcharset` record value MUST exactly equal one of the ASCII byte strings `BINARY`, `UTF-8`, or `ISO-IR 10646 2000 UTF-8`. Any other nonempty value MUST produce `UnsupportedPax`; matching MUST be byte-exact and MUST NOT trim, case-fold, or otherwise normalize the value. An empty `hdrcharset` value remains a deletion marker under PARSE-TAR-006 and MUST NOT be rejected as an unsupported token.
 #[test]
 fn hdrcharset_exact_tokens_and_empty_local_deletion_are_enforced() {
     for charset in [b"BINARY" as &[u8], b"UTF-8", b"ISO-IR 10646 2000 UTF-8"] {
