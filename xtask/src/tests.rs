@@ -5,11 +5,14 @@ static NEXT: AtomicUsize = AtomicUsize::new(0);
 struct Temp(PathBuf);
 impl Temp {
     fn new() -> Self {
-        let path = env::temp_dir().join(format!(
-            "duplicity-assurance-test-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
+        let path = env::temp_dir()
+            .canonicalize()
+            .expect("temporary directory should resolve to its physical path")
+            .join(format!(
+                "duplicity-assurance-test-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
         fs::create_dir_all(&path).unwrap();
         Self(path)
     }
