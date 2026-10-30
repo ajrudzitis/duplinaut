@@ -451,7 +451,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
 
   SECTION: [PARSE-STATE-005](#parse-state-005)
     TEXT[!MUST,implementation,test]: A successfully returned `SnapshotState` MUST NOT contain a backup-root entry whose type is not `Directory`.
-    TEXT[!MUST,test]: Applying a full set that contains no logical entry for the backup root MUST NOT synthesize a root entry in the resulting state.
+    TEXT[!MUST,implementation,test]: Applying a full set that contains no logical entry for the backup root MUST NOT synthesize a root entry in the resulting state.
 
   SECTION: [PARSE-BROWSE-001](#parse-browse-001)
     TEXT[!MUST]: Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.

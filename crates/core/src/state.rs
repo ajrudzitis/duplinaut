@@ -151,6 +151,9 @@ impl SnapshotState {
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
+    //= docs/parsing-requirements.md#parse-state-005
+    //= type=implementation
+    //# Applying a full set that contains no logical entry for the backup root MUST NOT synthesize a root entry in the resulting state.
     pub fn from_full(archive: &AssembledArchive, limits: StateLimits) -> Result<Self, StateError> {
         let previous = Self {
             entries: BTreeMap::new(),
