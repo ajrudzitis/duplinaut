@@ -1255,6 +1255,21 @@ fn pax_path_and_linkpath_charset_validation_and_fallback_are_exact() {
     assert_eq!(parsed.entries[0].name, b"snapshot/path-\xff");
     assert_eq!(parsed.entries[0].linkname, b"target/link-\xfe");
 
+    for charset in [None, Some(b"UTF-8" as &[u8])] {
+        let mut records = Vec::new();
+        if let Some(charset) = charset {
+            records.extend(record(b"hdrcharset", charset));
+        }
+        records.extend(record(b"linkpath", "target/café".as_bytes()));
+        let archive = [
+            member(b"local", b'x', &records),
+            symlink_with_linkname(b"target/header"),
+        ]
+        .concat();
+        let parsed = parse(&archive).expect("valid UTF-8 PAX linkpath is accepted");
+        assert_eq!(parsed.entries[0].linkname, "target/café".as_bytes());
+    }
+
     let utf8_charset = member(b"local", b'x', &record(b"hdrcharset", b"UTF-8"));
     let mut raw_header = member(b"snapshot/raw-\xff", b'2', b"");
     raw_header[157..157 + b"target/raw-\xfe".len()].copy_from_slice(b"target/raw-\xfe");
@@ -1276,6 +1291,22 @@ fn pax_path_and_linkpath_charset_validation_and_fallback_are_exact() {
     let parsed = parse(&gnu_fallback).expect("GNU fallbacks remain byte-preserving");
     assert_eq!(parsed.entries[0].name, b"snapshot/gnu-\xff");
     assert_eq!(parsed.entries[0].linkname, b"target/gnu-\xfe");
+
+    let utf8_with_deleted_link = [
+        record(b"hdrcharset", b"UTF-8"),
+        record(b"linkpath", b""),
+    ]
+    .concat();
+    let gnu_invalid_link = member(b"././@LongLink", b'K', b"target/deleted-\xfd\0");
+    let deleted_link_gnu_fallback = [
+        member(b"local", b'x', &utf8_with_deleted_link),
+        gnu_invalid_link,
+        symlink_with_linkname(b"target/header"),
+    ]
+    .concat();
+    let parsed = parse(&deleted_link_gnu_fallback)
+        .expect("empty PAX linkpath keeps GNU fallback byte-preserving");
+    assert_eq!(parsed.entries[0].linkname, b"target/deleted-\xfd");
 }
 
 //= docs/parsing-requirements.md#parse-tar-006
