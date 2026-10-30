@@ -420,7 +420,7 @@ pub open spec fn real_entry_count_admission_model(current: int, maximum: int) ->
 //= docs/parsing-requirements.md#parse-tar-021
 //# Before allocating or retaining output fields for a real tar entry, the parser MUST require the accepted entry count to be below `max_entries`. If the count equals or exceeds the limit, it MUST return Limit without returning a partial entry list.
 //= docs/parsing-requirements.md#parse-tar-038
-//# For an ordinary real entry, after header admission, selected payload-extent validation, and ordinary type admission, the parser MUST enforce `max_entries` before interpreting or allocating any selected output name, link target, owner name, or timestamp/ID metadata. If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit, including when a later output field would otherwise fail validation. Header, extent, and type errors MUST retain their earlier precedence; extension-header count and metadata checks remain governed separately.
+//# For an ordinary real entry, after checksum, header-profile, and raw numeric-field admission, effective payload-size selection, payload-extent validation, and ordinary type admission, the parser MUST enforce `max_entries` before interpreting or allocating the selected output name. If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit even when later selected-name interpretation would fail validation. This check MUST NOT precede the listed header, size-selection, extent, or type checks; extension-header count and metadata checks remain governed separately.
 pub fn admit_real_entry_count(current: usize, maximum: usize) -> (result: bool)
     ensures result == real_entry_count_admission_model(current as int, maximum as int),
 {
@@ -564,6 +564,7 @@ mod metadata_charge_tests {
     fn real_entry_count_admission_checks_below_limit() {
         assert!(admit_real_entry_count(0, 1));
         assert!(!admit_real_entry_count(1, 1));
+        assert!(!admit_real_entry_count(2, 1));
         assert!(!admit_real_entry_count(usize::MAX, usize::MAX));
     }
 

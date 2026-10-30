@@ -262,7 +262,7 @@ fn extension_header_count_is_bounded_before_content_interpretation() {
 //# Before allocating or retaining output fields for a real tar entry, the parser MUST require the accepted entry count to be below `max_entries`. If the count equals or exceeds the limit, it MUST return Limit without returning a partial entry list.
 //= docs/parsing-requirements.md#parse-tar-038
 //= type=test
-//# For an ordinary real entry, after header admission, selected payload-extent validation, and ordinary type admission, the parser MUST enforce `max_entries` before interpreting or allocating any selected output name, link target, owner name, or timestamp/ID metadata. If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit, including when a later output field would otherwise fail validation. Header, extent, and type errors MUST retain their earlier precedence; extension-header count and metadata checks remain governed separately.
+//# For an ordinary real entry, after checksum, header-profile, and raw numeric-field admission, effective payload-size selection, payload-extent validation, and ordinary type admission, the parser MUST enforce `max_entries` before interpreting or allocating the selected output name. If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit even when later selected-name interpretation would fail validation. This check MUST NOT precede the listed header, size-selection, extent, or type checks; extension-header count and metadata checks remain governed separately.
 #[test]
 fn real_entry_count_is_bounded_before_output_field_interpretation() {
     let first = member(b"snapshot/first", b'0', b"");
@@ -275,6 +275,60 @@ fn real_entry_count_is_bounded_before_output_field_interpretation() {
     assert_eq!(
         TarVolume::parse(&archive, Termination::Data, one_entry).unwrap_err(),
         TarError::Limit
+    );
+
+    let unsupported_second = member(b"snapshot/unsupported", b'7', b"");
+    let archive = [member(b"snapshot/first", b'0', b""), unsupported_second].concat();
+    assert_eq!(
+        TarVolume::parse(&archive, Termination::Data, one_entry).unwrap_err(),
+        TarError::UnsupportedEntry,
+        "ordinary type admission precedes the cumulative real-entry limit",
+    );
+
+    let mut bad_checksum_second = member(b"snapshot/second", b'0', b"");
+    bad_checksum_second[0] ^= 1;
+    let archive = [member(b"snapshot/first", b'0', b""), bad_checksum_second].concat();
+    assert_eq!(
+        TarVolume::parse(&archive, Termination::Data, one_entry).unwrap_err(),
+        TarError::Checksum,
+        "header admission precedes the cumulative real-entry limit",
+    );
+
+    let mut invalid_raw_numeric_second = member(b"snapshot/second", b'0', b"");
+    invalid_raw_numeric_second[124..136].fill(0xff);
+    checksum(&mut invalid_raw_numeric_second[..512]);
+    let archive = [
+        member(b"snapshot/first", b'0', b""),
+        invalid_raw_numeric_second,
+    ]
+    .concat();
+    assert_eq!(
+        TarVolume::parse(&archive, Termination::Data, one_entry).unwrap_err(),
+        TarError::Numeric,
+        "raw numeric-field admission precedes the cumulative real-entry limit",
+    );
+
+    let invalid_effective_size = member(b"local", b'x', &record(b"size", b"+1"));
+    let invalid_size_second = member(b"", b'0', b"");
+    let archive = [
+        member(b"snapshot/first", b'0', b""),
+        invalid_effective_size,
+        invalid_size_second,
+    ]
+    .concat();
+    assert_eq!(
+        TarVolume::parse(&archive, Termination::Data, one_entry).unwrap_err(),
+        TarError::Numeric,
+        "effective PAX size selection precedes the cumulative real-entry limit",
+    );
+
+    let mut truncated_second = member(b"snapshot/second", b'0', b"x");
+    truncated_second.truncate(512);
+    let archive = [member(b"snapshot/first", b'0', b""), truncated_second].concat();
+    assert_eq!(
+        TarVolume::parse(&archive, Termination::Data, one_entry).unwrap_err(),
+        TarError::Truncated,
+        "payload extent validation precedes the cumulative real-entry limit",
     );
 
     let zero_entries = TarLimits {

@@ -316,9 +316,9 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: Empty integer/fraction components, malformed bytes, multiple signs or dots, and numeric overflow MUST produce Numeric.
 
   SECTION: [PARSE-TAR-038](#parse-tar-038)
-    TEXT[!MUST,implementation,test]: For an ordinary real entry, after header admission, selected payload-extent validation, and ordinary type admission, the parser MUST enforce `max_entries` before interpreting or allocating any selected output name, link target, owner name, or timestamp/ID metadata.
-    TEXT[!MUST,implementation,test]: If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit, including when a later output field would otherwise fail validation.
-    TEXT[!MUST,implementation,test]: Header, extent, and type errors MUST retain their earlier precedence; extension-header count and metadata checks remain governed separately.
+    TEXT[!MUST,implementation,test]: For an ordinary real entry, after checksum, header-profile, and raw numeric-field admission, effective payload-size selection, payload-extent validation, and ordinary type admission, the parser MUST enforce `max_entries` before interpreting or allocating the selected output name.
+    TEXT[!MUST,implementation,test]: If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit even when later selected-name interpretation would fail validation.
+    TEXT[!MUST,implementation,test]: This check MUST NOT precede the listed header, size-selection, extent, or type checks; extension-header count and metadata checks remain governed separately.
 
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

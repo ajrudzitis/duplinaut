@@ -645,9 +645,9 @@ Provenance: DOC-TAR, SRC-TAR, and the reviewed PAX timestamp profile above. This
 
 ### PARSE-TAR-038
 
-For an ordinary real entry, after header admission, selected payload-extent validation, and ordinary type admission, the parser MUST enforce `max_entries` before interpreting or allocating any selected output name, link target, owner name, or timestamp/ID metadata. If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit, including when a later output field would otherwise fail validation. Header, extent, and type errors MUST retain their earlier precedence; extension-header count and metadata checks remain governed separately.
+For an ordinary real entry, after checksum, header-profile, and raw numeric-field admission, effective payload-size selection, payload-extent validation, and ordinary type admission, the parser MUST enforce `max_entries` before interpreting or allocating the selected output name. If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit even when later selected-name interpretation would fail validation. This check MUST NOT precede the listed header, size-selection, extent, or type checks; extension-header count and metadata checks remain governed separately.
 
-Provenance: POLICY and PARSE-TAR-021/034. This fixes the observable boundary between ordinary-entry admission and output-field interpretation; header validation, extent validation, type classification, and extension-entry ordering remain separate.
+Provenance: POLICY and PARSE-TAR-021/034. This fixes the observable boundary between ordinary-entry admission and selected-name interpretation. It does not specify the ordering of raw header fields that are decoded before the count check or of other output metadata interpreted afterward.
 
 ### PARSE-ENTRY-001
 
