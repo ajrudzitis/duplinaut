@@ -5084,6 +5084,20 @@ implementations = [{ path = "crates/core/src/state.rs", symbol = "full_set_opera
 proofs = [{ id = "snapshot-full-set-operation-admission", requirement = "PARSE-STATE-004", path = "crates/core/src/state.rs", symbol = "full_set_operation_allowed", kind = "contract" }]
 tests = [{ package = "duplicity-core", name = "full_sets_reject_diff_and_deleted_operations" }]
 
+[[milestone]]
+id = "snapshot-root-entry-policy"
+gate = false
+requirements = ["PARSE-STATE-005"]
+specified = true
+implemented = false
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+implementations = []
+proofs = []
+tests = []
+
 [[trusted]]
 id = "build-orchestration"
 reviewed = true

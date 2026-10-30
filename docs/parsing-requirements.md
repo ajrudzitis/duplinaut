@@ -876,6 +876,12 @@ A full set MUST contain only logical entries whose operation is `Snapshot`. If a
 
 Provenance: DOC-DUP, SRC-DIFF, SRC-PATCH, and official full-set fixtures. Full sets establish replacement state; delta and deletion operations belong to incremental state transitions. This requirement specifies admission only and does not prescribe a public error variant or prove the complete state-transition controller.
 
+### PARSE-STATE-005
+
+A successfully returned `SnapshotState` MUST NOT contain a backup-root entry whose type is not `Directory`. Applying a full set that contains no logical entry for the backup root MUST NOT synthesize a root entry in the resulting state.
+
+Provenance: PARSE-PATH-001, POLICY. The empty component sequence identifies the backup root. Snapshot state retains explicit backup metadata and does not invent root metadata for an archive that omitted the root; a present root entry is meaningful only as a directory. This requirement does not prescribe restoration of the destination root.
+
 ### PARSE-BROWSE-001
 
 Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.
