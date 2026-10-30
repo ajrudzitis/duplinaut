@@ -315,3 +315,44 @@ fn out_of_range_marked_index_returns_selection_preview_error_without_destination
     assert!(!temp.0.join(std::ffi::OsString::from_vec(leaf)).exists());
     worker.shutdown(&Cancellation::default(), |_| {}).unwrap();
 }
+
+#[test]
+//= docs/parsing-requirements.md#restore-ui-011
+//= type=test
+//# The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
+fn excess_repeated_root_count_returns_limit_before_dedup_without_destination() {
+    let temp = Temp::new();
+    let mut worker = worker();
+    let anchor = anchor(&mut worker);
+    let snapshot = snapshot(&mut worker, 1, anchor, 1700172800);
+    let valid_index = snapshot
+        .state()
+        .entries()
+        .position(|(path, _)| {
+            path.components() == &[b"a".to_vec(), b"b".to_vec(), b"child.txt".to_vec()]
+        })
+        .expect("official snapshot contains the selected file");
+    let leaf = b"excess-roots-preview".to_vec();
+
+    worker
+        .send(Command::Prepare {
+            id: 2,
+            snapshot,
+            marked: vec![valid_index; restore_flow::ROOTS + 1],
+            destination: Arc::new(Destination {
+                parent: temp.0.clone(),
+                name: leaf.clone(),
+            }),
+            cancel: Cancellation::default(),
+        })
+        .unwrap();
+    assert!(matches!(
+        receive(&mut worker),
+        Reply::Preview {
+            result: Err(restore_flow::Error::Limit),
+            ..
+        }
+    ));
+    assert!(!temp.0.join(std::ffi::OsString::from_vec(leaf)).exists());
+    worker.shutdown(&Cancellation::default(), |_| {}).unwrap();
+}
