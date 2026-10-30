@@ -186,6 +186,9 @@ mod tests {
     }
     #[cfg(not(target_os = "linux"))]
     #[test]
+    //= docs/parsing-requirements.md#restore-ui-005
+    //= type=test
+    //# The frontend MUST execute restoration through the adopted native `restore` API with its reviewed limits and profile policy, without implementing its own path extraction, destination replacement, staging cleanup or filesystem eligibility fallback.
     fn native_restore_options_are_rejected_on_unsupported_os() {
         assert!(matches!(
             parse(["local", "source", "--restore-parent", "parent"].map(OsString::from)),
@@ -195,6 +198,40 @@ mod tests {
             parse(["local", "source", "--restore-name", "name"].map(OsString::from)),
             Err("native restoration unsupported on this OS")
         ));
+    }
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-005
+    //= type=test
+    //# The frontend MUST execute restoration through the adopted native `restore` API with its reviewed limits and profile policy, without implementing its own path extraction, destination replacement, staging cleanup or filesystem eligibility fallback.
+    fn ordinary_local_and_s3_configs_remain_available_without_restore_destination() {
+        let local = parse(["local", "backups"].map(OsString::from))
+            .unwrap()
+            .unwrap();
+        assert!(local.destination.is_none());
+        assert!(matches!(local.source, Source::Local(path) if path.to_str() == Some("backups")));
+
+        let s3 = parse(
+            [
+                "s3",
+                "bucket-name",
+                "backup-prefix/",
+                "--region",
+                "us-west-2",
+            ]
+            .map(OsString::from),
+        )
+        .unwrap()
+        .unwrap();
+        assert!(s3.destination.is_none());
+        match s3.source {
+            Source::S3(config) => {
+                assert_eq!(config.bucket, "bucket-name");
+                assert_eq!(config.prefix, "backup-prefix/");
+                assert_eq!(config.region.as_deref(), Some("us-west-2"));
+            }
+            Source::Local(_) => panic!("expected S3 configuration"),
+        }
     }
     #[cfg(target_os = "linux")]
     #[test]

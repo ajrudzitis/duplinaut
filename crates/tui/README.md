@@ -52,6 +52,7 @@ anchor choice.
 - [x] Implement metadata history, explicit anchors/dates, volume-scan disclosure and byte-preserving snapshot navigation.
 - [x] Implement byte-preserving selection and bounded restore previews; independently review the read-only flow.
 - [x] Add focused official-fixture worker checks for RESTORE-UI-003 whole-snapshot and marked-preview details; the marked case only prepares a preview and does not publish. Broader frontend acceptance remains pending.
+- [x] Verify on macOS that ordinary local and S3 CLI configurations parse without a restore destination while native restore flags remain rejected; this is CLI parsing coverage only.
 - [x] Connect explicitly acknowledged selection to native Linux publication; use the existing SDK credential provider.
 - [ ] Test display escaping, errors and interaction flows.
 - [ ] Automate terminal interaction, cancellation, resize and S3 frontend tests.

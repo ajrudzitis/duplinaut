@@ -72,6 +72,9 @@ fn worker() -> Worker {
 //= docs/parsing-requirements.md#restore-ui-003
 //= type=test
 //# The frontend MUST present a concrete restoration preview identifying the exact snapshot target, configured parent and new leaf, marked/all selection, included ancestors, resulting entry count, total regular payload bytes, no-replacement policy and supported metadata policy before offering publication confirmation.
+//= docs/parsing-requirements.md#restore-ui-005
+//= type=test
+//# The frontend MUST execute restoration through the adopted native `restore` API with its reviewed limits and profile policy, without implementing its own path extraction, destination replacement, staging cleanup or filesystem eligibility fallback.
 //= docs/parsing-requirements.md#restore-ui-011
 //= type=test
 //# The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
