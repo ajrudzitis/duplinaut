@@ -260,6 +260,9 @@ fn extension_header_count_is_bounded_before_content_interpretation() {
 //= docs/parsing-requirements.md#parse-tar-021
 //= type=test
 //# Before allocating or retaining output fields for a real tar entry, the parser MUST require the accepted entry count to be below `max_entries`. If the count equals or exceeds the limit, it MUST return Limit without returning a partial entry list.
+//= docs/parsing-requirements.md#parse-tar-038
+//= type=test
+//# For an ordinary real entry, after header admission, selected payload-extent validation, and ordinary type admission, the parser MUST enforce `max_entries` before interpreting or allocating any selected output name, link target, owner name, or timestamp/ID metadata. If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit, including when a later output field would otherwise fail validation. Header, extent, and type errors MUST retain their earlier precedence; extension-header count and metadata checks remain governed separately.
 #[test]
 fn real_entry_count_is_bounded_before_output_field_interpretation() {
     let first = member(b"snapshot/first", b'0', b"");

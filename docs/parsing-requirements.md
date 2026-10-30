@@ -643,6 +643,12 @@ Each resolved nonempty PAX `mtime`, `atime`, or `ctime` value MUST consist of an
 
 Provenance: DOC-TAR, SRC-TAR, and the reviewed PAX timestamp profile above. This specifies value conversion after PAX state resolution; absent/deleted values, field selection, and global/local timing remain governed by PARSE-TAR-006/029/035, and complete tar-controller error ordering remains separate.
 
+### PARSE-TAR-038
+
+For an ordinary real entry, after header admission, selected payload-extent validation, and ordinary type admission, the parser MUST enforce `max_entries` before interpreting or allocating any selected output name, link target, owner name, or timestamp/ID metadata. If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit, including when a later output field would otherwise fail validation. Header, extent, and type errors MUST retain their earlier precedence; extension-header count and metadata checks remain governed separately.
+
+Provenance: POLICY and PARSE-TAR-021/034. This fixes the observable boundary between ordinary-entry admission and output-field interpretation; header validation, extent validation, type classification, and extension-entry ordering remain separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

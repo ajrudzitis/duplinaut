@@ -327,6 +327,8 @@ impl<'a> TarVolume<'a> {
             ) {
                 return Err(TarError::Limit);
             }
+            //= docs/parsing-requirements.md#parse-tar-038
+            //# For an ordinary real entry, after header admission, selected payload-extent validation, and ordinary type admission, the parser MUST enforce `max_entries` before interpreting or allocating any selected output name, link target, owner name, or timestamp/ID metadata. If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit, including when a later output field would otherwise fail validation. Header, extent, and type errors MUST retain their earlier precedence; extension-header count and metadata checks remain governed separately.
             let raw_name = text(h.name);
             let prefix = if posix { text(h.prefix) } else { b"" };
             //= docs/parsing-requirements.md#parse-tar-012
