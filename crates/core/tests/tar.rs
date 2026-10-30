@@ -1626,6 +1626,51 @@ fn invalid_pax_mtime_does_not_fall_back_to_valid_raw_header_time() {
     assert_eq!(parse(&bytes).unwrap_err(), TarError::Numeric);
 }
 
+//= docs/parsing-requirements.md#parse-tar-046
+//= type=test
+//# After checksum and header-profile admission, the parser MUST decode and admit the raw tar header `mtime` as a signed `i64` even when an effective PAX `mtime` supplies the real entry's output timestamp. A malformed raw numeric field or a decoded value outside the `i64` range MUST produce Numeric; a valid PAX override MUST NOT mask that raw-header error. This requirement does not change which timestamp is selected for output under PARSE-TAR-029.
+#[test]
+fn raw_header_mtime_must_be_admitted_under_valid_pax_override() {
+    fn binary(field: &mut [u8], value: i128) {
+        let encoded = value.to_be_bytes();
+        let length = field.len();
+        field.copy_from_slice(&encoded[16 - length..]);
+        field[0] = if value < 0 { 0xff } else { 0x80 };
+    }
+
+    let pax = member(b"local", b'x', &record(b"mtime", b"7.25"));
+    let mut malformed = member(b"snapshot/raw", b'0', b"");
+    malformed[136..148].copy_from_slice(b"00000000000X");
+    checksum(&mut malformed[..512]);
+    assert_eq!(
+        parse(&[pax.clone(), malformed].concat()).unwrap_err(),
+        TarError::Numeric,
+        "a valid PAX timestamp does not mask malformed raw mtime",
+    );
+
+    let mut out_of_range = member(b"snapshot/raw", b'0', b"");
+    binary(&mut out_of_range[136..148], i128::from(i64::MAX) + 1);
+    checksum(&mut out_of_range[..512]);
+    assert_eq!(
+        parse(&[pax.clone(), out_of_range].concat()).unwrap_err(),
+        TarError::Numeric,
+        "a valid PAX timestamp does not mask out-of-range raw mtime",
+    );
+
+    let mut boundary = member(b"snapshot/raw", b'0', b"");
+    binary(&mut boundary[136..148], i128::from(i64::MAX));
+    checksum(&mut boundary[..512]);
+    let bytes = [pax, boundary].concat();
+    let parsed = parse(&bytes).unwrap();
+    assert_eq!(
+        parsed.entries[0].mtime,
+        TarTime {
+            seconds: 7,
+            nanoseconds: 250_000_000
+        }
+    );
+}
+
 //= docs/parsing-requirements.md#parse-tar-035
 //= type=test
 //# For each real tar entry, the reader MUST set `TarEntry.atime` and `TarEntry.ctime` from their respective resolved effective PAX values when present, using the reviewed signed PAX timestamp profile. When an effective value is absent, the corresponding output field MUST be `None`. A present but invalid timestamp MUST produce Numeric; it MUST NOT be treated as absent. An empty local value MUST delete the corresponding inherited global value, so that field MUST be `None` for the next real entry.

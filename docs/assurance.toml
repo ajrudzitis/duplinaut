@@ -3939,23 +3939,28 @@ tests = [
 
 [[milestone]]
 id = "tar-header-mtime-admission-under-pax-override"
-gate = false
+gate = true
 requirements = ["PARSE-TAR-046"]
 specified = true
-implemented = false
-proved = false
-tested = false
-reviewed = false
+implemented = true
+proved = true
+tested = true
+reviewed = true
 proof_required = true
-# The parser currently narrows raw header mtime before resolving semantic
-# PAX mtime, but there is no direct regression test for an invalid raw mtime
-# paired with a valid PAX override. Keep this milestone ungated until that
-# behavior is explicitly tested and its proof scope is reviewed.
+# `narrow_mtime` contract proves signed-i64 admission. The focused integration
+# test exercises parser ordering and confirms PAX only selects the output value;
+# the complete tar-controller refinement remains outside the proof scope.
 implementations = [
-  { path = "crates/core/src/tar.rs", symbol = "parse" }
+  { path = "crates/core/src/tar.rs", symbol = "parse" },
+  { path = "crates/core/src/verified/tar_number.rs", symbol = "narrow_mtime" }
 ]
-proofs = []
-tests = []
+proofs = [
+  { id = "tar-header-mtime-narrowing", requirement = "PARSE-TAR-046", path = "crates/core/src/verified/tar_number.rs", symbol = "narrow_mtime", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "raw_header_mtime_must_be_admitted_under_valid_pax_override" },
+  { package = "duplicity-core", name = "numeric_conversion_boundaries_and_interior_padding" }
+]
 
 [[milestone]]
 id = "tar-entry-metadata-charge"
