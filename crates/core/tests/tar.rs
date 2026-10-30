@@ -1943,6 +1943,44 @@ fn pax_stream_reports_the_first_error_by_record_and_stage() {
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-040
+//= type=test
+//# Each PAX extended-header record MUST begin with a nonempty ASCII decimal length field followed by one ASCII space. Leading zeroes are accepted by this reader profile; no canonical no-leading-zero form is required. The decoded length MUST be positive, fit in `u64`, and identify the complete record byte count starting at the first length digit and ending immediately after that record's LF, including the length field and all delimiters. The declared span MUST be wholly present in the payload and its final byte MUST be LF; the first `=` within the record body MUST delimit the key and value. Consecutive records MUST be consumed contiguously, with no skipped or unconsumed bytes. A zero, malformed, overflowing, out-of-bounds, or delimiter-inconsistent declared span MUST be rejected as malformed PAX framing under PARSE-TAR-003.
+#[test]
+fn pax_record_declared_length_is_byte_exact_and_truncation_is_pax() {
+    let canonical = record(b"path", b"snapshot/zero-padded");
+    let space = canonical.iter().position(|byte| *byte == b' ').unwrap();
+    let mut padded = (canonical.len() + 1).to_string().into_bytes();
+    padded.insert(0, b'0');
+    padded.push(b' ');
+    padded.extend_from_slice(&canonical[space + 1..]);
+    assert_eq!(padded.len(), canonical.len() + 1);
+
+    let archive = [
+        member(b"local", b'x', &padded),
+        member(b"snapshot/header", b'0', b""),
+    ]
+    .concat();
+    let parsed = parse(&archive).expect("leading-zero record length is accepted");
+    assert_eq!(parsed.entries[0].name, b"snapshot/zero-padded");
+
+    let truncated = &canonical[..canonical.len() - 1];
+    for malformed in [
+        b"0 path=snapshot/file\n".as_slice(),
+        b"99 path=x\n".as_slice(),
+        b"8 path=x\n".as_slice(),
+        b"18446744073709551616 path=x\n".as_slice(),
+        truncated,
+    ] {
+        let archive = [
+            member(b"local", b'x', malformed),
+            member(b"snapshot/header", b'0', b""),
+        ]
+        .concat();
+        assert_eq!(parse(&archive).unwrap_err(), TarError::Pax, "{malformed:?}");
+    }
+}
+
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.

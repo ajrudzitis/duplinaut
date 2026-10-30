@@ -1273,8 +1273,9 @@ mod tests {
         effective_link_length_and_admission, effective_link_override, effective_mtime,
         effective_name_override, effective_optional_time, effective_owner_name,
         effective_owner_name_length_and_admission, effective_size, hdrcharset_value_supported,
-        ingest, nul_terminated_prefix, owner_name_requires_utf8, payload_size, resolve_values,
-        PaxIdError, PaxIngestError, PaxRecordAdmissionError, PaxSizeError, PaxTimeError,
+        ingest, nul_terminated_prefix, owner_name_requires_utf8, payload_size, record,
+        resolve_values, PaxIdError, PaxIngestError, PaxRecordAdmissionError, PaxSizeError,
+        PaxTimeError,
     };
 
     fn framed_record(key: &[u8], value: &[u8]) -> Vec<u8> {
@@ -1323,6 +1324,43 @@ mod tests {
         for (index, (_, expected)) in fields.iter().enumerate() {
             assert_eq!(slots[index], Some(*expected), "slot {index}");
         }
+    }
+
+    //= docs/parsing-requirements.md#parse-tar-040
+    //= type=test
+    //# Each PAX extended-header record MUST begin with a nonempty ASCII decimal length field followed by one ASCII space. Leading zeroes are accepted by this reader profile; no canonical no-leading-zero form is required. The decoded length MUST be positive, fit in `u64`, and identify the complete record byte count starting at the first length digit and ending immediately after that record's LF, including the length field and all delimiters. The declared span MUST be wholly present in the payload and its final byte MUST be LF; the first `=` within the record body MUST delimit the key and value. Consecutive records MUST be consumed contiguously, with no skipped or unconsumed bytes. A zero, malformed, overflowing, out-of-bounds, or delimiter-inconsistent declared span MUST be rejected as malformed PAX framing under PARSE-TAR-003.
+    #[test]
+    fn record_lengths_include_lf_accept_leading_zeroes_and_consume_contiguously() {
+        let canonical = framed_record(b"path", b"snapshot/padded=tail");
+        let space = canonical.iter().position(|byte| *byte == b' ').unwrap();
+        let mut length = (canonical.len() + 1).to_string().into_bytes();
+        length.insert(0, b'0');
+        length.push(b' ');
+        length.extend_from_slice(&canonical[space + 1..]);
+        assert_eq!(length.len(), canonical.len() + 1);
+
+        let next = framed_record(b"size", b"7");
+        let stream = [length.clone(), next.clone()].concat();
+        let (first_end, key, value) = record(&stream, 0).expect("zero-padded length is valid");
+        assert_eq!(first_end, length.len());
+        assert_eq!(key, b"path");
+        assert_eq!(value, b"snapshot/padded=tail");
+        let (second_end, second_key, second_value) =
+            record(&stream, first_end).expect("second record begins at the first end");
+        assert_eq!(second_end, stream.len());
+        assert_eq!(second_key, b"size");
+        assert_eq!(second_value, b"7");
+        let slots = ingest(&stream).expect("all record bytes are consumed contiguously");
+        assert_eq!(slots[0], Some(&b"snapshot/padded=tail"[..]));
+        assert_eq!(slots[2], Some(&b"7"[..]));
+
+        assert_eq!(record(&length[..length.len() - 1], 0), None);
+        assert_eq!(
+            ingest(&length[..length.len() - 1]),
+            Err(PaxIngestError::Framing)
+        );
+        assert_eq!(record(b"0 x=y\n", 0), None);
+        assert_eq!(ingest(b"0 x=y\n"), Err(PaxIngestError::Framing));
     }
 
     #[test]
