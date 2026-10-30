@@ -5068,6 +5068,22 @@ implementations = [{ path = "crates/core/src/path.rs", symbol = "component_prefi
 proofs = [{ id = "snapshot-prefix-order-convexity", requirement = "PARSE-STATE-001", path = "crates/core/src/path.rs", symbol = "component_prefix_is_order_convex", kind = "lemma" }]
 tests = [{ package = "duplicity-core", name = "component_prefixes_form_an_order_interval" }]
 
+[[milestone]]
+id = "snapshot-full-set-operation-admission"
+gate = false
+requirements = ["PARSE-STATE-004"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = false
+proof_required = true
+# The verified predicate classifies full-set operations; the unverified state
+# controller returns FullOperation when it rejects one and remains out of scope.
+implementations = [{ path = "crates/core/src/state.rs", symbol = "full_set_operation_allowed" }]
+proofs = [{ id = "snapshot-full-set-operation-admission", requirement = "PARSE-STATE-004", path = "crates/core/src/state.rs", symbol = "full_set_operation_allowed", kind = "contract" }]
+tests = [{ package = "duplicity-core", name = "full_sets_reject_diff_and_deleted_operations" }]
+
 [[trusted]]
 id = "build-orchestration"
 reviewed = true

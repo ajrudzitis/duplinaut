@@ -228,6 +228,23 @@ fn missing_ancestors_root_types_empty_state_and_unsupported_metadata() {
         Err(StateError::EntryPayload)
     ));
 }
+
+//= docs/parsing-requirements.md#parse-state-004
+//= type=test
+//# A full set MUST contain only logical entries whose operation is `Snapshot`. If any entry in a full set has operation `Diff` or `Deleted`, the reader MUST reject the full set and MUST NOT return a `SnapshotState` for it.
+#[test]
+fn full_sets_reject_diff_and_deleted_operations() {
+    for name in ["diff/file", "deleted/file"] {
+        assert!(matches!(
+            SnapshotState::from_full(
+                &archive(&[(name, b'0', b"operation payload")]),
+                StateLimits::default()
+            ),
+            Err(StateError::FullOperation)
+        ));
+    }
+}
+
 #[test]
 fn resulting_and_live_limits_prevent_partial_state_success() {
     let previous = initial();

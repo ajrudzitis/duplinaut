@@ -218,7 +218,7 @@ impl SnapshotState {
             next.entries.insert(path.clone(), Arc::clone(entry));
         }
         for entry in archive.entries() {
-            if full && entry.operation != LogicalOperation::Snapshot {
+            if full && !full_set_operation_allowed(entry.operation) {
                 return Err(StateError::FullOperation);
             }
             match entry.operation {
@@ -448,6 +448,26 @@ fn check_budget(
 }
 
 verus! {
+/// Full archives establish replacement state and cannot contain incremental operations.
+pub open spec fn full_set_operation_model(operation: LogicalOperation) -> bool {
+    match operation {
+        LogicalOperation::Snapshot => true,
+        LogicalOperation::Diff | LogicalOperation::Deleted => false,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-state-004
+//= type=implementation
+//# A full set MUST contain only logical entries whose operation is `Snapshot`. If any entry in a full set has operation `Diff` or `Deleted`, the reader MUST reject the full set and MUST NOT return a `SnapshotState` for it.
+pub(crate) fn full_set_operation_allowed(operation: LogicalOperation) -> (result: bool)
+    ensures result == full_set_operation_model(operation),
+{
+    match operation {
+        LogicalOperation::Snapshot => true,
+        LogicalOperation::Diff | LogicalOperation::Deleted => false,
+    }
+}
+
 /// Scalar projection of the same private native accounting counters. This is
 /// neither a container invariant nor an allocator-capacity specification.
 struct Charges {

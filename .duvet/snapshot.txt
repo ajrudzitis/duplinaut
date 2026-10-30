@@ -446,8 +446,8 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: Component boundaries MUST remain significant; the ordering MUST NOT be derived by comparing slash-joined or rendered path strings.
 
   SECTION: [PARSE-STATE-004](#parse-state-004)
-    TEXT[!MUST]: A full set MUST contain only logical entries whose operation is `Snapshot`.
-    TEXT[!MUST]: If any entry in a full set has operation `Diff` or `Deleted`, the reader MUST reject the full set and MUST NOT return a `SnapshotState` for it.
+    TEXT[!MUST,implementation,test]: A full set MUST contain only logical entries whose operation is `Snapshot`.
+    TEXT[!MUST,implementation,test]: If any entry in a full set has operation `Diff` or `Deleted`, the reader MUST reject the full set and MUST NOT return a `SnapshotState` for it.
 
   SECTION: [PARSE-BROWSE-001](#parse-browse-001)
     TEXT[!MUST]: Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.

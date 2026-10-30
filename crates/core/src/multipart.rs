@@ -17,6 +17,7 @@ use crate::verified::openpgp_admission::{
     AuthenticatedPermit, OpenPgpAdmission, TarValidatedPermit,
 };
 use std::collections::BTreeMap;
+use vstd::prelude::*;
 
 const CHUNK_BYTES: usize = 65536;
 
@@ -94,11 +95,13 @@ fn index_capacity_charge() -> usize {
     2 * (11 * (std::mem::size_of::<BackupPath>() + std::mem::size_of::<bool>())
         + 16 * std::mem::size_of::<usize>())
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LogicalOperation {
-    Snapshot,
-    Diff,
-    Deleted,
+verus! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum LogicalOperation {
+        Snapshot,
+        Diff,
+        Deleted,
+    }
 }
 #[derive(Debug)]
 pub struct LogicalEntry {
