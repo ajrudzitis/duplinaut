@@ -24,6 +24,54 @@ use std::{
 pub fn run(source: Arc<dyn ObjectSource>, prefix: String, initial: Cancellation) -> io::Result<()> {
     run_configured(source, prefix, initial, None)
 }
+fn pressed_key(event: Event) -> Option<KeyCode> {
+    match event {
+        Event::Key(key) if key.kind == KeyEventKind::Press => Some(key.code),
+        _ => None,
+    }
+}
+fn acknowledgment_confirms(ack: &Acknowledgment, code: KeyCode) -> bool {
+    code == KeyCode::Enter && ack.ready()
+}
+#[cfg(test)]
+mod key_event_tests {
+    use super::*;
+    use crossterm::event::{KeyEvent, KeyModifiers};
+
+    fn event(code: KeyCode, kind: KeyEventKind) -> Event {
+        Event::Key(KeyEvent::new_with_kind(code, KeyModifiers::NONE, kind))
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-004
+    //= type=test
+    //# The frontend MUST start at most one restoration operation only when its displayed successful `r` preview receives the exact ASCII acknowledgment `restore` followed by Enter, and MUST clear that acknowledgment and disarm confirmation when its snapshot, roots or destination changes or the user leaves that preview.
+    fn only_press_events_change_and_confirm_restore_acknowledgment() {
+        let mut ack = Acknowledgment::default();
+        ack.armed = true;
+
+        for kind in [KeyEventKind::Repeat, KeyEventKind::Release] {
+            assert_eq!(pressed_key(event(KeyCode::Char('r'), kind)), None);
+            assert_eq!(pressed_key(event(KeyCode::Enter, kind)), None);
+        }
+        assert_eq!(ack.text(), "");
+        assert!(!acknowledgment_confirms(&ack, KeyCode::Enter));
+
+        for character in "restore".chars() {
+            let Some(KeyCode::Char(accepted)) =
+                pressed_key(event(KeyCode::Char(character), KeyEventKind::Press))
+            else {
+                panic!("press character must be normalized");
+            };
+            ack.input(accepted);
+        }
+        assert!(ack.ready());
+        assert!(acknowledgment_confirms(
+            &ack,
+            pressed_key(event(KeyCode::Enter, KeyEventKind::Press)).unwrap()
+        ));
+    }
+}
 //= docs/parsing-requirements.md#restore-ui-004
 //= type=implementation
 //# The frontend MUST start at most one restoration operation only when its displayed successful `r` preview receives the exact ASCII acknowledgment `restore` followed by Enter, and MUST clear that acknowledgment and disarm confirmation when its snapshot, roots or destination changes or the user leaves that preview.
@@ -182,14 +230,11 @@ pub fn run_configured(
                 if !event::poll(Duration::from_millis(50))? {
                     continue;
                 }
-                let Event::Key(key) = event::read()? else {
+                let Some(code) = pressed_key(event::read()?) else {
                     continue;
                 };
-                if key.kind != KeyEventKind::Press {
-                    continue;
-                }
                 if active.is_some() {
-                    if matches!(key.code, KeyCode::Esc | KeyCode::Char('q')) {
+                    if matches!(code, KeyCode::Esc | KeyCode::Char('q')) {
                         cancel.cancel();
                         abandoning = true;
                         status="Cancellation requested; waiting for operation outcome. q after the result exits.".into();
@@ -197,7 +242,7 @@ pub fn run_configured(
                     continue;
                 }
                 if preview.is_some() {
-                    match key.code {
+                    match code {
                         KeyCode::Esc | KeyCode::Char('q') => {
                             preview = None;
                             ack.clear();
@@ -207,7 +252,7 @@ pub fn run_configured(
                         KeyCode::Down => offset = offset.saturating_add(1).min(scroll_max),
                         KeyCode::Backspace => ack.backspace(),
                         KeyCode::Enter => {
-                            if ack.ready() {
+                            if acknowledgment_confirms(&ack, code) {
                                 let frozen = preview.take().unwrap().frozen;
                                 ack.clear();
                                 serial = serial
@@ -237,7 +282,7 @@ pub fn run_configured(
                     continue;
                 }
                 if document.is_some() {
-                    match key.code {
+                    match code {
                         KeyCode::Up => {
                             offset = offset.saturating_sub(1);
                             continue;
@@ -254,7 +299,7 @@ pub fn run_configured(
                         _ => {}
                     }
                 }
-                match key.code {
+                match code {
                     KeyCode::Char('q') => break,
                     KeyCode::Esc => {
                         snapshot = None;
