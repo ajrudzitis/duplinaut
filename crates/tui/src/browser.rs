@@ -30,8 +30,13 @@ fn pressed_key(event: Event) -> Option<KeyCode> {
         _ => None,
     }
 }
-fn acknowledgment_confirms(ack: &Acknowledgment, code: KeyCode) -> bool {
-    code == KeyCode::Enter && ack.ready()
+fn take_confirmation(ack: &mut Acknowledgment, code: KeyCode) -> bool {
+    if code == KeyCode::Enter && ack.ready() {
+        ack.clear();
+        true
+    } else {
+        false
+    }
 }
 #[cfg(test)]
 mod key_event_tests {
@@ -55,7 +60,7 @@ mod key_event_tests {
             assert_eq!(pressed_key(event(KeyCode::Enter, kind)), None);
         }
         assert_eq!(ack.text(), "");
-        assert!(!acknowledgment_confirms(&ack, KeyCode::Enter));
+        assert!(!take_confirmation(&mut ack, KeyCode::Enter));
 
         for character in "restore".chars() {
             let Some(KeyCode::Char(accepted)) =
@@ -66,10 +71,11 @@ mod key_event_tests {
             ack.input(accepted);
         }
         assert!(ack.ready());
-        assert!(acknowledgment_confirms(
-            &ack,
-            pressed_key(event(KeyCode::Enter, KeyEventKind::Press)).unwrap()
-        ));
+        let enter = pressed_key(event(KeyCode::Enter, KeyEventKind::Press)).unwrap();
+        assert!(take_confirmation(&mut ack, enter));
+        assert_eq!(ack.text(), "");
+        assert!(!ack.armed);
+        assert!(!take_confirmation(&mut ack, enter));
     }
 }
 //= docs/parsing-requirements.md#restore-ui-004
@@ -252,9 +258,8 @@ pub fn run_configured(
                         KeyCode::Down => offset = offset.saturating_add(1).min(scroll_max),
                         KeyCode::Backspace => ack.backspace(),
                         KeyCode::Enter => {
-                            if acknowledgment_confirms(&ack, code) {
+                            if take_confirmation(&mut ack, code) {
                                 let frozen = preview.take().unwrap().frozen;
-                                ack.clear();
                                 serial = serial
                                     .checked_add(1)
                                     .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
