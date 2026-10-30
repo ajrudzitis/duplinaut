@@ -904,6 +904,8 @@ pub open spec fn optional_time_matches(
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-043
+//# The reader MUST recognize exactly these PAX key byte strings and map them to their corresponding semantic fields: `path`, `linkpath`, `size`, `mtime`, `uid`, `gid`, `uname`, `gname`, `atime`, `ctime`, and `hdrcharset`. Any other key MUST produce `UnsupportedPax`, including a key defined by POSIX that is outside this reader profile. Key recognition MUST NOT normalize or case-fold input bytes. Empty values for recognized keys remain deletion markers under PARSE-TAR-003/006; this requirement does not change duplicate-key, NUL, or value-grammar handling.
 pub fn key_index(input: &[u8]) -> (result: Option<usize>)
     ensures result == key_model(input@), result is Some ==> result.unwrap() < 11,
 {
@@ -1306,6 +1308,9 @@ mod tests {
     //= docs/parsing-requirements.md#parse-tar-040
     //= type=test
     //# Each PAX extended-header record MUST begin with a nonempty ASCII decimal length field followed by one ASCII space. Leading zeroes are accepted by this reader profile; no canonical no-leading-zero form is required. The decoded length MUST be positive, fit in `u64`, and identify the complete record byte count starting at the first length digit and ending immediately after that record's LF, including the length field and all delimiters. The declared span MUST be wholly present in the payload and its final byte MUST be LF; the first `=` within the record body MUST delimit the key and value. Consecutive records MUST be consumed contiguously, with no skipped or unconsumed bytes. A zero, malformed, overflowing, out-of-bounds, or delimiter-inconsistent declared span MUST be rejected as malformed PAX framing under PARSE-TAR-003.
+    //= docs/parsing-requirements.md#parse-tar-043
+    //= type=test
+    //# The reader MUST recognize exactly these PAX key byte strings and map them to their corresponding semantic fields: `path`, `linkpath`, `size`, `mtime`, `uid`, `gid`, `uname`, `gname`, `atime`, `ctime`, and `hdrcharset`. Any other key MUST produce `UnsupportedPax`, including a key defined by POSIX that is outside this reader profile. Key recognition MUST NOT normalize or case-fold input bytes. Empty values for recognized keys remain deletion markers under PARSE-TAR-003/006; this requirement does not change duplicate-key, NUL, or value-grammar handling.
     fn ingest_accumulates_a_successful_stream_into_all_eleven_slots() {
         let fields: [(&[u8], &[u8]); 11] = [
             (b"path", b"snapshot/file"),

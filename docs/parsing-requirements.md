@@ -674,6 +674,12 @@ For a real entry, each nonempty resolved PAX `path` and `linkpath` value MUST be
 
 Provenance: DOC-PAX, PARSE-TAR-003/006/009/010/012/013, and POLICY. This specifies charset treatment only; path/link selection, length admission, NUL rejection, PAX deletion timing, and GNU/PAX extension ordering remain governed separately. Existing integration evidence directly exercises PAX `path` under UTF-8 and BINARY policies; direct `linkpath` charset and invalid raw/GNU fallback cases remain to be added.
 
+### PARSE-TAR-043
+
+The reader MUST recognize exactly these PAX key byte strings and map them to their corresponding semantic fields: `path`, `linkpath`, `size`, `mtime`, `uid`, `gid`, `uname`, `gname`, `atime`, `ctime`, and `hdrcharset`. Any other key MUST produce `UnsupportedPax`, including a key defined by POSIX that is outside this reader profile. Key recognition MUST NOT normalize or case-fold input bytes. Empty values for recognized keys remain deletion markers under PARSE-TAR-003/006; this requirement does not change duplicate-key, NUL, or value-grammar handling.
+
+Provenance: DOC-PAX, PARSE-TAR-003/006, and POLICY. This fixes the accepted key-to-field map and unsupported-key outcome; record framing, duplicate handling, and value interpretation remain separately specified.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

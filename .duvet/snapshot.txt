@@ -346,6 +346,12 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: When a resolved PAX path or link override is absent, including after an empty-value deletion, the next selection source (GNU long-name/long-link or raw header field) MUST remain byte-preserving and MUST NOT be validated under the PAX charset.
     TEXT[implementation,test]:  This requirement does not relax NUL rejection for PAX records.
 
+  SECTION: [PARSE-TAR-043](#parse-tar-043)
+    TEXT[!MUST,implementation,test]: The reader MUST recognize exactly these PAX key byte strings and map them to their corresponding semantic fields: `path`, `linkpath`, `size`, `mtime`, `uid`, `gid`, `uname`, `gname`, `atime`, `ctime`, and `hdrcharset`.
+    TEXT[!MUST,implementation,test]: Any other key MUST produce `UnsupportedPax`, including a key defined by POSIX that is outside this reader profile.
+    TEXT[!MUST,implementation,test]: Key recognition MUST NOT normalize or case-fold input bytes.
+    TEXT[implementation,test]:  Empty values for recognized keys remain deletion markers under PARSE-TAR-003/006; this requirement does not change duplicate-key, NUL, or value-grammar handling.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 
