@@ -5100,6 +5100,20 @@ implementations = [{ path = "crates/core/src/path.rs", symbol = "is_root" }, { p
 proofs = [{ id = "snapshot-root-path-recognition", requirement = "PARSE-STATE-005", path = "crates/core/src/path.rs", symbol = "is_root", kind = "contract" }, { id = "snapshot-root-entry-type-admission", requirement = "PARSE-STATE-005", path = "crates/core/src/state.rs", symbol = "root_entry_type_allowed", kind = "contract" }]
 tests = [{ package = "duplicity-core", name = "full_root_policy_rejects_non_directory_and_does_not_synthesize_missing_root" }]
 
+[[milestone]]
+id = "snapshot-deletion-payload-admission"
+gate = false
+requirements = ["PARSE-STATE-006"]
+specified = true
+implemented = false
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+implementations = []
+proofs = []
+tests = []
+
 [[trusted]]
 id = "build-orchestration"
 reviewed = true

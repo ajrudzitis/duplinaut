@@ -882,6 +882,12 @@ A successfully returned `SnapshotState` MUST NOT contain a backup-root entry who
 
 Provenance: PARSE-PATH-002, POLICY. The empty component sequence identifies the backup root. Snapshot state retains explicit backup metadata and does not invent root metadata for an archive that omitted the root; a present root entry is meaningful only as a directory. This requirement does not prescribe restoration of the destination root.
 
+### PARSE-STATE-006
+
+An incremental logical entry whose operation is `Deleted` MUST have an empty payload. If it carries any payload bytes, the reader MUST reject the incremental set rather than apply the deletion and discard those bytes.
+
+Provenance: SRC-DIFF, SRC-PATCH, POLICY. A deleted entry removes path state and has no content semantics; rejection prevents unaccounted bytes from being silently ignored. This admission rule does not prescribe a public error variant or refine the complete state-transition controller.
+
 ### PARSE-BROWSE-001
 
 Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.
