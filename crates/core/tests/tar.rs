@@ -1688,7 +1688,29 @@ fn raw_header_mtime_must_be_admitted_under_valid_pax_override() {
     let mut boundary = member(b"snapshot/raw", b'0', b"");
     binary(&mut boundary[136..148], i128::from(i64::MAX));
     checksum(&mut boundary[..512]);
-    let bytes = [pax, boundary].concat();
+    let bytes = [pax.clone(), boundary].concat();
+    let parsed = parse(&bytes).unwrap();
+    assert_eq!(
+        parsed.entries[0].mtime,
+        TarTime {
+            seconds: 7,
+            nanoseconds: 250_000_000
+        }
+    );
+
+    let mut lower_out_of_range = member(b"snapshot/raw", b'0', b"");
+    binary(&mut lower_out_of_range[136..148], i128::from(i64::MIN) - 1);
+    checksum(&mut lower_out_of_range[..512]);
+    assert_eq!(
+        parse(&[pax.clone(), lower_out_of_range].concat()).unwrap_err(),
+        TarError::Numeric,
+        "a valid PAX timestamp does not mask raw mtime below i64::MIN",
+    );
+
+    let mut lower_boundary = member(b"snapshot/raw", b'0', b"");
+    binary(&mut lower_boundary[136..148], i128::from(i64::MIN));
+    checksum(&mut lower_boundary[..512]);
+    let bytes = [pax, lower_boundary].concat();
     let parsed = parse(&bytes).unwrap();
     assert_eq!(
         parsed.entries[0].mtime,
