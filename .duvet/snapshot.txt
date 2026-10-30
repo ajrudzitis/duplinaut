@@ -308,6 +308,13 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: An empty PAX record value remains a deletion marker under PARSE-TAR-006; when deletion leaves no effective override, the parser MUST use the raw header fallback.
     TEXT[!MUST,implementation,test]: GNU/PAX extension payloads MUST continue to use their raw header size.
 
+  SECTION: [PARSE-TAR-037](#parse-tar-037)
+    TEXT[!MUST,implementation,test]: Each resolved nonempty PAX `mtime`, `atime`, or `ctime` value MUST consist of an optional single `+` or `-`, one or more ASCII decimal integer digits, and an optional `.` followed by one or more ASCII decimal fraction digits.
+    TEXT[!MUST,implementation,test]: The integer magnitude MUST fit in `u64`.
+    TEXT[!MUST,implementation,test]: A fraction with at most nine digits MUST be interpreted exactly as nanoseconds by right-padding with zeroes; additional fraction digits MUST all be zero, or parsing MUST fail rather than lose precision.
+    TEXT[!MUST,implementation,test]: The sign MUST apply to the complete value, which MUST be normalized to `(seconds: i64, nanoseconds: u32)` with `0 <= nanoseconds < 1,000,000,000`; values outside that normalized range MUST produce Numeric.
+    TEXT[!MUST,implementation,test]: Empty integer/fraction components, malformed bytes, multiple signs or dots, and numeric overflow MUST produce Numeric.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

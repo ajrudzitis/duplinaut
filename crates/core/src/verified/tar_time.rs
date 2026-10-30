@@ -132,6 +132,8 @@ pub open spec fn time_model(input: Seq<u8>) -> Option<(int, int)> {
         }
     }
 }
+//= docs/parsing-requirements.md#parse-tar-037
+//# Each resolved nonempty PAX `mtime`, `atime`, or `ctime` value MUST consist of an optional single `+` or `-`, one or more ASCII decimal integer digits, and an optional `.` followed by one or more ASCII decimal fraction digits. The integer magnitude MUST fit in `u64`. A fraction with at most nine digits MUST be interpreted exactly as nanoseconds by right-padding with zeroes; additional fraction digits MUST all be zero, or parsing MUST fail rather than lose precision. The sign MUST apply to the complete value, which MUST be normalized to `(seconds: i64, nanoseconds: u32)` with `0 <= nanoseconds < 1,000,000,000`; values outside that normalized range MUST produce Numeric. Empty integer/fraction components, malformed bytes, multiple signs or dots, and numeric overflow MUST produce Numeric.
 pub fn time(input: &[u8]) -> (result: Option<(i64, u32)>)
     ensures match result {
         Some((s, n)) => time_model(input@) == Some((s as int, n as int)) && n < 1000000000,

@@ -637,6 +637,12 @@ After PAX global/local state resolution, an effective `size`, `uid`, or `gid` ov
 
 Provenance: DOC-TAR and SRC-TAR define these PAX fields as nonnegative decimal values; the reviewed reader profile and POLICY require checked `u64` admission and an explicit Numeric diagnostic. PAX record framing and global/local state selection remain specified by PARSE-TAR-003/006, and raw tar numeric decoding remains specified by PARSE-TAR-026/027. This requirement covers decimal conversion after effective-state resolution and real-entry fallback behavior, not extension-state timing or full tar-controller refinement.
 
+### PARSE-TAR-037
+
+Each resolved nonempty PAX `mtime`, `atime`, or `ctime` value MUST consist of an optional single `+` or `-`, one or more ASCII decimal integer digits, and an optional `.` followed by one or more ASCII decimal fraction digits. The integer magnitude MUST fit in `u64`. A fraction with at most nine digits MUST be interpreted exactly as nanoseconds by right-padding with zeroes; additional fraction digits MUST all be zero, or parsing MUST fail rather than lose precision. The sign MUST apply to the complete value, which MUST be normalized to `(seconds: i64, nanoseconds: u32)` with `0 <= nanoseconds < 1,000,000,000`; values outside that normalized range MUST produce Numeric. Empty integer/fraction components, malformed bytes, multiple signs or dots, and numeric overflow MUST produce Numeric.
+
+Provenance: DOC-TAR, SRC-TAR, and the reviewed PAX timestamp profile above. This specifies value conversion after PAX state resolution; absent/deleted values, field selection, and global/local timing remain governed by PARSE-TAR-006/029/035, and complete tar-controller error ordering remains separate.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
