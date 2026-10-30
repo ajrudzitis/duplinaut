@@ -320,6 +320,11 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: If the number of previously accepted real entries is equal to or greater than `max_entries`, the parser MUST return Limit even when later selected-name interpretation would fail validation.
     TEXT[!MUST,implementation,test]: This check MUST NOT precede the listed header, size-selection, extent, or type checks; extension-header count and metadata checks remain governed separately.
 
+  SECTION: [PARSE-TAR-039](#parse-tar-039)
+    TEXT[!MUST,implementation,test]: For a successfully parsed tar stream, `TarVolume.entry_stream_bytes` MUST equal the byte offset immediately after the final complete tar record, including its header, payload, and padding, and before any accepted zero footer or encrypted top-off.
+    TEXT[!MUST,implementation,test]: When the input ends exactly after complete records with no footer, the field MUST equal the input length.
+    TEXT[!MUST,implementation,test]: When a zero footer is present, the field MUST point to its first byte; validated footer and top-off bytes MUST NOT be included.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

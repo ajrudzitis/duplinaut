@@ -649,6 +649,12 @@ For an ordinary real entry, after checksum, header-profile, and raw numeric-fiel
 
 Provenance: POLICY and PARSE-TAR-021/034. This fixes the observable boundary between ordinary-entry admission and selected-name interpretation. It does not specify the ordering of raw header fields that are decoded before the count check or of other output metadata interpreted afterward.
 
+### PARSE-TAR-039
+
+For a successfully parsed tar stream, `TarVolume.entry_stream_bytes` MUST equal the byte offset immediately after the final complete tar record, including its header, payload, and padding, and before any accepted zero footer or encrypted top-off. When the input ends exactly after complete records with no footer, the field MUST equal the input length. When a zero footer is present, the field MUST point to its first byte; validated footer and top-off bytes MUST NOT be included.
+
+Provenance: PARSE-TAR-005 and POLICY. The offset separates parsed entry records from envelope termination bytes for encrypted-volume top-off checks and producer compatibility; footer validation and ciphertext comparison remain separately specified. This does not accept incomplete records or alter footer profiles.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

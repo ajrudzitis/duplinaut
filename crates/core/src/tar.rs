@@ -492,6 +492,8 @@ impl<'a> TarVolume<'a> {
                 return Err(TarError::Termination);
             }
         }
+        //= docs/parsing-requirements.md#parse-tar-039
+        //# For a successfully parsed tar stream, `TarVolume.entry_stream_bytes` MUST equal the byte offset immediately after the final complete tar record, including its header, payload, and padding, and before any accepted zero footer or encrypted top-off. When the input ends exactly after complete records with no footer, the field MUST equal the input length. When a zero footer is present, the field MUST point to its first byte; validated footer and top-off bytes MUST NOT be included.
         Ok(Self {
             entries,
             entry_stream_bytes: cursor,

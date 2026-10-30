@@ -359,6 +359,9 @@ fn real_entry_count_is_bounded_before_output_field_interpretation() {
 //= docs/parsing-requirements.md#parse-tar-008
 //= type=test
 //# It MUST reject configured entry-size excess and truncated extents with explicit errors.
+//= docs/parsing-requirements.md#parse-tar-039
+//= type=test
+//# For a successfully parsed tar stream, `TarVolume.entry_stream_bytes` MUST equal the byte offset immediately after the final complete tar record, including its header, payload, and padding, and before any accepted zero footer or encrypted top-off. When the input ends exactly after complete records with no footer, the field MUST equal the input length. When a zero footer is present, the field MUST point to its first byte; validated footer and top-off bytes MUST NOT be included.
 
 #[test]
 fn complete_entry_extents_padding_and_checksum() {
@@ -551,6 +554,9 @@ fn tar_payload_extent_boundaries_preserve_payload_padding_and_truncation_errors(
 //= docs/parsing-requirements.md#parse-tar-005
 //= type=test
 //# The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.
+//= docs/parsing-requirements.md#parse-tar-039
+//= type=test
+//# For a successfully parsed tar stream, `TarVolume.entry_stream_bytes` MUST equal the byte offset immediately after the final complete tar record, including its header, payload, and padding, and before any accepted zero footer or encrypted top-off. When the input ends exactly after complete records with no footer, the field MUST equal the input length. When a zero footer is present, the field MUST point to its first byte; validated footer and top-off bytes MUST NOT be included.
 
 #[test]
 fn footer_profiles_are_explicit() {
