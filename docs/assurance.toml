@@ -5102,13 +5102,13 @@ tests = [{ package = "duplicity-core", name = "full_root_policy_rejects_non_dire
 
 [[milestone]]
 id = "snapshot-deletion-payload-admission"
-gate = false
+gate = true
 requirements = ["PARSE-STATE-006"]
 specified = true
 implemented = true
 proved = true
 tested = true
-reviewed = false
+reviewed = true
 proof_required = true
 # Formal evidence covers only the operation/payload predicate, not the state
 # controller's rejection path or complete transition semantics.
