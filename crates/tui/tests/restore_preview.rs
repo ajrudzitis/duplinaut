@@ -3,6 +3,7 @@
 use duplicity_core::{local::LocalSource, names::Timestamp, source::Cancellation};
 use duplicity_tui::{
     cli::Destination,
+    restore_flow,
     worker::{Command, Reply, Worker},
 };
 use std::{
@@ -277,6 +278,40 @@ fn marked_official_preview_preserves_raw_roots_and_required_ancestors_without_ex
         .text
         .contains("New destination leaf: marked-preview\n"));
     assert_preview_policy(&preview.text);
+    assert!(!temp.0.join(std::ffi::OsString::from_vec(leaf)).exists());
+    worker.shutdown(&Cancellation::default(), |_| {}).unwrap();
+}
+
+#[test]
+//= docs/parsing-requirements.md#restore-ui-002
+//= type=test
+//# A selected unsupported type or invalid plan yields a preview error and no executable confirmation.
+fn out_of_range_marked_index_returns_selection_preview_error_without_destination() {
+    let temp = Temp::new();
+    let mut worker = worker();
+    let anchor = anchor(&mut worker);
+    let snapshot = snapshot(&mut worker, 1, anchor, 1700172800);
+    let leaf = b"invalid-preview".to_vec();
+
+    worker
+        .send(Command::Prepare {
+            id: 2,
+            marked: vec![snapshot.state().len()],
+            snapshot,
+            destination: Arc::new(Destination {
+                parent: temp.0.clone(),
+                name: leaf.clone(),
+            }),
+            cancel: Cancellation::default(),
+        })
+        .unwrap();
+    assert!(matches!(
+        receive(&mut worker),
+        Reply::Preview {
+            result: Err(restore_flow::Error::Selection),
+            ..
+        }
+    ));
     assert!(!temp.0.join(std::ffi::OsString::from_vec(leaf)).exists());
     worker.shutdown(&Cancellation::default(), |_| {}).unwrap();
 }

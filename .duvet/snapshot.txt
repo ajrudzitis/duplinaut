@@ -555,6 +555,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
 
   SECTION: [RESTORE-UI-002](#restore-ui-002)
     TEXT[!MUST,implementation,test]: The frontend MUST derive a restoration preview from the exact completed immutable snapshot and selected original byte-valued roots, including precisely the entries and source directory ancestors accepted by its `RestorePlan`.
+    TEXT[test]: A selected unsupported type or invalid plan yields a preview error and no executable confirmation.
 
   SECTION: [RESTORE-UI-003](#restore-ui-003)
     TEXT[!MUST,implementation,test]: The frontend MUST present a concrete restoration preview identifying the exact snapshot target, configured parent and new leaf, marked/all selection, included ancestors, resulting entry count, total regular payload bytes, no-replacement policy and supported metadata policy before offering publication confirmation.
