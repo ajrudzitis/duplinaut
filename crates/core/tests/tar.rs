@@ -283,13 +283,13 @@ fn extension_header_count_is_bounded_before_content_interpretation() {
             Termination::Data,
             TarLimits {
                 max_entry_bytes: 0,
-                max_extended_headers: 0,
+                max_extended_headers: 1,
                 ..TarLimits::default()
             },
         )
         .unwrap_err(),
         TarError::Limit,
-        "raw extension extent limit is enforced before the exhausted extension count",
+        "raw extension extent limit is enforced when extension count is available",
     );
 }
 

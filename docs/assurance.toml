@@ -3908,6 +3908,36 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-extension-extent-before-count"
+gate = true
+requirements = ["PARSE-TAR-045"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The selected raw extension extent and extension-count predicates are
+# contract-verified. Tests independently establish that an oversized extent
+# returns Limit, that Truncated precedes an exhausted count, and that count
+# precedes malformed content after a valid extent. Tests do not distinguish
+# simultaneous Limit-vs-Limit ordering; the parser sequence and local contracts
+# expose that order. Whole-loop ordering remains open.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry_extent.rs", symbol = "take_selected_entry_payload" },
+  { path = "crates/core/src/verified/tar_entry.rs", symbol = "admit_extension_header_count" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-extension-extent-before-count-extent", requirement = "PARSE-TAR-045", path = "crates/core/src/verified/tar_entry_extent.rs", symbol = "take_selected_entry_payload", kind = "contract" },
+  { id = "tar-extension-extent-before-count-admission", requirement = "PARSE-TAR-045", path = "crates/core/src/verified/tar_entry.rs", symbol = "admit_extension_header_count", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "extension_header_count_is_bounded_before_content_interpretation" },
+  { package = "duplicity-core", name = "extension_metadata_charges_accumulate_across_headers" }
+]
+
+[[milestone]]
 id = "tar-entry-metadata-charge"
 gate = true
 requirements = ["PARSE-TAR-018"]
