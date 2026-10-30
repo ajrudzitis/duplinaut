@@ -743,3 +743,89 @@ fn lemma_evidence_rejects_unexpanded_macros_and_ordinary_functions() {
         );
     }
 }
+
+#[test]
+fn gate_tests_are_grouped_by_package_and_deduplicated() {
+    let ledger: Ledger = toml::from_str(
+        r#"
+schema=1
+baseline_enabled=false
+specification='spec.md'
+algorithm_sources=[]
+trusted=[]
+[[milestone]]
+id='first'
+gate=true
+requirements=[]
+specified=true
+implemented=true
+proved=false
+tested=true
+reviewed=true
+proof_required=false
+implementations=[]
+proofs=[]
+tests=[{package='core',name='alpha'},{package='core',name='beta'}]
+[[milestone]]
+id='second'
+gate=true
+requirements=[]
+specified=true
+implemented=true
+proved=false
+tested=true
+reviewed=true
+proof_required=false
+implementations=[]
+proofs=[]
+tests=[{package='core',name='alpha'},{package='xtask',name='gamma'}]
+[[milestone]]
+id='inactive'
+gate=false
+requirements=[]
+specified=true
+implemented=true
+proved=false
+tested=false
+reviewed=false
+proof_required=false
+implementations=[]
+proofs=[]
+tests=[{package='unused',name='not_required'}]
+"#,
+    )
+    .unwrap();
+
+    let grouped = grouped_gate_tests(&ledger);
+    assert_eq!(grouped.len(), 2);
+    assert_eq!(grouped["core"].len(), 2);
+    assert!(grouped["core"].contains("alpha"));
+    assert!(grouped["core"].contains("beta"));
+    assert_eq!(
+        grouped["xtask"].iter().cloned().collect::<Vec<_>>(),
+        ["gamma"]
+    );
+    assert!(!grouped.contains_key("unused"));
+}
+
+#[test]
+fn package_gate_test_validation_rejects_missing_ignored_and_failed_tests() {
+    let names = ["required".to_owned()].into_iter().collect();
+    assert!(validate_package_test_output("core", &names, "other: test\n", "").is_err());
+    assert!(validate_package_test_output(
+        "core",
+        &names,
+        "required: test\n",
+        "test required ... ignored\n"
+    )
+    .is_err());
+    assert!(validate_package_test_output(
+        "core",
+        &names,
+        "required: test\n",
+        "test required ... FAILED\n"
+    )
+    .is_err());
+    validate_package_test_output("core", &names, "required: test\n", "test required ... ok\n")
+        .unwrap();
+}

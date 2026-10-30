@@ -5,6 +5,7 @@ use anyhow::{bail, Context, Result};
 use assurance::{load_ledger, source_digest, validate_ledger, Ledger};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::{BTreeMap, BTreeSet},
     env, fs,
     path::{Path, PathBuf},
     process::{Command, Output},
@@ -477,49 +478,58 @@ fn require_fresh_verification_summary(stdout: &[u8], stderr: &[u8]) -> Result<()
     Ok(())
 }
 fn validate_named_tests(root: &Path, ledger: &Ledger) -> Result<()> {
-    for milestone in ledger.milestone.iter().filter(|item| item.gate) {
-        for test in &milestone.tests {
-            let listing = String::from_utf8(
-                capture(
-                    root,
-                    Path::new("cargo"),
-                    &["test", "--locked", "-p", &test.package, "--", "--list"],
-                )?
-                .stdout,
-            )?;
-            if !listing
-                .lines()
-                .any(|line| line == format!("{}: test", test.name))
-            {
-                bail!(
-                    "required test {} in {} does not exist",
-                    test.name,
-                    test.package
-                );
-            }
-            let result = capture(
+    for (package, names) in grouped_gate_tests(ledger) {
+        let listing = String::from_utf8(
+            capture(
                 root,
                 Path::new("cargo"),
-                &[
-                    "test",
-                    "--locked",
-                    "-p",
-                    &test.package,
-                    &test.name,
-                    "--",
-                    "--exact",
-                ],
-            )?;
-            let output = String::from_utf8(result.stdout)?;
-            if !output
-                .lines()
-                .any(|line| line == format!("test {} ... ok", test.name))
-            {
-                bail!(
-                    "required test {} did not execute successfully (ignored or filtered)",
-                    test.name
-                );
-            }
+                &["test", "--locked", "-p", &package, "--", "--list"],
+            )?
+            .stdout,
+        )?;
+        let output = Command::new("cargo")
+            .current_dir(root)
+            .args(["test", "--locked", "-p", &package])
+            .output()
+            .with_context(|| format!("cannot run cargo test for package {package}"))?;
+        let stdout = String::from_utf8(output.stdout).context("non-UTF8 cargo test output")?;
+        let stderr = String::from_utf8(output.stderr).context("non-UTF8 cargo test diagnostics")?;
+        validate_package_test_output(&package, &names, &listing, &stdout)?;
+        if !output.status.success() {
+            bail!("cargo test failed for package {package}:\n{stdout}\n{stderr}");
+        }
+    }
+    Ok(())
+}
+
+fn grouped_gate_tests(ledger: &Ledger) -> BTreeMap<String, BTreeSet<String>> {
+    let mut grouped = BTreeMap::new();
+    for milestone in ledger.milestone.iter().filter(|item| item.gate) {
+        for test in &milestone.tests {
+            grouped
+                .entry(test.package.clone())
+                .or_insert_with(BTreeSet::new)
+                .insert(test.name.clone());
+        }
+    }
+    grouped
+}
+
+fn validate_package_test_output(
+    package: &str,
+    names: &BTreeSet<String>,
+    listing: &str,
+    output: &str,
+) -> Result<()> {
+    for name in names {
+        if !listing.lines().any(|line| line == format!("{name}: test")) {
+            bail!("required test {name} in {package} does not exist");
+        }
+        if !output
+            .lines()
+            .any(|line| line == format!("test {name} ... ok"))
+        {
+            bail!("required test {name} in {package} did not execute successfully (ignored, filtered, or failed)");
         }
     }
     Ok(())
