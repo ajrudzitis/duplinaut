@@ -54,6 +54,7 @@ anchor choice.
 - [x] Add focused official-fixture worker checks for RESTORE-UI-003 whole-snapshot and marked-preview details; both portable preview tests pass on macOS, independent review and full CI passed. The marked case only prepares a preview and does not publish; broader frontend acceptance remains pending.
 - [x] Test the RESTORE-UI-002 out-of-range selection error through the worker preview path, including absence of a destination; independent review and full macOS CI passed. This covers one invalid-plan path only.
 - [x] Test the RESTORE-UI-011 1,025 repeated valid-root preview limit, confirming rejection before deduplication and no destination; this covers only the root-count bound.
+- [x] Test the configured 20 MiB preview-text cap at the exact boundary: exact-limit appends succeed, and a one-byte overflow is rejected without changing the existing text. This covers preview-text growth only.
 - [x] Verify on macOS that ordinary local and S3 CLI configurations parse without a restore destination while native restore flags remain rejected; independent review and full CI passed. This is CLI parsing coverage only.
 - [x] Connect explicitly acknowledged selection to native Linux publication; use the existing SDK credential provider.
 - [ ] Test remaining display escaping, error and interaction paths.

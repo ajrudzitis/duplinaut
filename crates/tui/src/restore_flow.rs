@@ -409,6 +409,29 @@ mod tests {
         assert!(small.bytes(b"\xff").is_err());
         assert_eq!(small.finish(), "");
     }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-011
+    //= type=test
+    //# The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
+    fn preview_text_enforces_configured_limit_without_mutating_on_overflow() {
+        let mut text = Text::new(PREVIEW_BYTES);
+        text.reserve(PREVIEW_BYTES).unwrap();
+
+        // Fill the single owned preview buffer in chunks; the test does not
+        // allocate a second 20 MiB input string or construct a snapshot.
+        let chunk = [b'x'; 4096];
+        let chunk = std::str::from_utf8(&chunk).unwrap();
+        for _ in 0..(PREVIEW_BYTES / chunk.len()) {
+            text.push(chunk).unwrap();
+        }
+        assert_eq!(text.value.len(), PREVIEW_BYTES);
+        assert!(text.value.bytes().all(|byte| byte == b'x'));
+
+        assert!(matches!(text.push("x"), Err(Error::Limit)));
+        assert_eq!(text.value.len(), PREVIEW_BYTES);
+        assert!(text.value.bytes().all(|byte| byte == b'x'));
+    }
 }
 #[cfg(target_os = "linux")]
 //= docs/parsing-requirements.md#restore-ui-012
