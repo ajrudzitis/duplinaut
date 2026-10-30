@@ -222,11 +222,26 @@ fn missing_ancestors_root_types_empty_state_and_unsupported_metadata() {
         ),
         Err(StateError::FullOperation)
     ));
+}
+
+//= docs/parsing-requirements.md#parse-state-006
+//= type=test
+//# An incremental logical entry whose operation is `Deleted` MUST have an empty payload. If it carries any payload bytes, the reader MUST reject the incremental set rather than apply the deletion and discard those bytes.
+#[test]
+fn incremental_deleted_entries_require_empty_payloads() {
+    let previous = initial();
     let malformed = archive(&[("deleted/file", b'0', b"illegal")]);
     assert!(matches!(
-        initial().apply_incremental(&malformed, StateLimits::default()),
+        previous.apply_incremental(&malformed, StateLimits::default()),
         Err(StateError::EntryPayload)
     ));
+    assert!(previous.get(&path(b"file")).is_some());
+
+    let valid = archive(&[("deleted/file", b'0', b"")]);
+    let next = previous
+        .apply_incremental(&valid, StateLimits::default())
+        .unwrap();
+    assert!(next.get(&path(b"file")).is_none());
 }
 
 //= docs/parsing-requirements.md#parse-state-005

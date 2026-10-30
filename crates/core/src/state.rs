@@ -226,7 +226,7 @@ impl SnapshotState {
             }
             match entry.operation {
                 LogicalOperation::Deleted => {
-                    if !entry.payload.is_empty() {
+                    if !operation_payload_allowed(entry.operation, &entry.payload) {
                         return Err(StateError::EntryPayload);
                     }
                     next.remove(&entry.path, true)?;
@@ -478,6 +478,32 @@ pub(crate) fn root_entry_type_allowed(is_root_path: bool, entry_type: EntryType)
         | EntryType::CharacterDevice
         | EntryType::BlockDevice
         | EntryType::Fifo => !is_root_path,
+    }
+}
+
+/// Deleted operations have no payload semantics.
+pub open spec fn operation_payload_allowed_model(
+    operation: LogicalOperation,
+    payload_empty: bool,
+) -> bool {
+    match operation {
+        LogicalOperation::Deleted => payload_empty,
+        LogicalOperation::Snapshot | LogicalOperation::Diff => true,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-state-006
+//= type=implementation
+//# An incremental logical entry whose operation is `Deleted` MUST have an empty payload. If it carries any payload bytes, the reader MUST reject the incremental set rather than apply the deletion and discard those bytes.
+pub(crate) fn operation_payload_allowed(
+    operation: LogicalOperation,
+    payload: &[u8],
+) -> (result: bool)
+    ensures result == operation_payload_allowed_model(operation, payload.len() == 0),
+{
+    match operation {
+        LogicalOperation::Deleted => payload.len() == 0,
+        LogicalOperation::Snapshot | LogicalOperation::Diff => true,
     }
 }
 

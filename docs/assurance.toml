@@ -5105,14 +5105,16 @@ id = "snapshot-deletion-payload-admission"
 gate = false
 requirements = ["PARSE-STATE-006"]
 specified = true
-implemented = false
-proved = false
-tested = false
+implemented = true
+proved = true
+tested = true
 reviewed = false
 proof_required = true
-implementations = []
-proofs = []
-tests = []
+# Formal evidence covers only the operation/payload predicate, not the state
+# controller's rejection path or complete transition semantics.
+implementations = [{ path = "crates/core/src/state.rs", symbol = "operation_payload_allowed" }]
+proofs = [{ id = "snapshot-deletion-payload-predicate", requirement = "PARSE-STATE-006", path = "crates/core/src/state.rs", symbol = "operation_payload_allowed", kind = "contract" }]
+tests = [{ package = "duplicity-core", name = "incremental_deleted_entries_require_empty_payloads" }]
 
 [[trusted]]
 id = "build-orchestration"

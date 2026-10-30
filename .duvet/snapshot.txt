@@ -454,8 +454,8 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: Applying a full set that contains no logical entry for the backup root MUST NOT synthesize a root entry in the resulting state.
 
   SECTION: [PARSE-STATE-006](#parse-state-006)
-    TEXT[!MUST]: An incremental logical entry whose operation is `Deleted` MUST have an empty payload.
-    TEXT[!MUST]: If it carries any payload bytes, the reader MUST reject the incremental set rather than apply the deletion and discard those bytes.
+    TEXT[!MUST,implementation,test]: An incremental logical entry whose operation is `Deleted` MUST have an empty payload.
+    TEXT[!MUST,implementation,test]: If it carries any payload bytes, the reader MUST reject the incremental set rather than apply the deletion and discard those bytes.
 
   SECTION: [PARSE-BROWSE-001](#parse-browse-001)
     TEXT[!MUST]: Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.
