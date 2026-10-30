@@ -1428,13 +1428,27 @@ mod tests {
     fn effective_pax_size_selects_override_fallback_and_invalid_values() {
         assert_eq!(effective_size(None, 17), Ok(17));
         assert_eq!(effective_size(Some(b"0"), 17), Ok(0));
+        assert_eq!(effective_size(Some(b"000"), 17), Ok(0));
         assert_eq!(effective_size(Some(b"123"), 17), Ok(123));
-        assert_eq!(effective_size(Some(b""), 17), Err(PaxSizeError::Invalid));
         assert_eq!(
-            effective_size(Some(b"18446744073709551616"), 17),
-            Err(PaxSizeError::Invalid)
+            effective_size(Some(b"18446744073709551615"), 17),
+            Ok(u64::MAX)
         );
-        assert_eq!(effective_size(Some(b"1x"), 17), Err(PaxSizeError::Invalid));
+        assert_eq!(effective_size(Some(b""), 17), Err(PaxSizeError::Invalid));
+        for invalid in [
+            b"+1" as &[u8],
+            b"-1",
+            b" 1",
+            b"1 ",
+            b"1x",
+            b"\xff",
+            b"18446744073709551616",
+        ] {
+            assert_eq!(
+                effective_size(Some(invalid), 17),
+                Err(PaxSizeError::Invalid)
+            );
+        }
     }
 
     #[test]
@@ -1709,16 +1723,24 @@ mod tests {
     fn effective_pax_ids_select_fallback_and_exact_decimal_values() {
         assert_eq!(effective_id(None, 17), Ok(17));
         assert_eq!(effective_id(Some(b"0"), 17), Ok(0));
+        assert_eq!(effective_id(Some(b"000"), 17), Ok(0));
+        assert_eq!(effective_id(Some(b"123"), 17), Ok(123));
         assert_eq!(
             effective_id(Some(b"18446744073709551615"), 17),
             Ok(u64::MAX)
         );
         assert_eq!(effective_id(Some(b""), 17), Err(PaxIdError::Invalid));
-        assert_eq!(effective_id(Some(b"1x"), 17), Err(PaxIdError::Invalid));
-        assert_eq!(
-            effective_id(Some(b"18446744073709551616"), 17),
-            Err(PaxIdError::Invalid)
-        );
+        for invalid in [
+            b"+1" as &[u8],
+            b"-1",
+            b" 1",
+            b"1 ",
+            b"1x",
+            b"\xff",
+            b"18446744073709551616",
+        ] {
+            assert_eq!(effective_id(Some(invalid), 17), Err(PaxIdError::Invalid));
+        }
     }
 
     //= docs/parsing-requirements.md#parse-tar-029

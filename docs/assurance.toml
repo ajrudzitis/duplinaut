@@ -3960,6 +3960,41 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-pax-decimal-u64-fields"
+gate = true
+requirements = ["PARSE-TAR-036"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Connects the checked ASCII decimal u64 model to selected PAX size/uid/gid
+# slots; extension payload-size dispatch remains raw-header-only.
+implementations = [
+  { path = "crates/core/src/verified/tar_helpers.rs", symbol = "decimal" },
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_size" },
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_id" },
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "payload_size" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-pax-decimal-u64-fields-size", requirement = "PARSE-TAR-036", path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_size", kind = "contract" },
+  { id = "tar-pax-decimal-u64-fields-id", requirement = "PARSE-TAR-036", path = "crates/core/src/verified/tar_pax.rs", symbol = "effective_id", kind = "contract" },
+  { id = "tar-pax-decimal-u64-fields-extension-size", requirement = "PARSE-TAR-036", path = "crates/core/src/verified/tar_pax.rs", symbol = "payload_size", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::effective_pax_size_selects_override_fallback_and_invalid_values" },
+  { package = "duplicity-core", name = "verified::tar_pax::tests::payload_size_uses_raw_extension_size_and_effective_entry_size" },
+  { package = "duplicity-core", name = "verified::tar_pax::tests::effective_pax_ids_select_fallback_and_exact_decimal_values" },
+  { package = "duplicity-core", name = "invalid_pax_uid_gid_values_are_numeric_errors" },
+  { package = "duplicity-core", name = "invalid_pax_size_values_are_numeric_errors" },
+  { package = "duplicity-core", name = "pax_size_override_controls_payload_and_empty_local_deletion_falls_back" },
+  { package = "duplicity-core", name = "pax_uid_gid_global_local_deletion_and_header_fallback_are_exact" },
+  { package = "duplicity-core", name = "global_pax_size_does_not_change_extension_payload_extent" }
+]
+
+[[milestone]]
 id = "tar-pax-effective-size"
 gate = true
 requirements = ["PARSE-TAR-003"]

@@ -89,6 +89,8 @@ pub open spec fn decimal_prefix(input: Seq<u8>, n: int) -> Option<int>
             else { Some(v * 10 + input[n - 1] as int - 48) },
     }}
 }
+//= docs/parsing-requirements.md#parse-tar-036
+//# After PAX global/local state resolution, an effective `size`, `uid`, or `gid` override MUST be a nonempty sequence of ASCII decimal digits representing a value in `0..=u64::MAX`; leading zeroes and zero MUST be accepted. A selected nonempty value containing signs, whitespace, nondigits, or exceeding `u64::MAX` MUST produce Numeric and MUST NOT fall back to the raw header field. An empty PAX record value remains a deletion marker under PARSE-TAR-006; when deletion leaves no effective override, the parser MUST use the raw header fallback. GNU/PAX extension payloads MUST continue to use their raw header size.
 pub fn decimal(input: &[u8]) -> (result: Option<u64>)
     ensures match result {
         Some(value) => input.len() > 0 && decimal_prefix(input@, input.len() as int) == Some(value as int),
