@@ -888,6 +888,12 @@ An incremental logical entry whose operation is `Deleted` MUST have an empty pay
 
 Provenance: SRC-DIFF, SRC-PATCH, POLICY. A deleted entry removes path state and has no content semantics; rejection prevents unaccounted bytes from being silently ignored. This admission rule does not prescribe a public error variant or refine the complete state-transition controller.
 
+### PARSE-STATE-007
+
+Applying an incremental set MUST be transactional with respect to its preceding `SnapshotState`: if application returns an error for any reason, the preceding state MUST remain observably unchanged and no partially applied successor state may be returned.
+
+Provenance: POLICY. Callers may retry a corrected transition or continue browsing the preceding immutable snapshot after a failed set. This requirement specifies the state API's failure isolation, not complete proof of every transition or resource-accounting path.
+
 ### PARSE-BROWSE-001
 
 Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.

@@ -5116,6 +5116,20 @@ implementations = [{ path = "crates/core/src/state.rs", symbol = "operation_payl
 proofs = [{ id = "snapshot-deletion-payload-predicate", requirement = "PARSE-STATE-006", path = "crates/core/src/state.rs", symbol = "operation_payload_allowed", kind = "contract" }]
 tests = [{ package = "duplicity-core", name = "incremental_deleted_entries_require_empty_payloads" }]
 
+[[milestone]]
+id = "snapshot-incremental-transition-atomicity"
+gate = false
+requirements = ["PARSE-STATE-007"]
+specified = true
+implemented = false
+proved = false
+tested = false
+reviewed = false
+proof_required = true
+implementations = []
+proofs = []
+tests = []
+
 [[trusted]]
 id = "build-orchestration"
 reviewed = true
