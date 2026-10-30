@@ -5032,6 +5032,26 @@ reviewed = true
 rationale = "Pinned Verus/vstd/solver and Vest combinator primitives constitute upstream verification infrastructure. Vest's frontend is unverified; its generated semantics require independent review. Vest upstream trusted primitive external bodies do not permit project algorithm proof bypasses."
 requirements = ["ASSURE-PROOF-003", "ASSURE-VEST-003"]
 
+[[milestone]]
+id = "snapshot-entry-order-ord-adapter"
+gate = false
+requirements = ["PARSE-STATE-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = false
+proof_required = false
+proof_rationale = "The standard Ord/PartialOrd trait adapter delegates to the separately proved comparator and is checked by native pairwise tests. No proof is claimed for the adapter or Rust standard-library BTreeMap internals."
+implementations = [
+  { path = "crates/core/src/path.rs", symbol = "cmp" },
+  { path = "crates/core/src/path.rs", symbol = "partial_cmp" }
+]
+proofs = []
+tests = [
+  { package = "duplicity-core", name = "snapshot_entries_use_bytewise_component_lexicographic_order" }
+]
+
 [[trusted]]
 id = "build-orchestration"
 reviewed = true

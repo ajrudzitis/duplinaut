@@ -869,11 +869,19 @@ fn snapshot_entries_use_bytewise_component_lexicographic_order() {
             } else {
                 0
             };
+            let expected_cmp = match expected_order {
+                -1 => std::cmp::Ordering::Less,
+                0 => std::cmp::Ordering::Equal,
+                1 => std::cmp::Ordering::Greater,
+                _ => unreachable!(),
+            };
             assert_eq!(
                 left.compare(right),
                 expected_order,
                 "left={left:?}, right={right:?}"
             );
+            assert_eq!(left.cmp(right), expected_cmp);
+            assert_eq!(left.partial_cmp(right), Some(expected_cmp));
         }
     }
 }
