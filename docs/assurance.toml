@@ -3449,6 +3449,32 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-entry-stream-offset"
+gate = true
+requirements = ["PARSE-TAR-039"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The local Verus extent contract establishes the padded next cursor for one
+# complete tar record; end-to-end tests establish loop accumulation and the
+# pre-footer offset. Whole-parser cursor refinement remains open.
+implementations = [
+  { path = "crates/core/src/verified/tar_entry_extent.rs", symbol = "take_selected_entry_payload" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-entry-stream-offset", requirement = "PARSE-TAR-039", path = "crates/core/src/verified/tar_entry_extent.rs", symbol = "take_selected_entry_payload", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "complete_entry_extents_padding_and_checksum" },
+  { package = "duplicity-core", name = "footer_profiles_are_explicit" },
+  { package = "duplicity-core", name = "encrypted_record_footer_handles_one_block_and_full_record" }
+]
+
+[[milestone]]
 id = "tar-pax-slot-precedence"
 gate = true
 requirements = ["PARSE-TAR-003"]

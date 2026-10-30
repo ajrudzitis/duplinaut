@@ -65,6 +65,8 @@ pub fn take_entry_payload(input: &[u8], cursor: usize, size: usize)
 /// Select a PAX/raw header size, enforce its entry limit, then take its exact extent.
 //= docs/parsing-requirements.md#parse-tar-008
 //# It MUST reject configured entry-size excess and truncated extents with explicit errors.
+//= docs/parsing-requirements.md#parse-tar-039
+//# For a successfully parsed tar stream, `TarVolume.entry_stream_bytes` MUST equal the byte offset immediately after the final complete tar record, including its header, payload, and padding, and before any accepted zero footer or encrypted top-off. When the input ends exactly after complete records with no footer, the field MUST equal the input length. When a zero footer is present, the field MUST point to its first byte; validated footer and top-off bytes MUST NOT be included.
 pub fn take_selected_entry_payload(
     input: &[u8],
     cursor: usize,

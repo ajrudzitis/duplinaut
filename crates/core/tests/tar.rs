@@ -565,8 +565,11 @@ fn footer_profiles_are_explicit() {
     assert!(TarVolume::parse(&[], Termination::Signatures, TarLimits::default()).is_ok());
     for blocks in [1, 2, 20] {
         let bytes = [entry.clone(), vec![0; blocks * 512]].concat();
-        assert!(parse(&bytes).is_ok());
-        assert!(TarVolume::parse(&bytes, Termination::Signatures, TarLimits::default()).is_ok());
+        let parsed = parse(&bytes).unwrap();
+        assert_eq!(parsed.entry_stream_bytes, entry.len());
+        let parsed =
+            TarVolume::parse(&bytes, Termination::Signatures, TarLimits::default()).unwrap();
+        assert_eq!(parsed.entry_stream_bytes, entry.len());
     }
     let mut bad = [entry.clone(), vec![0; 512]].concat();
     bad.push(0);
@@ -575,25 +578,27 @@ fn footer_profiles_are_explicit() {
     assert!(parse(&bad).is_err());
     let encrypted = [entry.clone(), vec![0; 10240 - entry.len() % 10240]].concat();
     let stored = b"ciphertext bytes";
-    assert!(TarVolume::parse(
+    let parsed = TarVolume::parse(
         &encrypted,
         Termination::Encrypted {
             stored_ciphertext: stored,
-            nonfinal: false
+            nonfinal: false,
         },
-        TarLimits::default()
+        TarLimits::default(),
     )
-    .is_ok());
+    .unwrap();
+    assert_eq!(parsed.entry_stream_bytes, entry.len());
     let topped = [encrypted.clone(), stored[..6].to_vec()].concat();
-    assert!(TarVolume::parse(
+    let parsed = TarVolume::parse(
         &topped,
         Termination::Encrypted {
             stored_ciphertext: stored,
-            nonfinal: true
+            nonfinal: true,
         },
-        TarLimits::default()
+        TarLimits::default(),
     )
-    .is_ok());
+    .unwrap();
+    assert_eq!(parsed.entry_stream_bytes, entry.len());
     assert!(TarVolume::parse(
         &topped,
         Termination::Encrypted {
@@ -2265,6 +2270,9 @@ fn all_official_plain_gzip_archives_scan_and_classify() {
 //= docs/parsing-requirements.md#parse-tar-005
 //= type=test
 //# The tar parser MUST enforce the supported envelope-specific termination profile rather than treating an incomplete header or payload as a valid object boundary.
+//= docs/parsing-requirements.md#parse-tar-039
+//= type=test
+//# For a successfully parsed tar stream, `TarVolume.entry_stream_bytes` MUST equal the byte offset immediately after the final complete tar record, including its header, payload, and padding, and before any accepted zero footer or encrypted top-off. When the input ends exactly after complete records with no footer, the field MUST equal the input length. When a zero footer is present, the field MUST point to its first byte; validated footer and top-off bytes MUST NOT be included.
 
 #[test]
 fn encrypted_record_footer_handles_one_block_and_full_record() {
