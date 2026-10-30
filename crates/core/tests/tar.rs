@@ -1292,11 +1292,8 @@ fn pax_path_and_linkpath_charset_validation_and_fallback_are_exact() {
     assert_eq!(parsed.entries[0].name, b"snapshot/gnu-\xff");
     assert_eq!(parsed.entries[0].linkname, b"target/gnu-\xfe");
 
-    let utf8_with_deleted_link = [
-        record(b"hdrcharset", b"UTF-8"),
-        record(b"linkpath", b""),
-    ]
-    .concat();
+    let utf8_with_deleted_link =
+        [record(b"hdrcharset", b"UTF-8"), record(b"linkpath", b"")].concat();
     let gnu_invalid_link = member(b"././@LongLink", b'K', b"target/deleted-\xfd\0");
     let deleted_link_gnu_fallback = [
         member(b"local", b'x', &utf8_with_deleted_link),
