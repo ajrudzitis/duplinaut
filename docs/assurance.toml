@@ -4427,6 +4427,33 @@ tests = [
 ]
 
 [[milestone]]
+id = "tar-pax-path-linkpath-charset-policy"
+gate = true
+requirements = ["PARSE-TAR-042"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# The shared charset selector has a Verus contract; end-to-end tests establish
+# path/linkpath behavior. Field selection, length, NUL admission, and extension
+# timing remain separately scoped.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "owner_name_requires_utf8" },
+  { path = "crates/core/src/tar.rs", symbol = "parse" }
+]
+proofs = [
+  { id = "tar-pax-path-linkpath-charset-policy", requirement = "PARSE-TAR-042", path = "crates/core/src/verified/tar_pax.rs", symbol = "owner_name_requires_utf8", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "pax_path_and_linkpath_charset_validation_and_fallback_are_exact" },
+  { package = "duplicity-core", name = "pax_global_local_deletion_binary_and_numeric_overrides" },
+  { package = "duplicity-core", name = "malformed_and_unsupported_pax_are_not_skipped" },
+  { package = "duplicity-core", name = "empty_local_pax_linkpath_allows_gnu_or_header_link_fallback" }
+]
+
+[[milestone]]
 id = "complete-reader"
 gate = false
 requirements = []

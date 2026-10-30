@@ -1174,6 +1174,74 @@ fn pax_global_local_deletion_binary_and_numeric_overrides() {
     assert_eq!(parsed.entries[2].uid, 99);
 }
 
+//= docs/parsing-requirements.md#parse-tar-042
+//= type=test
+//# For a real entry, each nonempty resolved PAX `path` and `linkpath` value MUST be validated as UTF-8 when the effective `hdrcharset` is absent or selects a supported UTF-8 token (`UTF-8` or `ISO-IR 10646 2000 UTF-8`). Invalid bytes MUST produce `TextEncoding`. When the effective `hdrcharset` is `BINARY`, selected PAX `path` and `linkpath` values MUST be retained byte-for-byte without UTF-8 validation. When a resolved PAX path or link override is absent, including after an empty-value deletion, the next selection source (GNU long-name/long-link or raw header field) MUST remain byte-preserving and MUST NOT be validated under the PAX charset. This requirement does not relax NUL rejection for PAX records.
+#[test]
+fn pax_path_and_linkpath_charset_validation_and_fallback_are_exact() {
+    for charset in [
+        None,
+        Some(b"UTF-8" as &[u8]),
+        Some(b"ISO-IR 10646 2000 UTF-8" as &[u8]),
+    ] {
+        for key in [b"path" as &[u8], b"linkpath"] {
+            let mut pax_fields = Vec::new();
+            if let Some(charset) = charset {
+                pax_fields.extend(record(b"hdrcharset", charset));
+            }
+            pax_fields.extend(record(key, b"invalid-\xff"));
+            let entry = if key == b"path" {
+                member(b"snapshot/header", b'0', b"")
+            } else {
+                symlink_with_linkname(b"target/header")
+            };
+            let archive = [member(b"local", b'x', &pax_fields), entry].concat();
+            assert_eq!(
+                parse(&archive).unwrap_err(),
+                TarError::TextEncoding,
+                "charset={charset:?}, key={key:?}"
+            );
+        }
+    }
+
+    let binary_pax = [
+        record(b"hdrcharset", b"BINARY"),
+        record(b"path", b"snapshot/path-\xff"),
+        record(b"linkpath", b"target/link-\xfe"),
+    ]
+    .concat();
+    let archive = [
+        member(b"local", b'x', &binary_pax),
+        symlink_with_linkname(b"target/header"),
+    ]
+    .concat();
+    let parsed = parse(&archive).unwrap();
+    assert_eq!(parsed.entries[0].name, b"snapshot/path-\xff");
+    assert_eq!(parsed.entries[0].linkname, b"target/link-\xfe");
+
+    let utf8_charset = member(b"local", b'x', &record(b"hdrcharset", b"UTF-8"));
+    let mut raw_header = member(b"snapshot/raw-\xff", b'2', b"");
+    raw_header[157..157 + b"target/raw-\xfe".len()].copy_from_slice(b"target/raw-\xfe");
+    checksum(&mut raw_header[..512]);
+    let raw_fallback = [utf8_charset.clone(), raw_header].concat();
+    let parsed = parse(&raw_fallback).expect("raw header fallbacks remain byte-preserving");
+    assert_eq!(parsed.entries[0].name, b"snapshot/raw-\xff");
+    assert_eq!(parsed.entries[0].linkname, b"target/raw-\xfe");
+
+    let gnu_name = member(b"././@LongLink", b'L', b"snapshot/gnu-\xff\0");
+    let gnu_link = member(b"././@LongLink", b'K', b"target/gnu-\xfe\0");
+    let gnu_fallback = [
+        utf8_charset,
+        gnu_name,
+        gnu_link,
+        symlink_with_linkname(b"target/header"),
+    ]
+    .concat();
+    let parsed = parse(&gnu_fallback).expect("GNU fallbacks remain byte-preserving");
+    assert_eq!(parsed.entries[0].name, b"snapshot/gnu-\xff");
+    assert_eq!(parsed.entries[0].linkname, b"target/gnu-\xfe");
+}
+
 //= docs/parsing-requirements.md#parse-tar-006
 //= type=test
 //# Local fields MUST override global fields for the next real entry.
