@@ -885,3 +885,48 @@ fn snapshot_entries_use_bytewise_component_lexicographic_order() {
         }
     }
 }
+
+//= docs/parsing-requirements.md#parse-state-001
+//= type=test
+//# Snapshot interpretation MUST apply additions, replacement content, deltas, deletions, and file-type changes in chain order to the selected backup-relative path state.
+#[test]
+fn component_prefixes_form_an_order_interval() {
+    let paths = [
+        path(b"."),
+        path(b"a"),
+        path(b"a/child"),
+        path(b"a/child/deeper"),
+        path(b"a/\xff"),
+        path(b"a-"),
+        path(b"a-/child"),
+        path(b"a0"),
+        path(b"aa"),
+        path(b"b"),
+        path(b"\xff"),
+    ];
+    let mut checked_intervals = 0;
+
+    for prefix in &paths {
+        for left in &paths {
+            if !prefix.is_component_prefix_of(left) {
+                continue;
+            }
+            for right in &paths {
+                if !prefix.is_component_prefix_of(right) || left.compare(right) >= 0 {
+                    continue;
+                }
+                for middle in &paths {
+                    if left.compare(middle) < 0 && middle.compare(right) < 0 {
+                        assert!(
+                            prefix.is_component_prefix_of(middle),
+                            "prefix={prefix:?}, left={left:?}, middle={middle:?}, right={right:?}"
+                        );
+                        checked_intervals += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    assert!(checked_intervals > 0);
+}

@@ -18,6 +18,93 @@ pub open spec fn components_less(left: Seq<Seq<u8>>, right: Seq<Seq<u8>>) -> boo
         && left.take(i) == right.take(i) && bytes_less(left[i], right[i])
 }
 
+proof fn bytes_less_total_from(left: Seq<u8>, right: Seq<u8>, index: int)
+    requires
+        0 <= index <= left.len(),
+        index <= right.len(),
+        left.take(index) == right.take(index),
+        left != right,
+    ensures bytes_less(left, right) || bytes_less(right, left),
+    decreases (if left.len() < right.len() { left.len() } else { right.len() }) - index,
+{
+    let limit = if left.len() < right.len() { left.len() } else { right.len() };
+    if index < limit {
+        if left[index] == right[index] {
+            assert(left.take(index + 1) == right.take(index + 1)) by {
+                assert forall|i: int| 0 <= i < index + 1
+                    implies left[i] == right[i] by {
+                    if i < index {
+                        assert(left.take(index)[i] == left[i]);
+                        assert(left.take(index)[i] == right.take(index)[i]);
+                        assert(right.take(index)[i] == right[i]);
+                    } else {
+                        assert(i == index);
+                    }
+                }
+            }
+            bytes_less_total_from(left, right, index + 1);
+        } else if left[index] < right[index] {
+            assert(bytes_less(left, right)) by {
+                reveal(bytes_less);
+                assert(exists|i: int| 0 <= i < left.len() && i < right.len()
+                    && left.take(i) == right.take(i) && left[i] < right[i]) by {
+                    assert(left.take(index) == right.take(index));
+                }
+            }
+        } else {
+            assert(right[index] < left[index]);
+            assert(bytes_less(right, left)) by {
+                reveal(bytes_less);
+                assert(exists|i: int| 0 <= i < right.len() && i < left.len()
+                    && right.take(i) == left.take(i) && right[i] < left[i]) by {
+                    assert(right.take(index) == left.take(index));
+                }
+            }
+        }
+    } else if left.len() < right.len() {
+        assert(index == left.len());
+        assert(left == right.take(left.len() as int)) by {
+            assert forall|i: int| 0 <= i < left.len()
+                implies left[i] == right.take(left.len() as int)[i] by {
+                assert(left.take(index)[i] == left[i]);
+                assert(left.take(index)[i] == right.take(index)[i]);
+                assert(right.take(index)[i] == right[i]);
+            }
+        }
+        assert(bytes_less(left, right));
+    } else if right.len() < left.len() {
+        assert(index == right.len());
+        assert(right == left.take(right.len() as int)) by {
+            assert forall|i: int| 0 <= i < right.len()
+                implies right[i] == left.take(right.len() as int)[i] by {
+                assert(left.take(index)[i] == left[i]);
+                assert(left.take(index)[i] == right.take(index)[i]);
+                assert(right.take(index)[i] == right[i]);
+            }
+        }
+        assert(bytes_less(right, left));
+    } else {
+        assert(index == left.len() && index == right.len());
+        assert(left == right) by {
+            assert forall|i: int| 0 <= i < left.len()
+                implies left[i] == right[i] by {
+                assert(left.take(index)[i] == left[i]);
+                assert(left.take(index)[i] == right.take(index)[i]);
+                assert(right.take(index)[i] == right[i]);
+            }
+        }
+        assert(false);
+    }
+}
+
+proof fn bytes_less_total(left: Seq<u8>, right: Seq<u8>)
+    requires left != right,
+    ensures bytes_less(left, right) || bytes_less(right, left),
+{
+    assert(left.take(0) == right.take(0));
+    bytes_less_total_from(left, right, 0);
+}
+
 proof fn bytes_less_is_asymmetric(left: Seq<u8>, right: Seq<u8>)
     requires bytes_less(left, right),
     ensures !bytes_less(right, left),
@@ -127,6 +214,143 @@ proof fn components_less_is_asymmetric(left: Seq<Seq<u8>>, right: Seq<Seq<u8>>)
 pub open spec fn component_prefix(prefix: Seq<Seq<u8>>, path: Seq<Seq<u8>>) -> bool {
     prefix.len() <= path.len()
         && forall|i: int| 0 <= i < prefix.len() ==> prefix[i] == path[i]
+}
+
+/// Paths sharing a component prefix form one interval in component order.
+//= docs/parsing-requirements.md#parse-state-001
+//= type=implementation
+//# Snapshot interpretation MUST apply additions, replacement content, deltas, deletions, and file-type changes in chain order to the selected backup-relative path state.
+pub proof fn component_prefix_is_order_convex(
+    prefix: Seq<Seq<u8>>,
+    left: Seq<Seq<u8>>,
+    middle: Seq<Seq<u8>>,
+    right: Seq<Seq<u8>>,
+)
+    requires
+        component_prefix(prefix, left),
+        component_prefix(prefix, right),
+        components_less(left, middle),
+        components_less(middle, right),
+    ensures component_prefix(prefix, middle),
+{
+    reveal(component_prefix);
+    reveal(components_less);
+    assert(prefix.take(0) == middle.take(0));
+    component_prefix_is_order_convex_from(prefix, left, middle, right, 0);
+}
+
+proof fn component_prefix_is_order_convex_from(
+    prefix: Seq<Seq<u8>>,
+    left: Seq<Seq<u8>>,
+    middle: Seq<Seq<u8>>,
+    right: Seq<Seq<u8>>,
+    index: int,
+)
+    requires
+        component_prefix(prefix, left),
+        component_prefix(prefix, right),
+        components_less(left, middle),
+        components_less(middle, right),
+        0 <= index,
+        index <= prefix.len(),
+        index <= middle.len(),
+        prefix.take(index) == middle.take(index),
+    ensures component_prefix(prefix, middle),
+    decreases (if prefix.len() < middle.len() { prefix.len() } else { middle.len() }) - index,
+{
+    reveal(component_prefix);
+    reveal(components_less);
+    let limit = if prefix.len() < middle.len() { prefix.len() } else { middle.len() };
+    if index < limit {
+        if prefix[index] == middle[index] {
+            assert(prefix.take(index + 1) == middle.take(index + 1)) by {
+                assert forall|i: int| 0 <= i < index + 1
+                    implies prefix[i] == middle[i] by {
+                    if i < index {
+                        assert(prefix.take(index)[i] == prefix[i]);
+                        assert(prefix.take(index)[i] == middle.take(index)[i]);
+                        assert(middle.take(index)[i] == middle[i]);
+                    } else {
+                        assert(i == index);
+                    }
+                }
+            }
+            component_prefix_is_order_convex_from(prefix, left, middle, right, index + 1);
+        } else {
+            bytes_less_total(prefix[index], middle[index]);
+            if bytes_less(prefix[index], middle[index]) {
+                assert(components_less(right, middle)) by {
+                    reveal(components_less);
+                    assert(exists|i: int| 0 <= i < right.len() && i < middle.len()
+                        && right.take(i) == middle.take(i)
+                        && bytes_less(right[i], middle[i])) by {
+                        assert(right.take(index) == middle.take(index)) by {
+                            assert(right.take(index) == prefix.take(index)) by {
+                                assert forall|j: int| 0 <= j < index
+                                    implies right[j] == prefix[j] by {
+                                    assert(j < prefix.len());
+                                    assert(prefix[j] == right[j]);
+                                }
+                            }
+                            assert(prefix.take(index) == middle.take(index));
+                        }
+                        assert(bytes_less(right[index], middle[index])) by {
+                            assert(right[index] == prefix[index]);
+                        }
+                    }
+                }
+                components_less_is_asymmetric(middle, right);
+                assert(false);
+            } else {
+                assert(bytes_less(middle[index], prefix[index]));
+                assert(components_less(middle, left)) by {
+                    reveal(components_less);
+                    assert(exists|i: int| 0 <= i < middle.len() && i < left.len()
+                        && middle.take(i) == left.take(i)
+                        && bytes_less(middle[i], left[i])) by {
+                        assert(middle.take(index) == left.take(index)) by {
+                            assert(middle.take(index) == prefix.take(index));
+                            assert(prefix.take(index) == left.take(index)) by {
+                                assert forall|j: int| 0 <= j < index
+                                    implies prefix[j] == left[j] by {
+                                    assert(j < prefix.len());
+                                    assert(prefix[j] == left[j]);
+                                }
+                            }
+                        }
+                        assert(bytes_less(middle[index], left[index])) by {
+                            assert(left[index] == prefix[index]);
+                        }
+                    }
+                }
+                components_less_is_asymmetric(left, middle);
+                assert(false);
+            }
+        }
+    } else if prefix.len() <= middle.len() {
+        assert(index == prefix.len());
+        assert forall|i: int| 0 <= i < prefix.len()
+            implies prefix[i] == middle[i] by {
+            assert(prefix.take(index)[i] == prefix[i]);
+            assert(prefix.take(index)[i] == middle.take(index)[i]);
+            assert(middle.take(index)[i] == middle[i]);
+        }
+    } else {
+        assert(index == middle.len());
+        assert(middle == left.take(middle.len() as int)) by {
+            assert forall|i: int| 0 <= i < middle.len()
+                implies middle[i] == left.take(middle.len() as int)[i] by {
+                assert(middle.take(index)[i] == middle[i]);
+                assert(middle.take(index)[i] == prefix.take(index)[i]);
+                assert(prefix.take(index)[i] == prefix[i]);
+                assert(prefix[i] == left[i]);
+                assert(left.take(middle.len() as int)[i] == left[i]);
+            }
+        }
+        assert(components_less(middle, left));
+        components_less_is_asymmetric(middle, left);
+        assert(false);
+    }
 }
 
 pub open spec fn valid_component(component: Seq<u8>) -> bool {
