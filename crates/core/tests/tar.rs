@@ -1892,6 +1892,9 @@ fn successful_pax_stream_accumulates_all_eleven_fields_into_native_metadata() {
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# For each PAX extended-header stream, the reader MUST process records in input order and report the first failing record's error class using framing before key support, key support before duplicate/NUL admission, and admission before value syntax: malformed framing or duplicate/NUL values for a supported key classify as Pax, unsupported keys (including those with NUL values) and unsupported nonempty hdrcharset values as UnsupportedPax, and invalid decimal/time values as Numeric; empty values are accepted, and no later record changes the first error.
+//= docs/parsing-requirements.md#parse-tar-040
+//= type=test
+//# Each PAX extended-header record MUST begin with a nonempty ASCII decimal length field followed by one ASCII space. Leading zeroes are accepted by this reader profile; no canonical no-leading-zero form is required. The decoded length MUST be positive, fit in `u64`, and identify the complete record byte count starting at the first length digit and ending immediately after that record's LF, including the length field and all delimiters. The declared span MUST be wholly present in the payload and its final byte MUST be LF; the first `=` within the record body MUST delimit the key and value. Consecutive records MUST be consumed contiguously, with no skipped or unconsumed bytes. A zero, malformed, overflowing, out-of-bounds, or delimiter-inconsistent declared span MUST be rejected as malformed PAX framing under PARSE-TAR-003.
 #[test]
 fn pax_stream_reports_the_first_error_by_record_and_stage() {
     let cases: [(Vec<u8>, TarError); 9] = [

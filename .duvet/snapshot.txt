@@ -325,6 +325,14 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: When the input ends exactly after complete records with no footer, the field MUST equal the input length.
     TEXT[!MUST,implementation,test]: When a zero footer is present, the field MUST point to its first byte; validated footer and top-off bytes MUST NOT be included.
 
+  SECTION: [PARSE-TAR-040](#parse-tar-040)
+    TEXT[!MUST,implementation,test]: Each PAX extended-header record MUST begin with a nonempty ASCII decimal length field followed by one ASCII space.
+    TEXT[implementation,test]:  Leading zeroes are accepted by this reader profile; no canonical no-leading-zero form is required.
+    TEXT[!MUST,implementation,test]: The decoded length MUST be positive, fit in `u64`, and identify the complete record byte count starting at the first length digit and ending immediately after that record's LF, including the length field and all delimiters.
+    TEXT[!MUST,implementation,test]: The declared span MUST be wholly present in the payload and its final byte MUST be LF; the first `=` within the record body MUST delimit the key and value.
+    TEXT[!MUST,implementation,test]: Consecutive records MUST be consumed contiguously, with no skipped or unconsumed bytes.
+    TEXT[!MUST,implementation,test]: A zero, malformed, overflowing, out-of-bounds, or delimiter-inconsistent declared span MUST be rejected as malformed PAX framing under PARSE-TAR-003.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

@@ -20,6 +20,7 @@ Public documentation is the first reference:
 | DOC-NAME | [Official filename documentation](https://gitlab.com/duplicity/duplicity/-/raw/dev/docs/file_naming.rst) | Long/short object names, partial markers, suffixes |
 | DOC-RSYNC | [Librsync file formats](https://librsync.github.io/page_formats.html) | Integer byte order, signature and delta structures |
 | DOC-TAR | [Python 3.13 tar formats](https://docs.python.org/3.13/library/tarfile.html) | ustar/GNU/PAX interoperability and current PAX producer default |
+| DOC-PAX | [POSIX pax utility format](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/pax.html), accessible [POSIX.1p rendering](https://man7.org/linux/man-pages/man1/pax.1p.html) | Extended-header record framing and byte-counted decimal record length |
 | DOC-PGP | [RFC 9580](https://www.rfc-editor.org/rfc/rfc9580), historical [RFC 4880](https://www.rfc-editor.org/rfc/rfc4880), [RFC 6637](https://www.rfc-editor.org/rfc/rfc6637) | Packet integrity, composition, v4 keys and legacy Curve25519 ECDH |
 | DOC-RPGP | [rPGP 0.21.0 API](https://docs.rs/pgp/0.21.0/pgp/), [pinned implementation status](https://github.com/rpgp/rpgp/blob/c2b192e52b2e7f99777196539ea79b37f1f9ff30/docs/IMPL_STATUS.md), [security status](https://github.com/rpgp/rpgp/blob/c2b192e52b2e7f99777196539ea79b37f1f9ff30/docs/SECURITY_STATUS.md) | Native adapter capability and trusted upstream limitations |
 | DOC-LINUX-RENAME | [Linux rename(2)](https://man7.org/linux/man-pages/man2/rename.2.html) | Directory-relative no-replace publication, cross-parent directory permissions, NFS ambiguity |
@@ -654,6 +655,12 @@ Provenance: POLICY and PARSE-TAR-021/034. This fixes the observable boundary bet
 For a successfully parsed tar stream, `TarVolume.entry_stream_bytes` MUST equal the byte offset immediately after the final complete tar record, including its header, payload, and padding, and before any accepted zero footer or encrypted top-off. When the input ends exactly after complete records with no footer, the field MUST equal the input length. When a zero footer is present, the field MUST point to its first byte; validated footer and top-off bytes MUST NOT be included.
 
 Provenance: PARSE-TAR-005 and POLICY. The offset separates parsed entry records from envelope termination bytes for encrypted-volume top-off checks and producer compatibility; footer validation and ciphertext comparison remain separately specified. This does not accept incomplete records or alter footer profiles.
+
+### PARSE-TAR-040
+
+Each PAX extended-header record MUST begin with a nonempty ASCII decimal length field followed by one ASCII space. Leading zeroes are accepted by this reader profile; no canonical no-leading-zero form is required. The decoded length MUST be positive, fit in `u64`, and identify the complete record byte count starting at the first length digit and ending immediately after that record's LF, including the length field and all delimiters. The declared span MUST be wholly present in the payload and its final byte MUST be LF; the first `=` within the record body MUST delimit the key and value. Consecutive records MUST be consumed contiguously, with no skipped or unconsumed bytes. A zero, malformed, overflowing, out-of-bounds, or delimiter-inconsistent declared span MUST be rejected as malformed PAX framing under PARSE-TAR-003.
+
+Provenance: DOC-PAX, PARSE-TAR-003, and POLICY. This specifies length interpretation and exact record boundaries; supported key selection, duplicate/NUL admission, value grammar, and first-error ordering remain governed by PARSE-TAR-003.
 
 ### PARSE-ENTRY-001
 

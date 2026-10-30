@@ -74,6 +74,8 @@ pub fn nul_terminated_prefix<'a>(input: &'a [u8]) -> (result: &'a [u8])
     }
 }
 
+//= docs/parsing-requirements.md#parse-tar-040
+//# Each PAX extended-header record MUST begin with a nonempty ASCII decimal length field followed by one ASCII space. Leading zeroes are accepted by this reader profile; no canonical no-leading-zero form is required. The decoded length MUST be positive, fit in `u64`, and identify the complete record byte count starting at the first length digit and ending immediately after that record's LF, including the length field and all delimiters. The declared span MUST be wholly present in the payload and its final byte MUST be LF; the first `=` within the record body MUST delimit the key and value. Consecutive records MUST be consumed contiguously, with no skipped or unconsumed bytes. A zero, malformed, overflowing, out-of-bounds, or delimiter-inconsistent declared span MUST be rejected as malformed PAX framing under PARSE-TAR-003.
 pub open spec fn record_model(input: Seq<u8>, cursor: int) -> Option<(int, Seq<u8>, Seq<u8>)> {
     if !(0 <= cursor < input.len()) { None }
     else { match find(input, cursor, input.len() as int, b' ') {
@@ -96,6 +98,8 @@ pub open spec fn record_model(input: Seq<u8>, cursor: int) -> Option<(int, Seq<u
         },
     }}
 }
+//= docs/parsing-requirements.md#parse-tar-040
+//# Each PAX extended-header record MUST begin with a nonempty ASCII decimal length field followed by one ASCII space. Leading zeroes are accepted by this reader profile; no canonical no-leading-zero form is required. The decoded length MUST be positive, fit in `u64`, and identify the complete record byte count starting at the first length digit and ending immediately after that record's LF, including the length field and all delimiters. The declared span MUST be wholly present in the payload and its final byte MUST be LF; the first `=` within the record body MUST delimit the key and value. Consecutive records MUST be consumed contiguously, with no skipped or unconsumed bytes. A zero, malformed, overflowing, out-of-bounds, or delimiter-inconsistent declared span MUST be rejected as malformed PAX framing under PARSE-TAR-003.
 pub fn record<'a>(input: &'a [u8], cursor: usize)
     -> (result: Option<(usize, &'a [u8], &'a [u8])>)
     ensures match result {
@@ -1056,6 +1060,8 @@ pub open spec fn pax_first_error_model(
 
 //= docs/parsing-requirements.md#parse-tar-003
 //# For each PAX extended-header stream, the reader MUST process records in input order and report the first failing record's error class using framing before key support, key support before duplicate/NUL admission, and admission before value syntax: malformed framing or duplicate/NUL values for a supported key classify as Pax, unsupported keys (including those with NUL values) and unsupported nonempty hdrcharset values as UnsupportedPax, and invalid decimal/time values as Numeric; empty values are accepted, and no later record changes the first error.
+//= docs/parsing-requirements.md#parse-tar-040
+//# Each PAX extended-header record MUST begin with a nonempty ASCII decimal length field followed by one ASCII space. Leading zeroes are accepted by this reader profile; no canonical no-leading-zero form is required. The decoded length MUST be positive, fit in `u64`, and identify the complete record byte count starting at the first length digit and ending immediately after that record's LF, including the length field and all delimiters. The declared span MUST be wholly present in the payload and its final byte MUST be LF; the first `=` within the record body MUST delimit the key and value. Consecutive records MUST be consumed contiguously, with no skipped or unconsumed bytes. A zero, malformed, overflowing, out-of-bounds, or delimiter-inconsistent declared span MUST be rejected as malformed PAX framing under PARSE-TAR-003.
 
 /// Parse and accumulate a complete PAX stream into its eleven semantic slots.
 /// The success postcondition relates the actual borrowed slot map to the
@@ -1292,6 +1298,9 @@ mod tests {
     }
 
     #[test]
+    //= docs/parsing-requirements.md#parse-tar-040
+    //= type=test
+    //# Each PAX extended-header record MUST begin with a nonempty ASCII decimal length field followed by one ASCII space. Leading zeroes are accepted by this reader profile; no canonical no-leading-zero form is required. The decoded length MUST be positive, fit in `u64`, and identify the complete record byte count starting at the first length digit and ending immediately after that record's LF, including the length field and all delimiters. The declared span MUST be wholly present in the payload and its final byte MUST be LF; the first `=` within the record body MUST delimit the key and value. Consecutive records MUST be consumed contiguously, with no skipped or unconsumed bytes. A zero, malformed, overflowing, out-of-bounds, or delimiter-inconsistent declared span MUST be rejected as malformed PAX framing under PARSE-TAR-003.
     fn ingest_accumulates_a_successful_stream_into_all_eleven_slots() {
         let fields: [(&[u8], &[u8]); 11] = [
             (b"path", b"snapshot/file"),
