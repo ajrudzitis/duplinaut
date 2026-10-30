@@ -2059,6 +2059,9 @@ fn pax_owner_names_fallback_override_delete_and_resume_global_values() {
 //= docs/parsing-requirements.md#parse-tar-003
 //= type=test
 //# The reader MUST support the reviewed GNU/ustar headers, GNU long-name/long-link records, and semantic PAX overrides described in the tar profile above.
+//= docs/parsing-requirements.md#parse-tar-041
+//= type=test
+//# For a real entry, each present resolved PAX `uname` and `gname` value MUST be validated as UTF-8 when the effective `hdrcharset` is absent or selects a supported UTF-8 token (`UTF-8` or `ISO-IR 10646 2000 UTF-8`). Invalid bytes MUST produce TextEncoding. When the effective `hdrcharset` is `BINARY`, PAX owner-name values MUST be preserved byte-for-byte without UTF-8 validation. When a resolved PAX owner-name value is absent, the corresponding raw-header fallback MUST be preserved byte-for-byte and MUST NOT be validated under the PAX charset.
 #[test]
 fn pax_owner_names_follow_utf8_and_binary_charset_policy() {
     let valid_utf8 = [

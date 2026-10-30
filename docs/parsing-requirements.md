@@ -662,6 +662,12 @@ Each PAX extended-header record MUST begin with a nonempty ASCII decimal length 
 
 Provenance: DOC-PAX, PARSE-TAR-003, and POLICY. This specifies length interpretation and exact record boundaries; supported key selection, duplicate/NUL admission, value grammar, and first-error ordering remain governed by PARSE-TAR-003.
 
+### PARSE-TAR-041
+
+For a real entry, each present resolved PAX `uname` and `gname` value MUST be validated as UTF-8 when the effective `hdrcharset` is absent or selects a supported UTF-8 token (`UTF-8` or `ISO-IR 10646 2000 UTF-8`). Invalid bytes MUST produce TextEncoding. When the effective `hdrcharset` is `BINARY`, PAX owner-name values MUST be preserved byte-for-byte without UTF-8 validation. When a resolved PAX owner-name value is absent, the corresponding raw-header fallback MUST be preserved byte-for-byte and MUST NOT be validated under the PAX charset.
+
+Provenance: DOC-PAX, PARSE-TAR-003/004/017, and POLICY. This covers charset validation of resolved PAX owner-name values and raw-header fallback; owner-name selection/length, supported charset-token admission, empty-value deletion, and global/local timing remain separately specified.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

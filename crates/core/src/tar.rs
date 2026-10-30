@@ -358,6 +358,8 @@ impl<'a> TarVolume<'a> {
             if !name_admitted || !link_admitted {
                 return Err(TarError::Limit);
             }
+            //= docs/parsing-requirements.md#parse-tar-041
+            //# For a real entry, each present resolved PAX `uname` and `gname` value MUST be validated as UTF-8 when the effective `hdrcharset` is absent or selects a supported UTF-8 token (`UTF-8` or `ISO-IR 10646 2000 UTF-8`). Invalid bytes MUST produce TextEncoding. When the effective `hdrcharset` is `BINARY`, PAX owner-name values MUST be preserved byte-for-byte without UTF-8 validation. When a resolved PAX owner-name value is absent, the corresponding raw-header fallback MUST be preserved byte-for-byte and MUST NOT be validated under the PAX charset.
             if crate::verified::tar_pax::owner_name_requires_utf8(values[10]) {
                 for i in [0, 1, 6, 7] {
                     if let Some(value) = values[i] {
