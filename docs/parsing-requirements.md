@@ -870,6 +870,12 @@ Provenance: SRC-PATCH; rejecting a missing or incompatible basis is POLICY.
 
 Provenance: POLICY. A stable public iteration order makes listings and callers deterministic while preserving the reader's raw-byte path identity. Verification may establish the project comparator contract and native tests may exercise the standard map's observable iteration; this requirement does not claim proof of Rust's standard-library map internals.
 
+### PARSE-STATE-004
+
+A full set MUST contain only logical entries whose operation is `Snapshot`. If any entry in a full set has operation `Diff` or `Deleted`, the reader MUST reject the full set and MUST NOT return a `SnapshotState` for it.
+
+Provenance: DOC-DUP, SRC-DIFF, SRC-PATCH, and official full-set fixtures. Full sets establish replacement state; delta and deletion operations belong to incremental state transitions. This requirement specifies admission only and does not prescribe a public error variant or prove the complete state-transition controller.
+
 ### PARSE-BROWSE-001
 
 Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.
