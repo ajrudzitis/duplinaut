@@ -357,6 +357,11 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: Any other nonempty value MUST produce `UnsupportedPax`; matching MUST be byte-exact and MUST NOT trim, case-fold, or otherwise normalize the value.
     TEXT[!MUST,implementation,test]: An empty `hdrcharset` value remains a deletion marker under PARSE-TAR-006 and MUST NOT be rejected as an unsupported token.
 
+  SECTION: [PARSE-TAR-045](#parse-tar-045)
+    TEXT[!MUST,implementation,test]: For each GNU L/K or PAX x/g extension header, after checksum, header-profile, and raw numeric-field admission and selection of the raw extension size, the parser MUST validate the bounded raw payload extent before enforcing `max_extended_headers`.
+    TEXT[!MUST,implementation,test]: A truncated extension payload MUST therefore produce `Truncated` even when the configured extension count is already exhausted; an extent exceeding `max_entry_bytes` MUST produce `Limit`.
+    TEXT[!MUST,implementation,test]: Once the complete bounded extent is admitted, the parser MUST enforce the cumulative extension count before metadata charging or interpreting extension contents.
+
   SECTION: [PARSE-ENTRY-001](#parse-entry-001)
     TEXT[!MUST,implementation,test]: The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.
 

@@ -252,6 +252,8 @@ impl<'a> TarVolume<'a> {
                 cursor = next;
                 //= docs/parsing-requirements.md#parse-tar-020
                 //# The reader MUST checked-increment the GNU/PAX extension-header count and reject the header if the increment overflows or exceeds `max_extended_headers`, before charging or interpreting extension contents.
+                //= docs/parsing-requirements.md#parse-tar-045
+                //# For each GNU L/K or PAX x/g extension header, after checksum, header-profile, and raw numeric-field admission and selection of the raw extension size, the parser MUST validate the bounded raw payload extent before enforcing `max_extended_headers`. A truncated extension payload MUST therefore produce `Truncated` even when the configured extension count is already exhausted; an extent exceeding `max_entry_bytes` MUST produce `Limit`. Once the complete bounded extent is admitted, the parser MUST enforce the cumulative extension count before metadata charging or interpreting extension contents.
                 extended = crate::verified::tar_entry::admit_extension_header_count(
                     extended,
                     limits.max_extended_headers,

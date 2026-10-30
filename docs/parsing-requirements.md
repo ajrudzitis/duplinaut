@@ -686,6 +686,12 @@ Each nonempty PAX `hdrcharset` record value MUST exactly equal one of the ASCII 
 
 Provenance: DOC-PAX, PARSE-TAR-003/006, and POLICY. This defines token admission for nonempty `hdrcharset` values; global/local selection, deletion timing, and the charset behavior applied to owner/path/link values remain specified separately.
 
+### PARSE-TAR-045
+
+For each GNU L/K or PAX x/g extension header, after checksum, header-profile, and raw numeric-field admission and selection of the raw extension size, the parser MUST validate the bounded raw payload extent before enforcing `max_extended_headers`. A truncated extension payload MUST therefore produce `Truncated` even when the configured extension count is already exhausted; an extent exceeding `max_entry_bytes` MUST produce `Limit`. Once the complete bounded extent is admitted, the parser MUST enforce the cumulative extension count before metadata charging or interpreting extension contents.
+
+Provenance: POLICY and PARSE-TAR-007/008/020. This specifies the relative order of raw extension extent, extension-count, metadata-charge, and content admission; it does not alter the error classes for those stages or refine the complete tar controller.
+
 ### PARSE-ENTRY-001
 
 The reader MUST classify duplicity data entries using the five data-entry prefixes defined above.

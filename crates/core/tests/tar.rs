@@ -206,6 +206,9 @@ fn extension_metadata_charges_accumulate_across_headers() {
 //= docs/parsing-requirements.md#parse-tar-020
 //= type=test
 //# The reader MUST checked-increment the GNU/PAX extension-header count and reject the header if the increment overflows or exceeds `max_extended_headers`, before charging or interpreting extension contents.
+//= docs/parsing-requirements.md#parse-tar-045
+//= type=test
+//# For each GNU L/K or PAX x/g extension header, after checksum, header-profile, and raw numeric-field admission and selection of the raw extension size, the parser MUST validate the bounded raw payload extent before enforcing `max_extended_headers`. A truncated extension payload MUST therefore produce `Truncated` even when the configured extension count is already exhausted; an extent exceeding `max_entry_bytes` MUST produce `Limit`. Once the complete bounded extent is admitted, the parser MUST enforce the cumulative extension count before metadata charging or interpreting extension contents.
 #[test]
 fn extension_header_count_is_bounded_before_content_interpretation() {
     let payload = record(b"path", b"snapshot/file");
@@ -254,6 +257,39 @@ fn extension_header_count_is_bounded_before_content_interpretation() {
         .unwrap_err(),
         TarError::Limit,
         "the cumulative extension count must reject the second malformed header before parsing it",
+    );
+
+    let payload = record(b"path", b"snapshot/truncated");
+    let mut truncated = member(b"pax", b'x', &payload);
+    truncated.truncate(512 + payload.len() - 1);
+    assert_eq!(
+        TarVolume::parse(
+            &truncated,
+            Termination::Data,
+            TarLimits {
+                max_extended_headers: 0,
+                ..TarLimits::default()
+            },
+        )
+        .unwrap_err(),
+        TarError::Truncated,
+        "raw extension extent validation precedes the exhausted extension count",
+    );
+
+    let over_limit = member(b"pax", b'x', &payload);
+    assert_eq!(
+        TarVolume::parse(
+            &over_limit,
+            Termination::Data,
+            TarLimits {
+                max_entry_bytes: 0,
+                max_extended_headers: 0,
+                ..TarLimits::default()
+            },
+        )
+        .unwrap_err(),
+        TarError::Limit,
+        "raw extension extent limit is enforced before the exhausted extension count",
     );
 }
 
