@@ -4495,6 +4495,32 @@ proofs = []
 tests = []
 
 [[milestone]]
+id = "tar-pax-hdrcharset-token-profile"
+gate = true
+requirements = ["PARSE-TAR-044"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Reuses the exact finite-token contract and native UnsupportedPax/deletion
+# tests. Global/local selection timing and downstream charset behavior remain
+# separately scoped.
+implementations = [
+  { path = "crates/core/src/verified/tar_pax.rs", symbol = "hdrcharset_value_supported" },
+  { path = "crates/core/src/tar.rs", symbol = "pax" }
+]
+proofs = [
+  { id = "tar-pax-hdrcharset-token-profile", requirement = "PARSE-TAR-044", path = "crates/core/src/verified/tar_pax.rs", symbol = "hdrcharset_value_supported", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::tar_pax::tests::hdrcharset_value_admission_matches_exact_supported_tokens" },
+  { package = "duplicity-core", name = "malformed_and_unsupported_pax_are_not_skipped" },
+  { package = "duplicity-core", name = "hdrcharset_exact_tokens_and_empty_local_deletion_are_enforced" }
+]
+
+[[milestone]]
 id = "tar-pax-hdrcharset-admission"
 gate = true
 requirements = ["PARSE-TAR-003", "PARSE-TAR-004"]
