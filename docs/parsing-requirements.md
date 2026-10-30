@@ -864,6 +864,12 @@ A delta entry MUST use the reconstructed regular-file content for that same path
 
 Provenance: SRC-PATCH; rejecting a missing or incompatible basis is POLICY.
 
+### PARSE-STATE-003
+
+`SnapshotState::entries()` MUST enumerate retained entries in bytewise lexicographic order of their backup-relative path components. Each component MUST be compared as an unsigned byte sequence using lexicographic byte order, with a proper prefix ordered before the longer sequence. Paths MUST be compared as sequences of components using the same lexicographic rule, with a proper component-sequence prefix ordered before the longer path. Component boundaries MUST remain significant; the ordering MUST NOT be derived by comparing slash-joined or rendered path strings.
+
+Provenance: POLICY. A stable public iteration order makes listings and callers deterministic while preserving the reader's raw-byte path identity. Verification may establish the project comparator contract and native tests may exercise the standard map's observable iteration; this requirement does not claim proof of Rust's standard-library map internals.
+
 ### PARSE-BROWSE-001
 
 Listings derived from signature archives MUST distinguish metadata availability from volume-integrity and restorability validation.
