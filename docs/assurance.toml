@@ -5034,13 +5034,13 @@ requirements = ["ASSURE-PROOF-003", "ASSURE-VEST-003"]
 
 [[milestone]]
 id = "snapshot-entry-order-ord-adapter"
-gate = false
+gate = true
 requirements = ["PARSE-STATE-003"]
 specified = true
 implemented = true
 proved = false
 tested = true
-reviewed = false
+reviewed = true
 proof_required = false
 proof_rationale = "The standard Ord/PartialOrd trait adapter delegates to the separately proved comparator and is checked by native pairwise tests. No proof is claimed for the adapter or Rust standard-library BTreeMap internals."
 implementations = [
