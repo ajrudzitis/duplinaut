@@ -363,7 +363,7 @@ impl SnapshotState {
             .try_reserve_exact(stack_len)
             .map_err(|_| StateError::Allocation)?;
         for (path, entry) in &next.entries {
-            if path.components().is_empty() && entry.entry_type != EntryType::Directory {
+            if !root_entry_type_allowed(path.is_root(), entry.entry_type) {
                 return Err(StateError::RootType);
             }
             while ancestors.last().is_some_and(|parent| {
@@ -448,6 +448,36 @@ fn check_budget(
 }
 
 verus! {
+/// Only a directory can occupy the explicit backup-root path.
+pub open spec fn root_entry_type_allowed_model(is_root_path: bool, entry_type: EntryType) -> bool {
+    match entry_type {
+        EntryType::Directory => true,
+        EntryType::Regular
+        | EntryType::Symlink
+        | EntryType::Hardlink
+        | EntryType::CharacterDevice
+        | EntryType::BlockDevice
+        | EntryType::Fifo => !is_root_path,
+    }
+}
+
+//= docs/parsing-requirements.md#parse-state-005
+//= type=implementation
+//# A successfully returned `SnapshotState` MUST NOT contain a backup-root entry whose type is not `Directory`.
+pub(crate) fn root_entry_type_allowed(is_root_path: bool, entry_type: EntryType) -> (result: bool)
+    ensures result == root_entry_type_allowed_model(is_root_path, entry_type),
+{
+    match entry_type {
+        EntryType::Directory => true,
+        EntryType::Regular
+        | EntryType::Symlink
+        | EntryType::Hardlink
+        | EntryType::CharacterDevice
+        | EntryType::BlockDevice
+        | EntryType::Fifo => !is_root_path,
+    }
+}
+
 /// Full archives establish replacement state and cannot contain incremental operations.
 pub open spec fn full_set_operation_model(operation: LogicalOperation) -> bool {
     match operation {

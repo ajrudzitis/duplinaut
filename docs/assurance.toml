@@ -5089,14 +5089,16 @@ id = "snapshot-root-entry-policy"
 gate = false
 requirements = ["PARSE-STATE-005"]
 specified = true
-implemented = false
-proved = false
-tested = false
+implemented = true
+proved = true
+tested = true
 reviewed = false
 proof_required = true
-implementations = []
-proofs = []
-tests = []
+# Formal evidence covers BackupPath root recognition and the root/type
+# classifier. The controller's no-synthesis behavior is tested natively only.
+implementations = [{ path = "crates/core/src/path.rs", symbol = "is_root" }, { path = "crates/core/src/state.rs", symbol = "root_entry_type_allowed" }]
+proofs = [{ id = "snapshot-root-path-recognition", requirement = "PARSE-STATE-005", path = "crates/core/src/path.rs", symbol = "is_root", kind = "contract" }, { id = "snapshot-root-entry-type-admission", requirement = "PARSE-STATE-005", path = "crates/core/src/state.rs", symbol = "root_entry_type_allowed", kind = "contract" }]
+tests = [{ package = "duplicity-core", name = "full_root_policy_rejects_non_directory_and_does_not_synthesize_missing_root" }]
 
 [[trusted]]
 id = "build-orchestration"

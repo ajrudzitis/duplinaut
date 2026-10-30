@@ -543,6 +543,23 @@ impl BackupPath {
         ensures result@.map_values(|component: Vec<u8>| component@) == self@,
     { &self.components }
 
+    /// Return whether this path identifies the backup root.
+    //= docs/parsing-requirements.md#parse-state-005
+    //= type=implementation
+    //# A successfully returned `SnapshotState` MUST NOT contain a backup-root entry whose type is not `Directory`.
+    pub fn is_root(&self) -> (result: bool)
+        ensures result == (self@.len() == 0),
+    {
+        let result = self.components.len() == 0;
+        proof {
+            vstd::std_specs::vec::axiom_spec_len(&self.components);
+            reveal(BackupPath::view);
+            assert(self.components@.map_values(|component: Vec<u8>| component@).len()
+                == self.components@.len());
+        }
+        result
+    }
+
     /// Component-wise ancestor test, including equality and the empty root.
     //= docs/parsing-requirements.md#parse-state-001
     //= type=implementation

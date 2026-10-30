@@ -229,6 +229,24 @@ fn missing_ancestors_root_types_empty_state_and_unsupported_metadata() {
     ));
 }
 
+//= docs/parsing-requirements.md#parse-state-005
+//= type=test
+//# A successfully returned `SnapshotState` MUST NOT contain a backup-root entry whose type is not `Directory`. Applying a full set that contains no logical entry for the backup root MUST NOT synthesize a root entry in the resulting state.
+#[test]
+fn full_root_policy_rejects_non_directory_and_does_not_synthesize_missing_root() {
+    assert!(matches!(
+        SnapshotState::from_full(
+            &archive(&[("snapshot/.", b'0', b"not a directory")]),
+            StateLimits::default()
+        ),
+        Err(StateError::RootType)
+    ));
+
+    let state = SnapshotState::from_full(&archive(&[]), StateLimits::default()).unwrap();
+    assert!(state.is_empty());
+    assert!(state.get(&path(b"")).is_none());
+}
+
 //= docs/parsing-requirements.md#parse-state-004
 //= type=test
 //# A full set MUST contain only logical entries whose operation is `Snapshot`. If any entry in a full set has operation `Diff` or `Deleted`, the reader MUST reject the full set and MUST NOT return a `SnapshotState` for it.
