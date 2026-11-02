@@ -1,7 +1,8 @@
 # Read-only snapshot PTY acceptance plan
 
-Status: acceptance scope independently reviewed and adopted before implementation;
-execution and implementation review are pending.
+Status: acceptance scope independently reviewed and adopted before implementation.
+Implementation and independent review pass the focused macOS PTY test; the full
+assurance gate is pending.
 
 This extends the existing automated local-history/quit test through the actual
 browser event loop and the official full-plus-two-incremental chain. It applies

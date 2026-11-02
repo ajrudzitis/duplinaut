@@ -183,6 +183,229 @@ mod pty_acceptance {
         }
     }
 
+    // Ratatui redraws only changed cells. Keep a zero-scrollback screen model
+    // so later assertions observe the current display, not stale transcript text.
+    fn wait_for_screen(
+        master: &File,
+        child: &mut ChildGuard,
+        output: &mut Vec<u8>,
+        parser: &mut vt100::Parser,
+        phase: &str,
+        expected: impl Fn(&str) -> bool,
+    ) {
+        let deadline = Instant::now() + STARTUP_TIMEOUT;
+        loop {
+            let previous = output.len();
+            pump(master, output, 100);
+            parser.process(&output[previous..]);
+            let screen = parser.screen().contents();
+            assert!(
+                child.0.try_wait().unwrap().is_none(),
+                "TUI exited during {phase}; current screen:\n{screen}"
+            );
+            if expected(&screen) {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "timed out during {phase}; current screen:\n{screen}"
+            );
+        }
+    }
+
+    fn oracle_components(entry: &serde_json::Value) -> Vec<Vec<u8>> {
+        entry["components_hex"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|part| {
+                let hex = part.as_str().unwrap();
+                assert_eq!(hex.len() % 2, 0);
+                (0..hex.len())
+                    .step_by(2)
+                    .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-014
+    //= type=test
+    //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+    fn official_chain_readonly_previews_through_pty_match_source_oracle() {
+        let oracle: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/duplicity-3.0.7/expected.json"
+        ))
+        .unwrap();
+        let entries = oracle["snapshots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|snapshot| snapshot["mode"] == "plain" && snapshot["index"] == 2)
+            .unwrap()["entries"]
+            .as_array()
+            .unwrap();
+        let expected_payload: u64 = entries
+            .iter()
+            .filter(|entry| entry["kind"] == "file")
+            .map(|entry| entry["size"].as_u64().unwrap())
+            .sum();
+        let child_components = vec![b"a".to_vec(), b"b".to_vec(), b"child.txt".to_vec()];
+        let mut paths: Vec<_> = entries.iter().map(oracle_components).collect();
+        paths.sort();
+        let child_index = paths
+            .iter()
+            .position(|path| path == &child_components)
+            .unwrap();
+        let selected_count = entries
+            .iter()
+            .filter(|entry| {
+                let path = oracle_components(entry);
+                path.starts_with(&child_components)
+                    || (entry["kind"] == "directory" && child_components.starts_with(&path))
+            })
+            .count();
+        assert_eq!(selected_count, 4, "fixture selection changed");
+
+        let fixture = fs::canonicalize(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/duplicity-3.0.7/plain"),
+        )
+        .unwrap();
+        let before_source = fingerprint(&fixture);
+        let scratch = Scratch::new();
+        let winsize = Winsize {
+            ws_row: 40,
+            ws_col: 240,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        let pty = openpty(Some(&winsize), None).expect("open PTY");
+        let slave = File::from(pty.slave);
+        let original_termios = tcgetattr(&slave).expect("read original PTY attributes");
+        let master = File::from(pty.master);
+        let mut child = ChildGuard(
+            Command::new(env!("CARGO_BIN_EXE_duplicity-tui"))
+                .arg("local")
+                .arg(&fixture)
+                .current_dir(&scratch.0)
+                .env("TERM", "xterm-256color")
+                .env("COLUMNS", "240")
+                .env("LINES", "40")
+                .stdin(Stdio::from(slave.try_clone().unwrap()))
+                .stdout(Stdio::from(slave.try_clone().unwrap()))
+                .stderr(Stdio::from(slave.try_clone().unwrap()))
+                .spawn()
+                .expect("spawn TUI in PTY"),
+        );
+        let mut output = Vec::new();
+        let mut parser = vt100::Parser::new(40, 240, 0);
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "history",
+            |screen| {
+                screen.contains(std::str::from_utf8(HISTORY_MARKER).unwrap())
+                    && screen.contains("Metadata only. a selects full anchor")
+            },
+        );
+        assert_ne!(tcgetattr(&slave).unwrap(), original_termios);
+        write(&master, b"a").unwrap();
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "anchor selection",
+            |screen| screen.contains("Full anchor selected; choose target then Enter."),
+        );
+        // The history contains the full set followed by its two incrementals.
+        write(&master, b"\x1b[B\x1b[B\r").unwrap();
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "scan disclosure",
+            |screen| {
+                screen.contains("Full volume scan required.") && screen.contains("Enter confirms.")
+            },
+        );
+        assert!(!parser.screen().contents().contains("Validated snapshot:"));
+        write(&master, b"\r").unwrap();
+        let snapshot_status = format!(
+            "Validated snapshot: {} entries, {expected_payload} payload bytes.",
+            entries.len()
+        );
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "validated snapshot",
+            |screen| {
+                screen.contains(&snapshot_status)
+                    && screen.contains("a/b/child.txt")
+                    && screen.contains("raw-\\xff.bin")
+            },
+        );
+        write(&master, b"p").unwrap();
+        let whole_status = format!(
+            "Read-only preview:{} entries including source ancestors. Nothing is written.",
+            entries.len()
+        );
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "whole snapshot preview",
+            |screen| screen.contains(&whole_status),
+        );
+        for _ in 0..child_index {
+            write(&master, b"\x1b[B").unwrap();
+        }
+        write(&master, b" ").unwrap();
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "marked child",
+            |screen| {
+                screen.contains("1 marked roots.")
+                    && screen.lines().any(|line| {
+                        line.contains("* Regular")
+                            && line.trim_end_matches([' ', '│']).ends_with("a/b/child.txt")
+                    })
+            },
+        );
+        write(&master, b"p").unwrap();
+        let marked_status = format!(
+            "Read-only preview:{selected_count} entries including source ancestors. Nothing is written."
+        );
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "marked child preview",
+            |screen| screen.contains(&marked_status) && !screen.contains(&whole_status),
+        );
+        write(&master, b"q").unwrap();
+        let status = wait_for_exit(&master, &mut child, &mut output)
+            .expect("TUI did not exit after q within timeout");
+        assert!(status.success(), "TUI exited with {status}");
+        assert_eq!(tcgetattr(&slave).unwrap(), original_termios);
+        assert!(contains(&output, b"\x1b[?1049h"));
+        assert!(contains(&output, b"\x1b[?1049l"));
+        assert!(fs::read_dir(&scratch.0).unwrap().next().is_none());
+        assert_eq!(fingerprint(&fixture), before_source);
+    }
+
     #[test]
     //= docs/parsing-requirements.md#restore-ui-014
     //= type=test

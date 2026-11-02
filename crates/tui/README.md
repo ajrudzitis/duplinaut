@@ -40,8 +40,15 @@ and verifies successful exit, raw-mode entry/restoration, alternate-screen
 teardown, unchanged source contents, and an empty working directory. The earlier
 manual PTY smoke loaded the full plus two incremental sets, displayed 21 entries
 and 2,621,564 payload bytes, and restored terminal state on exit. This automated
-case covers history startup and quit only; it does not establish live S3
-acceptance or a frontend proof.
+case covers history startup and quit. A second automated PTY case uses a
+zero-scrollback terminal screen model to follow the official full plus two
+incremental sets, check oracle-derived snapshot counts and byte-path display,
+and exercise whole-snapshot and marked-child read-only `p` previews. Its focused
+macOS test and independent review pass; full CI is pending. The
+[acceptance plan](../../docs/tui-readonly-pty-acceptance.md) records the scope:
+the terse `p` preview supplies a count rather than executable-preview details,
+and final source content/working-directory comparisons do not exclude transient
+writes or access-time changes. Live S3 acceptance and frontend proofs remain open.
 An additional terminal run marked `a/b/child.txt` and previewed exactly four
 entries: the file and its three source directory ancestors. Independent source
 review accepted the read-only flow after fixing confirmation reset on an invalid
@@ -62,6 +69,7 @@ anchor choice.
 - [x] Test the RESTORE-UI-011 candidate-comparison budget arithmetic at exactly 16,000,000, above the cap, and multiplication overflow; independent review and full macOS CI passed. Both root-copy and preview preparation use this shared checked predicate. This tests budget arithmetic only, without snapshot candidate traversal.
 - [x] Test RESTORE-UI-004 key-kind normalization: reported Repeat/Release `r` and Enter events are ignored, while Press `restore` plus Press Enter satisfy the existing acknowledgment policy; independent review and full macOS CI passed. This is a pure key-event test; it does not establish physical-key origin, since legacy terminals may report repeats as Press.
 - [x] Add a Unix PTY acceptance test for local fixture history: wait for a rendered manifest row, send `q`, require successful exit, compare raw terminal attributes before/during/after, verify alternate-screen teardown, and confirm the source fingerprint and empty working directory are unchanged. This does not cover preview, acknowledgment, restoration, cancellation, resize, terminal failure or S3.
+- [ ] Complete the official-chain read-only PTY acceptance case: actual anchor/target/scan-confirmation keys, oracle-derived final snapshot count/payload, visible escaped non-UTF-8 path, whole `p` count and marked `a/b/child.txt` four-entry `p` count, restored terminal state and unchanged final source contents/empty working directory. Implementation, focused macOS test and independent review pass; full CI is pending. Executable preview, acknowledgment, publication, cancellation, resize, terminal failure and S3 remain outside this case.
 - [x] Test one-shot RESTORE-UI-004 confirmation: the first Press Enter consumes and clears the armed acknowledgment, and a second Enter cannot confirm again; independent review and full macOS CI passed. This exercises the pure confirmation helper only; it does not test worker execution.
 - [x] Verify on macOS that ordinary local and S3 CLI configurations parse without a restore destination while native restore flags remain rejected; independent review and full CI passed. This is CLI parsing coverage only.
 - [x] Connect explicitly acknowledged selection to native Linux publication; use the existing SDK credential provider.
