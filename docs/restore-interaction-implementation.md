@@ -113,6 +113,16 @@ and timestamps against independent source oracles. Source-only link timestamp
 changes follow the recorded oracle exclusion; actual emitted link mtimes are
 checked exactly. Preview cancellation and command serialization write nothing. Production lifecycle integration injects event, teardown and fallback-output faults during an actual active restore, drains/joins and retains the exact typed result. Partial-init tests check request-channel closure before teardown with a deterministically queued Ready reply; Native teardown aggregation tests prove all three actions are attempted despite errors. A concrete Terminal/CrosstermBackend regression hides the cursor, breaks its writer, invokes the production restoration-and-disarm helper with a failed actual cursor show, and proves dropping the terminal makes zero additional underlying writer calls; its infallible error-log branch therefore cannot be entered even if stderr is unavailable. Synthetic worker-result-loss tests distinguish unavailable outcomes from unpublished results.
 
+Automated Unix PTY tests now cover local history/quit and the official full plus
+two-incremental scan through whole and marked-child read-only `p` previews. The
+second case checks the current screen through a pinned terminal model against
+the independent source oracle, including the escaped non-UTF-8 filename,
+21-entry/2,621,564-byte final snapshot and four-entry marked selection. Both pass
+full macOS CI; [the acceptance record](tui-readonly-pty-acceptance.md) retains the
+exact source identity and limits. This supplies read-only terminal interaction
+evidence; automated acceptance of executable `r` preview/acknowledgment/publication
+and comprehensive frontend acceptance remain pending.
+
 The checked-in PTY smoke script exercises real rendering and key sequences with a
 non-UTF-8 destination leaf. It observes read-only/preparation/empty-confirmation
 no-write states, explicit acknowledgment publication and exact terminal mode

@@ -1,8 +1,7 @@
 # Read-only snapshot PTY acceptance plan
 
 Status: acceptance scope independently reviewed and adopted before implementation.
-Implementation and independent review pass the focused macOS PTY test; the full
-assurance gate is pending.
+Implementation, independent review and the full macOS assurance gate pass.
 
 This extends the existing automated local-history/quit test through the actual
 browser event loop and the official full-plus-two-incremental chain. It applies
@@ -73,3 +72,20 @@ the real terminal loop on supported Unix hosts. Executable `r` previews,
 acknowledgment, Linux publication/outcomes, cancellation races, resize, terminal
 fault injection, S3, encrypted credential flow and formal frontend controller
 proofs remain separate backlog work.
+
+## Accepted evidence
+
+The acceptance plan was committed at `c102993` before implementation. The test
+was independently reviewed and rerun on macOS, then committed at `75d339b`.
+Its zero-scrollback current-screen model uses pinned, test-only `vt100` 0.16.2;
+this model is test infrastructure and supplies no parser or controller proof.
+
+On 2026-11-02, unfiltered `cargo xtask ci` passed on aarch64 macOS at `75d339b`,
+source SHA-256
+`f3e5d05601e44af611fab9e88670779f796c2b5812325e0aff01c3a8b4a7d8dc`.
+Fresh isolated verification reported 2,047 vstd, 3,183 Vest and 1,274 core
+obligations with zero errors. Duvet snapshot/coverage gates, formatting, strict
+workspace Clippy, all workspace tests/doctests and the exact named-test replay
+passed. Both automated CLI PTY cases executed successfully in that gate.
+The existing core proof obligations are unchanged by this test milestone;
+frontend controller proofs and the broader cases above remain pending.
