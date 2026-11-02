@@ -34,9 +34,13 @@ mod pty_acceptance {
         errno::Errno,
         poll::{poll, PollFd, PollFlags},
         pty::{openpty, Winsize},
-        sys::termios::tcgetattr,
-        unistd::{read, write},
+        sys::{
+            signal::{kill, Signal},
+            termios::tcgetattr,
+        },
+        unistd::{read, write, Pid},
     };
+    use rustix::termios::{tcgetwinsize, tcsetwinsize, Winsize as TerminalSize};
     use sha2::{Digest, Sha256};
     use std::{
         fs::{self, File},
@@ -229,11 +233,72 @@ mod pty_acceptance {
             .collect()
     }
 
-    #[test]
-    //= docs/parsing-requirements.md#restore-ui-014
-    //= type=test
-    //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
-    fn official_chain_readonly_previews_through_pty_match_source_oracle() {
+    fn marked_child_on_screen(screen: &str) -> bool {
+        screen.lines().any(|line| {
+            line.contains("* Regular")
+                && line.trim_end_matches([' ', '│']).ends_with("a/b/child.txt")
+        })
+    }
+
+    fn frame_at_geometry(screen: &str, rows: u16, columns: u16) -> bool {
+        let Some(top) = screen.lines().next() else {
+            return false;
+        };
+        let Some(bottom) = screen.lines().nth(usize::from(rows - 1)) else {
+            return false;
+        };
+        // Local model resizing can crop/extend the old display, but cannot draw
+        // these corners at the new right and bottom boundaries for the child.
+        top.starts_with('┌')
+            && top.chars().count() == usize::from(columns)
+            && top.ends_with('┐')
+            && bottom.starts_with('└')
+            && bottom.chars().count() == usize::from(columns)
+            && bottom.ends_with('┘')
+    }
+
+    fn resize_pty(
+        master: &File,
+        slave: &File,
+        child: &ChildGuard,
+        output: &mut Vec<u8>,
+        parser: &mut vt100::Parser,
+        rows: u16,
+        columns: u16,
+    ) -> usize {
+        // Interpret any immediately queued old frame bytes at the old size.
+        // This bounded drain need not eliminate every concurrent-draw race;
+        // the caller waits for an eventual complete frame at the new geometry.
+        let mut drained = false;
+        for _ in 0..128 {
+            let previous = output.len();
+            pump(master, output, 0);
+            parser.process(&output[previous..]);
+            if output.len() == previous {
+                drained = true;
+                break;
+            }
+        }
+        assert!(drained, "PTY output did not quiesce before resize");
+        let before_resize = output.len();
+        let size = TerminalSize {
+            ws_row: rows,
+            ws_col: columns,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        tcsetwinsize(slave, size).expect("resize slave PTY");
+        assert_eq!(tcgetwinsize(slave).unwrap(), size);
+        parser.screen_mut().set_size(rows, columns);
+        // The child has slave stdio but no controlling-terminal session. Send
+        // SIGWINCH explicitly; automatic foreground-group delivery is untested.
+        let pid = i32::try_from(child.0.id()).expect("child PID exceeds signed range");
+        assert!(pid > 0, "never send a process-group signal");
+        kill(Pid::from_raw(pid), Signal::SIGWINCH).expect("notify child of resize");
+        before_resize
+    }
+
+    fn check_official_chain_readonly_previews(resize: bool) {
         let oracle: serde_json::Value = serde_json::from_str(include_str!(
             "../../../tests/fixtures/duplicity-3.0.7/expected.json"
         ))
@@ -375,13 +440,7 @@ mod pty_acceptance {
             &mut output,
             &mut parser,
             "marked child",
-            |screen| {
-                screen.contains("1 marked roots.")
-                    && screen.lines().any(|line| {
-                        line.contains("* Regular")
-                            && line.trim_end_matches([' ', '│']).ends_with("a/b/child.txt")
-                    })
-            },
+            |screen| screen.contains("1 marked roots.") && marked_child_on_screen(screen),
         );
         write(&master, b"p").unwrap();
         let marked_status = format!(
@@ -395,6 +454,57 @@ mod pty_acceptance {
             "marked child preview",
             |screen| screen.contains(&marked_status) && !screen.contains(&whole_status),
         );
+        if resize {
+            for (rows, columns) in [(18, 96), (40, 240)] {
+                let before_resize = resize_pty(
+                    &master,
+                    &slave,
+                    &child,
+                    &mut output,
+                    &mut parser,
+                    rows,
+                    columns,
+                );
+                wait_for_screen(
+                    &master,
+                    &mut child,
+                    &mut output,
+                    &mut parser,
+                    "resized marked snapshot preview",
+                    |screen| {
+                        frame_at_geometry(screen, rows, columns)
+                            && screen.contains("Snapshot paths")
+                            && marked_child_on_screen(screen)
+                            && screen.contains(&marked_status)
+                    },
+                );
+                assert!(
+                    output.len() > before_resize,
+                    "resize produced no new output"
+                );
+                assert_eq!(parser.screen().size(), (rows, columns));
+            }
+            // The mark could survive even if the cursor silently moved. Space
+            // must remove the existing child mark rather than add another root.
+            write(&master, b" ").unwrap();
+            wait_for_screen(
+                &master,
+                &mut child,
+                &mut output,
+                &mut parser,
+                "unmark retained selected child after resize",
+                |screen| screen.contains("0 marked roots.") && !marked_child_on_screen(screen),
+            );
+            write(&master, b"p").unwrap();
+            wait_for_screen(
+                &master,
+                &mut child,
+                &mut output,
+                &mut parser,
+                "whole snapshot preview after resize",
+                |screen| screen.contains(&whole_status),
+            );
+        }
         write(&master, b"q").unwrap();
         let status = wait_for_exit(&master, &mut child, &mut output)
             .expect("TUI did not exit after q within timeout");
@@ -404,6 +514,22 @@ mod pty_acceptance {
         assert!(contains(&output, b"\x1b[?1049l"));
         assert!(fs::read_dir(&scratch.0).unwrap().next().is_none());
         assert_eq!(fingerprint(&fixture), before_source);
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-014
+    //= type=test
+    //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+    fn official_chain_readonly_previews_through_pty_match_source_oracle() {
+        check_official_chain_readonly_previews(false);
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-014
+    //= type=test
+    //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+    fn official_chain_pty_resize_preserves_snapshot_mark_and_cursor() {
+        check_official_chain_readonly_previews(true);
     }
 
     #[test]

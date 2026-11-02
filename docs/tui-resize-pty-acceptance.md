@@ -1,7 +1,8 @@
 # Unix PTY resize acceptance plan
 
-Status: independently reviewed and adopted before implementation;
-implementation and execution are pending.
+Status: independently reviewed and adopted before implementation. Implementation,
+focused macOS execution and independent implementation review pass; full CI is
+pending.
 
 This extends [read-only PTY acceptance](tui-readonly-pty-acceptance.md) with a
 shrink/expand cycle while the actual local browser retains a reconstructed
