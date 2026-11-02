@@ -1,8 +1,7 @@
 # Unix PTY resize acceptance plan
 
 Status: independently reviewed and adopted before implementation. Implementation,
-focused macOS execution and independent implementation review pass; full CI is
-pending.
+independent implementation review and full macOS CI pass.
 
 This extends [read-only PTY acceptance](tui-readonly-pty-acceptance.md) with a
 shrink/expand cycle while the actual local browser retains a reconstructed
@@ -91,3 +90,19 @@ metadata changes such as access times. This case does not cover zero/tiny
 dimensions, arbitrary resize storms, executable preview wrapping/scrolling,
 restoration, acknowledgment, cancellation, terminal/output faults, live S3,
 encrypted credentials or formal frontend controller obligations.
+
+## Accepted evidence
+
+The reviewed plan was committed at `7182878` before implementation. The test
+checkpoint was committed at `0b16a7f`, after focused macOS execution and an
+independent rerun/review passed. All five CLI tests passed after the shared
+full-chain helper extraction, including the original read-only case.
+
+On 2026-11-02, unfiltered `cargo xtask ci` passed on aarch64 macOS at `0b16a7f`,
+source SHA-256
+`1977de0986126ee396b02076e6d3b5be6da57392ce5ec5fcab42fd395abfcf24`.
+Fresh isolated verification reported 2,047 vstd, 3,183 Vest and 1,274 core
+obligations with zero errors. Duvet snapshot/coverage gates, formatting, strict
+workspace Clippy, workspace tests/doctests and exact named-test replay passed.
+No production parser or browser code changed, and this milestone adds terminal
+evidence without adding or closing frontend controller proof obligations.

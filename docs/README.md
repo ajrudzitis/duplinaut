@@ -35,6 +35,12 @@ checkpoint, including its official source oracle and successful full macOS CI.
 It adds terminal evidence without closing executable restoration interaction or
 formal frontend controller obligations.
 
+The [Unix PTY resize checkpoint](tui-resize-pty-acceptance.md) also passes
+independent review and full macOS CI: actual compact/expanded dimensions,
+fresh redraws, retained snapshot/selection/cursor and terminal restoration are
+observed. Explicit harness signal delivery and remaining resize/controller
+limits are recorded separately.
+
 The fresh `cargo xtask verify` checkpoint at commit `f5b0042` verified 2,047 vstd, 3,183 Vest and 994 core obligations with zero errors, using an isolated empty target and the full-summary gate. Its receipt records source SHA-256 `6eb290bb9bcf7da934dbccd9b3bad270642f419c131b7753f02bb75bf173faab`, default features, locked dependencies and project `--no-cheating`. It records tests as **not run** and accepts only the tooling milestone. This is successful verification of the contracts present at that source identity; it does not close missing semantic/controller obligations, enable pending component milestones, or establish full CI/complete-reader acceptance. Later source changes require a new acceptance run.
 
 Detailed boundaries and residual obligations appear in [chain planning](chain-planning.md), [reader orchestration](reader-orchestration.md), [local source](local-source.md), [restore selection](restore-plan.md), and the [core](../crates/core/README.md), [S3](../crates/s3/README.md) and [TUI](../crates/tui/README.md) records. Budget tests establish specific retained-capacity/work/payload limits; they do not establish a global heap or cancellation-latency proof. Manual terminal smoke runs do not establish automated interaction or live-service acceptance.
