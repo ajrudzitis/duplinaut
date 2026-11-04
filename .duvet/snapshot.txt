@@ -84,7 +84,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: The adapter MUST restrict decryption and verification algorithms to the enumerated initial capability profile.
 
   SECTION: [PARSE-ENV-009](#parse-env-009)
-    TEXT[!MUST]: The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
+    TEXT[!MUST,implementation,test]: The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
 
   SECTION: [PARSE-ENV-010](#parse-env-010)
     TEXT[!MUST,implementation,test]: The adapter MUST enforce its configured ciphertext bound before materializing an encrypted object and authenticate the complete SEIPDv1 payload before releasing plaintext to message or duplicity parsers.

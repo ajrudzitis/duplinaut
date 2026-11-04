@@ -154,6 +154,9 @@ impl ObjectSource for FixtureSource {
 //= docs/parsing-requirements.md#parse-env-017
 //= type=test
 //# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+//= docs/parsing-requirements.md#parse-env-009
+//= type=test
+//# The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
 //= docs/parsing-requirements.md#parse-env-018
 //= type=test
 //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
@@ -226,6 +229,20 @@ fn original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidenc
             },
             require_signature: mode == "signed",
         };
+        assert_eq!(
+            credentials.message_passwords.len(),
+            usize::from(mode == "symmetric"),
+            "{mode} credential mode uses only its intended message-passphrase inputs"
+        );
+        assert_eq!(
+            credentials.secret_exports.len(),
+            usize::from(mode != "symmetric"),
+            "{mode} credential mode uses caller-exported secret-key material as required"
+        );
+        if mode == "public-key" {
+            assert_eq!(credentials.secret_exports[0].bytes, secret.as_slice());
+            assert!(credentials.secret_exports[0].password.is_some());
+        }
         let context = CryptoReadContext {
             credentials,
             crypto_limits: OpenPgpLimits::default(),

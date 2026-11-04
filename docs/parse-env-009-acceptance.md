@@ -1,13 +1,14 @@
 # PARSE-ENV-009 caller-credential acceptance plan
 
-Status: proposed before adding Duvet implementation and test links.
+Status: implementation and full core verification complete; independent review
+and hosted assurance CI remain pending.
 
 This is a local traceability and regression-test slice for
 [PARSE-ENV-009](parsing-requirements.md#parse-env-009). Its bounded scope is
 the caller-provided credential path: symmetric message passphrases and
-exported supported secret keys. The current section-scoped Duvet query reports
-no implementation annotation; the core README already records successful
-official symmetric and public-key encrypted-chain tests.
+exported supported secret keys. The official encrypted-chain source-oracle
+test now carries the PARSE-ENV-009 trace link and explicitly checks both
+credential modes.
 
 ## Acceptance requirements
 
@@ -42,6 +43,25 @@ official symmetric and public-key encrypted-chain tests.
 - Full core native tests, Duvet trace, and required assurance CI MUST pass
   before this slice is recorded complete. No Verus proof is claimed for the
   pinned OpenPGP library or its cryptographic primitives.
+
+## Current evidence
+
+- `original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidence`
+  runs the checked-in official symmetric, public-key, and signed chains against
+  the independent three-date snapshot/content oracle. It asserts that
+  symmetric mode uses the supplied message passphrase, while public-key mode
+  uses the supplied exported secret-key bytes and a present fixture password;
+  both reconstruct the source-oracle snapshots and produce bounded
+  authentication evidence.
+- Source review found no process/keyring/external-helper use in the OpenPGP
+  decode path. `CryptoError` diagnostics contain only the error variant, and
+  the reader test asserts that a wrong passphrase does not appear in formatted
+  errors. This does not claim secure erasure or zero internal key copies.
+- The focused official-chain test, `cargo test -p duplicity-core`, targeted
+  PARSE-ENV-009 Duvet query, `cargo xtask trace`, formatting checks, and strict
+  core Clippy pass. Clippy emits existing warnings in vendored `vest_lib`,
+  while `duplicity-core` passes `-D warnings`. Independent review and hosted
+  assurance CI remain pending.
 
 ## Non-goals
 

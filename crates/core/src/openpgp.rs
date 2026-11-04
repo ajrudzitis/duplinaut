@@ -865,6 +865,9 @@ fn content(bytes: &[u8], depth: usize, work: &mut Work) -> Result<Content, Crypt
 //= docs/parsing-requirements.md#parse-env-012
 //= type=implementation
 //# Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
+//= docs/parsing-requirements.md#parse-env-009
+//= type=implementation
+//# The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
 pub(crate) fn decode(
     stored: &[u8],
     credentials: Credentials<'_>,
