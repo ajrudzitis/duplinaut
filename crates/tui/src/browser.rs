@@ -38,6 +38,60 @@ fn take_confirmation(ack: &mut Acknowledgment, code: KeyCode) -> bool {
         false
     }
 }
+fn r_transition(
+    key: KeyCode,
+    retry_allowed: bool,
+    has_snapshot: bool,
+    has_destination: bool,
+    status: &mut String,
+    prepare: impl FnOnce() -> io::Result<()>,
+) -> io::Result<bool> {
+    if key != KeyCode::Char('r') {
+        return Ok(false);
+    }
+    if !retry_allowed {
+        *status =
+            "Further restores disabled after success or uncertain/unavailable outcome.".into();
+        return Ok(false);
+    }
+    if has_snapshot && has_destination {
+        prepare()?;
+        Ok(true)
+    } else {
+        *status = "Restore requires a validated snapshot and paired --restore-parent/--restore-name. Nothing is written.".into();
+        Ok(false)
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn outcome_transition(
+    result: Result<duplicity_core::restore_linux::RestoreOutcome, crate::restore_flow::Error>,
+    retry: &mut bool,
+    document: &mut Option<String>,
+    offset: &mut usize,
+    status: &mut String,
+    known_outcome: &mut Option<duplicity_core::restore_linux::RestoreOutcome>,
+) {
+    match result {
+        Ok(value) => {
+            *retry = crate::restore_flow::retry_allowed(&value);
+            *document = Some(
+                crate::restore_flow::diagnostics(&value).unwrap_or_else(|_| {
+                    "Known restore outcome retained; diagnostic rendering failed.".into()
+                }),
+            );
+            *offset = 0;
+            *status = "Restore result. Up/Down scroll; Esc returns; q exits.".into();
+            *known_outcome = Some(value);
+        }
+        Err(_) => {
+            *retry = false;
+            *status =
+                "Restore request failed before a typed backend result; inspection required, retries disabled."
+                    .into();
+        }
+    }
+}
 #[cfg(test)]
 mod key_event_tests {
     use super::*;
@@ -175,21 +229,14 @@ pub fn run_configured(
                                 }
                             }
                             #[cfg(target_os = "linux")]
-                            Reply::Outcome { result, .. } => match result {
-                                Ok(value) => {
-                                    retry = crate::restore_flow::retry_allowed(&value);
-                                    document=Some(crate::restore_flow::diagnostics(&value).unwrap_or_else(|_|"Known restore outcome retained; diagnostic rendering failed.".into()));
-                                    offset = 0;
-                                    status =
-                                        "Restore result. Up/Down scroll; Esc returns; q exits."
-                                            .into();
-                                    known_outcome = Some(value);
-                                }
-                                Err(_) => {
-                                    retry = false;
-                                    status="Restore request failed before a typed backend result; inspection required, retries disabled.".into();
-                                }
-                            },
+                            Reply::Outcome { result, .. } => outcome_transition(
+                                result,
+                                &mut retry,
+                                &mut document,
+                                &mut offset,
+                                &mut status,
+                                &mut known_outcome,
+                            ),
                             Reply::Error { text, .. } => status = text.into(),
                         }
                     }
@@ -370,30 +417,38 @@ pub fn run_configured(
                         }
                     }
                     KeyCode::Char('r') => {
-                        if !retry {
-                            status="Further restores disabled after success or uncertain/unavailable outcome.".into();
-                            continue;
-                        }
-                        if let (Some(value), Some(dest)) = (&snapshot, &destination) {
-                            serial = serial
-                                .checked_add(1)
-                                .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
-                            *cancel = Cancellation::default();
-                            document = None;
-                            worker.send(Command::Prepare {
-                                id: serial,
-                                snapshot: value.clone(),
-                                marked: marked.clone(),
-                                destination: dest.clone(),
-                                cancel: cancel.clone(),
-                            })?;
-                            active = Some(serial);
+                        let prepared = r_transition(
+                            code,
+                            retry,
+                            snapshot.is_some(),
+                            destination.is_some(),
+                            &mut status,
+                            || {
+                                let (Some(value), Some(dest)) = (&snapshot, &destination) else {
+                                    unreachable!("availability checked by r_transition")
+                                };
+                                serial = serial
+                                    .checked_add(1)
+                                    .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
+                                *cancel = Cancellation::default();
+                                document = None;
+                                worker.send(Command::Prepare {
+                                    id: serial,
+                                    snapshot: value.clone(),
+                                    marked: marked.clone(),
+                                    destination: dest.clone(),
+                                    cancel: cancel.clone(),
+                                })?;
+                                active = Some(serial);
+                                Ok(())
+                            },
+                        )?;
+                        if prepared {
                             abandoning = false;
                             ack.clear();
                             status="Preparing frozen executable preview on worker; acknowledgment input is ignored.".into();
-                        } else {
-                            status="Restore requires a validated snapshot and paired --restore-parent/--restore-name. Nothing is written.".into();
                         }
+                        continue;
                     }
                     KeyCode::Char('a') if snapshot.is_none() => {
                         scan_confirm = false;
@@ -498,5 +553,202 @@ mod tests {
         assert_eq!(accessible, text);
         assert!(accessible.ends_with("\\xff"));
         assert_eq!(wrapped_rows(&text, 1).count(), text.len());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-008
+    //= type=test
+    //# The frontend MUST preserve the backend's published, unpublished and publication-indeterminate outcome distinction, including successful-publication precedence over racing cancellation and all reported cleanup warnings or uncertainty.
+    //= docs/parsing-requirements.md#restore-ui-009
+    //= type=test
+    //# The frontend MUST refrain from automatic retry, rollback, destination inspection-based outcome promotion or modifying cleanup after publication uncertainty or an unavailable worker outcome.
+    //= docs/parsing-requirements.md#restore-ui-014
+    //= type=test
+    //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+    // This test invokes the same typed-result and `r` transition helpers used
+    // by the browser loop. Synthetic replies are state-machine evidence only;
+    // no native backend or terminal interaction is exercised.
+    fn blocked_typed_outcomes_retain_document_and_reject_r_transition() {
+        use crossterm::event::{KeyEvent, KeyEventKind, KeyModifiers};
+        use duplicity_core::{
+            chain::SetKind,
+            local::LocalSource,
+            names::{NameConfig, Timestamp},
+            reader::{Catalog, ReaderLimits},
+            restore_linux::{
+                Cause, Cleanup, Identity, Indeterminate, Profile, Receipt, RestoreOutcome,
+                Unpublished,
+            },
+            source::Cancellation,
+        };
+        use std::{ffi::CString, path::PathBuf};
+
+        let source = LocalSource::new(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/duplicity-3.0.7/plain"),
+        )
+        .unwrap();
+        let cancellation = Cancellation::default();
+        let catalog = Catalog::discover(
+            &source,
+            "duplicity-",
+            NameConfig::default(),
+            ReaderLimits::default(),
+            &cancellation,
+        )
+        .unwrap();
+        let anchor = catalog
+            .manifests()
+            .find(|(_, _, set)| {
+                set.kind() == SetKind::Full
+                    && set.start() == Timestamp(1700000000)
+                    && set.end() == Timestamp(1700000000)
+            })
+            .unwrap()
+            .0;
+        let snapshot = Arc::new(
+            catalog
+                .read_snapshot(anchor, Timestamp(1700172800), &cancellation)
+                .unwrap(),
+        );
+        let destination = Arc::new(Destination {
+            parent: PathBuf::from("/tmp/retry-lockout-parent"),
+            name: b"retry-lockout-leaf".to_vec(),
+        });
+        let receipt = || Receipt {
+            destination: CString::new("retry-lockout-leaf").unwrap(),
+            staging: CString::new(".retry-lockout-stage").unwrap(),
+            profile: Profile::PrivateParentSameParent,
+            parent: Identity {
+                device: 10,
+                inode: 20,
+            },
+            root: Identity {
+                device: 10,
+                inode: 30,
+            },
+            filesystem: 0xef53,
+            unspecified_empty_root_mtime: false,
+            cleanup: Cleanup::default(),
+        };
+        let cases = [
+            (
+                RestoreOutcome::Published(receipt()),
+                "Published completed tree.",
+                "Parent device=10 inode=20; root device=10 inode=30",
+                0,
+            ),
+            (
+                RestoreOutcome::Unpublished(Unpublished {
+                    cause: Cause::Fidelity,
+                    cleanup: Cleanup {
+                        attempted: 2,
+                        failures: 1,
+                        ..Cleanup::default()
+                    },
+                    uncertain_outer: Some(CString::new("outer-candidate").unwrap()),
+                }),
+                "Unpublished: cause Fidelity",
+                "First-stage candidate uncertain; no session retry: outer-candidate",
+                1,
+            ),
+            (
+                RestoreOutcome::PublicationIndeterminate(Indeterminate {
+                    error: rustix::io::Errno::IO,
+                    receipt: receipt(),
+                }),
+                "Publication indeterminate:",
+                "Publication may have occurred; no retry, recovery or cleanup is authorized.",
+                2,
+            ),
+        ];
+
+        for (case_index, (outcome, expected_document, expected_evidence, expected_kind)) in
+            cases.into_iter().enumerate()
+        {
+            let mut retry = true;
+            let mut document = None;
+            let mut offset = 17;
+            let mut status = String::from("before result");
+            let mut known_outcome = None;
+            let reply = Reply::Outcome {
+                id: 91 + case_index as u64,
+                result: Ok(outcome),
+            };
+            let Reply::Outcome { result, .. } = reply else {
+                unreachable!("test supplies a synthetic outcome reply")
+            };
+            outcome_transition(
+                result,
+                &mut retry,
+                &mut document,
+                &mut offset,
+                &mut status,
+                &mut known_outcome,
+            );
+
+            assert!(!retry);
+            assert_eq!(offset, 0);
+            assert_eq!(
+                status,
+                "Restore result. Up/Down scroll; Esc returns; q exits."
+            );
+            let retained_document = document.clone().unwrap();
+            assert!(retained_document.contains(expected_document));
+            assert!(retained_document.contains(expected_evidence));
+            let assert_evidence = |value: &RestoreOutcome| match (expected_kind, value) {
+                (0, RestoreOutcome::Published(r)) => {
+                    assert_eq!(r.destination.to_bytes(), b"retry-lockout-leaf");
+                    assert_eq!(r.parent.device, 10);
+                    assert_eq!(r.root.inode, 30);
+                }
+                (1, RestoreOutcome::Unpublished(e)) => {
+                    assert_eq!(e.cause, Cause::Fidelity);
+                    assert_eq!(
+                        e.uncertain_outer.as_ref().unwrap().to_bytes(),
+                        b"outer-candidate"
+                    );
+                }
+                (2, RestoreOutcome::PublicationIndeterminate(e)) => {
+                    assert_eq!(e.error, rustix::io::Errno::IO);
+                    assert_eq!(e.receipt.destination.to_bytes(), b"retry-lockout-leaf");
+                }
+                _ => panic!("typed result variant must remain unchanged"),
+            };
+            assert_evidence(known_outcome.as_ref().unwrap());
+
+            let mut sent = Vec::new();
+            let r_event = Event::Key(KeyEvent::new_with_kind(
+                KeyCode::Char('r'),
+                KeyModifiers::NONE,
+                KeyEventKind::Press,
+            ));
+            let key = pressed_key(r_event).expect("press-r event normalizes to a key");
+            assert_eq!(key, KeyCode::Char('r'));
+            let prepared = r_transition(
+                key,
+                retry,
+                snapshot.is_some(),
+                destination.is_some(),
+                &mut status,
+                || {
+                    sent.push("Prepare");
+                    Ok(())
+                },
+            )
+            .unwrap();
+            assert!(!prepared);
+            assert_eq!(
+                status,
+                "Further restores disabled after success or uncertain/unavailable outcome."
+            );
+            assert!(
+                sent.is_empty(),
+                "no Prepare or Execute command may follow the result"
+            );
+            assert_eq!(document.as_deref(), Some(retained_document.as_str()));
+            assert_evidence(known_outcome.as_ref().unwrap());
+        }
     }
 }
