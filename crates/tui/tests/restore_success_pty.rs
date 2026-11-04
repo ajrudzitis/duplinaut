@@ -12,11 +12,11 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
     fs::{self, File},
-    io::{Read, Write},
+    io::Read,
     os::{
         fd::{AsFd, AsRawFd},
         unix::{
-            ffi::{OsStrExt, OsStringExt},
+            ffi::OsStrExt,
             fs::{MetadataExt, PermissionsExt},
         },
     },
@@ -182,9 +182,10 @@ fn observe_tree(
 }
 
 fn decode_hex(hex: &str) -> Vec<u8> {
-    assert_eq!(hex.len() % 2, 0, "oracle hex has complete byte pairs");
-    hex.as_bytes()
-        .chunks_exact(2)
+    let (pairs, remainder) = hex.as_bytes().as_chunks::<2>();
+    assert!(remainder.is_empty(), "oracle hex has complete byte pairs");
+    pairs
+        .iter()
         .map(|pair| {
             let digit = |value: u8| match value {
                 b'0'..=b'9' => value - b'0',
