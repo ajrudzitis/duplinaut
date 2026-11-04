@@ -66,6 +66,8 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [ ] Implement and independently review the PARSE-ENV-013 policy/evidence Duvet mapping; expired/revoked-certificate behavior remains a separate open test question.
 - [x] Specify PARSE-ENV-015 trusted-boundary evidence traceability for the pinned OpenPGP dependency, official positive/negative fixtures, and explicit trust limits. See the [acceptance plan](../../docs/parse-env-015-evidence-acceptance.md).
 - [ ] Implement and independently review the PARSE-ENV-015 source/test links and implementation-record corrections; do not claim formal verification of cryptographic primitives.
+- [x] Specify PARSE-ENV-016 OpenPGP resource-admission boundaries, including permitted-fingerprint counts and SKESK/protected-key S2K preflight. See the [acceptance plan](../../docs/parse-env-016-resource-acceptance.md).
+- [ ] Implement and independently review the PARSE-ENV-016 limit boundary and precedence matrix using reduced local bounds and cheap admission-only fixtures.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 
