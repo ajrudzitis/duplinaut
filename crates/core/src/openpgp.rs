@@ -862,6 +862,9 @@ fn content(bytes: &[u8], depth: usize, work: &mut Work) -> Result<Content, Crypt
 //= docs/parsing-requirements.md#parse-env-014
 //= type=implementation
 //# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
+//= docs/parsing-requirements.md#parse-env-012
+//= type=implementation
+//# Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
 pub(crate) fn decode(
     stored: &[u8],
     credentials: Credentials<'_>,

@@ -93,7 +93,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The adapter MUST consume every accepted message and compression layer to its authenticated end and reject unexpected trailing packets or bytes.
 
   SECTION: [PARSE-ENV-012](#parse-env-012)
-    TEXT[!MUST]: Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
+    TEXT[!MUST,implementation,test]: Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
 
   SECTION: [PARSE-ENV-013](#parse-env-013)
     TEXT[!MUST]: Historical signer verification MUST report its explicit offline fingerprint-authorization scope without claiming current certificate validity or Web-of-Trust validation.

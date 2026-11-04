@@ -157,6 +157,9 @@ impl ObjectSource for FixtureSource {
 //= docs/parsing-requirements.md#parse-env-018
 //= type=test
 //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+//= docs/parsing-requirements.md#parse-env-012
+//= type=test
+//# Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
 //= docs/parsing-requirements.md#parse-env-024
 //= type=test
 //# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
@@ -300,6 +303,13 @@ fn original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidenc
                     duplicity_core::reader::AuthenticationKind::OpenPgpIntegrity
                 }));
             if mode == "signed" {
+                assert_eq!(
+                    policy.permitted_primary_fingerprints,
+                    [[
+                        0xd0, 0x68, 0x47, 0xba, 0xc3, 0xb1, 0x17, 0xc4, 0x6b, 0xb6, 0x8b, 0xda,
+                        0x6f, 0x23, 0x17, 0x3b, 0xad, 0x8a, 0x76, 0x56,
+                    ]]
+                );
                 assert_eq!(
                     evidence.certificates().len(),
                     1,
@@ -560,6 +570,9 @@ fn public_crypto_reader_rejects_unsupported_pkesk_algorithm_without_snapshot() {
 //= docs/parsing-requirements.md#parse-env-018
 //= type=test
 //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+//= docs/parsing-requirements.md#parse-env-012
+//= type=test
+//# Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
 //= docs/parsing-requirements.md#parse-env-014
 //= type=test
 //# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
@@ -599,7 +612,9 @@ fn public_crypto_reader_rejects_valid_signature_from_disallowed_primary_signer()
         password: Some(&password),
     }];
     let signer_exports = [signer.as_slice()];
-    let disallowed_signer = [[0x55; 20]];
+    let mut suffix_collision = [0x55; 20];
+    suffix_collision[12..].copy_from_slice(&[0x6f, 0x23, 0x17, 0x3b, 0xad, 0x8a, 0x76, 0x56]);
+    let disallowed_signer = [suffix_collision];
     let context = CryptoReadContext {
         credentials: CryptoCredentials {
             secret_exports: &secret_exports,

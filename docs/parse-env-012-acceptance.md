@@ -1,14 +1,13 @@
 # PARSE-ENV-012 primary-fingerprint acceptance plan
 
-Status: proposed before adding Duvet implementation and test links.
+Status: implementation and full core verification complete; independent review
+and hosted assurance CI remain pending.
 
 This is a bounded local acceptance slice for
 [PARSE-ENV-012](parsing-requirements.md#parse-env-012): exact matching of the
-caller-authorized full primary-certificate fingerprint. The current
-section-scoped Duvet query reports no implementation annotation for this
-requirement. The repository already has official signed-chain positive and
-disallowed-signer test paths that can supply local evidence; no AWS access is
-needed.
+caller-authorized full primary-certificate fingerprint. The implementation
+and existing official signed-chain positive and disallowed-signer test paths
+now carry scoped Duvet links. No AWS access is needed.
 
 ## Acceptance requirements
 
@@ -45,6 +44,21 @@ needed.
   fingerprint and does not authorize via key ID or issuer hints.
 - No Verus proof is claimed for upstream certificate parsing, fingerprint
   calculation, or signature verification.
+
+## Current evidence
+
+- The official signed-chain test requires the exact 20-byte permitted
+  fingerprint, successful snapshot reconstruction, and matching primary
+  fingerprint in authorization evidence.
+- The disallowed-signer test uses a different 20-byte value with the same
+  final eight bytes as the fixture signer and requires `SignerNotAllowed`.
+  It returns no snapshot on this error path.
+- Focused positive and negative tests pass. `cargo test -p duplicity-core`
+  passes all unit, integration, and doc tests. The PARSE-ENV-012 Duvet query,
+  `cargo xtask trace`, formatting checks, and strict core Clippy pass. Clippy
+  reports existing warnings in vendored `vest_lib`; the core crate passes
+  `-D warnings`. Hosted assurance CI remains pending. Duvet traceability is
+  not proof of the upstream fingerprint or signature primitives.
 
 ## Non-goals
 
