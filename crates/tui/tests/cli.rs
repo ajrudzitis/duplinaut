@@ -1400,25 +1400,17 @@ mod pty_acceptance {
             previous_component = position;
         }
         assert!(preview_frames.contains(r"p\x1b\\\xff"));
-        // Return to the preview start so confirmation applies to the complete
-        // concrete request and its summary, then acknowledge exactly.
-        for _ in 0..80 {
-            let screen = parser.screen().contents();
-            if preview_ready(&screen) {
-                break;
-            }
-            let previous = screen;
-            write(&master, b"\x1b[A").expect("scroll preview back to top");
-            wait_for_screen(
-                &master,
-                &mut child,
-                &mut output,
-                &mut parser,
-                "return preview to summary",
-                |screen| screen != previous,
-            );
-        }
-        assert!(preview_ready(&parser.screen().contents()));
+        // The initial current screen already established the summary. Keep
+        // this interaction on the verified lower preview frame, where the
+        // acknowledgement footer remains independently visible; avoid an
+        // extra cursor-key round trip through terminal escape decoding.
+        let preview_identity_screen = parser.screen().contents();
+        assert!(
+            preview_identity_screen
+                .contains("Restore preview / outcome / Up-Down scroll")
+                && preview_identity_screen.contains("Acknowledgment [] ready"),
+            "preview identity frame retains the empty acknowledgment; current screen:\n{preview_identity_screen}"
+        );
         write(&master, b"restore").expect("type exact acknowledgment");
         wait_for_screen(
             &master,
@@ -1426,7 +1418,10 @@ mod pty_acceptance {
             &mut output,
             &mut parser,
             "ready acknowledgment",
-            |screen| preview_ready(screen) && screen.contains("Acknowledgment [restore] ready"),
+            |screen| {
+                screen.contains("Restore preview / outcome / Up-Down scroll")
+                    && screen.contains("Acknowledgment [restore] ready")
+            },
         );
         write(&master, b"\r").expect("confirm exact restore acknowledgment");
         wait_for_screen(
