@@ -1,7 +1,7 @@
 # TUI selected-root byte-cap acceptance plan
 
-Status: proposed; specification only. This is a bounded test of selected-root
-admission and does not change backlog status.
+Status: accepted. Linux assurance (`cargo xtask ci`) and Duvet Pages publication
+passed in [run 41844077888](https://github.com/ajrudzitis/duplinaut/actions/runs/41844077888).
 
 ## Goal and scope
 
@@ -47,14 +47,15 @@ a global allocator or process-memory bound.
 
 ## Verification and evidence
 
-- Run the focused selected-root byte-cap test and `cargo test -p
-  duplicity-tui` locally. The test is portable and does not require Linux
+- The focused selected-root byte-cap test and full `cargo test -p
+  duplicity-tui` suite passed in the hosted Linux assurance run. The test uses
+  the checked-in official fixture and is portable; it does not require Linux
   filesystem publication, PTYs, AWS credentials, or network access.
-- Run targeted Duvet queries for RESTORE-UI-011 and, if used, RESTORE-UI-002;
-  then run `cargo xtask trace-update` and `cargo xtask trace`.
-- Run formatting and strict TUI Clippy locally. Run the hosted Linux assurance
-  workflow (`cargo xtask ci`) and require Duvet report publication before
-  acceptance.
+- Targeted Duvet queries for RESTORE-UI-011 and RESTORE-UI-002,
+  `cargo xtask trace-update`, `cargo xtask trace`, formatting, and strict TUI
+  Clippy passed in the hosted Linux assurance workflow (`cargo xtask ci`).
+  Duvet Pages publication also passed in [run
+  41844077888](https://github.com/ajrudzitis/duplinaut/actions/runs/41844077888).
 - Independent review must confirm the production cap is unchanged, the test
   charge accounts for root-vector element storage, each selected path's outer
   component-vector capacity, and every inner component byte-vector capacity;
@@ -71,10 +72,10 @@ the caller's marks are an authenticated or durable selection record.
 
 ## Checklist
 
-- [ ] Add the private test-local cap seam while retaining the fixed 4 MiB
+- [x] Add the private test-local cap seam while retaining the fixed 4 MiB
       production limit.
-- [ ] Add exact-cap and cap-minus-one tests over official plain-snapshot roots;
+- [x] Add exact-cap and cap-minus-one tests over official plain-snapshot roots;
       link the test and implementation to the applicable Duvet requirements.
-- [ ] Focused/full TUI tests, Duvet trace, formatting, and strict Clippy pass
-      locally; hosted Linux assurance and Duvet Pages pass.
-- [ ] Independent review accepts the test and its limited claim.
+- [x] Focused/full TUI tests, Duvet trace, formatting, and strict Clippy pass in
+      hosted Linux assurance; Duvet Pages publication passes.
+- [x] Independent review accepts the test and its limited claim.
