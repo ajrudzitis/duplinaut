@@ -40,12 +40,16 @@ terminal evidence.
    Extract an internal helper or inject the reply through a test harness for
    the production event loop; do not reimplement these effects in the test.
 4. Feed the recorded preparation's successful `Reply::Preview` through the
-   production preview-result mapping used by the browser loop. The test and
-   production path MUST share that mapping, including the fresh empty/unarmed
-   acknowledgment state. Then send Press Enter through the shared production
-   preview-key/confirmation transition, or through an injected production-loop
-   harness, so the test observes whether Execute is enqueued. Use state
-   assertions or bounded channels; do not use sleeps or a real backend.
+   same production/test reply-dispatch transition used by the browser loop.
+   That transition MUST clear the active operation ID only when the reply ID
+   matches, then perform the successful-preview state mapping. Assert the
+   matching reply clears active before mapping, and a stale reply leaves the
+   current active ID unchanged. The test and production path MUST share this
+   transition, including the fresh empty/unarmed acknowledgment state.
+5. Send Press Enter through the shared production preview-key/confirmation
+   transition, or through an injected production-loop harness, so the test
+   observes whether Execute is enqueued. Use state assertions or bounded
+   channels; do not use sleeps or a real backend.
 
 ## MUST-level acceptance requirements
 
@@ -57,11 +61,13 @@ terminal evidence.
    strictly greater than the completed operation's ID. The old token MUST
    remain cancelled; the new token MUST be initially clear and distinct in
    cancellation state. No `Command::Execute` may be sent by `r`.
-3. Require the new preview acknowledgment to be empty and unarmed. An Enter
-   event before typing the full `restore` acknowledgment MUST NOT enqueue
-   Execute, and this assertion MUST exercise the production preview-key/
-   confirmation transition or production-loop harness. This acceptance stops
-   before testing the new acknowledged Execute itself.
+3. Require a matching successful Preview reply to clear its active operation
+   ID before mapping preview state, while a stale reply leaves the current
+   active ID unchanged. Require the new preview acknowledgment to be empty
+   and unarmed. An Enter event before typing the full `restore` acknowledgment
+   MUST NOT enqueue Execute, and this assertion MUST exercise the production
+   preview-key/confirmation transition or production-loop harness. This
+   acceptance stops before testing the new acknowledged Execute itself.
 4. Duvet-link the test to RESTORE-UI-009, -007, -004, -006, -008, and -014. Test
    annotations MUST identify the outcome and preview as synthetic/frontend
    state-machine evidence, not native backend behavior.
@@ -78,7 +84,9 @@ terminal evidence.
 - Review must confirm the new command is Prepare-only, the old token remains
   cancelled, the new token is fresh, and confirmation state cannot carry over
   to the next preview. Both the `r` dispatch and successful Preview mapping
-  and the unarmed Enter check must exercise shared production code.
+  and the unarmed Enter check must exercise shared production code. Matching
+  Preview IDs must clear active before mapping; stale IDs must leave active
+  unchanged.
 
 ## Exclusions
 
