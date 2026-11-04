@@ -219,8 +219,15 @@ control explicit confirmation, staging, cancellation and uncertain publication.
 - [x] Test integrity-only versus authorized evidence semantics, evidence object cap,
       metadata-byte cap, certificate-version cap and comparison-work cap.
 - [x] Reject a plain incremental manifest after a signed encrypted full set under the
-      same chain-wide signer policy. An unsigned OpenPGP incremental and irrelevant
-      catalog artifacts remain pending.
+      same chain-wide signer policy.
+- [x] Locally test an official signed full set followed by symmetric-encrypted
+      incremental sets under the same signer policy. The reader returns exact
+      `Unsigned` at the first incremental manifest after opening only the signed
+      full manifest and volume; no snapshot or evidence is returned. Independent
+      review and hosted assurance remain pending; see the
+      [ENV-019 acceptance plan](parse-env-019-unsigned-openpgp-incremental-acceptance.md).
+- [ ] Test unsigned encrypted data-volume cases, irrelevant catalog artifacts,
+      and other mixed-envelope chain transitions.
 - [x] Test encrypted record footer and normalized final/nonfinal status with original
       full/incremental official encrypted volumes; directly reject encrypted queued
       restart StartingPath compatibility.

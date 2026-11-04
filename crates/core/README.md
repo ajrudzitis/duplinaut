@@ -68,6 +68,8 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [ ] Implement and independently review the PARSE-ENV-015 source/test links and implementation-record corrections; do not claim formal verification of cryptographic primitives.
 - [x] Specify PARSE-ENV-016 OpenPGP resource-admission boundaries, including permitted-fingerprint counts and SKESK/protected-key S2K preflight. See the [acceptance plan](../../docs/parse-env-016-resource-acceptance.md).
 - [ ] Independently review the PARSE-ENV-016 limit boundary and precedence matrix using reduced local bounds and cheap admission-only fixtures. Local focused tests (4), full core tests, targeted Duvet query/full trace, formatting, and strict Clippy pass on macOS; hosted assurance is pending. See the [acceptance plan and evidence](../../docs/parse-env-016-resource-acceptance.md).
+- [x] Specify the PARSE-ENV-019 signed-full to unsigned symmetric-encrypted incremental regression, with unchanged signer policy and exact `Unsigned` expectation. See the [acceptance plan](../../docs/parse-env-019-unsigned-openpgp-incremental-acceptance.md).
+- [ ] Implement and independently review the PARSE-ENV-019 mixed official fixture-chain regression. Focused and full core tests, targeted Duvet query/full trace, formatting, and strict Clippy must pass; hosted assurance remains pending. This one chain does not close the broader mixed-envelope matrix.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 

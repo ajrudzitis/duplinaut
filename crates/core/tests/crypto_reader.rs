@@ -96,6 +96,54 @@ impl FixtureSource {
             open_behavior: None,
         }
     }
+    fn signed_full_symmetric_incrementals() -> Self {
+        let root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7");
+        let mut values: Vec<(StoredObject, Vec<u8>)> = Vec::new();
+        let selected_incrementals = [
+            "duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest.gpg",
+            "duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gpg",
+            "duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest.gpg",
+            "duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gpg",
+        ];
+        for mode in ["signed", "symmetric"] {
+            for item in std::fs::read_dir(root.join(mode)).unwrap() {
+                let item = item.unwrap();
+                let filename = item.file_name().to_string_lossy().into_owned();
+                let selected = if mode == "signed" {
+                    filename == "duplicity-full.20231114T221320Z.manifest.gpg"
+                        || filename == "duplicity-full.20231114T221320Z.vol1.difftar.gpg"
+                } else {
+                    selected_incrementals.contains(&filename.as_str())
+                };
+                if !selected {
+                    continue;
+                }
+                let key = format!("backup/{filename}");
+                assert!(
+                    values.iter().all(|(existing, _)| existing.key != key),
+                    "fixture selection has no same-name profile collisions"
+                );
+                let bytes = std::fs::read(item.path()).unwrap();
+                values.push((
+                    StoredObject {
+                        key,
+                        size: bytes.len() as u64,
+                        identity: ObjectIdentity {
+                            version_id: Some(format!("{mode}-v1")),
+                            etag: Some(format!("{:x}", Sha256::digest(&bytes))),
+                        },
+                    },
+                    bytes,
+                ));
+            }
+        }
+        Self {
+            values,
+            opens: AtomicUsize::new(0),
+            open_behavior: None,
+        }
+    }
 }
 impl ObjectSource for FixtureSource {
     fn list(
@@ -1404,6 +1452,74 @@ fn signer_policy_rejects_plain_incremental_after_signed_encrypted_full() {
         ),
         Ok(_) => panic!("mixed-chain signer policy returned a snapshot"),
     }
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-019
+//= type=test
+//# A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
+fn signer_policy_rejects_symmetric_encrypted_incremental_after_signed_full() {
+    let source = FixtureSource::signed_full_symmetric_incrementals();
+    assert_eq!(
+        source.values.len(),
+        6,
+        "only the selected six objects are loaded"
+    );
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .expect("signed full manifest is the selected anchor")
+        .0;
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/test-keys");
+    let public = std::fs::read(root.join("public.asc")).unwrap();
+    let secret = std::fs::read(root.join("secret.asc")).unwrap();
+    let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+    let secret_exports = [SecretExport {
+        bytes: &secret,
+        password: Some(&password),
+    }];
+    let signer_exports = [public.as_slice()];
+    let permitted_signers = [[
+        0xd0, 0x68, 0x47, 0xba, 0xc3, 0xb1, 0x17, 0xc4, 0x6b, 0xb6, 0x8b, 0xda, 0x6f, 0x23, 0x17,
+        0x3b, 0xad, 0x8a, 0x76, 0x56,
+    ]];
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords: std::slice::from_ref(&password),
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &permitted_signers,
+            require_signature: true,
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    let result = catalog.read_snapshot_with_crypto(
+        anchor,
+        Timestamp(1700172800),
+        &Cancellation::default(),
+        &context,
+    );
+    assert!(matches!(
+        result,
+        Err(ReaderError::Crypto(
+            duplicity_core::reader::OpenPgpError::Unsigned
+        ))
+    ));
+    assert_eq!(
+        source.opens.load(Ordering::SeqCst),
+        3,
+        "full manifest and volume pass before the first unsigned incremental manifest fails"
+    );
 }
 
 #[test]

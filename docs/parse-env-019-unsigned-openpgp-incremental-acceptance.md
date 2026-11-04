@@ -1,6 +1,9 @@
 # PARSE-ENV-019 unsigned OpenPGP incremental acceptance plan
 
-Status: proposed. No implementation or backlog status changes are included.
+Status: regression test and Duvet links are implemented. Focused and full core
+tests, targeted Duvet query/full trace, formatting, and strict Clippy pass
+locally on macOS. Independent review and hosted Linux assurance remain
+pending. The broader mixed-envelope matrix remains open.
 
 This local reader test closes one explicit gap in
 [PARSE-ENV-019](parsing-requirements.md#parse-env-019): configured signer
@@ -58,6 +61,25 @@ credentials.
   incremental manifest without returning provisional snapshot/evidence.
 - This is native integration evidence for policy continuity. It does not
   formally verify OpenPGP cryptography or the complete reader controller.
+
+## Current evidence
+
+- The mixed fixture contains six unique objects: the signed full manifest and
+  volume plus only the two symmetric increment manifests and volumes. Fixture
+  identities are recomputed from unchanged original bytes.
+- The regression uses the checked-in recipient secret and password, symmetric
+  message password, signer certificate, and exact primary fingerprint with
+  `require_signature: true`. It expects `OpenPgpError::Unsigned` and confirms
+  that exactly the full manifest, full volume, and first incremental manifest
+  were opened; the `Result` contains no snapshot or evidence on failure.
+- The Duvet implementation link is on the chain-wide reader decision and the
+  regression test is linked to PARSE-ENV-019. The focused mixed-chain test and
+  complete `cargo test -p duplicity-core` suite pass. The targeted Duvet query,
+  `cargo xtask trace-update`, `cargo xtask trace`,
+  `cargo fmt --all -- --check`,
+  `cargo clippy -p duplicity-core --all-targets -- -D warnings`, and
+  `git diff --check` pass locally. Independent review and hosted Linux
+  assurance remain pending; the backlog stays open until they pass.
 
 ## Scope limits
 

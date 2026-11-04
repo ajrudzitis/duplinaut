@@ -645,9 +645,6 @@ impl<'a> Catalog<'a> {
     //= docs/parsing-requirements.md#parse-env-018
     //= type=implementation
     //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
-    //= docs/parsing-requirements.md#parse-env-019
-    //= type=implementation
-    //# A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
     //= docs/parsing-requirements.md#parse-env-021
     //= type=implementation
     //# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
@@ -681,6 +678,9 @@ impl<'a> Catalog<'a> {
     ) -> Result<ValidatedSnapshot, ReaderError> {
         self.read_snapshot_inner(full_anchor, target, cancel, Some(context))
     }
+    //= docs/parsing-requirements.md#parse-env-019
+    //= type=implementation
+    //# A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
     fn read_snapshot_inner(
         &self,
         full_anchor: usize,
