@@ -174,10 +174,14 @@ impl Work {
         Ok(())
     }
 }
-fn read_bounded(
+fn read_bounded(reader: impl Read, maximum: usize, limit: Limit) -> Result<Vec<u8>, CryptoError> {
+    read_bounded_with_error(reader, maximum, limit, CryptoError::AuthenticationFailed)
+}
+fn read_bounded_with_error(
     mut reader: impl Read,
     maximum: usize,
     limit: Limit,
+    read_error: CryptoError,
 ) -> Result<Vec<u8>, CryptoError> {
     let mut output = Vec::new();
     let mut buffer = [0; 32768];
@@ -186,7 +190,7 @@ fn read_bounded(
         let request = available.saturating_add(1).min(buffer.len());
         let count = reader
             .read(&mut buffer[..request])
-            .map_err(|_| CryptoError::AuthenticationFailed)?;
+            .map_err(|_| read_error)?;
         if count > request {
             return Err(CryptoError::Malformed);
         }
@@ -640,6 +644,9 @@ fn subpackets(mut bytes: &[u8], depth: usize, work: &mut Work) -> Result<(), Cry
     }
     Ok(())
 }
+//= docs/parsing-requirements.md#parse-env-011
+//= type=implementation
+//# The adapter MUST consume every accepted message and compression layer to its authenticated end and reject unexpected trailing packets or bytes.
 fn decompress(frame: &Frame, work: &mut Work) -> Result<Vec<u8>, CryptoError> {
     let (&kind, bytes) = frame.body.split_first().ok_or(CryptoError::Malformed)?;
     let available = work
@@ -658,7 +665,12 @@ fn decompress(frame: &Frame, work: &mut Work) -> Result<Vec<u8>, CryptoError> {
         2 => inflate(bytes, true, available)?,
         3 => {
             let mut reader = bzip2::bufread::BzDecoder::new(bytes);
-            let decoded = read_bounded(&mut reader, available, Limit::Expanded)?;
+            let decoded = read_bounded_with_error(
+                &mut reader,
+                available,
+                Limit::Expanded,
+                CryptoError::Malformed,
+            )?;
             if !reader.into_inner().is_empty() {
                 return Err(CryptoError::Malformed);
             }
@@ -720,6 +732,9 @@ struct Content {
     bytes: Vec<u8>,
     signatures: Vec<Signature>,
 }
+//= docs/parsing-requirements.md#parse-env-011
+//= type=implementation
+//# The adapter MUST consume every accepted message and compression layer to its authenticated end and reject unexpected trailing packets or bytes.
 fn content(bytes: &[u8], depth: usize, work: &mut Work) -> Result<Content, CryptoError> {
     if depth > work.limits.depth {
         return Err(CryptoError::Limit(Limit::Depth));
@@ -837,10 +852,16 @@ fn content(bytes: &[u8], depth: usize, work: &mut Work) -> Result<Content, Crypt
     Ok(result)
 }
 
-/// Decrypt an original stored object. No plaintext is returned until complete
-/// MDC, framing, decompression and configured signer checks have passed.
+/// Decrypt an original stored object. Key-binding validation and complete MDC,
+/// framing, decompression, signature, and configured signer checks must pass
+/// before this returns a decoded object. A failed check returns an error with
+/// no plaintext result. This crypto-layer boundary does not publish snapshots
+/// or filesystem state.
 //= docs/parsing-requirements.md#parse-env-010
 //# The adapter MUST enforce its configured ciphertext bound before materializing an encrypted object and authenticate the complete SEIPDv1 payload before releasing plaintext to message or duplicity parsers.
+//= docs/parsing-requirements.md#parse-env-014
+//= type=implementation
+//# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
 pub(crate) fn decode(
     stored: &[u8],
     credentials: Credentials<'_>,
@@ -1265,6 +1286,9 @@ mod tests {
         output
     }
     #[test]
+    //= docs/parsing-requirements.md#parse-env-014
+    //= type=test
+    //# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
     fn corrupt_binding_secret_integrity_and_missing_key_password_fail() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../tests/fixtures/duplicity-3.0.7");

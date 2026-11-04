@@ -420,6 +420,9 @@ fn corrupted_ciphertext_fails_declared_digest_before_missing_credentials() {
 //= docs/parsing-requirements.md#parse-env-018
 //= type=test
 //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+//= docs/parsing-requirements.md#parse-env-014
+//= type=test
+//# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
 //= docs/parsing-requirements.md#parse-env-021
 //= type=test
 //# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
@@ -557,6 +560,9 @@ fn public_crypto_reader_rejects_unsupported_pkesk_algorithm_without_snapshot() {
 //= docs/parsing-requirements.md#parse-env-018
 //= type=test
 //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+//= docs/parsing-requirements.md#parse-env-014
+//= type=test
+//# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
 //= docs/parsing-requirements.md#parse-env-019
 //= type=test
 //# A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
@@ -630,6 +636,9 @@ fn public_crypto_reader_rejects_valid_signature_from_disallowed_primary_signer()
 //= docs/parsing-requirements.md#parse-env-010
 //= type=test
 //# The adapter MUST enforce its configured ciphertext bound before materializing an encrypted object and authenticate the complete SEIPDv1 payload before releasing plaintext to message or duplicity parsers.
+//= docs/parsing-requirements.md#parse-env-014
+//= type=test
+//# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
 //= docs/parsing-requirements.md#parse-env-018
 //= type=test
 //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.

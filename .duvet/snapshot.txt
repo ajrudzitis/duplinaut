@@ -90,7 +90,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The adapter MUST enforce its configured ciphertext bound before materializing an encrypted object and authenticate the complete SEIPDv1 payload before releasing plaintext to message or duplicity parsers.
 
   SECTION: [PARSE-ENV-011](#parse-env-011)
-    TEXT[!MUST]: The adapter MUST consume every accepted message and compression layer to its authenticated end and reject unexpected trailing packets or bytes.
+    TEXT[!MUST,implementation,test]: The adapter MUST consume every accepted message and compression layer to its authenticated end and reject unexpected trailing packets or bytes.
 
   SECTION: [PARSE-ENV-012](#parse-env-012)
     TEXT[!MUST]: Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
@@ -99,7 +99,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: Historical signer verification MUST report its explicit offline fingerprint-authorization scope without claiming current certificate validity or Web-of-Trust validation.
 
   SECTION: [PARSE-ENV-014](#parse-env-014)
-    TEXT[!MUST]: The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
+    TEXT[!MUST,implementation,test]: The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
 
   SECTION: [PARSE-ENV-015](#parse-env-015)
     TEXT[!MUST]: The crypto adapter's trusted contract and limitations MUST be recorded with the pinned dependency identities and independent positive and negative integration evidence.

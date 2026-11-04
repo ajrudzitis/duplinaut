@@ -62,6 +62,12 @@ fn recover(
     )
 }
 #[test]
+//= docs/parsing-requirements.md#parse-env-011
+//= type=test
+//# The adapter MUST consume every accepted message and compression layer to its authenticated end and reject unexpected trailing packets or bytes.
+//= docs/parsing-requirements.md#parse-env-014
+//= type=test
+//# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
 fn authenticated_payload_is_exactly_one_literal_and_has_no_trailing_bytes() {
     let good = literal(b"complete");
     assert_eq!(
@@ -70,9 +76,13 @@ fn authenticated_payload_is_exactly_one_literal_and_has_no_trailing_bytes() {
             .bytes,
         b"complete"
     );
+    let trailing_literal = [good.as_slice(), literal(b"second").as_slice()].concat();
+    assert!(matches!(
+        recover(&seal(&trailing_literal), CryptoLimits::default()),
+        Err(CryptoError::Malformed)
+    ));
     for bad in [
         Vec::new(),
-        [good.as_slice(), literal(b"second").as_slice()].concat(),
         [good.as_slice(), &[0]].concat(),
         packet(18, &[1, 0]),
         packet(9, &[0]),
@@ -141,6 +151,12 @@ fn truncation_mutations_unsupported_envelopes_and_partial_framing_are_rejected()
     }
 }
 #[test]
+//= docs/parsing-requirements.md#parse-env-011
+//= type=test
+//# The adapter MUST consume every accepted message and compression layer to its authenticated end and reject unexpected trailing packets or bytes.
+//= docs/parsing-requirements.md#parse-env-014
+//= type=test
+//# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
 fn every_compression_profile_is_bounded_and_consumes_exactly_its_stream() {
     let input = literal(b"compressible literal content");
     for algorithm in 0..=3 {
@@ -185,11 +201,20 @@ fn every_compression_profile_is_bounded_and_consumes_exactly_its_stream() {
         if algorithm != 0 {
             let truncated = &body[..body.len() - 1];
             assert!(
-                recover(&seal(&packet(8, truncated)), CryptoLimits::default()).is_err(),
+                matches!(
+                    recover(&seal(&packet(8, truncated)), CryptoLimits::default()),
+                    Err(CryptoError::Malformed)
+                ),
                 "truncated compression {algorithm}"
             );
             body.push(0);
-            assert!(recover(&seal(&packet(8, &body)), CryptoLimits::default()).is_err());
+            assert!(
+                matches!(
+                    recover(&seal(&packet(8, &body)), CryptoLimits::default()),
+                    Err(CryptoError::Malformed)
+                ),
+                "trailing byte after compression {algorithm}"
+            );
         }
     }
 }

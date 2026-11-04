@@ -13,6 +13,14 @@ pattern = "crates/core/src/*.rs"
 type = "implementation"
 
 [[source]]
+pattern = "crates/core/src/openpgp/*_tests.rs"
+type = "test"
+
+[[source]]
+pattern = "crates/core/src/openpgp.rs"
+type = "test"
+
+[[source]]
 pattern = "crates/core/src/reader/**/*.rs"
 type = "test"
 

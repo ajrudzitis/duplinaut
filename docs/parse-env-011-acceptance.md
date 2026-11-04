@@ -1,15 +1,18 @@
 # PARSE-ENV-011 compressed-stream acceptance plan
 
-Status: proposed before implementation and Duvet annotation changes.
+Status: implementation and focused verification complete; independent review
+and full core/assurance CI remain pending.
 
 This is a bounded core-reader test milestone for
 [PARSE-ENV-011](parsing-requirements.md#parse-env-011), with negative results
 also supporting [PARSE-ENV-014](parsing-requirements.md#parse-env-014). The
-section-scoped Duvet query currently reports no implementation annotation for
-PARSE-ENV-011. This plan targets exact completion of supported compression
-streams and rejection of trailing data; it does not claim acceptance of every
-OpenPGP message, signer, or nested-layer profile covered by the broader
-requirement.
+implementation annotation covers the compression/content parsing path; the
+ENV-014 annotation at `openpgp::decode` describes only its crypto-layer
+fail-closed result boundary. It does not claim snapshot or filesystem
+publication behavior, which belongs to the reader/restore boundary. This plan
+targets exact completion of supported compression streams and rejection of
+trailing data; it does not claim acceptance of every OpenPGP message, signer,
+or nested-layer profile covered by the broader requirement.
 
 ## Acceptance requirements
 
@@ -45,7 +48,14 @@ requirement.
   unchanged `CryptoError::Limit(Limit::Expanded)` result.
 - Duvet's implementation and test checks for PARSE-ENV-011 and test coverage
   for PARSE-ENV-014 MUST pass. Duvet links provide traceability; they do not
-  prove every profile variation in the full normative requirement.
+  prove every profile variation in the full normative requirement. ENV-014
+  test links here and in the crypto-reader integration tests cover only the
+  tested malformed/trailing input, wrong-credential, disallowed-signer, and
+  official MDC-mutation cases. A direct core test mutates signer-certificate
+  binding data and asserts `CryptoError::InvalidBinding`; snapshot absence is
+  asserted for the integration cases. These representative tests do not cover
+  all ENV-014 failure classes. Snapshot/filesystem publication in general
+  remains outside this slice.
 - Full core native tests and the required assurance CI MUST pass before the
   README marks this slice complete. No Verus proof is claimed for upstream
   OpenPGP, DEFLATE, ZLIB, or BZip2 implementations; code review must verify
@@ -54,6 +64,24 @@ requirement.
 - The PARSE-ENV-010 official-MDC positive and negative controls remain the
   separate evidence for SEIPDv1 authentication. This plan does not substitute
   compression completion for successful outer-message authentication.
+
+## Current evidence
+
+- Both focused parser tests pass: `authenticated_payload_is_exactly_one_literal_and_has_no_trailing_bytes`
+  and `every_compression_profile_is_bounded_and_consumes_exactly_its_stream`.
+- Focused Duvet `implementation,test` queries pass for PARSE-ENV-011 and
+  PARSE-ENV-014, and `cargo xtask trace` passes with the updated snapshot.
+- ENV-014 coverage is intentionally partial: tests exercise malformed and
+  trailing complete-read failures, a wrong credential, a disallowed signer,
+  a mutated signer-certificate binding, and mutation of an official
+  ciphertext's MDC byte. These representative cases do not exhaust ENV-014;
+  the scoped `decode` annotation does not establish whole-reader
+  snapshot/filesystem publication.
+- `cargo fmt --all -- --check`, `git diff --check`, and
+  `cargo clippy -p duplicity-core --all-targets -- -D warnings` pass. Clippy
+  reports only pre-existing warnings in vendored `vest_lib`.
+- Independent review, full core native tests, and the required assurance CI
+  remain pending; this is not yet marked complete in the README checklist.
 
 ## Non-goals
 
