@@ -1,7 +1,7 @@
 # TUI active-restore controlled-shutdown acceptance plan
 
-Status: proposed; specification only. This composes the worker shutdown path
-with a deterministic lifecycle error and does not change backlog status.
+Status: accepted. The Linux-gated compositional test, hosted Linux assurance,
+and Duvet Pages passed in [run 41851231765](https://github.com/ajrudzitis/duplinaut/actions/runs/41851231765).
 
 ## Goal and scope
 
@@ -97,10 +97,14 @@ was produced by the real backend.
 
 ## Checklist
 
-- [ ] Add a deterministic Execute gate and lifecycle-error test in test-only
+- [x] Add a deterministic Execute gate and lifecycle-error test in test-only
       code; production behavior remains unchanged.
-- [ ] Assert exact-token cancellation, request closure, restoration attempt,
+- [x] Assert exact-token cancellation, request closure, restoration attempt,
       retained typed outcome, separate error fields, and joined worker.
-- [ ] Focused/full Linux TUI tests, Duvet trace, formatting, and strict Clippy
-      pass; hosted Linux assurance and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped test evidence.
+- [x] Focused/full Linux TUI tests, Duvet trace, formatting, and strict Clippy
+      pass; hosted Linux assurance and Duvet Pages pass in [run 41851231765](https://github.com/ajrudzitis/duplinaut/actions/runs/41851231765).
+- [x] Independent implementation review accepts the scoped test evidence.
+
+The evidence is limited to the injected worker/lifecycle composition described
+above. It does not establish behavior from a real filesystem backend or a real
+PTY/output failure.
