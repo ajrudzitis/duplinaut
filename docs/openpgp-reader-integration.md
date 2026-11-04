@@ -227,6 +227,14 @@ control explicit confirmation, staging, cancellation and uncertain publication.
       evidence is returned. Independent review and hosted assurance remain
       pending; see the
       [ENV-019 acceptance plan](parse-env-019-unsigned-openpgp-incremental-acceptance.md).
+- [x] Locally test an official signed full set followed by public-key-encrypted
+      unsigned incrementals under the unchanged signer policy and with no message
+      passwords. The first unsigned incremental manifest returns exact `Unsigned`
+      on the third open. Producer command/hash provenance is checked against
+      `provenance.json`; this case does not cover data-volume failures or the full
+      mixed-envelope matrix. Independent review and local `cargo xtask ci` passed;
+      hosted assurance remains pending; see the
+      [public-key ENV-019 acceptance plan](parse-env-019-public-key-unsigned-incremental-acceptance.md).
 - [ ] Test unsigned encrypted data-volume cases, irrelevant catalog artifacts,
       and other mixed-envelope chain transitions.
 - [x] Test encrypted record footer and normalized final/nonfinal status with original

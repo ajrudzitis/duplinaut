@@ -144,6 +144,79 @@ impl FixtureSource {
             open_behavior: None,
         }
     }
+    fn signed_full_public_key_incrementals() -> Self {
+        let root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7");
+        let expected_hashes = [
+            (
+                "duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest.gpg",
+                "217171eb4460e330153350683b91f66ef14c766ecf40ad966bf8ca14a58c4594",
+            ),
+            (
+                "duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gpg",
+                "eac62fc566682c7fbb63029e14326c925f26004e4640afb09aabb044a52b12b6",
+            ),
+            (
+                "duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest.gpg",
+                "1d2f90cfa9f6f956414e6fa54efa4db9a1a551807d0f5cf69c3cf93fc46d024e",
+            ),
+            (
+                "duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gpg",
+                "ce224c3b2ed3abb0b54523ff07a4da4f80450369a2f9ce25f36518aeb64e80d1",
+            ),
+        ];
+        let selected_incrementals = expected_hashes.map(|(filename, _)| filename);
+        let mut values: Vec<(StoredObject, Vec<u8>)> = Vec::new();
+        for mode in ["signed", "public-key"] {
+            for item in std::fs::read_dir(root.join(mode)).unwrap() {
+                let item = item.unwrap();
+                let filename = item.file_name().to_string_lossy().into_owned();
+                let selected = if mode == "signed" {
+                    filename == "duplicity-full.20231114T221320Z.manifest.gpg"
+                        || filename == "duplicity-full.20231114T221320Z.vol1.difftar.gpg"
+                } else {
+                    selected_incrementals.contains(&filename.as_str())
+                };
+                if !selected {
+                    continue;
+                }
+                let key = format!("backup/{filename}");
+                assert!(
+                    values.iter().all(|(existing, _)| existing.key != key),
+                    "fixture selection has no same-name profile collisions"
+                );
+                let bytes = std::fs::read(item.path()).unwrap();
+                if mode == "public-key" {
+                    let expected = expected_hashes
+                        .iter()
+                        .find(|(expected_filename, _)| *expected_filename == filename)
+                        .expect("selected public-key output has recorded provenance")
+                        .1;
+                    assert_eq!(
+                        format!("{:x}", Sha256::digest(&bytes)),
+                        expected,
+                        "checked-in output matches provenance.json SHA256 for {filename}"
+                    );
+                }
+                values.push((
+                    StoredObject {
+                        key,
+                        size: bytes.len() as u64,
+                        identity: ObjectIdentity {
+                            version_id: Some(format!("{mode}-v1")),
+                            etag: Some(format!("{:x}", Sha256::digest(&bytes))),
+                        },
+                    },
+                    bytes,
+                ));
+            }
+        }
+        Self {
+            values,
+            opens: AtomicUsize::new(0),
+            open_behavior: None,
+        }
+    }
     fn signed_with_malformed_unused_full_signatures() -> Self {
         let mut source = Self::new("signed", None);
         let (object, bytes) = source
@@ -1605,6 +1678,82 @@ fn signer_policy_rejects_symmetric_encrypted_incremental_after_signed_full() {
     let context = CryptoReadContext {
         credentials: CryptoCredentials {
             message_passwords: std::slice::from_ref(&password),
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &permitted_signers,
+            require_signature: true,
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    let result = catalog.read_snapshot_with_crypto(
+        anchor,
+        Timestamp(1700172800),
+        &Cancellation::default(),
+        &context,
+    );
+    assert!(matches!(
+        result,
+        Err(ReaderError::Crypto(
+            duplicity_core::reader::OpenPgpError::Unsigned
+        ))
+    ));
+    assert_eq!(
+        source.opens.load(Ordering::SeqCst),
+        3,
+        "full manifest and volume pass before the first unsigned incremental manifest fails"
+    );
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-019
+//= type=test
+//# A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
+/// Bounded provenance: `provenance.json` records `duplicity incremental`
+/// commands for the two public-key output intervals with `--encrypt-key
+/// D06847BAC3B117C46BB68BDA6F23173BAD8A7656` and no `--sign-key`. The recipe
+/// applies `--encrypt-key` in public-key and signed modes, adding `--sign-key`
+/// only for signed mode. The four selected output SHA-256 values are checked
+/// against the recorded provenance hashes in the fixture helper. This describes
+/// these fixtures only; the reader and this test invoke no producer or external
+/// crypto tool.
+fn signer_policy_rejects_public_key_incremental_after_signed_full() {
+    let source = FixtureSource::signed_full_public_key_incrementals();
+    assert_eq!(
+        source.values.len(),
+        6,
+        "only the selected six objects are loaded"
+    );
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .expect("signed full manifest is the selected anchor")
+        .0;
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/test-keys");
+    let public = std::fs::read(root.join("public.asc")).unwrap();
+    let secret = std::fs::read(root.join("secret.asc")).unwrap();
+    let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+    let secret_exports = [SecretExport {
+        bytes: &secret,
+        password: Some(&password),
+    }];
+    let signer_exports = [public.as_slice()];
+    let permitted_signers = [[
+        0xd0, 0x68, 0x47, 0xba, 0xc3, 0xb1, 0x17, 0xc4, 0x6b, 0xb6, 0x8b, 0xda, 0x6f, 0x23, 0x17,
+        0x3b, 0xad, 0x8a, 0x76, 0x56,
+    ]];
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords: &[],
             secret_exports: &secret_exports,
             signer_exports: &signer_exports,
             permitted_signers: &permitted_signers,
