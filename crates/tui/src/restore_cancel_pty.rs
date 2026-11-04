@@ -596,6 +596,11 @@ fn check_active_restore_cancel(key: &[u8], post_result: &[u8]) {
     }));
 }
 
+struct OutputDiagnostics<'a> {
+    stderr: &'a BoundedStderr,
+    control: &'a Path,
+}
+
 fn wait_output_screen(
     master: &File,
     child: &mut ChildGuard,
@@ -603,8 +608,7 @@ fn wait_output_screen(
     parser: &mut vt100::Parser,
     phase: &str,
     expected: impl Fn(&str) -> bool,
-    stderr: &BoundedStderr,
-    control: &Path,
+    diagnostics: &OutputDiagnostics<'_>,
 ) {
     let deadline = Instant::now() + PHASE_TIMEOUT;
     loop {
@@ -615,8 +619,8 @@ fn wait_output_screen(
         assert!(
             child.0.try_wait().unwrap().is_none(),
             "child exited during {phase}; screen:\n{screen}{}; control={:?}",
-            stderr.diagnostic(),
-            fs::read_dir(control)
+            diagnostics.stderr.diagnostic(),
+            fs::read_dir(diagnostics.control)
                 .unwrap()
                 .map(|entry| entry.unwrap().file_name())
                 .collect::<Vec<_>>()
@@ -627,7 +631,7 @@ fn wait_output_screen(
         assert!(
             Instant::now() < deadline,
             "timed out during {phase}; screen:\n{screen}{}",
-            stderr.diagnostic()
+            diagnostics.stderr.diagnostic()
         );
     }
 }
@@ -696,6 +700,10 @@ fn check_active_restore_output_failure() {
 
     let mut output_bytes = Vec::new();
     let mut parser = vt100::Parser::new(ROWS, COLS, 0);
+    let diagnostics = OutputDiagnostics {
+        stderr: &stderr,
+        control: &control.0,
+    };
     wait_output_screen(
         &output_master,
         &mut child,
@@ -706,8 +714,7 @@ fn check_active_restore_output_failure() {
             screen.contains(std::str::from_utf8(HISTORY_MARKER).unwrap())
                 && screen.contains("Metadata only. a selects full anchor")
         },
-        &stderr,
-        &control.0,
+        &diagnostics,
     );
     assert_ne!(tcgetattr(&input_slave).unwrap(), original_termios);
     write(&input_master, b"a").unwrap();
@@ -718,8 +725,7 @@ fn check_active_restore_output_failure() {
         &mut parser,
         "active-restore full anchor",
         |screen| screen.contains("Full anchor selected; choose target then Enter."),
-        &stderr,
-        &control.0,
+        &diagnostics,
     );
     write(&input_master, b"\x1b[B\x1b[B\r").unwrap();
     wait_output_screen(
@@ -731,8 +737,7 @@ fn check_active_restore_output_failure() {
         |screen| {
             screen.contains("Full volume scan required.") && screen.contains("Enter confirms.")
         },
-        &stderr,
-        &control.0,
+        &diagnostics,
     );
     write(&input_master, b"\r").unwrap();
     wait_output_screen(
@@ -742,8 +747,7 @@ fn check_active_restore_output_failure() {
         &mut parser,
         "active-restore validated snapshot",
         |screen| screen.contains("Validated snapshot:"),
-        &stderr,
-        &control.0,
+        &diagnostics,
     );
     write(&input_master, b"r").unwrap();
     wait_output_screen(
@@ -756,8 +760,7 @@ fn check_active_restore_output_failure() {
             screen.contains("Type the exact ASCII word restore")
                 && screen.contains("Acknowledgment [] ready")
         },
-        &stderr,
-        &control.0,
+        &diagnostics,
     );
     write(&input_master, b"restore\r").unwrap();
     wait_output_screen(
@@ -771,8 +774,7 @@ fn check_active_restore_output_failure() {
                 && marker(&control.0, "execute-entered").unwrap().as_deref()
                     == Some(&b"operation_id=3;cancelled=false\n"[..])
         },
-        &stderr,
-        &control.0,
+        &diagnostics,
     );
     assert!(marker(&control.0, "cancel-observed").unwrap().is_none());
     assert!(marker(&control.0, "execute-result").unwrap().is_none());
