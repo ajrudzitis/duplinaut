@@ -220,8 +220,9 @@ fn gated_scan_browser_helper() {
 #[ignore = "internal isolated PTY driver; explicitly executed by the default output-failure test"]
 fn gated_output_failure_browser_helper() {
     nix::unistd::setsid().expect("isolate output-failure driver from the test runner session");
-    let stdin = File::open("/dev/stdin").expect("open child stdin");
-    tcgetattr(&stdin).expect("child stdin must remain attached to its PTY");
+    let stdin = io::stdin();
+    let stdin_lock = stdin.lock();
+    tcgetattr(&stdin_lock).expect("child stdin must remain attached to its PTY");
     assert!(
         File::open("/dev/tty").is_err(),
         "isolated output-failure child must have no controlling terminal"
