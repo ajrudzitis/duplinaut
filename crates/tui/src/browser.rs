@@ -228,6 +228,7 @@ fn idle_enter_transition(
 #[cfg(target_os = "linux")]
 fn outcome_transition(
     result: Result<duplicity_core::restore_linux::RestoreOutcome, crate::restore_flow::Error>,
+    requested: Option<&crate::cli::Destination>,
     retry: &mut bool,
     document: &mut Option<String>,
     offset: &mut usize,
@@ -238,9 +239,14 @@ fn outcome_transition(
         Ok(value) => {
             *retry = crate::restore_flow::retry_allowed(&value);
             *document = Some(
-                crate::restore_flow::diagnostics(&value).unwrap_or_else(|_| {
-                    "Known restore outcome retained; diagnostic rendering failed.".into()
-                }),
+                requested
+                    .map(|destination| {
+                        crate::restore_flow::diagnostics_for_request(&value, destination)
+                    })
+                    .unwrap_or_else(|| crate::restore_flow::diagnostics(&value))
+                    .unwrap_or_else(|_| {
+                        "Known restore outcome retained; diagnostic rendering failed.".into()
+                    }),
             );
             *offset = 0;
             *status = "Restore result. Up/Down scroll; Esc returns; q exits.".into();
@@ -348,6 +354,8 @@ pub fn run_configured(
     let mut retry = true;
     #[cfg(target_os = "linux")]
     let mut known_outcome = None;
+    #[cfg(target_os = "linux")]
+    let mut active_destination: Option<Arc<Destination>> = None;
     let result = crate::terminal::interact(
         &mut worker,
         &mut cancel,
@@ -386,6 +394,7 @@ pub fn run_configured(
                                 #[cfg(target_os = "linux")]
                                 Reply::Outcome { result, .. } => outcome_transition(
                                     result,
+                                    active_destination.as_deref(),
                                     &mut retry,
                                     &mut document,
                                     &mut offset,
@@ -455,6 +464,10 @@ pub fn run_configured(
                         KeyCode::Down => offset = offset.saturating_add(1).min(scroll_max),
                         KeyCode::Backspace => ack.backspace(),
                         KeyCode::Enter => {
+                            #[cfg(target_os = "linux")]
+                            let frozen_destination = preview
+                                .as_ref()
+                                .map(|value| Arc::clone(value.frozen.destination()));
                             let executed = preview_enter_transition(
                                 code,
                                 PreviewEnterState {
@@ -471,6 +484,7 @@ pub fn run_configured(
                                 #[cfg(target_os = "linux")]
                                 {
                                     known_outcome = None;
+                                    active_destination = frozen_destination;
                                 }
                                 abandoning = false;
                             }
@@ -1184,6 +1198,7 @@ mod tests {
             };
             outcome_transition(
                 result,
+                None,
                 &mut retry,
                 &mut document,
                 &mut offset,
@@ -1358,6 +1373,7 @@ mod tests {
         };
         outcome_transition(
             result,
+            None,
             &mut retry,
             &mut document,
             &mut offset,

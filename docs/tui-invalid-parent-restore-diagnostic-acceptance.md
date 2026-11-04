@@ -63,8 +63,10 @@ flow, and terminal harness. This case uses fixed PTY size and no resize.
    escaped form with final component suffix `p\x1b\\\xff`, and the leaf as
    exactly `\x1b\\\xffR`, following `display::bytes`.
 2. Type exactly ASCII `restore`, observe the ready/armed acknowledgment, and
-   press Enter once. Require a rendered running state followed by a completed
-   result document. Do not retry.
+   press Enter once. Require the completed result document with typed
+   `Unpublished(ENOTDIR)` evidence. An intermediate `Restoration running.`
+   frame is not required because this immediate backend error may be polled
+   before the next draw. Do not retry.
 3. Require the production UI to retain a typed
    `RestoreOutcome::Unpublished` with cause `Syscall(ENOTDIR)`, no
    `uncertain_outer`, and cleanup counters `attempted=0`, `failures=0`,
@@ -88,10 +90,12 @@ flow, and terminal harness. This case uses fixed PTY size and no resize.
    regular file), no `.duplicity-*` staging sibling exists in the test-owned
    working directory, and the parent sentinel bytes/metadata are unchanged.
    Require the local backup source fingerprint unchanged. Quit with `q`; check
-   successful controlled exit, original PTY termios restoration,
-   alternate-screen leave output, and empty scratch contents after removing
-   the test-owned sentinel file. The test MUST NOT recursively remove any path
-   outside its unique scratch directory.
+   successful controlled exit, original PTY termios restoration, and
+   alternate-screen leave output. Only after the child is reaped and all
+   absence, sentinel, source, and terminal assertions pass, explicitly remove
+   the unique test-owned scratch directory and assert it is absent. On any
+   failure, preserve and report the scratch directory for inspection. The test
+   MUST NOT recursively remove any path outside its unique scratch directory.
 
 ## Duvet and verification
 
@@ -109,9 +113,10 @@ flow, and terminal harness. This case uses fixed PTY size and no resize.
   launch and its raw bytes are passed unchanged; the backend fails at the
   directory-only parent open before staging; the result remains typed
   `Unpublished(ENOTDIR)`; the diagnostic adds only the frozen requested parent
-  and leaf; escape strings match exact bytes; no cleanup or false receipt is
-  claimed; and all filesystem assertions stay within the test-owned scratch
-  root.
+  and leaf; escape strings match exact bytes; no backend cleanup or false
+  receipt is claimed; the harness removes its scratch directory only after
+  successful assertions and preserves it on failure; and all filesystem
+  assertions stay within the test-owned scratch root.
 
 ## Exclusions
 

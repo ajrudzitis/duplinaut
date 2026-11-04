@@ -97,6 +97,13 @@ pub struct Frozen {
     destination: Arc<Destination>,
     summary: Summary,
 }
+impl Frozen {
+    /// The destination captured by this immutable request, used only to add
+    /// request identity when a definite backend rejection has no receipt.
+    pub fn destination(&self) -> &Arc<Destination> {
+        &self.destination
+    }
+}
 pub struct Preview {
     pub frozen: Frozen,
     pub text: String,
@@ -311,7 +318,23 @@ pub fn retry_allowed(outcome: &duplicity_core::restore_linux::RestoreOutcome) ->
 pub fn diagnostics(
     outcome: &duplicity_core::restore_linux::RestoreOutcome,
 ) -> Result<String, Error> {
-    diagnostics_with_limit(outcome, DIAGNOSTIC_BYTES)
+    diagnostics_with_request(outcome, None)
+}
+
+#[cfg(target_os = "linux")]
+pub fn diagnostics_for_request(
+    outcome: &duplicity_core::restore_linux::RestoreOutcome,
+    requested: &Destination,
+) -> Result<String, Error> {
+    diagnostics_with_request(outcome, Some(requested))
+}
+
+#[cfg(target_os = "linux")]
+fn diagnostics_with_request(
+    outcome: &duplicity_core::restore_linux::RestoreOutcome,
+    requested: Option<&Destination>,
+) -> Result<String, Error> {
+    diagnostics_with_limit_and_request(outcome, DIAGNOSTIC_BYTES, requested)
 }
 
 // The limit seam is private so only tests can exercise the byte boundary; all
@@ -320,6 +343,15 @@ pub fn diagnostics(
 fn diagnostics_with_limit(
     outcome: &duplicity_core::restore_linux::RestoreOutcome,
     limit: usize,
+) -> Result<String, Error> {
+    diagnostics_with_limit_and_request(outcome, limit, None)
+}
+
+#[cfg(target_os = "linux")]
+fn diagnostics_with_limit_and_request(
+    outcome: &duplicity_core::restore_linux::RestoreOutcome,
+    limit: usize,
+    requested: Option<&Destination>,
 ) -> Result<String, Error> {
     use duplicity_core::restore_linux::RestoreOutcome;
     let mut text = Text::new(limit);
@@ -343,6 +375,16 @@ fn diagnostics_with_limit(
             if let Some(candidate) = &e.uncertain_outer {
                 text.push("First-stage candidate uncertain; no session retry: ")?;
                 text.bytes(candidate.to_bytes())?;
+                text.push("\n")?;
+            } else if let Some(destination) = requested {
+                // A definite unpublished outcome has no receipt. Report the
+                // exact frozen request identity without implying that the
+                // backend opened, inspected, or published this destination.
+                use std::os::unix::ffi::OsStrExt;
+                text.push("Requested parent: ")?;
+                text.bytes(destination.parent.as_os_str().as_bytes())?;
+                text.push("\nRequested leaf: ")?;
+                text.bytes(&destination.name)?;
                 text.push("\n")?;
             }
             None

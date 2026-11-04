@@ -136,6 +136,18 @@ mod pty_acceptance {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    struct PreserveOnFailure<'a>(&'a mut Scratch);
+
+    #[cfg(target_os = "linux")]
+    impl Drop for PreserveOnFailure<'_> {
+        fn drop(&mut self) {
+            if std::thread::panicking() {
+                self.0.preserve();
+            }
+        }
+    }
+
     fn hash(bytes: &[u8]) -> [u8; 32] {
         Sha256::digest(bytes).into()
     }
@@ -1074,6 +1086,391 @@ mod pty_acceptance {
         assert!(fs::read_dir(&parent).unwrap().next().is_none());
         assert!(fs::read_dir(&workdir).unwrap().next().is_none());
         assert_eq!(fingerprint(&fixture), source_before);
+    }
+
+    #[cfg(target_os = "linux")]
+    fn raw_os_string(bytes: Vec<u8>) -> std::ffi::OsString {
+        use std::os::unix::ffi::OsStringExt;
+        std::ffi::OsString::from_vec(bytes)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn escaped_byte(byte: u8) -> String {
+        format!("\\x{byte:02x}")
+    }
+
+    #[cfg(target_os = "linux")]
+    fn contains_staging_entry(root: &Path) -> bool {
+        let entries = fs::read_dir(root).expect("inspect test-owned restore tree");
+        entries
+            .map(|entry| entry.expect("inspect test-owned directory entry"))
+            .any(|entry| {
+                use std::os::unix::ffi::OsStrExt;
+                let path = entry.path();
+                entry.file_name().as_bytes().starts_with(b".duplicity-")
+                    || (entry
+                        .file_type()
+                        .expect("inspect test-owned entry type")
+                        .is_dir()
+                        && contains_staging_entry(&path))
+            })
+    }
+
+    #[cfg(target_os = "linux")]
+    fn create_raw_file_parent(root: &Path) -> (PathBuf, Vec<u8>) {
+        use std::os::unix::ffi::OsStrExt;
+        let mut parent = root.to_path_buf();
+        // Escaped components make the requested pathname taller than the
+        // result viewport, proving that the complete identity is scrollable.
+        for index in 0x80..0x8e {
+            parent.push(raw_os_string(vec![index; 120]));
+            fs::create_dir(&parent).expect("create raw-byte workdir component");
+        }
+        let parent_leaf = vec![b'p', 0x1b, b'\\', 0xff];
+        parent.push(raw_os_string(parent_leaf.clone()));
+        let sentinel = b"restore-parent sentinel; must remain unchanged".to_vec();
+        fs::write(&parent, &sentinel).expect("create regular-file restore parent");
+        assert!(fs::metadata(&parent).unwrap().is_file());
+        assert_eq!(parent.file_name().unwrap().as_bytes(), parent_leaf);
+        (parent, sentinel)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn metadata_identity(metadata: &fs::Metadata) -> (u64, u64, u32, u64, i64, i64) {
+        use std::os::unix::fs::MetadataExt;
+        (
+            metadata.dev(),
+            metadata.ino(),
+            metadata.mode(),
+            metadata.len(),
+            metadata.mtime(),
+            metadata.mtime_nsec(),
+        )
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    //= docs/parsing-requirements.md#restore-ui-003
+    //= type=test
+    //# The frontend MUST present a concrete restoration preview identifying the exact snapshot target, configured parent and new leaf, marked/all selection, included ancestors, resulting entry count, total regular payload bytes, no-replacement policy and supported metadata policy before offering publication confirmation.
+    //= docs/parsing-requirements.md#restore-ui-005
+    //= type=test
+    //# The frontend MUST execute restoration through the adopted native `restore` API with its reviewed limits and profile policy, without implementing its own path extraction, destination replacement, staging cleanup or filesystem eligibility fallback.
+    //= docs/parsing-requirements.md#restore-ui-008
+    //= type=test
+    //# The frontend MUST preserve the backend's published, unpublished and publication-indeterminate outcome distinction, including successful-publication precedence over racing cancellation and all reported cleanup warnings or uncertainty.
+    //= docs/parsing-requirements.md#restore-ui-010
+    //= type=test
+    //# The frontend MUST render destination, selected paths, staging/candidate names and diagnostics using reversible terminal-safe byte escaping, preserving complete backend identity and warning fields in the accessible final result.
+    //= docs/parsing-requirements.md#restore-ui-014
+    //= type=test
+    //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+    fn invalid_raw_parent_produces_scrolled_unpublished_diagnostic_over_pty() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let oracle: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/duplicity-3.0.7/expected.json"
+        ))
+        .expect("parse official source oracle");
+        let entries = oracle["snapshots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|snapshot| snapshot["mode"] == "plain" && snapshot["index"] == 2)
+            .unwrap()["entries"]
+            .as_array()
+            .unwrap();
+        assert_eq!(entries.len(), 21);
+        let payload_bytes: u64 = entries
+            .iter()
+            .filter(|entry| entry["kind"] == "file")
+            .map(|entry| entry["size"].as_u64().unwrap())
+            .sum();
+        assert_eq!(payload_bytes, 2_621_564);
+
+        let fixture = fs::canonicalize(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/duplicity-3.0.7/plain"),
+        )
+        .expect("official plain fixture");
+        let source_before = fingerprint(&fixture);
+        let mut scratch = Scratch::new();
+        let workdir = scratch.0.clone();
+        let (parent, sentinel) = create_raw_file_parent(&workdir);
+        // This guard is declared before ChildGuard below, so failures reap the
+        // process first and then retain the private tree for diagnosis.
+        let _preserve_on_failure = PreserveOnFailure(&mut scratch);
+        let parent_before = fs::metadata(&parent).expect("parent sentinel metadata");
+        let parent_identity = metadata_identity(&parent_before);
+        let leaf = vec![0x1b, b'\\', 0xff, b'R'];
+        let destination = parent.join(raw_os_string(leaf.clone()));
+
+        let original_size = TerminalSize {
+            ws_row: 40,
+            ws_col: 240,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        let pty = openpty(
+            Some(&Winsize {
+                ws_row: original_size.ws_row,
+                ws_col: original_size.ws_col,
+                ws_xpixel: 0,
+                ws_ypixel: 0,
+            }),
+            None,
+        )
+        .expect("open invalid-parent acceptance PTY");
+        fcntl_setfd(&pty.master, FdFlags::CLOEXEC).expect("close PTY master on exec");
+        let master = File::from(pty.master);
+        fcntl_setfd(&pty.slave, FdFlags::CLOEXEC).expect("close parent slave on exec");
+        let slave = File::from(pty.slave);
+        let original_termios = tcgetattr(&slave).expect("read original terminal attributes");
+
+        let mut command = Command::new("setsid");
+        command
+            .arg("--wait")
+            .arg(env!("CARGO_BIN_EXE_duplicity-tui"))
+            .arg("local")
+            .arg(&fixture)
+            .arg("--restore-parent")
+            .arg(&parent)
+            .arg("--restore-name")
+            .arg(OsString::from_vec(leaf.clone()))
+            .current_dir(&workdir)
+            .env("TERM", "xterm-256color")
+            .env("COLUMNS", "240")
+            .env("LINES", "40")
+            .stdin(Stdio::from(slave.try_clone().unwrap()))
+            .stdout(Stdio::from(slave.try_clone().unwrap()))
+            .stderr(Stdio::from(slave.try_clone().unwrap()));
+        let mut child = ChildGuard(command.spawn().expect("launch TUI under setsid"));
+        let mut output = Vec::new();
+        let mut parser = vt100::Parser::new(original_size.ws_row, original_size.ws_col, 0);
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "history before invalid-parent restore",
+            |screen| {
+                screen.contains(std::str::from_utf8(HISTORY_MARKER).unwrap())
+                    && screen.contains("Metadata only. a selects full anchor")
+            },
+        );
+        assert_ne!(tcgetattr(&slave).unwrap(), original_termios);
+        write(&master, b"a").expect("select full anchor");
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "full anchor selection",
+            |screen| screen.contains("Full anchor selected; choose target then Enter."),
+        );
+        write(&master, b"\x1b[B\x1b[B\r").expect("select final target and request scan");
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "full scan disclosure",
+            |screen| {
+                screen.contains("Full volume scan required.") && screen.contains("Enter confirms.")
+            },
+        );
+        write(&master, b"\r").expect("confirm full scan");
+        let validated = format!(
+            "Validated snapshot: {} entries, {payload_bytes} payload bytes.",
+            entries.len()
+        );
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "official final snapshot validated",
+            |screen| screen.contains(&validated),
+        );
+        write(&master, b"r").expect("request executable whole-snapshot preview");
+        let preview_ready = |screen: &str| {
+            screen.contains("Restore preview / outcome / Up-Down scroll")
+                && screen.contains("Snapshot target: 1700172800")
+                && screen.contains("Scope: whole snapshot (no marks)")
+                && screen.contains("Entries: 21")
+                && screen.contains("Regular payload bytes: 2621564")
+                && screen.contains("Include exact source directory ancestors; no flattening.")
+                && screen.contains("Acknowledgment [] ready")
+        };
+        assert!(wait_for_preview_ready_with_initial_unarmed_ack(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            preview_ready,
+        ));
+
+        let mut preview_frames = parser.screen().contents();
+        let escaped_leaf = r"\x1b\\\xffR";
+        let mut preview_saw_leaf = false;
+        for step in 0..80 {
+            let screen = parser.screen().contents();
+            preview_saw_leaf |= screen.contains(&format!("New destination leaf: {escaped_leaf}"));
+            preview_frames.push_str(&screen);
+            if preview_saw_leaf {
+                break;
+            }
+            let previous = screen;
+            write(&master, b"\x1b[B").expect("scroll preview to requested identity");
+            wait_for_screen(
+                &master,
+                &mut child,
+                &mut output,
+                &mut parser,
+                "scroll preview identity",
+                |screen| screen != previous,
+            );
+            assert!(step < 79, "preview did not expose configured leaf");
+        }
+        assert!(preview_saw_leaf, "preview shows exact escaped leaf");
+        assert!(preview_frames.contains("Atomic no-replacement publication"));
+        assert!(preview_frames.contains("Backend checks parent policy/filesystem"));
+        assert!(preview_frames.contains("Preserves ordinary modes"));
+        assert!(preview_frames.contains("supported exact modification times"));
+        assert!(preview_frames.contains("raw symlink target bytes"));
+        assert!(preview_frames
+            .contains("Ownership, source ACLs/xattrs and crash durability are excluded."));
+        assert!(preview_frames.contains(&format!("Requested parent: {}", workdir.display())));
+        let mut previous_component = 0;
+        for byte in 0x80..0x8e {
+            let marker = escaped_byte(byte).repeat(20);
+            let position = preview_frames
+                .find(&marker)
+                .unwrap_or_else(|| panic!("preview preserves raw component byte {byte:02x}"));
+            assert!(
+                position >= previous_component,
+                "preview preserves requested parent component order"
+            );
+            previous_component = position;
+        }
+        assert!(preview_frames.contains(r"p\x1b\\\xff"));
+        // Return to the preview start so confirmation applies to the complete
+        // concrete request and its summary, then acknowledge exactly.
+        for _ in 0..80 {
+            let screen = parser.screen().contents();
+            if preview_ready(&screen) {
+                break;
+            }
+            let previous = screen;
+            write(&master, b"\x1b[A").expect("scroll preview back to top");
+            wait_for_screen(
+                &master,
+                &mut child,
+                &mut output,
+                &mut parser,
+                "return preview to summary",
+                |screen| screen != previous,
+            );
+        }
+        assert!(preview_ready(&parser.screen().contents()));
+        write(&master, b"restore").expect("type exact acknowledgment");
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "ready acknowledgment",
+            |screen| preview_ready(screen) && screen.contains("Acknowledgment [restore] ready"),
+        );
+        write(&master, b"\r").expect("confirm exact restore acknowledgment");
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "typed ENOTDIR result",
+            |screen| {
+                screen.contains("Restore result. Up/Down scroll; Esc returns; q exits.")
+                    && screen.contains("Unpublished: cause Syscall errno Some(20)")
+                    && screen.contains("Cleanup attempted=0 failures=0 first_errno=None exhausted=false detail_truncated=false")
+                    && !screen.contains("Publication indeterminate")
+                    && !screen.contains("Published completed tree")
+                    && !screen.contains("First-stage candidate uncertain")
+                    && !screen.contains("Profile ")
+                    && !screen.contains("Parent device=")
+                    && !screen.contains("Destination: ")
+                    && !screen.contains("Staging: ")
+                    && !screen.contains("Empty-root mtime")
+            },
+        );
+        let result_first_screen = parser.screen().contents();
+        assert!(!result_first_screen.contains("Requested leaf:"));
+        assert!(!result_first_screen.contains('\u{fffd}'));
+
+        let mut result_frames = result_first_screen.clone();
+        let mut result_has_identity = false;
+        for step in 0..80 {
+            let screen = parser.screen().contents();
+            result_has_identity |= screen.contains(&format!("Requested leaf: {escaped_leaf}"));
+            result_frames.push_str(&screen);
+            if result_has_identity {
+                break;
+            }
+            let previous = screen;
+            write(&master, b"\x1b[B").expect("scroll typed result diagnostics");
+            wait_for_screen(
+                &master,
+                &mut child,
+                &mut output,
+                &mut parser,
+                "scroll result identity",
+                |screen| screen != previous,
+            );
+            assert!(step < 79, "result document did not expose requested leaf");
+        }
+        assert!(
+            result_has_identity,
+            "result exposes exact escaped requested leaf"
+        );
+        assert!(result_frames.contains(r"p\x1b\\\xff"));
+        assert!(result_frames.contains(&format!("Requested parent: {}", workdir.display())));
+        assert!(!result_frames.contains('\u{fffd}'));
+        let mut previous_component = 0;
+        for byte in 0x80..0x8e {
+            let marker = escaped_byte(byte).repeat(20);
+            let position = result_frames
+                .find(&marker)
+                .unwrap_or_else(|| panic!("result preserves raw component byte {byte:02x}"));
+            assert!(
+                position >= previous_component,
+                "result preserves requested parent component order"
+            );
+            previous_component = position;
+        }
+
+        assert_eq!(fs::read(&parent).unwrap(), sentinel);
+        assert_eq!(
+            metadata_identity(&fs::metadata(&parent).unwrap()),
+            parent_identity
+        );
+        assert!(
+            matches!(fs::symlink_metadata(&destination), Err(error) if error.kind() == std::io::ErrorKind::NotFound || error.kind() == std::io::ErrorKind::NotADirectory)
+        );
+        assert!(
+            !contains_staging_entry(&workdir),
+            "no .duplicity-* staging path was created"
+        );
+        assert_eq!(fingerprint(&fixture), source_before);
+
+        write(&master, b"q").expect("quit from result document");
+        let status = wait_for_exit(&master, &mut child, &mut output)
+            .expect("TUI did not exit after q within timeout");
+        assert!(status.success(), "TUI exited with {status}");
+        assert_eq!(tcgetattr(&slave).unwrap(), original_termios);
+        assert!(contains(&output, b"\x1b[?1049h"));
+        assert!(contains(&output, b"\x1b[?1049l"));
+        fs::remove_dir_all(&workdir).expect("remove test-owned invalid-parent scratch tree");
+        assert!(!workdir.exists(), "test-owned scratch tree was removed");
     }
 
     #[test]
