@@ -1,9 +1,9 @@
 # PARSE-ENV-016 resource-admission acceptance plan
 
-Status: implementation and test links are in place. Focused tests, the full
-core suite, targeted Duvet query, full Duvet trace, formatting, and strict
-Clippy pass locally on macOS. Independent review and hosted assurance remain
-pending; keep the backlog item open until those gates pass.
+Status: accepted. Focused tests, the full core suite, targeted Duvet query,
+full Duvet trace, formatting, strict Clippy, and independent review pass.
+Hosted Linux assurance and Duvet Pages succeeded in
+[run 41810224878](https://github.com/ajrudzitis/duplinaut/actions/runs/41810224878).
 
 This is a local OpenPGP resource-preflight acceptance slice for
 [PARSE-ENV-016](parsing-requirements.md#parse-env-016). Native code and local
@@ -81,6 +81,8 @@ local bounds and cheap admission inputs; no live AWS credentials are needed.
 - `cargo fmt --all -- --check`,
   `cargo clippy -p duplicity-core --all-targets -- -D warnings`, and
   `git diff --check`: passed.
+- Independent review passed. Hosted Linux assurance and Duvet Pages succeeded
+  in [run 41810224878](https://github.com/ajrudzitis/duplinaut/actions/runs/41810224878).
 - The generated fixtures exercise only admission behavior with small S2K
   counts; this does not establish limits on total process memory or verify
   cryptographic primitives.
