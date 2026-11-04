@@ -105,7 +105,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The crypto adapter's trusted contract and limitations MUST be recorded with the pinned dependency identities and independent positive and negative integration evidence.
 
   SECTION: [PARSE-ENV-016](#parse-env-016)
-    TEXT[!MUST]: The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
+    TEXT[!MUST,implementation,test]: The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
 
   SECTION: [PARSE-ENV-017](#parse-env-017)
     TEXT[!MUST,implementation,test]: OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.

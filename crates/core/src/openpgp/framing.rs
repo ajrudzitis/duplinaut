@@ -36,6 +36,9 @@ fn length(bytes: &mut &[u8]) -> Result<(usize, bool), CryptoError> {
         )),
     }
 }
+//= docs/parsing-requirements.md#parse-env-016
+//= type=implementation
+//# The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
 pub(super) fn frames(mut bytes: &[u8], work: &mut Work) -> Result<Vec<Packet>, CryptoError> {
     let mut packets = Vec::new();
     let mut sessions = 0usize;

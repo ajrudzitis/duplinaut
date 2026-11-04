@@ -11,6 +11,8 @@ mod armor_crc_tests;
 #[cfg(test)]
 mod fixture_tests;
 mod framing;
+#[cfg(test)]
+mod resource_acceptance_tests;
 use framing::{frames, native, Packet as Frame};
 use pgp::{
     composed::{
@@ -169,6 +171,9 @@ impl Work {
         self.signatures += 1;
         Ok(())
     }
+    //= docs/parsing-requirements.md#parse-env-016
+    //= type=implementation
+    //# The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
     fn derivation(&mut self) -> Result<(), CryptoError> {
         if self.derivations >= self.limits.derivations {
             return Err(CryptoError::Limit(Limit::Derivations));
@@ -251,6 +256,9 @@ fn signature_policy(body: &[u8], document: bool) -> Result<(), CryptoError> {
         _ => Err(CryptoError::Unsupported),
     }
 }
+//= docs/parsing-requirements.md#parse-env-016
+//= type=implementation
+//# The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
 fn s2k(body: &[u8], maximum: usize) -> Result<usize, CryptoError> {
     let typ = *body.first().ok_or(CryptoError::Malformed)?;
     let hash = *body.get(1).ok_or(CryptoError::Malformed)?;
@@ -357,6 +365,9 @@ fn key_policy(packet: &Frame, work: &Work) -> Result<(), CryptoError> {
     }
     Ok(())
 }
+//= docs/parsing-requirements.md#parse-env-016
+//= type=implementation
+//# The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
 fn key_bytes(export: &[u8], private: bool, maximum: usize) -> Result<Vec<u8>, CryptoError> {
     if export.len() > maximum {
         return Err(CryptoError::Limit(Limit::KeyBytes));
@@ -402,6 +413,9 @@ fn key_bytes(export: &[u8], private: bool, maximum: usize) -> Result<Vec<u8>, Cr
     }
     Ok(decoded)
 }
+//= docs/parsing-requirements.md#parse-env-016
+//= type=implementation
+//# The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
 fn key_packets(
     export: &[u8],
     private: bool,
@@ -569,6 +583,9 @@ fn session_key(
     Ok(())
 }
 
+//= docs/parsing-requirements.md#parse-env-016
+//= type=implementation
+//# The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
 fn signature_preflight(
     body: &[u8],
     document: bool,
@@ -738,6 +755,9 @@ struct Content {
 //= docs/parsing-requirements.md#parse-env-011
 //= type=implementation
 //# The adapter MUST consume every accepted message and compression layer to its authenticated end and reject unexpected trailing packets or bytes.
+//= docs/parsing-requirements.md#parse-env-016
+//= type=implementation
+//# The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
 fn content(bytes: &[u8], depth: usize, work: &mut Work) -> Result<Content, CryptoError> {
     if depth > work.limits.depth {
         return Err(CryptoError::Limit(Limit::Depth));
@@ -871,6 +891,9 @@ fn content(bytes: &[u8], depth: usize, work: &mut Work) -> Result<Content, Crypt
 //= docs/parsing-requirements.md#parse-env-009
 //= type=implementation
 //# The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
+//= docs/parsing-requirements.md#parse-env-016
+//= type=implementation
+//# The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.
 pub(crate) fn decode(
     stored: &[u8],
     credentials: Credentials<'_>,

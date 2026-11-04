@@ -1,14 +1,14 @@
 # PARSE-ENV-016 resource-admission acceptance plan
 
-Status: proposed before adding Duvet implementation and test links; test
-fixtures use deliberately reduced local bounds.
+Status: implementation and test links are in place. Focused tests, the full
+core suite, targeted Duvet query, full Duvet trace, formatting, and strict
+Clippy pass locally on macOS. Independent review and hosted assurance remain
+pending; keep the backlog item open until those gates pass.
 
 This is a local OpenPGP resource-preflight acceptance slice for
-[PARSE-ENV-016](parsing-requirements.md#parse-env-016). The current
-section-scoped Duvet query reports no implementation annotation. Native code
-and fixture tests already exercise these limits, so the next work is bounded
-to completing requirement traceability and checking the admission boundaries;
-it needs no live AWS credentials.
+[PARSE-ENV-016](parsing-requirements.md#parse-env-016). Native code and local
+fixtures exercise the configured admission boundaries. All tests use reduced
+local bounds and cheap admission inputs; no live AWS credentials are needed.
 
 ## Acceptance requirements
 
@@ -69,6 +69,21 @@ it needs no live AWS credentials.
   aggregate accounting.
 - No Verus proof is claimed for the native OpenPGP controller or upstream key,
   packet, or S2K implementations.
+
+## Current local evidence
+
+- `cargo test -p duplicity-core --lib resource_acceptance_tests`: 4 passed.
+- `cargo test -p duplicity-core`: passed, including official encrypted-chain
+  source-oracle coverage.
+- `cargo xtask trace-update`, `cargo xtask trace`, and the targeted
+  `duvet query --check implementation,test --section
+  docs/parsing-requirements.md#parse-env-016`: passed.
+- `cargo fmt --all -- --check`,
+  `cargo clippy -p duplicity-core --all-targets -- -D warnings`, and
+  `git diff --check`: passed.
+- The generated fixtures exercise only admission behavior with small S2K
+  counts; this does not establish limits on total process memory or verify
+  cryptographic primitives.
 
 ## Non-goals
 
