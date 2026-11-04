@@ -212,6 +212,19 @@ fn preview_enter_transition(
     Ok(true)
 }
 
+fn idle_enter_transition(
+    code: KeyCode,
+    preview_available: bool,
+    snapshot_available: bool,
+    idle_enter: impl FnOnce() -> io::Result<()>,
+) -> io::Result<bool> {
+    if code != KeyCode::Enter || preview_available || snapshot_available {
+        return Ok(false);
+    }
+    idle_enter()?;
+    Ok(true)
+}
+
 #[cfg(target_os = "linux")]
 fn outcome_transition(
     result: Result<duplicity_core::restore_linux::RestoreOutcome, crate::restore_flow::Error>,
@@ -581,29 +594,32 @@ pub fn run_configured(
                             }
                         }
                     }
-                    KeyCode::Enter if snapshot.is_none() => {
-                        if let (Some(full), Some(row)) = (anchor, history.get(selected)) {
-                            if !scan_confirm {
-                                status=format!("Full volume scan required. Listed total {:?} bytes; exact download size unknown. Enter confirms.",total);
-                                scan_confirm = true;
+                    KeyCode::Enter => {
+                        idle_enter_transition(code, preview.is_some(), snapshot.is_some(), || {
+                            if let (Some(full), Some(row)) = (anchor, history.get(selected)) {
+                                if !scan_confirm {
+                                    status=format!("Full volume scan required. Listed total {:?} bytes; exact download size unknown. Enter confirms.",total);
+                                    scan_confirm = true;
+                                } else {
+                                    serial = serial.checked_add(1).ok_or_else(|| {
+                                        io::Error::other("operation ID exhausted")
+                                    })?;
+                                    *cancel = Cancellation::default();
+                                    worker.send(Command::Scan {
+                                        id: serial,
+                                        anchor: full,
+                                        target: row.end,
+                                        cancel: cancel.clone(),
+                                    })?;
+                                    active = Some(serial);
+                                    scan_confirm = false;
+                                    status="Reading and validating every required volume... Esc/q cancels and waits.".into();
+                                }
                             } else {
-                                serial = serial
-                                    .checked_add(1)
-                                    .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
-                                *cancel = Cancellation::default();
-                                worker.send(Command::Scan {
-                                    id: serial,
-                                    anchor: full,
-                                    target: row.end,
-                                    cancel: cancel.clone(),
-                                })?;
-                                active = Some(serial);
-                                scan_confirm = false;
-                                status="Reading and validating every required volume... Esc/q cancels and waits.".into();
+                                status = "Choose a full anchor with a first.".into();
                             }
-                        } else {
-                            status = "Choose a full anchor with a first.".into();
-                        }
+                            Ok(())
+                        })?;
                     }
                     _ => {}
                 }
@@ -673,6 +689,118 @@ mod tests {
         assert_eq!(accessible, text);
         assert!(accessible.ends_with("\\xff"));
         assert_eq!(wrapped_rows(&text, 1).count(), text.len());
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-004
+    //= type=test
+    //# The frontend MUST start at most one restoration operation only when its displayed successful `r` preview receives the exact ASCII acknowledgment `restore` followed by Enter, and MUST clear that acknowledgment and disarm confirmation when its snapshot, roots or destination changes or the user leaves that preview.
+    //= docs/parsing-requirements.md#restore-ui-006
+    //= type=test
+    //# The frontend MUST retain one frozen operation's exact snapshot, roots, destination and bounded plan summary across preview and confirmation, and keep at most one active scan, preview or restoration with bounded request/reply queues.
+    //= docs/parsing-requirements.md#restore-ui-014
+    //= type=test
+    //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+    // Synthetic preview failures exercise frontend state handling only; they
+    // do not establish native restore or real-terminal behavior.
+    fn preview_error_reply_clears_matching_operation_and_never_executes() {
+        use crossterm::event::{KeyEvent, KeyEventKind, KeyModifiers};
+
+        const OPERATION: u64 = 55;
+        let mut active = Some(OPERATION);
+        let mut scan_confirm = true;
+        let mut selected = 6;
+        let mut preview = None;
+        let mut offset = 12;
+        let mut ack = Acknowledgment::default();
+        ack.armed = true;
+        for character in "rest".chars() {
+            ack.input(character);
+        }
+        let mut abandoning = false;
+        let mut status = "Waiting for matching Preview result".to_string();
+
+        let stale_reply = Reply::Preview {
+            id: OPERATION - 1,
+            result: Err(crate::restore_flow::Error::Selection),
+        };
+        assert!(dispatch_reply(
+            stale_reply,
+            ReplyDispatchState {
+                active: &mut active,
+                scan_confirm: &mut scan_confirm,
+                selected: &mut selected,
+                preview: &mut preview,
+                offset: &mut offset,
+                ack: &mut ack,
+                abandoning: &mut abandoning,
+                status: &mut status,
+            },
+        )
+        .is_none());
+        assert_eq!(active, Some(OPERATION));
+        assert!(scan_confirm);
+        assert_eq!(selected, 6);
+        assert!(preview.is_none());
+        assert_eq!(offset, 12);
+        assert_eq!(ack.text(), "rest");
+        assert!(
+            ack.armed,
+            "stale reply preserves the current acknowledgment"
+        );
+        assert!(!abandoning);
+        assert_eq!(status, "Waiting for matching Preview result");
+
+        let matching_reply = Reply::Preview {
+            id: OPERATION,
+            result: Err(crate::restore_flow::Error::Selection),
+        };
+        assert!(dispatch_reply(
+            matching_reply,
+            ReplyDispatchState {
+                active: &mut active,
+                scan_confirm: &mut scan_confirm,
+                selected: &mut selected,
+                preview: &mut preview,
+                offset: &mut offset,
+                ack: &mut ack,
+                abandoning: &mut abandoning,
+                status: &mut status,
+            },
+        )
+        .is_none());
+        assert_eq!(active, None);
+        assert!(!scan_confirm);
+        assert_eq!(selected, 0);
+        assert!(preview.is_none());
+        assert_eq!(ack.text(), "");
+        assert!(
+            !ack.armed,
+            "matching preview failure clears and disarms ack"
+        );
+        assert_eq!(status, "Executable preview failed; no restore is armed.");
+
+        let enter_event = Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Enter,
+            KeyModifiers::NONE,
+            KeyEventKind::Press,
+        ));
+        let enter = pressed_key(enter_event).expect("Press Enter normalizes to a key");
+        assert_eq!(enter, KeyCode::Enter);
+        let (command_tx, command_rx) = mpsc::sync_channel(1);
+        let dispatched = idle_enter_transition(enter, preview.is_some(), true, move || {
+            command_tx.send("Execute").map_err(io::Error::other)
+        })
+        .unwrap();
+        assert!(!dispatched);
+        assert!(preview.is_none());
+        assert_eq!(status, "Executable preview failed; no restore is armed.");
+        assert_eq!(ack.text(), "");
+        assert!(!ack.armed);
+        assert!(matches!(
+            command_rx.try_recv(),
+            Err(mpsc::TryRecvError::Disconnected)
+        ));
     }
 
     #[test]
