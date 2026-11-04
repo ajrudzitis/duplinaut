@@ -64,6 +64,8 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Implement and independently review the PARSE-ENV-009 Duvet mapping and credential-path source review; do not claim cryptographic primitive verification. Focused/full core tests, Clippy, Duvet trace, and hosted Linux assurance passed in [run 41802573515](https://github.com/ajrudzitis/duplinaut/actions/runs/41802573515).
 - [x] Specify PARSE-ENV-013 offline signer-policy scope and evidence reporting using the existing official signed-chain fixture. See the [acceptance plan](../../docs/parse-env-013-acceptance.md).
 - [ ] Implement and independently review the PARSE-ENV-013 policy/evidence Duvet mapping; expired/revoked-certificate behavior remains a separate open test question.
+- [x] Specify PARSE-ENV-015 trusted-boundary evidence traceability for the pinned OpenPGP dependency, official positive/negative fixtures, and explicit trust limits. See the [acceptance plan](../../docs/parse-env-015-evidence-acceptance.md).
+- [ ] Implement and independently review the PARSE-ENV-015 source/test links and implementation-record corrections; do not claim formal verification of cryptographic primitives.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 
