@@ -669,7 +669,7 @@ fn public_crypto_reader_rejects_authenticated_manifest_ciphertext_mutation() {
             &context,
         )
         .expect("unmodified official manifest authenticates with fixture credentials");
-    assert!(positive.state().len() > 0);
+    assert!(!positive.state().is_empty());
     assert!(positive
         .authentication_evidence()
         .objects()
