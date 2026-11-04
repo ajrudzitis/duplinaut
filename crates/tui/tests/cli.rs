@@ -1166,8 +1166,6 @@ mod pty_acceptance {
     //= type=test
     //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
     fn invalid_raw_parent_produces_scrolled_unpublished_diagnostic_over_pty() {
-        use std::os::unix::ffi::OsStringExt;
-
         let oracle: serde_json::Value = serde_json::from_str(include_str!(
             "../../../tests/fixtures/duplicity-3.0.7/expected.json"
         ))
@@ -1236,7 +1234,7 @@ mod pty_acceptance {
             .arg("--restore-parent")
             .arg(&parent)
             .arg("--restore-name")
-            .arg(OsString::from_vec(leaf.clone()))
+            .arg(raw_os_string(leaf.clone()))
             .current_dir(&workdir)
             .env("TERM", "xterm-256color")
             .env("COLUMNS", "240")
