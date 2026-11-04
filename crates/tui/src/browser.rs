@@ -940,7 +940,7 @@ mod tests {
         });
         let marked = vec![0usize];
         let completed_operation = 17;
-        let mut old_cancel = Cancellation::default();
+        let old_cancel = Cancellation::default();
         old_cancel.cancel();
         let mut cancel = old_cancel.clone();
         let mut retry = false;
