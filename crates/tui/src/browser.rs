@@ -38,29 +38,159 @@ fn take_confirmation(ack: &mut Acknowledgment, code: KeyCode) -> bool {
         false
     }
 }
+struct RTransition<'a> {
+    retry_allowed: bool,
+    snapshot: Option<&'a Arc<ValidatedSnapshot>>,
+    marked: &'a [usize],
+    destination: Option<&'a Arc<Destination>>,
+    serial: &'a mut u64,
+    cancel: &'a mut Cancellation,
+    active: &'a mut Option<u64>,
+    document: &'a mut Option<String>,
+    ack: &'a mut Acknowledgment,
+    abandoning: &'a mut bool,
+    status: &'a mut String,
+}
 fn r_transition(
     key: KeyCode,
-    retry_allowed: bool,
-    has_snapshot: bool,
-    has_destination: bool,
-    status: &mut String,
-    prepare: impl FnOnce() -> io::Result<()>,
+    state: RTransition<'_>,
+    prepare: impl FnOnce(Command) -> io::Result<()>,
 ) -> io::Result<bool> {
     if key != KeyCode::Char('r') {
         return Ok(false);
     }
-    if !retry_allowed {
-        *status =
+    if !state.retry_allowed {
+        *state.status =
             "Further restores disabled after success or uncertain/unavailable outcome.".into();
         return Ok(false);
     }
-    if has_snapshot && has_destination {
-        prepare()?;
+    if let (Some(value), Some(dest)) = (state.snapshot, state.destination) {
+        *state.serial = state
+            .serial
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
+        *state.cancel = Cancellation::default();
+        *state.document = None;
+        prepare(Command::Prepare {
+            id: *state.serial,
+            snapshot: value.clone(),
+            marked: state.marked.to_vec(),
+            destination: dest.clone(),
+            cancel: state.cancel.clone(),
+        })?;
+        *state.active = Some(*state.serial);
+        *state.abandoning = false;
+        state.ack.clear();
+        *state.status =
+            "Preparing frozen executable preview on worker; acknowledgment input is ignored."
+                .into();
         Ok(true)
     } else {
-        *status = "Restore requires a validated snapshot and paired --restore-parent/--restore-name. Nothing is written.".into();
+        *state.status = "Restore requires a validated snapshot and paired --restore-parent/--restore-name. Nothing is written.".into();
         Ok(false)
     }
+}
+
+fn preview_transition(
+    result: Result<Preview, crate::restore_flow::Error>,
+    abandoning: &mut bool,
+    preview: &mut Option<Preview>,
+    offset: &mut usize,
+    ack: &mut Acknowledgment,
+    status: &mut String,
+) {
+    ack.clear();
+    if *abandoning {
+        *status = "Preview abandoned; nothing staged.".into();
+        *abandoning = false;
+        return;
+    }
+    match result {
+        Ok(value) => {
+            *preview = Some(value);
+            *offset = 0;
+            *status =
+                "Preparing empty acknowledgment field; pending input is being drained.".into();
+        }
+        Err(_) => {
+            *status = "Executable preview failed; no restore is armed.".into();
+        }
+    }
+}
+
+struct ReplyDispatchState<'a> {
+    active: &'a mut Option<u64>,
+    scan_confirm: &'a mut bool,
+    selected: &'a mut usize,
+    preview: &'a mut Option<Preview>,
+    offset: &'a mut usize,
+    ack: &'a mut Acknowledgment,
+    abandoning: &'a mut bool,
+    status: &'a mut String,
+}
+fn dispatch_reply(reply: Reply, state: ReplyDispatchState<'_>) -> Option<Reply> {
+    if *state.active != Some(reply.id()) {
+        return None;
+    }
+    *state.active = None;
+    *state.scan_confirm = false;
+    *state.selected = 0;
+    state.ack.clear();
+    match reply {
+        Reply::Preview { result, .. } => {
+            preview_transition(
+                result,
+                state.abandoning,
+                state.preview,
+                state.offset,
+                state.ack,
+                state.status,
+            );
+            None
+        }
+        other => Some(other),
+    }
+}
+
+struct PreviewEnterState<'a> {
+    preview: &'a mut Option<Preview>,
+    ack: &'a mut Acknowledgment,
+    serial: &'a mut u64,
+    cancel: &'a mut Cancellation,
+    active: &'a mut Option<u64>,
+    status: &'a mut String,
+}
+fn preview_enter_transition(
+    code: KeyCode,
+    state: PreviewEnterState<'_>,
+    execute: impl FnOnce(Command) -> io::Result<()>,
+) -> io::Result<bool> {
+    if code != KeyCode::Enter {
+        return Ok(false);
+    }
+    if !take_confirmation(state.ack, code) {
+        *state.status = "Acknowledgment must be exactly restore, then Enter.".into();
+        return Ok(false);
+    }
+    let frozen = state
+        .preview
+        .take()
+        .expect("preview exists in preview key state")
+        .frozen;
+    *state.serial = state
+        .serial
+        .checked_add(1)
+        .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
+    *state.cancel = Cancellation::default();
+    execute(Command::Execute {
+        id: *state.serial,
+        frozen,
+        cancel: state.cancel.clone(),
+    })?;
+    *state.active = Some(*state.serial);
+    *state.status =
+        "Restoration running. Esc/q requests cancellation; waiting for typed outcome.".into();
+    Ok(true)
 }
 
 #[cfg(target_os = "linux")]
@@ -193,54 +323,47 @@ pub fn run_configured(
         |terminal, worker, cancel| -> io::Result<()> {
             loop {
                 match worker.poll() {
-                    Ok(reply) if active == Some(reply.id()) => {
-                        active = None;
-                        scan_confirm = false;
-                        selected = 0;
-                        ack.clear();
-                        match reply {
-                            Reply::Ready(rows, bytes) => {
-                                history = rows;
-                                total = bytes;
-                                status="Metadata only. a selects full anchor; Enter selects exact target scan.".into();
-                            }
-                            Reply::Snapshot { value, .. } => {
-                                marked.clear();
-                                status=format!("Validated snapshot: {} entries, {} payload bytes. p read-only; r executable preview.",value.state().len(),value.state().payload_bytes());
-                                snapshot = Some(value);
-                            }
-                            Reply::Preview { result, .. } => {
-                                if abandoning {
-                                    status = "Preview abandoned; nothing staged.".into();
-                                    abandoning = false;
-                                } else {
-                                    match result {
-                                        Ok(value) => {
-                                            preview = Some(value);
-                                            offset = 0;
-                                            status="Preparing empty acknowledgment field; pending input is being drained.".into();
-                                        }
-                                        Err(_) => {
-                                            status =
-                                                "Executable preview failed; no restore is armed."
-                                                    .into()
-                                        }
-                                    }
+                    Ok(reply) => {
+                        if let Some(reply) = dispatch_reply(
+                            reply,
+                            ReplyDispatchState {
+                                active: &mut active,
+                                scan_confirm: &mut scan_confirm,
+                                selected: &mut selected,
+                                preview: &mut preview,
+                                offset: &mut offset,
+                                ack: &mut ack,
+                                abandoning: &mut abandoning,
+                                status: &mut status,
+                            },
+                        ) {
+                            match reply {
+                                Reply::Ready(rows, bytes) => {
+                                    history = rows;
+                                    total = bytes;
+                                    status="Metadata only. a selects full anchor; Enter selects exact target scan.".into();
                                 }
+                                Reply::Snapshot { value, .. } => {
+                                    marked.clear();
+                                    status=format!("Validated snapshot: {} entries, {} payload bytes. p read-only; r executable preview.",value.state().len(),value.state().payload_bytes());
+                                    snapshot = Some(value);
+                                }
+                                Reply::Preview { .. } => {
+                                    unreachable!("matching preview mapped by dispatch_reply")
+                                }
+                                #[cfg(target_os = "linux")]
+                                Reply::Outcome { result, .. } => outcome_transition(
+                                    result,
+                                    &mut retry,
+                                    &mut document,
+                                    &mut offset,
+                                    &mut status,
+                                    &mut known_outcome,
+                                ),
+                                Reply::Error { text, .. } => status = text.into(),
                             }
-                            #[cfg(target_os = "linux")]
-                            Reply::Outcome { result, .. } => outcome_transition(
-                                result,
-                                &mut retry,
-                                &mut document,
-                                &mut offset,
-                                &mut status,
-                                &mut known_outcome,
-                            ),
-                            Reply::Error { text, .. } => status = text.into(),
                         }
                     }
-                    Ok(_) => {}
                     Err(mpsc::TryRecvError::Disconnected) if active.is_some() => {
                         active = None;
                         preview = None;
@@ -305,27 +428,24 @@ pub fn run_configured(
                         KeyCode::Down => offset = offset.saturating_add(1).min(scroll_max),
                         KeyCode::Backspace => ack.backspace(),
                         KeyCode::Enter => {
-                            if take_confirmation(&mut ack, code) {
-                                let frozen = preview.take().unwrap().frozen;
-                                serial = serial
-                                    .checked_add(1)
-                                    .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
-                                *cancel = Cancellation::default();
+                            let executed = preview_enter_transition(
+                                code,
+                                PreviewEnterState {
+                                    preview: &mut preview,
+                                    ack: &mut ack,
+                                    serial: &mut serial,
+                                    cancel,
+                                    active: &mut active,
+                                    status: &mut status,
+                                },
+                                |command| worker.send(command),
+                            )?;
+                            if executed {
                                 #[cfg(target_os = "linux")]
                                 {
                                     known_outcome = None;
                                 }
-                                worker.send(Command::Execute {
-                                    id: serial,
-                                    frozen,
-                                    cancel: cancel.clone(),
-                                })?;
-                                active = Some(serial);
                                 abandoning = false;
-                                status="Restoration running. Esc/q requests cancellation; waiting for typed outcome.".into();
-                            } else {
-                                status =
-                                    "Acknowledgment must be exactly restore, then Enter.".into();
                             }
                         }
                         KeyCode::Char(c) => ack.input(c),
@@ -417,37 +537,23 @@ pub fn run_configured(
                         }
                     }
                     KeyCode::Char('r') => {
-                        let prepared = r_transition(
+                        r_transition(
                             code,
-                            retry,
-                            snapshot.is_some(),
-                            destination.is_some(),
-                            &mut status,
-                            || {
-                                let (Some(value), Some(dest)) = (&snapshot, &destination) else {
-                                    unreachable!("availability checked by r_transition")
-                                };
-                                serial = serial
-                                    .checked_add(1)
-                                    .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
-                                *cancel = Cancellation::default();
-                                document = None;
-                                worker.send(Command::Prepare {
-                                    id: serial,
-                                    snapshot: value.clone(),
-                                    marked: marked.clone(),
-                                    destination: dest.clone(),
-                                    cancel: cancel.clone(),
-                                })?;
-                                active = Some(serial);
-                                Ok(())
+                            RTransition {
+                                retry_allowed: retry,
+                                snapshot: snapshot.as_ref(),
+                                marked: &marked,
+                                destination: destination.as_ref(),
+                                serial: &mut serial,
+                                cancel,
+                                active: &mut active,
+                                document: &mut document,
+                                ack: &mut ack,
+                                abandoning: &mut abandoning,
+                                status: &mut status,
                             },
+                            |command| worker.send(command),
                         )?;
-                        if prepared {
-                            abandoning = false;
-                            ack.clear();
-                            status="Preparing frozen executable preview on worker; acknowledgment input is ignored.".into();
-                        }
                         continue;
                     }
                     KeyCode::Char('a') if snapshot.is_none() => {
@@ -719,6 +825,11 @@ mod tests {
             assert_evidence(known_outcome.as_ref().unwrap());
 
             let mut sent = Vec::new();
+            let mut serial = 91 + case_index as u64;
+            let mut cancel = Cancellation::default();
+            let mut active = None;
+            let mut ack = Acknowledgment::default();
+            let mut abandoning = false;
             let r_event = Event::Key(KeyEvent::new_with_kind(
                 KeyCode::Char('r'),
                 KeyModifiers::NONE,
@@ -728,11 +839,20 @@ mod tests {
             assert_eq!(key, KeyCode::Char('r'));
             let prepared = r_transition(
                 key,
-                retry,
-                snapshot.is_some(),
-                destination.is_some(),
-                &mut status,
-                || {
+                RTransition {
+                    retry_allowed: retry,
+                    snapshot: Some(&snapshot),
+                    marked: &[],
+                    destination: Some(&destination),
+                    serial: &mut serial,
+                    cancel: &mut cancel,
+                    active: &mut active,
+                    document: &mut document,
+                    ack: &mut ack,
+                    abandoning: &mut abandoning,
+                    status: &mut status,
+                },
+                |_| {
                     sent.push("Prepare");
                     Ok(())
                 },
@@ -750,5 +870,294 @@ mod tests {
             assert_eq!(document.as_deref(), Some(retained_document.as_str()));
             assert_evidence(known_outcome.as_ref().unwrap());
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-004
+    //= type=test
+    //# The frontend MUST start at most one restoration operation only when its displayed successful `r` preview receives the exact ASCII acknowledgment `restore` followed by Enter, and MUST clear that acknowledgment and disarm confirmation when its snapshot, roots or destination changes or the user leaves that preview.
+    //= docs/parsing-requirements.md#restore-ui-006
+    //= type=test
+    //# The frontend MUST retain one frozen operation's exact snapshot, roots, destination and bounded plan summary across preview and confirmation, and keep at most one active scan, preview or restoration with bounded request/reply queues.
+    //= docs/parsing-requirements.md#restore-ui-007
+    //= type=test
+    //# The frontend MUST run plan preparation and filesystem restoration outside the terminal event/render loop, with an operation-specific cancellation token and explicit running/cancellation-requested states.
+    //= docs/parsing-requirements.md#restore-ui-008
+    //= type=test
+    //# The frontend MUST preserve the backend's published, unpublished and publication-indeterminate outcome distinction, including successful-publication precedence over racing cancellation and all reported cleanup warnings or uncertainty.
+    //= docs/parsing-requirements.md#restore-ui-009
+    //= type=test
+    //# The frontend MUST refrain from automatic retry, rollback, destination inspection-based outcome promotion or modifying cleanup after publication uncertainty or an unavailable worker outcome.
+    //= docs/parsing-requirements.md#restore-ui-014
+    //= type=test
+    //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+    // A synthetic Unpublished(Cancelled) reply and recording command sender
+    // exercise frontend transitions only; no native restore backend runs.
+    fn definitely_unpublished_cancelled_result_allows_one_fresh_preview_only() {
+        use crossterm::event::{KeyEvent, KeyEventKind, KeyModifiers};
+        use duplicity_core::{
+            chain::SetKind,
+            local::LocalSource,
+            names::{NameConfig, Timestamp},
+            reader::{Catalog, ReaderLimits},
+            restore_linux::{Cause, Cleanup, RestoreOutcome, Unpublished},
+            source::Cancellation,
+        };
+        use std::path::PathBuf;
+
+        let source = LocalSource::new(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/duplicity-3.0.7/plain"),
+        )
+        .unwrap();
+        let cancellation = Cancellation::default();
+        let catalog = Catalog::discover(
+            &source,
+            "duplicity-",
+            NameConfig::default(),
+            ReaderLimits::default(),
+            &cancellation,
+        )
+        .unwrap();
+        let anchor = catalog
+            .manifests()
+            .find(|(_, _, set)| {
+                set.kind() == SetKind::Full
+                    && set.start() == Timestamp(1700000000)
+                    && set.end() == Timestamp(1700000000)
+            })
+            .unwrap()
+            .0;
+        let snapshot = Arc::new(
+            catalog
+                .read_snapshot(anchor, Timestamp(1700172800), &cancellation)
+                .unwrap(),
+        );
+        let destination = Arc::new(Destination {
+            parent: PathBuf::from("/tmp/definite-retry-parent"),
+            name: b"definite-retry-leaf".to_vec(),
+        });
+        let marked = vec![0usize];
+        let completed_operation = 17;
+        let mut old_cancel = Cancellation::default();
+        old_cancel.cancel();
+        let mut cancel = old_cancel.clone();
+        let mut retry = false;
+        let mut document = None;
+        let mut offset = 19;
+        let mut status = String::new();
+        let mut known_outcome = None;
+        let reply = Reply::Outcome {
+            id: completed_operation,
+            result: Ok(RestoreOutcome::Unpublished(Unpublished {
+                cause: Cause::Cancelled,
+                cleanup: Cleanup::default(),
+                uncertain_outer: None,
+            })),
+        };
+        let Reply::Outcome { result, .. } = reply else {
+            unreachable!("test submits a typed outcome reply")
+        };
+        outcome_transition(
+            result,
+            &mut retry,
+            &mut document,
+            &mut offset,
+            &mut status,
+            &mut known_outcome,
+        );
+        assert!(retry, "definitely unpublished cancellation permits a retry");
+        assert_eq!(offset, 0);
+        assert!(document
+            .as_deref()
+            .unwrap()
+            .contains("Unpublished: cause Cancelled"));
+        assert!(matches!(
+            known_outcome.as_ref(),
+            Some(RestoreOutcome::Unpublished(value))
+                if value.cause == Cause::Cancelled && value.uncertain_outer.is_none()
+        ));
+
+        let mut serial = completed_operation;
+        let mut active = None;
+        let mut preview = None;
+        let mut abandoning = false;
+        let mut ack = Acknowledgment::default();
+        ack.armed = true;
+        for character in "restore".chars() {
+            ack.input(character);
+        }
+        assert_eq!(ack.text(), "restore");
+        let r_event = Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Char('r'),
+            KeyModifiers::NONE,
+            KeyEventKind::Press,
+        ));
+        let r_key = pressed_key(r_event).expect("press-r event normalizes to a key");
+        assert_eq!(r_key, KeyCode::Char('r'));
+        let (prepare_tx, prepare_rx) = mpsc::sync_channel(1);
+        let prepared = r_transition(
+            r_key,
+            RTransition {
+                retry_allowed: retry,
+                snapshot: Some(&snapshot),
+                marked: &marked,
+                destination: Some(&destination),
+                serial: &mut serial,
+                cancel: &mut cancel,
+                active: &mut active,
+                document: &mut document,
+                ack: &mut ack,
+                abandoning: &mut abandoning,
+                status: &mut status,
+            },
+            move |command| prepare_tx.send(command).map_err(io::Error::other),
+        )
+        .unwrap();
+        assert!(prepared);
+        assert_eq!(serial, completed_operation + 1);
+        assert_eq!(active, Some(serial));
+        assert!(
+            document.is_none(),
+            "prior result document is cleared for new preview"
+        );
+        assert_eq!(ack.text(), "");
+        assert!(!ack.armed);
+        assert!(
+            old_cancel.is_cancelled(),
+            "old operation token remains cancelled"
+        );
+        assert!(!cancel.is_cancelled(), "new operation token starts clear");
+        assert!(!abandoning);
+        assert_eq!(
+            status,
+            "Preparing frozen executable preview on worker; acknowledgment input is ignored."
+        );
+
+        let Command::Prepare {
+            id,
+            snapshot: prepared_snapshot,
+            marked: prepared_marked,
+            destination: prepared_destination,
+            cancel: prepared_cancel,
+        } = prepare_rx.recv().unwrap()
+        else {
+            panic!("Press-r must enqueue exactly one Prepare command")
+        };
+        assert_eq!(id, serial);
+        assert!(id > completed_operation);
+        assert!(Arc::ptr_eq(&prepared_snapshot, &snapshot));
+        assert_eq!(prepared_marked, marked);
+        assert!(Arc::ptr_eq(&prepared_destination, &destination));
+        assert!(!prepared_cancel.is_cancelled());
+        assert!(old_cancel.is_cancelled());
+        assert!(matches!(
+            prepare_rx.try_recv(),
+            Err(mpsc::TryRecvError::Disconnected)
+        ));
+
+        let mut selected = 4;
+        let mut scan_confirm = true;
+        let stale_preview = Reply::Preview {
+            id: id - 1,
+            result: Err(crate::restore_flow::Error::Cancelled),
+        };
+        assert!(dispatch_reply(
+            stale_preview,
+            ReplyDispatchState {
+                active: &mut active,
+                scan_confirm: &mut scan_confirm,
+                selected: &mut selected,
+                preview: &mut preview,
+                offset: &mut offset,
+                ack: &mut ack,
+                abandoning: &mut abandoning,
+                status: &mut status,
+            },
+        )
+        .is_none());
+        assert_eq!(
+            active,
+            Some(id),
+            "stale Preview must not clear the active ID"
+        );
+        assert_eq!(selected, 4);
+        assert!(scan_confirm);
+        assert!(preview.is_none());
+
+        let prepared_preview = crate::restore_flow::prepare(
+            prepared_snapshot,
+            prepared_marked,
+            prepared_destination,
+            &prepared_cancel,
+        )
+        .unwrap();
+        let preview_reply = Reply::Preview {
+            id,
+            result: Ok(prepared_preview),
+        };
+        assert!(dispatch_reply(
+            preview_reply,
+            ReplyDispatchState {
+                active: &mut active,
+                scan_confirm: &mut scan_confirm,
+                selected: &mut selected,
+                preview: &mut preview,
+                offset: &mut offset,
+                ack: &mut ack,
+                abandoning: &mut abandoning,
+                status: &mut status,
+            },
+        )
+        .is_none());
+        assert_eq!(active, None, "matching Preview clears its operation ID");
+        assert_eq!(selected, 0);
+        assert!(!scan_confirm);
+        assert!(preview.is_some());
+        assert_eq!(ack.text(), "");
+        assert!(!ack.armed);
+        assert_eq!(offset, 0);
+        assert!(status.contains("empty acknowledgment field"));
+
+        let enter_event = Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Enter,
+            KeyModifiers::NONE,
+            KeyEventKind::Press,
+        ));
+        let enter_key = pressed_key(enter_event).expect("press-Enter event normalizes to a key");
+        assert_eq!(enter_key, KeyCode::Enter);
+        let (execute_tx, execute_rx) = mpsc::sync_channel(1);
+        let executed = preview_enter_transition(
+            enter_key,
+            PreviewEnterState {
+                preview: &mut preview,
+                ack: &mut ack,
+                serial: &mut serial,
+                cancel: &mut cancel,
+                active: &mut active,
+                status: &mut status,
+            },
+            move |command| execute_tx.send(command).map_err(io::Error::other),
+        )
+        .unwrap();
+        assert!(!executed);
+        assert!(preview.is_some());
+        assert_eq!(serial, id);
+        assert_eq!(active, None);
+        assert_eq!(
+            status,
+            "Acknowledgment must be exactly restore, then Enter."
+        );
+        assert!(matches!(
+            execute_rx.try_recv(),
+            Err(mpsc::TryRecvError::Disconnected)
+        ));
+        assert!(!prepared_cancel.is_cancelled());
+        assert!(matches!(
+            known_outcome.as_ref(),
+            Some(RestoreOutcome::Unpublished(value))
+                if value.cause == Cause::Cancelled && value.uncertain_outer.is_none()
+        ));
     }
 }
