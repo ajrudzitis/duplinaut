@@ -1,7 +1,7 @@
 # PARSE-ENV-012 primary-fingerprint acceptance plan
 
-Status: implementation and full core verification complete; independent review
-and hosted assurance CI remain pending.
+Status: accepted. Implementation, full core verification, independent review,
+hosted Linux assurance, and Duvet report publication pass.
 
 This is a bounded local acceptance slice for
 [PARSE-ENV-012](parsing-requirements.md#parse-env-012): exact matching of the
@@ -57,8 +57,10 @@ now carry scoped Duvet links. No AWS access is needed.
   passes all unit, integration, and doc tests. The PARSE-ENV-012 Duvet query,
   `cargo xtask trace`, formatting checks, and strict core Clippy pass. Clippy
   reports existing warnings in vendored `vest_lib`; the core crate passes
-  `-D warnings`. Hosted assurance CI remains pending. Duvet traceability is
-  not proof of the upstream fingerprint or signature primitives.
+  `-D warnings`. Hosted Linux assurance run
+  [41801255350](https://github.com/ajrudzitis/duplinaut/actions/runs/41801255350)
+  passed and published the Duvet report. Duvet traceability is not proof of
+  the upstream fingerprint or signature primitives.
 
 ## Non-goals
 
