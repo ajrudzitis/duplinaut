@@ -4,8 +4,9 @@ Status: in progress. Local portable TUI tests, targeted Duvet queries/trace,
 formatting, strict Clippy, and implementation review passed. The Linux-gated
 test and hosted assurance (`cargo xtask ci`), plus Duvet report
 generation/artifact upload, passed in [run 41860735429](https://github.com/ajrudzitis/duplinaut/actions/runs/41860735429).
-Duvet Pages deployment remains queued, so acceptance is incomplete. This
-complements the accepted [active-restore shutdown case](tui-active-restore-shutdown-acceptance.md)
+Duvet Pages deployment is waiting for environment approval, so acceptance is
+incomplete. This complements the accepted
+[active-restore shutdown case](tui-active-restore-shutdown-acceptance.md)
 by checking successful diagnostic delivery when the worker result is
 unavailable.
 
@@ -101,5 +102,6 @@ synthetic worker driver only tests frontend handling of a missing final reply.
       and strict Clippy passed.
 - [x] Linux-gated test and hosted assurance (`cargo xtask ci`), plus Duvet
       report generation/artifact upload, passed in [run 41860735429](https://github.com/ajrudzitis/duplinaut/actions/runs/41860735429).
-- [ ] Duvet Pages deployment succeeds; currently queued for run 41860735429.
+- [ ] Duvet Pages deployment succeeds; the Publish job for run 41860735429 is
+      waiting for environment approval.
 - [x] Independent implementation review accepts the scoped evidence.
