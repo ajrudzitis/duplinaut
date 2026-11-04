@@ -1,8 +1,9 @@
 # TUI active-restore PTY output-failure acceptance plan
 
-Status: proposed; specification only. This adds real terminal output-failure
-evidence during an active restore, complementing the accepted compositional
-worker/lifecycle shutdown test.
+Status: accepted. The focused Linux PTY case, full assurance gate, and Duvet
+Pages deployment passed in [run 41886697516](https://github.com/ajrudzitis/duplinaut/actions/runs/41886697516).
+This adds real terminal output-failure evidence during an active restore,
+complementing the accepted compositional worker/lifecycle shutdown test.
 
 ## Goal and scope
 
@@ -107,10 +108,10 @@ made about cancellation during an active filesystem syscall.
 
 ## Checklist
 
-- [ ] Trigger a real stdout PTY output failure while Execute is active, with
+- [x] Trigger a real stdout PTY output failure while Execute is active, with
       q-triggered cancellation on the separate live input PTY.
-- [ ] Assert exact token, typed outcome retention, controlled teardown,
+- [x] Assert exact token, typed outcome retention, controlled teardown,
       fallback reporting, worker join, and filesystem/source invariants.
-- [ ] Focused/full Linux tests, Duvet trace, formatting and strict Clippy pass;
+- [x] Focused/full Linux tests, Duvet trace, formatting and strict Clippy pass;
       hosted Linux assurance and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped evidence.
+- [x] Independent implementation review accepts the scoped evidence.
