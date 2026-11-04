@@ -1,6 +1,9 @@
 # Encrypted reader official snapshot-oracle acceptance plan
 
-Status: proposed; no implementation or backlog status changes are included.
+Status: locally implemented; focused/full core tests, targeted Duvet queries,
+full trace, formatting, strict Clippy, diff checks, local `cargo xtask ci`, and
+independent review pass. Hosted assurance remains pending; the backlog is
+unchecked.
 
 The existing encrypted-reader source-oracle test checks snapshot entry count
 and regular-file paths/content hashes. This acceptance extends it to compare
@@ -53,16 +56,34 @@ complete controller proof.
 
 ## Verification and evidence
 
-- Run the focused encrypted-reader oracle test and the complete
-  `cargo test -p duplicity-core` suite using checked-in fixtures only.
-- Run the targeted Duvet checks for PARSE-ENV-024, PARSE-STATE-001, and
-  PARSE-STATE-003, then `cargo xtask trace-update` and `cargo xtask trace`.
-- Run formatting and strict core Clippy checks, followed by required assurance
-  CI (`cargo xtask ci`). Record hosted Linux CI evidence before marking this
+### Current local evidence
+
+- `original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidence`
+  compares all three fixture profiles and all three recorded dates. For each
+  snapshot it requires equal entry counts, an exact raw component-vector path
+  sequence, oracle order, kind and mode, and checked file/directory timestamps.
+  It requires every file's retained content, exact byte length and SHA-256, and
+  every symlink's exact target bytes. The test makes no assertion about symlink
+  mtime because `expected.json` lists `symlink_mtime_ns` in
+  `official_comparison_exclusions`; `tests/producer/generate.py` documents that
+  Duplicity 3.0.7 skips symlink `utime`.
+- The focused test passed across all nine profile/date combinations. Full
+  `cargo test -p duplicity-core` passed, including 195 unit tests and all
+  integration and doc tests. Targeted Duvet test queries for PARSE-ENV-024,
+  PARSE-STATE-001, and PARSE-STATE-003 passed, as did `cargo xtask trace-update`
+  and `cargo xtask trace`.
+- `cargo fmt --all -- --check`,
+  `cargo clippy -p duplicity-core --all-targets -- -D warnings`, and
+  `git diff --check` passed. Independent review and local `cargo xtask ci`
+  passed; hosted assurance remains pending.
+
+- Focused/full core tests, targeted Duvet checks, full trace, formatting, strict
+  Clippy, diff checks, and local assurance CI (`cargo xtask ci`) passed using
+  checked-in fixtures only. Record hosted Linux CI evidence before marking this
   acceptance complete.
-- Independent review MUST check path-component preservation, exact timestamp
-  conversion, entry-kind mapping, and that every expected entry participates in
-  the comparison for every profile/date pair.
+- Independent review verified path-component preservation, exact timestamp
+  conversion, entry-kind mapping, and participation of every expected entry for
+  every profile/date pair.
 - The result establishes oracle agreement for the enumerated fields in the
   public encrypted reader. It does not prove upstream crypto primitives,
   complete reader/controller refinement, or filesystem publication.

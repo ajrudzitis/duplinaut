@@ -292,6 +292,18 @@ impl ObjectSource for FixtureSource {
         Ok(Box::new(Cursor::new(bytes.clone())))
     }
 }
+fn decode_hex_bytes(hex: &str) -> Vec<u8> {
+    assert_eq!(hex.len() % 2, 0, "hex oracle values have whole bytes");
+    let (pairs, remainder) = hex.as_bytes().as_chunks::<2>();
+    assert!(remainder.is_empty());
+    pairs
+        .iter()
+        .map(|pair| {
+            let pair = std::str::from_utf8(pair).unwrap();
+            u8::from_str_radix(pair, 16).expect("oracle contains valid hex")
+        })
+        .collect()
+}
 #[test]
 //= docs/parsing-requirements.md#parse-env-017
 //= type=test
@@ -311,6 +323,14 @@ impl ObjectSource for FixtureSource {
 //= docs/parsing-requirements.md#parse-env-024
 //= type=test
 //# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+
+//= docs/parsing-requirements.md#parse-state-001
+//= type=test
+//# Snapshot interpretation MUST apply additions, replacement content, deltas, deletions, and file-type changes in chain order to the selected backup-relative path state.
+
+//= docs/parsing-requirements.md#parse-state-003
+//= type=test
+//# `SnapshotState::entries()` MUST enumerate retained entries in bytewise lexicographic order of their backup-relative path components. Each component MUST be compared as an unsigned byte sequence using lexicographic byte order, with a proper prefix ordered before the longer sequence. Paths MUST be compared as sequences of components using the same lexicographic rule, with a proper component-sequence prefix ordered before the longer path. Component boundaries MUST remain significant; the ordering MUST NOT be derived by comparing slash-joined or rendered path strings.
 //= docs/parsing-requirements.md#parse-env-021
 //= type=test
 //# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
@@ -414,36 +434,86 @@ fn original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidenc
                 .as_array()
                 .unwrap();
             assert_eq!(snapshot.state().len(), expected.len(), "{mode}/{day}");
-            let expected_files: std::collections::BTreeMap<_, _> = expected
+            let mut expected_by_path = std::collections::BTreeMap::new();
+            for expected_entry in expected {
+                let components = expected_entry["components_hex"]
+                    .as_array()
+                    .expect("oracle path components")
+                    .iter()
+                    .map(|component| decode_hex_bytes(component.as_str().unwrap()))
+                    .collect::<Vec<_>>();
+                assert!(
+                    expected_by_path
+                        .insert(components, expected_entry)
+                        .is_none(),
+                    "oracle contains each raw component path once ({mode}/{day})"
+                );
+            }
+            let actual_entries = snapshot.state().entries().collect::<Vec<_>>();
+            let actual_paths = actual_entries
                 .iter()
-                .filter(|entry| entry["kind"] == "file")
-                .map(|entry| {
-                    (
-                        entry["path_hex"].as_str().unwrap().to_owned(),
-                        entry["sha256"].as_str().unwrap().to_owned(),
-                    )
-                })
-                .collect();
-            let actual_files: std::collections::BTreeMap<_, _> = snapshot
-                .state()
-                .entries()
-                .filter_map(|(path, entry)| {
-                    let content = entry.content()?;
-                    let raw = path
-                        .components()
-                        .iter()
-                        .map(|part| part.as_slice())
-                        .collect::<Vec<_>>()
-                        .join(&b'/');
-                    Some((
-                        raw.iter()
-                            .map(|byte| format!("{byte:02x}"))
-                            .collect::<String>(),
-                        format!("{:x}", Sha256::digest(content)),
-                    ))
-                })
-                .collect();
-            assert_eq!(actual_files, expected_files, "{mode}/{day} source oracle");
+                .map(|(path, _)| path.components().clone())
+                .collect::<Vec<_>>();
+            let expected_sorted_paths = expected_by_path.keys().cloned().collect::<Vec<_>>();
+            assert_eq!(
+                actual_paths, expected_sorted_paths,
+                "all raw component paths match and iterate in oracle bytewise order ({mode}/{day})"
+            );
+            for (path, entry) in actual_entries {
+                let expected_entry = expected_by_path
+                    .get(path.components())
+                    .expect("every retained snapshot entry has an oracle entry");
+                let expected_kind = match expected_entry["kind"].as_str().unwrap() {
+                    "file" => duplicity_core::tar::EntryType::Regular,
+                    "directory" => duplicity_core::tar::EntryType::Directory,
+                    "symlink" => duplicity_core::tar::EntryType::Symlink,
+                    other => panic!("unexpected oracle entry kind {other}"),
+                };
+                assert_eq!(entry.entry_type(), expected_kind, "{mode}/{day} kind");
+                assert_eq!(
+                    entry.mode(),
+                    u32::try_from(expected_entry["mode"].as_u64().unwrap()).unwrap(),
+                    "{mode}/{day} mode"
+                );
+                if expected_kind != duplicity_core::tar::EntryType::Symlink {
+                    let mtime_ns = expected_entry["mtime_ns"]
+                        .as_i64()
+                        .expect("oracle mtime_ns fits checked signed i64");
+                    assert_eq!(
+                        entry.mtime(),
+                        duplicity_core::tar::TarTime {
+                            seconds: mtime_ns.div_euclid(1_000_000_000),
+                            nanoseconds: u32::try_from(mtime_ns.rem_euclid(1_000_000_000)).unwrap(),
+                        },
+                        "{mode}/{day} mtime for raw components {:?}",
+                        path.components()
+                    );
+                }
+                match expected_kind {
+                    duplicity_core::tar::EntryType::Regular => {
+                        let content = entry
+                            .content()
+                            .expect("every oracle file has retained content");
+                        assert_eq!(
+                            content.len() as u64,
+                            expected_entry["size"].as_u64().unwrap(),
+                            "{mode}/{day} file size"
+                        );
+                        assert_eq!(
+                            format!("{:x}", Sha256::digest(content)),
+                            expected_entry["sha256"].as_str().unwrap(),
+                            "{mode}/{day} file SHA-256"
+                        );
+                    }
+                    duplicity_core::tar::EntryType::Symlink => assert_eq!(
+                        entry.linkname(),
+                        decode_hex_bytes(expected_entry["symlink_target_hex"].as_str().unwrap()),
+                        "{mode}/{day} symlink target"
+                    ),
+                    duplicity_core::tar::EntryType::Directory => {}
+                    other => panic!("unsupported oracle entry kind {other:?}"),
+                }
+            }
             let evidence = snapshot.authentication_evidence();
             assert!(!evidence.objects().is_empty());
             let policy = evidence.policy().expect("recorded per-read policy");
