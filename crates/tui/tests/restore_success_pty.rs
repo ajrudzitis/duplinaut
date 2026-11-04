@@ -261,6 +261,42 @@ fn wait_screen(
     }
 }
 
+fn wait_preview_and_observe_initial_unarmed_ack(
+    master: &File,
+    child: &mut ChildGuard,
+    output: &mut Vec<u8>,
+    parser: &mut vt100::Parser,
+    expected: impl Fn(&str) -> bool,
+) -> bool {
+    let deadline = Instant::now() + PHASE_TIMEOUT;
+    let mut saw_empty_unarmed = false;
+    loop {
+        let previous = output.len();
+        pump(master, output, 100);
+        // Process bytes incrementally so a ready redraw in the same PTY read
+        // cannot hide the earlier rendered empty/unarmed preview state.
+        let mut saw_ready = false;
+        for byte in &output[previous..] {
+            parser.process(std::slice::from_ref(byte));
+            let screen = parser.screen().contents();
+            saw_empty_unarmed |= screen.contains("Acknowledgment [] unarmed");
+            saw_ready |= expected(&screen);
+        }
+        if saw_ready {
+            return saw_empty_unarmed;
+        }
+        let screen = parser.screen().contents();
+        assert!(
+            child.0.try_wait().unwrap().is_none(),
+            "production TUI exited before executable preview was ready; screen:\n{screen}"
+        );
+        assert!(
+            Instant::now() < deadline,
+            "timed out waiting for ready executable preview; initial empty/unarmed acknowledgment observed={saw_empty_unarmed}; screen:\n{screen}"
+        );
+    }
+}
+
 fn wait_exit(master: &File, child: &mut ChildGuard, output: &mut Vec<u8>) -> Option<ExitStatus> {
     let deadline = Instant::now() + PHASE_TIMEOUT;
     loop {
@@ -522,13 +558,11 @@ fn production_linux_tui_publishes_official_plain_snapshot_through_pty() {
     );
     write(&master, b"r").expect("request executable restore preview");
     let parent_text = destination_parent.display().to_string();
-    wait_screen(
+    let saw_empty_unarmed = wait_preview_and_observe_initial_unarmed_ack(
         &master,
         &mut child,
         &mut output,
         &mut parser,
-        "concrete executable preview",
-        PHASE_TIMEOUT,
         |screen| {
             screen.contains("Snapshot target: 1700172800")
                 && screen.contains("Scope: whole snapshot (no marks)")
@@ -546,9 +580,7 @@ fn production_linux_tui_publishes_official_plain_snapshot_through_pty() {
         },
     );
     assert!(
-        output
-            .windows(b"Acknowledgment [] unarmed".len())
-            .any(|window| window == b"Acknowledgment [] unarmed"),
+        saw_empty_unarmed,
         "the preview first rendered with an empty, unarmed acknowledgment"
     );
     write(&master, b"\x1b[B").expect("scroll preview toward its end");
