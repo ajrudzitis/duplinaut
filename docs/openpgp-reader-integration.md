@@ -222,9 +222,10 @@ control explicit confirmation, staging, cancellation and uncertain publication.
       same chain-wide signer policy.
 - [x] Locally test an official signed full set followed by symmetric-encrypted
       incremental sets under the same signer policy. The reader returns exact
-      `Unsigned` at the first incremental manifest after opening only the signed
-      full manifest and volume; no snapshot or evidence is returned. Independent
-      review and hosted assurance remain pending; see the
+      `Unsigned` when the third open reaches the first incremental manifest, after
+      successfully opening the signed full manifest and volume; no snapshot or
+      evidence is returned. Independent review and hosted assurance remain
+      pending; see the
       [ENV-019 acceptance plan](parse-env-019-unsigned-openpgp-incremental-acceptance.md).
 - [ ] Test unsigned encrypted data-volume cases, irrelevant catalog artifacts,
       and other mixed-envelope chain transitions.
