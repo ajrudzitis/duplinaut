@@ -1,6 +1,8 @@
 # Unused OpenPGP signature archive acceptance plan
 
-Status: proposed; no implementation or backlog status changes are included.
+Status: implementation, local verification, independent review, and
+`cargo xtask ci` are complete. Required hosted Linux assurance remains pending;
+the backlog item stays open until assurance passes.
 
 This local reader-integration test checks one bounded catalog behavior: a
 malformed OpenPGP signature archive that is not required to reconstruct the
@@ -57,6 +59,25 @@ requirement.
   signer fingerprint match the official signed-chain positive control, and
   the open count includes all required objects but excludes the auxiliary
   archive.
+
+## Current local evidence
+
+- The focused regression passes. It replaces only the in-memory full-signatures
+  archive with same-length `0xff` bytes, leaves its key and size unchanged, and
+  recomputes its ETag from the replacement bytes before discovery.
+- The official signed chain succeeds with the existing fixture recipient key,
+  key password, signer certificate, exact permitted primary fingerprint, and
+  signature-required policy. The snapshot has exactly six `OpenPgpAuthorized`
+  records for the exact three manifests and three data volumes, each naming
+  the permitted primary fingerprint, and the source has exactly six opens.
+  The malformed auxiliary archive is not opened.
+- `cargo test -p duplicity-core` passes. The targeted Duvet query for ENV-019
+  and ENV-024, `cargo xtask trace-update`, `cargo xtask trace`,
+  `cargo fmt --all -- --check`,
+  `cargo clippy -p duplicity-core --all-targets -- -D warnings`, and
+  `git diff --check` pass locally. Independent review and `cargo xtask ci` also
+  pass; hosted Linux assurance remains pending. This result covers only the
+  named unused archive and policy.
 
 ## Scope limits
 

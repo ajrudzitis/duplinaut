@@ -144,6 +144,27 @@ impl FixtureSource {
             open_behavior: None,
         }
     }
+    fn signed_with_malformed_unused_full_signatures() -> Self {
+        let mut source = Self::new("signed", None);
+        let (object, bytes) = source
+            .values
+            .iter_mut()
+            .find(|(object, _)| {
+                object
+                    .key
+                    .ends_with("duplicity-full-signatures.20231114T221320Z.sigtar.gpg")
+            })
+            .expect("official signed full-signatures archive");
+        let original_size = bytes.len();
+        bytes.fill(0xff);
+        assert_eq!(bytes.len(), original_size, "archive mutation keeps size");
+        assert_eq!(
+            object.size, original_size as u64,
+            "catalog size is unchanged"
+        );
+        object.identity.etag = Some(format!("{:x}", Sha256::digest(bytes)));
+        source
+    }
 }
 impl ObjectSource for FixtureSource {
     fn list(
@@ -444,6 +465,95 @@ fn original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidenc
                 .all(|index| *index < evidence.certificates().len())));
         }
     }
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-019
+//= type=test
+//# A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+/// This covers only the unused official full-signatures archive, not all
+/// irrelevant catalog artifacts or signer-policy combinations.
+fn malformed_unused_full_signatures_archive_does_not_affect_authorized_snapshot() {
+    let source = FixtureSource::signed_with_malformed_unused_full_signatures();
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .expect("official signed full manifest remains discoverable")
+        .0;
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/test-keys");
+    let public = std::fs::read(root.join("public.asc")).unwrap();
+    let secret = std::fs::read(root.join("secret.asc")).unwrap();
+    let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+    let secret_exports = [SecretExport {
+        bytes: &secret,
+        password: Some(&password),
+    }];
+    let signer_exports = [public.as_slice()];
+    let fingerprint = [
+        0xd0, 0x68, 0x47, 0xba, 0xc3, 0xb1, 0x17, 0xc4, 0x6b, 0xb6, 0x8b, 0xda, 0x6f, 0x23, 0x17,
+        0x3b, 0xad, 0x8a, 0x76, 0x56,
+    ];
+    let permitted_signers = [fingerprint];
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &permitted_signers,
+            require_signature: true,
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    let snapshot = catalog
+        .read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1700172800),
+            &Cancellation::default(),
+            &context,
+        )
+        .expect("unused malformed signature archive must not affect signed chain");
+    assert!(!snapshot.state().is_empty());
+    let evidence = snapshot.authentication_evidence();
+    assert_eq!(evidence.objects().len(), 6);
+    let expected_keys = [
+        "backup/duplicity-full.20231114T221320Z.manifest.gpg",
+        "backup/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest.gpg",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gpg",
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest.gpg",
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gpg",
+    ];
+    let actual_keys = evidence
+        .objects()
+        .iter()
+        .map(|record| record.key.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        actual_keys,
+        expected_keys.into_iter().collect(),
+        "evidence records correspond exactly to required manifests and volumes"
+    );
+    assert!(evidence.objects().iter().all(|record| {
+        record.kind == duplicity_core::reader::AuthenticationKind::OpenPgpAuthorized
+            && record
+                .authorized_signer
+                .as_ref()
+                .is_some_and(|signer| signer.primary_fingerprint == fingerprint)
+    }));
+    assert_eq!(source.opens.load(Ordering::SeqCst), 6);
 }
 
 #[test]
