@@ -56,6 +56,16 @@ review and full macOS CI pass. The
 [resize acceptance plan](../../docs/tui-resize-pty-acceptance.md) records the
 explicit child `SIGWINCH` stimulus; automatic foreground-group signal delivery,
 resize storms and executable-preview wrapping remain outside this case.
+Two source-injected PTY cases drive the production browser's `q` and Esc scan
+cancellation paths while a test wrapper holds an identity-checked local volume
+open. They observe cancellation of that exact scan token, the visible waiting
+state before releasing the worker, the combined validation/cancellation result,
+and controlled browser return after its worker join. Focused macOS tests, independent review and full macOS CI pass. The default CLI target has seven
+parent tests and one ignored internal driver, which both cancellation parents
+explicitly execute in separate processes. The
+[scan-cancellation plan](../../docs/tui-scan-cancel-pty-acceptance.md) distinguishes
+these source-injected browser cases from the actual CLI-binary PTY tests and
+leaves active filesystem-restoration cancellation outside their scope.
 An additional terminal run marked `a/b/child.txt` and previewed exactly four
 entries: the file and its three source directory ancestors. Independent source
 review accepted the read-only flow after fixing confirmation reset on an invalid
@@ -78,6 +88,7 @@ anchor choice.
 - [x] Add a Unix PTY acceptance test for local fixture history: wait for a rendered manifest row, send `q`, require successful exit, compare raw terminal attributes before/during/after, verify alternate-screen teardown, and confirm the source fingerprint and empty working directory are unchanged. This does not cover preview, acknowledgment, restoration, cancellation, resize, terminal failure or S3.
 - [x] Complete the official-chain read-only PTY acceptance case: actual anchor/target/scan-confirmation keys, oracle-derived final snapshot count/payload, visible escaped non-UTF-8 path, whole `p` count and marked `a/b/child.txt` four-entry `p` count, restored terminal state and unchanged final source contents/empty working directory. Independent review and full macOS CI pass. Executable preview, acknowledgment, publication, cancellation, resize, terminal failure and S3 remain outside this case.
 - [x] Complete Unix PTY shrink/expand acceptance: actual OS window-size updates and explicit child `SIGWINCH`, fresh 18x96 and 40x240 frames, retained marked child/four-entry preview, then Space unmarks that same child and `p` reports the oracle's whole-snapshot count. Independent review and full macOS CI pass. Terminal restoration and final source-content/empty-working-directory checks remain included; automatic signal delivery, tiny dimensions, resize storms and executable-preview wrapping remain open.
+- [x] Complete deterministic production-browser read-only scan cancellation for `q` and Esc in isolated PTYs: initially uncancelled exact scan token, held-worker cancellation/waiting observation, explicit gate release and combined error result, browser-return marker after join, terminal restoration and final source-content/empty-working-directory checks. Both focused macOS parent cases, independent review and full macOS CI pass. The ignored internal child driver has no separate Duvet/gate claim; active restoration, cancellation latency and real blocking-call interruption remain open.
 - [x] Test one-shot RESTORE-UI-004 confirmation: the first Press Enter consumes and clears the armed acknowledgment, and a second Enter cannot confirm again; independent review and full macOS CI passed. This exercises the pure confirmation helper only; it does not test worker execution.
 - [x] Verify on macOS that ordinary local and S3 CLI configurations parse without a restore destination while native restore flags remain rejected; independent review and full CI passed. This is CLI parsing coverage only.
 - [x] Connect explicitly acknowledged selection to native Linux publication; use the existing SDK credential provider.

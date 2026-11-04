@@ -1,7 +1,7 @@
 # Read-only scan cancellation PTY acceptance plan
 
-Status: independently reviewed and adopted before implementation; implementation
-and execution are pending.
+Status: independently reviewed and adopted before implementation. Implementation,
+independent review, focused macOS tests and full macOS CI pass.
 
 This adds two deterministic read-only scan-cancellation cases through the
 production browser event loop and native terminal lifecycle. It supplies scoped
@@ -138,3 +138,19 @@ This case does not cover active restoration, publication outcomes or races,
 preview acknowledgment, arbitrary channel/terminal/output faults, discovery
 cancellation, live S3, encrypted credentials or formal browser controller
 obligations.
+
+## Accepted evidence
+
+The plan was adopted at `901d1ae` before implementation. The parent tests and
+ignored driver were independently reviewed and rerun on macOS; full CI passed at
+the implementation commit. On 2026-11-03, unfiltered `cargo xtask ci` passed on
+aarch64 macOS at `SOURCECOMMIT`, source SHA-256
+`fa22169e395a2a5095ae6f6d1678939b554f3091a224f82194ca14e35d5ab4e0`.
+Fresh isolated verification reported 2,047 vstd, 3,183 Vest and 1,274 core
+obligations with zero errors. Duvet, formatting, strict Clippy, all workspace
+tests/doctests and exact named-test replay passed. The CLI target ran seven
+default tests and one ignored internal driver; both parent cancellation tests
+each explicitly ran a separate configured helper process. The ignored helper is
+not independently counted as passing coverage. This evidence covers scan
+cancellation in the source-injected production browser, not filesystem-restore
+cancellation or frontend controller proofs.
