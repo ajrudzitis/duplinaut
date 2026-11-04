@@ -1,7 +1,7 @@
 # PARSE-ENV-015 trusted-boundary evidence acceptance plan
 
-Status: implementation and full core verification complete; independent review
-and hosted assurance CI remain pending.
+Status: implementation, independent review, and full core verification pass;
+hosted assurance CI remains pending.
 
 This is a bounded traceability slice for
 [PARSE-ENV-015](parsing-requirements.md#parse-env-015). The module trust-boundary
@@ -59,7 +59,8 @@ scoped Duvet links. No AWS access or new parser behavior is required.
   targeted PARSE-ENV-015 Duvet query, `cargo xtask trace`, formatting checks,
   and strict core Clippy pass. Clippy emits existing warnings in vendored
   `vest_lib`, while `duplicity-core` passes `-D warnings`. Independent review
-  and hosted assurance CI remain pending.
+  confirms the lockfile/archive identity and scoped trust limits; hosted
+  assurance CI remains pending.
 
 ## Non-goals
 
