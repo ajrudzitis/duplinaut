@@ -133,9 +133,20 @@ fn summarize(plan: &RestorePlan<'_>) -> Result<Summary, Error> {
         empty_root_policy: plan.entries().is_empty(),
     })
 }
+//= docs/parsing-requirements.md#restore-ui-011
+//= type=implementation
+//# The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
 pub fn copy_roots(
     snapshot: &ValidatedSnapshot,
     marked: &[usize],
+) -> Result<Vec<BackupPath>, Error> {
+    copy_roots_with_limit(snapshot, marked, ROOT_BYTES)
+}
+
+fn copy_roots_with_limit(
+    snapshot: &ValidatedSnapshot,
+    marked: &[usize],
+    byte_limit: usize,
 ) -> Result<Vec<BackupPath>, Error> {
     if marked.len() > ROOTS || !within_comparison_budget(snapshot.state().len(), marked.len()) {
         return Err(Error::Limit);
@@ -149,17 +160,23 @@ pub fn copy_roots(
         .ok_or(Error::Limit)?;
     for (i, (path, _)) in snapshot.state().entries().enumerate() {
         if marked.contains(&i) {
-            charge = path
+            let component_vector_bytes = path
+                .components()
+                .capacity()
+                .checked_mul(std::mem::size_of::<Vec<u8>>())
+                .ok_or(Error::Limit)?;
+            let component_byte_capacity = path
                 .components()
                 .iter()
-                .try_fold(charge, |n, p| {
-                    n.checked_add(p.capacity())
-                        .and_then(|n| n.checked_add(std::mem::size_of::<Vec<u8>>()))
-                })
+                .try_fold(0usize, |n, component| n.checked_add(component.capacity()))
+                .ok_or(Error::Limit)?;
+            charge = charge
+                .checked_add(component_vector_bytes)
+                .and_then(|n| n.checked_add(component_byte_capacity))
                 .ok_or(Error::Limit)?;
         }
     }
-    if charge > ROOT_BYTES {
+    if charge > byte_limit {
         return Err(Error::Limit);
     }
     let mut roots = Vec::new();
@@ -445,6 +462,97 @@ mod tests {
         assert!(matches!(text.push("x"), Err(Error::Limit)));
         assert_eq!(text.value.len(), PREVIEW_BYTES);
         assert!(text.value.bytes().all(|byte| byte == b'x'));
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-002
+    //= type=test
+    //# The frontend MUST derive a restoration preview from the exact completed immutable snapshot and selected original byte-valued roots, including precisely the entries and source directory ancestors accepted by its `RestorePlan`.
+    //= docs/parsing-requirements.md#restore-ui-011
+    //= type=test
+    //# The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
+    fn selected_root_copy_admits_exact_owned_capacity_charge() {
+        use duplicity_core::{
+            chain::SetKind,
+            local::LocalSource,
+            names::{NameConfig, Timestamp},
+            reader::{Catalog, ReaderLimits},
+            source::Cancellation,
+        };
+        use std::{mem::size_of, path::PathBuf};
+
+        let source = LocalSource::new(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/duplicity-3.0.7/plain"),
+        )
+        .unwrap();
+        let cancel = Cancellation::default();
+        let catalog = Catalog::discover(
+            &source,
+            "duplicity-",
+            NameConfig::default(),
+            ReaderLimits::default(),
+            &cancel,
+        )
+        .unwrap();
+        let anchor = catalog
+            .manifests()
+            .find(|(_, _, set)| {
+                set.kind() == SetKind::Full
+                    && set.start() == Timestamp(1700000000)
+                    && set.end() == Timestamp(1700000000)
+            })
+            .unwrap()
+            .0;
+        let snapshot = catalog
+            .read_snapshot(anchor, Timestamp(1700172800), &cancel)
+            .unwrap();
+        let expected_components = vec![b"raw-\xff.bin".to_vec()];
+        let (index, (selected_path, _)) = snapshot
+            .state()
+            .entries()
+            .enumerate()
+            .find(|(_, (path, _))| path.components() == &expected_components)
+            .expect("official snapshot contains the raw-0xff root");
+        let marked = [index];
+
+        // Independently charge root-vector element storage, the selected
+        // BackupPath component-vector capacity, and every owned byte-vector
+        // capacity that the subsequent clone must retain.
+        let mut expected_charge = marked.len().checked_mul(size_of::<BackupPath>()).unwrap();
+        let component_vectors = selected_path
+            .components()
+            .capacity()
+            .checked_mul(size_of::<Vec<u8>>())
+            .unwrap();
+        let component_bytes = selected_path
+            .components()
+            .iter()
+            .try_fold(0usize, |sum, component| {
+                sum.checked_add(component.capacity())
+            })
+            .unwrap();
+        expected_charge = expected_charge
+            .checked_add(component_vectors)
+            .and_then(|sum| sum.checked_add(component_bytes))
+            .unwrap();
+        assert!(expected_charge > 1);
+
+        assert_eq!(ROOT_BYTES, 4 * 1024 * 1024);
+        let production_roots = copy_roots(&snapshot, &marked).unwrap();
+        assert_eq!(production_roots.len(), 1);
+        assert_eq!(
+            production_roots[0].components(),
+            expected_components.as_slice()
+        );
+
+        let exact_roots = copy_roots_with_limit(&snapshot, &marked, expected_charge).unwrap();
+        assert_eq!(exact_roots.len(), 1);
+        assert_eq!(exact_roots[0].components(), expected_components.as_slice());
+        assert!(matches!(
+            copy_roots_with_limit(&snapshot, &marked, expected_charge - 1),
+            Err(Error::Limit)
+        ));
     }
 }
 #[cfg(target_os = "linux")]
