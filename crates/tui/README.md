@@ -70,9 +70,9 @@ The output-failure case uses separate input/output PTYs and a gated read-only
 scan. It closes only the output master, then sends an explicit resize event to
 force a production redraw failure; the helper checks the structured event and
 teardown faults, waits for worker shutdown, and the parent verifies input raw
-mode restoration and unchanged fixture contents. Its focused macOS test passes
-and independent review is complete; the Duvet trace passes. Linux execution and
-full assurance CI remain pending. This covers the controlled resize-triggered redraw
+mode restoration and unchanged fixture contents. Its focused macOS test, Duvet
+trace, and full macOS assurance CI pass, and independent review is complete;
+hosted Linux assurance CI remains pending. This covers the controlled resize-triggered redraw
 failure only, not close-only failures, active restoration failure, alternate
 screen restoration through failed output, or live S3. See the
 [output-failure acceptance plan](../../docs/tui-output-failure-pty-acceptance.md).

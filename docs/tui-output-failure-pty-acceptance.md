@@ -1,8 +1,12 @@
 # PTY output failure acceptance plan
 
 Status: implementation and independent review are complete. The focused
-macOS PTY acceptance test and Duvet trace pass. Linux execution and full
-assurance CI evidence remain pending before this milestone is accepted.
+macOS PTY acceptance test, Duvet trace, and full macOS assurance CI pass.
+Hosted Linux assurance CI remains pending before this milestone is accepted.
+
+Local full-CI receipt: source SHA-256
+`d5b4e7031b851f113055f0628d2be885a282671a31db88f6b3f930b38a22d422`;
+fresh Verus/Vest/core proof counts were 2,047/3,183/1,274 with zero errors.
 
 This records one controlled terminal output failure while a read-only scan is
 active. It exercises the production browser and terminal lifecycle for
