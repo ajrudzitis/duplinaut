@@ -290,14 +290,12 @@ impl Worker {
         while let Ok(reply) = self.replies.recv() {
             observe(reply);
         }
-        self.handle
-            .join()
-            .map_err(|_| io::Error::other("worker outcome unavailable; inspection required"))?;
+        let joined = self.handle.join();
         #[cfg(test)]
         if let Some(observer) = self.join_observer.take() {
             let _ = observer.send(());
         }
-        Ok(())
+        joined.map_err(|_| io::Error::other("worker outcome unavailable; inspection required"))
     }
 }
 
@@ -933,5 +931,258 @@ mod tests {
                 if error.cause == Cause::Cancelled && error.uncertain_outer.is_none()
         ));
         assert!(cancellation.is_cancelled());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-007
+    //= type=test
+    //# The frontend MUST run plan preparation and filesystem restoration outside the terminal event/render loop, with an operation-specific cancellation token and explicit running/cancellation-requested states.
+    //= docs/parsing-requirements.md#restore-ui-008
+    //= type=test
+    //# The frontend MUST preserve the backend's published, unpublished and publication-indeterminate outcome distinction, including successful-publication precedence over racing cancellation and all reported cleanup warnings or uncertainty.
+    //= docs/parsing-requirements.md#restore-ui-009
+    //= type=test
+    //# The frontend MUST refrain from automatic retry, rollback, destination inspection-based outcome promotion or modifying cleanup after publication uncertainty or an unavailable worker outcome.
+    //= docs/parsing-requirements.md#restore-ui-010
+    //= type=test
+    //# The frontend MUST render destination, selected paths, staging/candidate names and diagnostics using reversible terminal-safe byte escaping, preserving complete backend identity and warning fields in the accessible final result.
+    //= docs/parsing-requirements.md#restore-ui-012
+    //= type=test
+    //# On a controlled terminal I/O failure or shutdown during active restoration, the frontend MUST request cancellation, close or signal its worker request path, attempt terminal-state restoration, drain and join the worker without bounded-channel deadlock, retain its typed result, and attempt escaped final-result reporting through an available non-raw output sink before controlled exit.
+    //= docs/parsing-requirements.md#restore-ui-014
+    //= type=test
+    //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+    // This synthetic worker deliberately panics before a final backend result;
+    // the test exercises frontend reporting only and never calls the native
+    // filesystem restore backend.
+    fn active_execute_worker_loss_reports_unavailable_with_escaped_destination() {
+        use duplicity_core::{
+            chain::SetKind,
+            local::LocalSource,
+            names::{NameConfig, Timestamp},
+            reader::{Catalog, ReaderLimits},
+            source::Cancellation,
+        };
+        use std::{ffi::OsString, os::unix::ffi::OsStringExt, path::PathBuf, time::Duration};
+
+        const OPERATION: u64 = 74;
+        const EVENT_ERROR: &str = "injected unavailable-result event-loop error";
+        const TEARDOWN_ERROR: &str = "injected unavailable-result teardown error";
+        const PHASE_TIMEOUT: Duration = Duration::from_secs(10);
+
+        let source = LocalSource::new(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/duplicity-3.0.7/plain"),
+        )
+        .unwrap();
+        let cancellation = Cancellation::default();
+        let catalog = Catalog::discover(
+            &source,
+            "duplicity-",
+            NameConfig::default(),
+            ReaderLimits::default(),
+            &cancellation,
+        )
+        .unwrap();
+        let anchor = catalog
+            .manifests()
+            .find(|(_, _, set)| {
+                set.kind() == SetKind::Full
+                    && set.start() == Timestamp(1700000000)
+                    && set.end() == Timestamp(1700000000)
+            })
+            .unwrap()
+            .0;
+        let snapshot = Arc::new(
+            catalog
+                .read_snapshot(anchor, Timestamp(1700172800), &cancellation)
+                .unwrap(),
+        );
+        let destination = Arc::new(crate::cli::Destination {
+            parent: PathBuf::from(OsString::from_vec(
+                b"/tmp/duplinaut-parent-\x1b\x01\xff".to_vec(),
+            )),
+            name: b"leaf-\x1b\x02\xfe".to_vec(),
+        });
+        let frozen =
+            restore_flow::prepare(snapshot, Vec::new(), destination.clone(), &cancellation)
+                .unwrap()
+                .frozen;
+
+        let (requests, inbox) = mpsc::sync_channel::<Command>(1);
+        let (responses, replies) = mpsc::sync_channel::<Reply>(1);
+        let (execute_entered_tx, execute_entered_rx) = mpsc::sync_channel::<u64>(1);
+        let (event_error_tx, event_error_rx) = mpsc::sync_channel::<()>(1);
+        let (close_observed_tx, close_observed_rx) = mpsc::sync_channel::<(bool, bool)>(1);
+        let (release_tx, release_rx) = mpsc::sync_channel::<u64>(1);
+        let (driver_panics_tx, driver_panics_rx) = mpsc::sync_channel::<u64>(1);
+        let (join_returned_tx, join_returned_rx) = mpsc::sync_channel::<()>(1);
+        let handle = std::thread::spawn(move || {
+            let command = inbox.recv().expect("one Execute request arrives");
+            let (id, execute_cancel) = match command {
+                Command::Execute { id, frozen, cancel } => {
+                    drop(frozen);
+                    (id, cancel)
+                }
+                _ => panic!("test worker expected only the Execute command"),
+            };
+            assert_eq!(id, OPERATION);
+            assert!(!execute_cancel.is_cancelled());
+            execute_entered_tx.send(id).unwrap();
+
+            // The held synthetic worker does not call the native backend.
+            assert_eq!(release_rx.recv_timeout(PHASE_TIMEOUT).unwrap(), OPERATION);
+            assert!(execute_cancel.is_cancelled());
+            assert!(matches!(
+                inbox.try_recv(),
+                Err(mpsc::TryRecvError::Disconnected)
+            ));
+            drop(responses);
+            driver_panics_tx.send(id).unwrap();
+            panic!("injected worker loss before final backend result");
+        });
+        let mut worker = Worker {
+            requests: Some(requests),
+            replies,
+            handle,
+            active: None,
+            last: 0,
+            close_observer: Some(close_observed_tx),
+            join_observer: Some(join_returned_tx),
+        };
+        worker
+            .send(Command::Execute {
+                id: OPERATION,
+                frozen,
+                cancel: cancellation.clone(),
+            })
+            .unwrap();
+        assert_eq!(worker.active, Some(OPERATION));
+        assert_eq!(worker.last, OPERATION);
+
+        struct InjectedLifecycle {
+            cancellation: Cancellation,
+            close_observed: mpsc::Receiver<(bool, bool)>,
+            event_error: mpsc::Receiver<()>,
+            restored: bool,
+        }
+        impl crate::terminal::Lifecycle for InjectedLifecycle {
+            type Terminal = ();
+            fn initialize(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+            fn restore(&mut self) -> io::Result<()> {
+                self.event_error
+                    .try_recv()
+                    .expect("event-loop failure precedes lifecycle restoration");
+                assert_eq!(
+                    self.close_observed.recv_timeout(PHASE_TIMEOUT).unwrap(),
+                    (true, true)
+                );
+                assert!(self.cancellation.is_cancelled());
+                self.restored = true;
+                Err(io::Error::other(TEARDOWN_ERROR))
+            }
+        }
+        let mut lifecycle = InjectedLifecycle {
+            cancellation: cancellation.clone(),
+            close_observed: close_observed_rx,
+            event_error: event_error_rx,
+            restored: false,
+        };
+        let mut lifecycle_cancellation = cancellation.clone();
+        let completion = crate::terminal::interact(
+            &mut worker,
+            &mut lifecycle_cancellation,
+            &mut lifecycle,
+            |_, _, _| {
+                assert_eq!(
+                    execute_entered_rx.recv_timeout(PHASE_TIMEOUT).unwrap(),
+                    OPERATION
+                );
+                event_error_tx.send(()).unwrap();
+                Err(io::Error::other(EVENT_ERROR))
+            },
+        );
+        assert_eq!(completion.event.as_ref().unwrap().to_string(), EVENT_ERROR);
+        assert_eq!(
+            completion.teardown.as_ref().unwrap().to_string(),
+            TEARDOWN_ERROR
+        );
+        assert!(lifecycle.restored);
+        assert!(cancellation.is_cancelled());
+        assert!(worker.is_closed());
+
+        release_tx.send(OPERATION).unwrap();
+        let mut sink = Vec::new();
+        let error = finish(
+            worker,
+            &cancellation,
+            completion,
+            None,
+            Some(destination.clone()),
+            Some(OPERATION),
+            &mut sink,
+        )
+        .unwrap_err();
+        assert_eq!(
+            driver_panics_rx.recv_timeout(PHASE_TIMEOUT).unwrap(),
+            OPERATION
+        );
+        join_returned_rx
+            .recv_timeout(PHASE_TIMEOUT)
+            .expect("finish returned only after joining the panicked worker");
+        assert!(cancellation.is_cancelled());
+
+        let failure = error
+            .get_ref()
+            .and_then(|payload| payload.downcast_ref::<restore_flow::ShutdownFailure>())
+            .expect("finish retains the structured unavailable-result failure");
+        assert!(failure.outcome.is_none());
+        assert!(failure.unavailable);
+        assert!(failure.shutdown.is_some());
+        assert_eq!(failure.operation, Some(OPERATION));
+        assert!(Arc::ptr_eq(
+            failure.requested_destination.as_ref().unwrap(),
+            &destination
+        ));
+        assert_eq!(
+            failure
+                .requested_destination
+                .as_ref()
+                .unwrap()
+                .parent
+                .as_os_str()
+                .as_bytes(),
+            b"/tmp/duplinaut-parent-\x1b\x01\xff"
+        );
+        assert_eq!(
+            failure.requested_destination.as_ref().unwrap().name,
+            b"leaf-\x1b\x02\xfe"
+        );
+        assert_eq!(failure.terminal.as_ref().unwrap().to_string(), EVENT_ERROR);
+        assert_eq!(
+            failure.teardown.as_ref().unwrap().to_string(),
+            TEARDOWN_ERROR
+        );
+        assert!(
+            failure.output.is_none(),
+            "the in-memory fallback sink succeeded"
+        );
+
+        let report = std::str::from_utf8(&sink).unwrap();
+        assert!(report.contains("Restoration outcome unavailable; inspection required."));
+        assert!(report.contains("Operation Some(74)."));
+        assert!(report.contains("Requested parent: /tmp/duplinaut-parent-\\x1b\\x01\\xff"));
+        assert!(report.contains("Requested new leaf: leaf-\\x1b\\x02\\xfe"));
+        assert!(report.contains("No staging or publication absence is inferred."));
+        assert!(report.contains("No retry, recovery or modifying cleanup is authorized."));
+        assert!(
+            !sink.contains(&0x1b),
+            "raw ESC must not reach the report sink"
+        );
+        assert!(!report.contains("Unpublished"));
+        assert!(!report.contains("Cancelled"));
     }
 }
