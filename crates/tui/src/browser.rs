@@ -299,8 +299,23 @@ pub fn run_configured(
                         KeyCode::Esc => {
                             document = None;
                             offset = 0;
+                            #[cfg(target_os = "linux")]
+                            if let Some(value) = known_outcome.as_ref() {
+                                status = match value {
+                                    duplicity_core::restore_linux::RestoreOutcome::Unpublished(error) => {
+                                        format!("Restore result retained: Unpublished: cause {:?}. q exits.", error.cause)
+                                    }
+                                    duplicity_core::restore_linux::RestoreOutcome::Published(_) => {
+                                        "Restore result retained: Published. q exits.".into()
+                                    }
+                                    duplicity_core::restore_linux::RestoreOutcome::PublicationIndeterminate(_) => {
+                                        "Restore result retained: Publication indeterminate. q exits.".into()
+                                    }
+                                };
+                            }
                             continue;
                         }
+                        KeyCode::Char('q') => break,
                         _ => {}
                     }
                 }

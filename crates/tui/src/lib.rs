@@ -6,3 +6,6 @@ pub mod restore_flow;
 pub mod worker;
 
 pub mod terminal;
+
+#[cfg(all(test, target_os = "linux"))]
+mod restore_cancel_pty;

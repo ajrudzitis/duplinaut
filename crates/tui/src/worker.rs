@@ -208,10 +208,12 @@ impl Worker {
                         Command::Execute { id, frozen, cancel } => {
                             #[cfg(target_os = "linux")]
                             {
-                                Reply::Outcome {
-                                    id,
-                                    result: restore_flow::execute(frozen, &cancel),
-                                }
+                                #[cfg(test)]
+                                execute_cancel_test_gate(id, &cancel);
+                                let result = restore_flow::execute(frozen, &cancel);
+                                #[cfg(test)]
+                                record_test_execute_result(id, &result);
+                                Reply::Outcome { id, result }
                             }
                             #[cfg(not(target_os = "linux"))]
                             {
@@ -280,6 +282,101 @@ impl Worker {
             .join()
             .map_err(|_| io::Error::other("worker outcome unavailable; inspection required"))
     }
+}
+
+// The deterministic active-restore PTY acceptance holds the actual Execute
+// command immediately before backend entry. It is absent from production builds.
+#[cfg(all(test, target_os = "linux"))]
+fn execute_cancel_test_gate(id: u64, cancel: &Cancellation) {
+    use std::{
+        fs,
+        path::PathBuf,
+        thread,
+        time::{Duration, Instant},
+    };
+
+    let Some(control) = std::env::var_os("DUPLINAUT_RESTORE_CANCEL_CONTROL") else {
+        return;
+    };
+    let control = PathBuf::from(control);
+    assert!(
+        !control.join("execute-entered").exists(),
+        "only one Execute may enter this acceptance gate"
+    );
+    assert!(
+        !cancel.is_cancelled(),
+        "Execute token cancelled before gate entry"
+    );
+    let marker = |name: &str, body: &[u8]| {
+        let path = control.join(name);
+        let temporary = control.join(format!("{name}.pending"));
+        fs::write(&temporary, body).expect("write restore-cancel gate marker");
+        fs::rename(temporary, path).expect("publish restore-cancel gate marker");
+    };
+    marker(
+        "execute-entered",
+        format!("operation_id={id};cancelled=false\n").as_bytes(),
+    );
+    let token = cancel.clone();
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while !token.is_cancelled() {
+        assert!(
+            Instant::now() < deadline,
+            "Execute gate timed out waiting for UI cancellation"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+    marker(
+        "cancel-observed",
+        format!("operation_id={id};cancelled=true\n").as_bytes(),
+    );
+    let expected = format!("release operation_id={id}\n");
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        if fs::read(control.join("release")).is_ok_and(|bytes| bytes == expected.as_bytes()) {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Execute gate timed out waiting for parent release"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+fn record_test_execute_result(
+    id: u64,
+    result: &Result<duplicity_core::restore_linux::RestoreOutcome, restore_flow::Error>,
+) {
+    use std::{fs, path::PathBuf};
+    let Some(control) = std::env::var_os("DUPLINAUT_RESTORE_CANCEL_CONTROL") else {
+        return;
+    };
+    let outcome = match result {
+        Ok(duplicity_core::restore_linux::RestoreOutcome::Unpublished(value))
+            if value.cause == duplicity_core::restore_linux::Cause::Cancelled
+                && value.uncertain_outer.is_none() =>
+        {
+            "outcome=Unpublished;cause=Cancelled;uncertain_outer=false"
+        }
+        Ok(duplicity_core::restore_linux::RestoreOutcome::Unpublished(value)) => {
+            panic!("unexpected unpublished Execute result: {value:?}")
+        }
+        Ok(duplicity_core::restore_linux::RestoreOutcome::Published(_)) => {
+            panic!("cancelled Execute unexpectedly published")
+        }
+        Ok(duplicity_core::restore_linux::RestoreOutcome::PublicationIndeterminate(_)) => {
+            panic!("cancelled Execute unexpectedly became indeterminate")
+        }
+        Err(error) => panic!("cancelled Execute did not return a typed backend outcome: {error:?}"),
+    };
+    let control = PathBuf::from(control);
+    let temporary = control.join("execute-result.pending");
+    fs::write(&temporary, format!("operation_id={id};{outcome}\n"))
+        .expect("write restore-cancel result marker");
+    fs::rename(temporary, control.join("execute-result"))
+        .expect("publish restore-cancel result marker");
 }
 /// Called after terminal teardown was attempted. Keeps a known typed result even
 /// if the terminal, join or fallback sink failed; no modifying recovery follows.
