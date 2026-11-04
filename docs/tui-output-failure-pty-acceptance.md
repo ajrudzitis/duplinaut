@@ -1,17 +1,22 @@
 # PTY output failure acceptance plan
 
-Status: q-triggered acceptance stimulus independently reviewed and adopted
-before implementation. The q-triggered implementation, focused macOS test,
-independent review, and Duvet trace pass. Full macOS assurance CI and hosted
-Linux CI for this exact variant remain pending.
-The earlier resize-only variant passed focused macOS PTY testing and local
-macOS CI, but its post-close PTY resize is not portable to Linux and does not
-validate this revised stimulus.
+Status: accepted. The q-triggered implementation passed focused macOS testing,
+independent review, Duvet traceability, full macOS assurance CI, and the
+GitHub-hosted Linux assurance gate.
 
-Previous-variant local full-CI receipt: source SHA-256
-`d5b4e7031b851f113055f0628d2be885a282671a31db88f6b3f930b38a22d422`;
-fresh Verus/Vest/core proof counts were 2,047/3,183/1,274 with zero errors.
-These results do not establish acceptance of the revised q-triggered case.
+Acceptance evidence:
+
+- Local macOS `cargo xtask ci`, source SHA-256
+  `714bd2f4fd7553330f7313cf3fded68e9946017eab3b2cce478c102212717c65`;
+  fresh Verus/Vest/core proof counts were 2,047/3,183/1,274 with zero errors.
+- GitHub-hosted Linux `cargo xtask ci` and Duvet Pages deployment passed in
+  [run 41789678928](https://github.com/ajrudzitis/duplinaut/actions/runs/41789678928)
+  for commit `d43201c269911cc758ce3311ea46a15a1bb46e74`.
+- The q-triggered test passed on both macOS and Linux; each full TUI CLI suite
+  reported 8 passed and 2 intentionally ignored.
+
+The earlier resize-only variant's local CI receipt does not establish this
+variant's acceptance. The q-triggered stimulus is the accepted case.
 
 This records one controlled terminal output failure while a read-only scan is
 active. It exercises the production browser and terminal lifecycle for

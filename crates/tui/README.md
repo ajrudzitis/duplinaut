@@ -73,7 +73,8 @@ must fail on closed stdout. The helper checks the structured event and teardown
 faults, waits for worker shutdown, and the parent verifies input raw-mode
 restoration and unchanged fixture contents. Its focused macOS test and Duvet
 trace pass, and independent review is complete. Full macOS assurance CI and
-hosted Linux CI for this revised variant remain pending. This covers the
+GitHub-hosted Linux assurance CI both pass; run [41789678928](https://github.com/ajrudzitis/duplinaut/actions/runs/41789678928)
+also published the Duvet report. This covers the
 q-triggered status redraw failure only, not close-only failures, active
 restoration failure, alternate-screen restoration through failed output, or
 live S3. See the
