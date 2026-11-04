@@ -26,12 +26,16 @@ complete controller proof.
    boundaries MUST remain significant; a proper component prefix sorts before
    the longer component, and a proper path-component-sequence prefix sorts
    before the longer path.
-2. For every matched entry, require the exact expected entry kind, mode, and
-   modification timestamp. Convert `mtime_ns` to a checked signed `i64`, then
-   compute seconds with `div_euclid(1_000_000_000)` and nanoseconds with
+2. For every matched entry, require the exact expected entry kind and mode.
+   For regular files and directories, also require the exact modification
+   timestamp: convert `mtime_ns` to a checked signed `i64`, then compute
+   seconds with `div_euclid(1_000_000_000)` and nanoseconds with
    `rem_euclid(1_000_000_000)`. Compare both exact results with the snapshot
    entry's `TarTime`; do not round, use host timezone conversion, or compare
-   only whole seconds.
+   only whole seconds. Do not assert symlink mtime: `expected.json` records
+   `symlink_mtime_ns` in `official_comparison_exclusions`, and the
+   [producer generator](../tests/producer/generate.py) documents that
+   duplicity 3.0.7 skips symlink `utime`.
 3. For every regular file, require exact expected byte length and SHA-256 of
    its content. For every symlink, require exact `symlink_target_hex` bytes.
    Directory entries MUST be present with their expected path, kind, mode,
@@ -40,10 +44,12 @@ complete controller proof.
    PARSE-STATE-001, and PARSE-STATE-003. The test MUST use the checked-in
    independent oracle and official encrypted fixtures without changing
    producer data or invoking duplicity, GnuPG, or other external crypto tools.
-5. The comparison MUST be limited to fields recorded in `expected.json`:
-   path components, kind, mode, mtime, file length/content hash, and symlink
-   target. It MUST NOT imply verification of uid/gid, owner names, atime/ctime,
-   filesystem effects, or metadata absent from that oracle.
+5. The comparison MUST be limited to fields recorded in `expected.json` and
+   its stated comparison exclusions: path components, kind, mode, regular
+   file/directory mtime, file length/content hash, and symlink target. Symlink
+   mtime is explicitly excluded. It MUST NOT imply verification of uid/gid,
+   owner names, atime/ctime, filesystem effects, or metadata absent from that
+   oracle.
 
 ## Verification and evidence
 
