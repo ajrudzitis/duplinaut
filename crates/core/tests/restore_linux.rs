@@ -6,7 +6,7 @@ use duplicity_core::{
         AuthenticationKind, Catalog, CryptoCredentials, CryptoReadContext, OpenPgpLimits,
         OpenPgpPassword, ReaderLimits, SecretExport,
     },
-    restore_linux::{restore, Cause, Profile, RestoreLimits, RestoreOutcome},
+    restore_linux::{Cause, Profile, RestoreLimits, RestoreOutcome, restore},
     restore_plan::RestorePlanLimits,
     source::Cancellation,
     tar::EntryType,
@@ -74,7 +74,7 @@ impl Drop for PreserveOnIndeterminateTemp {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ObservedKind {
     Directory,
     Regular,
@@ -178,9 +178,11 @@ fn fixture_fingerprint(directory: &Path) -> std::collections::BTreeMap<Vec<u8>, 
             }
             digest.update(&buffer[..read]);
         }
-        assert!(files
-            .insert(name, (size, format!("{:x}", digest.finalize())))
-            .is_none());
+        assert!(
+            files
+                .insert(name, (size, format!("{:x}", digest.finalize())))
+                .is_none()
+        );
     }
     files
 }
