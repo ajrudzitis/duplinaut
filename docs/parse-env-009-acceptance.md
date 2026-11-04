@@ -1,7 +1,7 @@
 # PARSE-ENV-009 caller-credential acceptance plan
 
-Status: implementation and full core verification complete; independent review
-and hosted assurance CI remain pending.
+Status: accepted. Implementation, full core verification, independent review,
+hosted Linux assurance, and Duvet report publication pass.
 
 This is a local traceability and regression-test slice for
 [PARSE-ENV-009](parsing-requirements.md#parse-env-009). Its bounded scope is
@@ -60,8 +60,10 @@ credential modes.
 - The focused official-chain test, `cargo test -p duplicity-core`, targeted
   PARSE-ENV-009 Duvet query, `cargo xtask trace`, formatting checks, and strict
   core Clippy pass. Clippy emits existing warnings in vendored `vest_lib`,
-  while `duplicity-core` passes `-D warnings`. Independent review and hosted
-  assurance CI remain pending.
+  while `duplicity-core` passes `-D warnings`. Independent review passes.
+  Hosted Linux assurance run
+  [41802573515](https://github.com/ajrudzitis/duplinaut/actions/runs/41802573515)
+  passed and published the Duvet report.
 
 ## Non-goals
 
