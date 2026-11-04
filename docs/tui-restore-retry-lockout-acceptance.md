@@ -1,7 +1,11 @@
 # TUI restore retry-lockout acceptance plan
 
-Status: proposed; specification only. This tests the frontend guard that
-prevents another restore after an outcome that is published or uncertain.
+Status: accepted. Local portable TUI tests, Duvet trace, formatting, strict
+Clippy, and independent implementation review passed. Hosted Linux assurance
+(`cargo xtask ci`), Duvet report artifact upload, and Pages publication passed
+in [run 41867978723](https://github.com/ajrudzitis/duplinaut/actions/runs/41867978723).
+This tests the frontend guard that prevents another restore after an outcome
+that is published or uncertain, using synthetic outcomes only.
 
 ## Goal and scope
 
@@ -76,9 +80,12 @@ publication behavior.
 
 ## Checklist
 
-- [ ] Exercise the production browser `r` transition with Published,
+- [x] Exercise the production browser `r` transition with Published,
       uncertain Unpublished, and PublicationIndeterminate results.
-- [ ] Assert no command is sent and the typed result/document remain retained.
-- [ ] Focused/full TUI tests, Duvet trace, formatting, and strict Clippy pass;
-      hosted Linux assurance and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped evidence.
+- [x] Assert no command is sent and the typed result/document remain retained.
+- [x] Local portable TUI tests, Duvet trace, formatting, and strict Clippy
+      passed.
+- [x] Linux assurance (`cargo xtask ci`) and Duvet report
+      generation/artifact upload passed in [run 41867978723](https://github.com/ajrudzitis/duplinaut/actions/runs/41867978723).
+- [x] Duvet Pages deployment passed in [run 41867978723](https://github.com/ajrudzitis/duplinaut/actions/runs/41867978723).
+- [x] Independent implementation review accepts the scoped evidence.

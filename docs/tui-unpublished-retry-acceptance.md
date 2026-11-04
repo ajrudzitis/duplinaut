@@ -1,8 +1,12 @@
 # TUI definitely-unpublished retry acceptance plan
 
-Status: proposed; specification only. This is the positive counterpart to the
-restore retry-lockout acceptance and covers only an ordinary definitely
-unpublished result.
+Status: accepted. Local portable TUI tests, Duvet trace, formatting, strict
+Clippy, and independent implementation review passed. Hosted Linux assurance
+(`cargo xtask ci`), Duvet report artifact upload, and Pages publication passed
+in [run 41867978723](https://github.com/ajrudzitis/duplinaut/actions/runs/41867978723).
+This is the positive counterpart to the restore retry-lockout acceptance and
+covers only an ordinary definitely unpublished result with synthetic frontend
+outcomes.
 
 ## Goal and scope
 
@@ -99,10 +103,13 @@ destination, cover S3 or crypto, or prove frontend controller behavior.
 
 ## Checklist
 
-- [ ] Exercise the production outcome and Press-`r` transitions for a definite
+- [x] Exercise the production outcome and Press-`r` transitions for a definite
       `Unpublished(Cancelled)` reply.
-- [ ] Assert one fresh Prepare operation/token and a new empty, unarmed
+- [x] Assert one fresh Prepare operation/token and a new empty, unarmed
       acknowledgment with no Execute on Enter alone.
-- [ ] Focused/full TUI tests, Duvet trace, formatting, and strict Clippy pass;
-      hosted Linux assurance and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped evidence.
+- [x] Local portable TUI tests, Duvet trace, formatting, and strict Clippy
+      passed.
+- [x] Linux assurance (`cargo xtask ci`) and Duvet report
+      generation/artifact upload passed in [run 41867978723](https://github.com/ajrudzitis/duplinaut/actions/runs/41867978723).
+- [x] Duvet Pages deployment passed in [run 41867978723](https://github.com/ajrudzitis/duplinaut/actions/runs/41867978723).
+- [x] Independent implementation review accepts the scoped evidence.
