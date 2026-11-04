@@ -1,8 +1,8 @@
 # PTY output failure acceptance plan
 
-Status: independently reviewed and adopted before implementation. The plan was
-amended after close-only output did not trigger a redraw; implementation is
-pending.
+Status: implementation and independent review are complete. The focused
+macOS PTY acceptance test and Duvet trace pass. Linux execution and full
+assurance CI evidence remain pending before this milestone is accepted.
 
 This records one controlled terminal output failure while a read-only scan is
 active. It exercises the production browser and terminal lifecycle for

@@ -66,6 +66,16 @@ explicitly execute in separate processes. The
 [scan-cancellation plan](../../docs/tui-scan-cancel-pty-acceptance.md) distinguishes
 these source-injected browser cases from the actual CLI-binary PTY tests and
 leaves active filesystem-restoration cancellation outside their scope.
+The output-failure case uses separate input/output PTYs and a gated read-only
+scan. It closes only the output master, then sends an explicit resize event to
+force a production redraw failure; the helper checks the structured event and
+teardown faults, waits for worker shutdown, and the parent verifies input raw
+mode restoration and unchanged fixture contents. Its focused macOS test passes
+and independent review is complete; the Duvet trace passes. Linux execution and
+full assurance CI remain pending. This covers the controlled resize-triggered redraw
+failure only, not close-only failures, active restoration failure, alternate
+screen restoration through failed output, or live S3. See the
+[output-failure acceptance plan](../../docs/tui-output-failure-pty-acceptance.md).
 An additional terminal run marked `a/b/child.txt` and previewed exactly four
 entries: the file and its three source directory ancestors. Independent source
 review accepted the read-only flow after fixing confirmation reset on an invalid
@@ -93,7 +103,7 @@ anchor choice.
 - [x] Verify on macOS that ordinary local and S3 CLI configurations parse without a restore destination while native restore flags remain rejected; independent review and full CI passed. This is CLI parsing coverage only.
 - [x] Connect explicitly acknowledged selection to native Linux publication; use the existing SDK credential provider.
 - [ ] Test remaining display escaping, error and interaction paths.
-- [ ] Automate terminal interaction, cancellation, resize and S3 frontend tests.
+- [ ] Automate terminal interaction, cancellation, resize and S3 frontend tests. The bounded source-injected redraw-output-failure case is implemented and independently reviewed; its focused macOS test and Duvet trace pass, while Linux execution and full assurance CI remain pending.
 
 See [requirements](../../docs/parsing-requirements.md) and the [machine ledger](../../docs/assurance.toml).
 

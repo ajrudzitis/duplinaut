@@ -11,8 +11,15 @@ use duplicity_core::{
 };
 use nix::{
     pty::{openpty, Winsize},
-    sys::termios::tcgetattr,
+    sys::{
+        signal::{kill, Signal},
+        termios::tcgetattr,
+    },
     unistd::write,
+};
+use rustix::{
+    io::{fcntl_setfd, FdFlags},
+    termios::{tcgetwinsize, tcsetwinsize, Winsize as TerminalSize},
 };
 use std::{
     fs::{self, File, OpenOptions},
@@ -24,6 +31,7 @@ use std::{
 };
 
 const DRIVER_TEST: &str = "scan_cancel::gated_scan_browser_helper";
+const OUTPUT_DRIVER_TEST: &str = "scan_cancel::gated_output_failure_browser_helper";
 const CONTROL_ENV: &str = "DUPLINAUT_PTY_SCAN_CANCEL_CONTROL";
 const REQUIRED_VOLUME: &str = "duplicity-full.20231114T221320Z.vol1.difftar.gz";
 const CONFIG: &[u8] = b"duplinaut source-injected scan-cancel driver v1\n";
@@ -32,8 +40,11 @@ const OBSERVED: &[u8] = b"cancelled duplicity-full.20231114T221320Z.vol1.difftar
 const RELEASE: &[u8] = b"release the cancelled volume open\n";
 const COMPLETED: &[u8] =
     b"browser returned; entered=true observed=true released=true returned-cancelled=true failure=none\n";
+const OUTPUT_CONFIG: &[u8] = b"duplinaut source-injected redraw-output-failure driver v1\n";
+const OUTPUT_COMPLETED: &[u8] = b"browser-returned; event=true teardown=true raw_failed=false screen_failed=true cursor_failed=true; entered=true observed=true released=true returned-cancelled=true failure=none\n";
 const PHASE_TIMEOUT: Duration = Duration::from_secs(30);
 const MARKER_LIMIT: u64 = 256;
+const STDERR_LIMIT: usize = 64 * 1024;
 
 // Markers have fixed private names and bounded bodies. Rename publishes each
 // complete body atomically; a partially written marker is never an accepted phase.
@@ -205,6 +216,84 @@ fn gated_scan_browser_helper() {
     publish(&control, "browser-returned", COMPLETED).unwrap();
 }
 
+#[test]
+#[ignore = "internal isolated PTY driver; explicitly executed by the default output-failure test"]
+fn gated_output_failure_browser_helper() {
+    nix::unistd::setsid().expect("isolate output-failure driver from the test runner session");
+    let stdin = File::open("/dev/stdin").expect("open child stdin");
+    tcgetattr(&stdin).expect("child stdin must remain attached to its PTY");
+    assert!(
+        File::open("/dev/tty").is_err(),
+        "isolated output-failure child must have no controlling terminal"
+    );
+    let control = PathBuf::from(
+        std::env::var_os(CONTROL_ENV)
+            .expect("isolated output-failure driver configuration missing"),
+    );
+    assert!(marker_matches(&control, "driver-config", OUTPUT_CONFIG).unwrap());
+    assert_ne!(
+        fs::canonicalize(&control).unwrap(),
+        fs::canonicalize(std::env::current_dir().unwrap()).unwrap(),
+        "IPC must not use the browser working directory"
+    );
+    let fixture = fs::canonicalize(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7/plain"),
+    )
+    .unwrap();
+    let state = Arc::new(Mutex::new(GateState::default()));
+    let source = Arc::new(GatedLocalSource {
+        inner: LocalSource::new(fixture).unwrap(),
+        control: control.clone(),
+        state: state.clone(),
+    });
+    let error = duplicity_tui::browser::run(source, String::new(), Cancellation::default())
+        .expect_err("redraw output failure must return a controlled browser error");
+    #[cfg(not(target_os = "linux"))]
+    let completion = error
+        .get_ref()
+        .and_then(|payload| payload.downcast_ref::<duplicity_tui::terminal::Completion>())
+        .expect("browser error must retain structured terminal completion");
+    #[cfg(target_os = "linux")]
+    let (event_failed, teardown) = {
+        let failure = error
+            .get_ref()
+            .and_then(|payload| {
+                payload.downcast_ref::<duplicity_tui::restore_flow::ShutdownFailure>()
+            })
+            .expect("Linux browser error must retain structured shutdown failure");
+        (failure.terminal.is_some(), failure.teardown.as_ref())
+    };
+    #[cfg(not(target_os = "linux"))]
+    let (event_failed, teardown) = (completion.event.is_some(), completion.teardown.as_ref());
+    assert!(
+        event_failed,
+        "redraw failure must be recorded as an event fault"
+    );
+    let teardown = teardown.expect("terminal teardown error must be retained");
+    let faults = teardown
+        .get_ref()
+        .and_then(|payload| payload.downcast_ref::<duplicity_tui::terminal::TeardownFaults>())
+        .expect("teardown error must retain individual action faults");
+    let raw_failed = faults.raw.is_some();
+    let screen_failed = faults.screen.is_some();
+    let cursor_failed = faults.cursor.is_some();
+    assert!(!raw_failed, "input PTY raw mode must be restorable");
+    assert!(
+        screen_failed && cursor_failed,
+        "closed stdout PTY must report failed output teardown"
+    );
+    {
+        let state = state.lock().unwrap();
+        assert!(state.claimed && state.entered && state.observed && state.released);
+        assert!(state.returned_cancelled);
+        assert!(state.failure.is_none(), "gate failure: {:?}", state.failure);
+    }
+    // A successful exit is a controlled harness result. Skip libtest's normal
+    // summary because it would write to the intentionally broken stdout PTY.
+    publish(&control, "browser-returned", OUTPUT_COMPLETED).unwrap();
+    std::process::exit(0);
+}
+
 fn check_scan_cancellation(key: &[u8]) {
     let fixture = fs::canonicalize(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7/plain"),
@@ -342,6 +431,214 @@ fn check_scan_cancellation(key: &[u8]) {
     assert!(fs::read_dir(&working.0).unwrap().next().is_none());
 }
 
+fn check_redraw_output_failure() {
+    let fixture = fs::canonicalize(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7/plain"),
+    )
+    .unwrap();
+    let before_source = fingerprint(&fixture);
+    let working = Scratch::new();
+    let control = Scratch::new();
+    publish(&control.0, "driver-config", OUTPUT_CONFIG).unwrap();
+    let size = Winsize {
+        ws_row: 40,
+        ws_col: 240,
+        ws_xpixel: 0,
+        ws_ypixel: 0,
+    };
+    let input = openpty(Some(&size), None).expect("open input PTY");
+    fcntl_setfd(&input.master, FdFlags::CLOEXEC).expect("make input PTY master close-on-exec");
+    let input_slave = File::from(input.slave);
+    fcntl_setfd(&input_slave, FdFlags::CLOEXEC).expect("make parent input PTY slave close-on-exec");
+    let original_termios = tcgetattr(&input_slave).unwrap();
+    let input_master = File::from(input.master);
+    let output = openpty(Some(&size), None).expect("open output PTY");
+    fcntl_setfd(&output.master, FdFlags::CLOEXEC).expect("make output PTY master close-on-exec");
+    let output_slave = File::from(output.slave);
+    fcntl_setfd(&output_slave, FdFlags::CLOEXEC)
+        .expect("make parent output PTY slave close-on-exec");
+    let output_master = File::from(output.master);
+    let mut child = ChildGuard(
+        Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                OUTPUT_DRIVER_TEST,
+                "--ignored",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CONTROL_ENV, &control.0)
+            .env("TERM", "xterm-256color")
+            .env("COLUMNS", "240")
+            .env("LINES", "40")
+            .current_dir(&working.0)
+            .stdin(Stdio::from(input_slave.try_clone().unwrap()))
+            .stdout(Stdio::from(output_slave.try_clone().unwrap()))
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn isolated output-failure browser driver"),
+    );
+    let stderr_reader = child
+        .0
+        .stderr
+        .take()
+        .expect("capture isolated child stderr");
+    // Drain continuously so a faulty child cannot block on a full pipe. Keep
+    // only a fixed diagnostic prefix and report whether the cap was exceeded.
+    let stderr_drain = std::thread::spawn(move || -> io::Result<(Vec<u8>, bool)> {
+        let mut stderr = Vec::new();
+        let mut overflow = false;
+        let mut reader = stderr_reader;
+        let mut chunk = [0u8; 4096];
+        loop {
+            let count = reader.read(&mut chunk)?;
+            if count == 0 {
+                break;
+            }
+            let remaining = STDERR_LIMIT.saturating_sub(stderr.len());
+            let retained = count.min(remaining);
+            stderr.extend_from_slice(&chunk[..retained]);
+            overflow |= retained != count;
+        }
+        Ok((stderr, overflow))
+    });
+    let mut output_bytes = Vec::new();
+    let mut parser = vt100::Parser::new(40, 240, 0);
+    wait_for_screen(
+        &output_master,
+        &mut child,
+        &mut output_bytes,
+        &mut parser,
+        "output-failure history",
+        |screen| {
+            screen.contains(std::str::from_utf8(HISTORY_MARKER).unwrap())
+                && screen.contains("Metadata only. a selects full anchor")
+        },
+    );
+    assert_ne!(tcgetattr(&input_slave).unwrap(), original_termios);
+    write(&input_master, b"a").unwrap();
+    wait_for_screen(
+        &output_master,
+        &mut child,
+        &mut output_bytes,
+        &mut parser,
+        "output-failure anchor selection",
+        |screen| screen.contains("Full anchor selected; choose target then Enter."),
+    );
+    write(&input_master, b"\x1b[B\x1b[B\r").unwrap();
+    wait_for_screen(
+        &output_master,
+        &mut child,
+        &mut output_bytes,
+        &mut parser,
+        "output-failure scan disclosure",
+        |screen| {
+            screen.contains("Full volume scan required.") && screen.contains("Enter confirms.")
+        },
+    );
+    write(&input_master, b"\r").unwrap();
+    wait_for_screen(
+        &output_master,
+        &mut child,
+        &mut output_bytes,
+        &mut parser,
+        "output-failure gated scan",
+        |screen| {
+            screen.contains("Reading and validating every required volume...")
+                && marker_matches(&control.0, "gate-entered", ENTERED).unwrap()
+        },
+    );
+    assert!(!marker_matches(&control.0, "cancel-observed", OBSERVED).unwrap());
+    assert!(!marker_matches(&control.0, "browser-returned", OUTPUT_COMPLETED).unwrap());
+
+    // Prove the isolated child obtains its terminal geometry from the output
+    // PTY, then cause a second changed frame after the reader is closed.
+    let compact = TerminalSize {
+        ws_row: 18,
+        ws_col: 80,
+        ws_xpixel: 0,
+        ws_ypixel: 0,
+    };
+    tcsetwinsize(&output_slave, compact).expect("resize output PTY to compact geometry");
+    assert_eq!(tcgetwinsize(&output_slave).unwrap(), compact);
+    parser.screen_mut().set_size(compact.ws_row, compact.ws_col);
+    let child_pid = i32::try_from(child.0.id()).expect("child PID exceeds signed range");
+    assert!(child_pid > 0, "never send a process-group signal");
+    kill(nix::unistd::Pid::from_raw(child_pid), Signal::SIGWINCH)
+        .expect("notify isolated child of compact output resize");
+    wait_for_screen(
+        &output_master,
+        &mut child,
+        &mut output_bytes,
+        &mut parser,
+        "compact output-failure scan frame",
+        |screen| crate::pty_acceptance::frame_at_geometry(screen, compact.ws_row, compact.ws_col),
+    );
+
+    // Preserve the output slave descriptor for the child, but remove the only
+    // reader. A second resize notification makes the next production draw
+    // write a complete frame to the closed output PTY.
+    drop(output_master);
+    let expanded = TerminalSize {
+        ws_row: size.ws_row,
+        ws_col: size.ws_col,
+        ws_xpixel: 0,
+        ws_ypixel: 0,
+    };
+    tcsetwinsize(&output_slave, expanded).expect("resize output PTY after master close");
+    assert_eq!(tcgetwinsize(&output_slave).unwrap(), expanded);
+    kill(nix::unistd::Pid::from_raw(child_pid), Signal::SIGWINCH)
+        .expect("notify isolated child of post-close output resize");
+    let deadline = Instant::now() + PHASE_TIMEOUT;
+    while !marker_matches(&control.0, "cancel-observed", OBSERVED).unwrap() {
+        assert!(
+            child.0.try_wait().unwrap().is_none(),
+            "child exited before output-failure cancellation"
+        );
+        assert!(
+            Instant::now() < deadline,
+            "redraw failure did not cancel the gated scan"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        child.0.try_wait().unwrap().is_none(),
+        "child exited before the held scan gate was released"
+    );
+    assert!(!marker_matches(&control.0, "browser-returned", OUTPUT_COMPLETED).unwrap());
+    publish(&control.0, "release", RELEASE).unwrap();
+
+    let deadline = Instant::now() + PHASE_TIMEOUT;
+    let status = loop {
+        if let Some(status) = child.0.try_wait().unwrap() {
+            break status;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "output-failure child did not finish controlled teardown"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    };
+    let (stderr, stderr_overflow) = stderr_drain
+        .join()
+        .expect("stderr drainer thread panicked")
+        .expect("read isolated child stderr");
+    assert!(
+        !stderr_overflow,
+        "isolated child stderr exceeded its bounded diagnostic cap"
+    );
+    assert!(
+        status.success(),
+        "output-failure helper rejected lifecycle: {status}; stderr: {}",
+        String::from_utf8_lossy(&stderr)
+    );
+    assert!(marker_matches(&control.0, "browser-returned", OUTPUT_COMPLETED).unwrap());
+    assert_eq!(tcgetattr(&input_slave).unwrap(), original_termios);
+    assert_eq!(fingerprint(&fixture), before_source);
+    assert!(fs::read_dir(&working.0).unwrap().next().is_none());
+    drop(output_slave);
+}
+
 #[test]
 //= docs/parsing-requirements.md#restore-ui-014
 //= type=test
@@ -356,4 +653,12 @@ fn q_cancels_gated_scan_and_waits_for_worker_before_exit() {
 //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
 fn escape_cancels_gated_scan_and_waits_for_worker_before_exit() {
     check_scan_cancellation(b"\x1b");
+}
+
+#[test]
+//= docs/parsing-requirements.md#restore-ui-014
+//= type=test
+//# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+fn redraw_output_failure_cancels_scan_and_restores_input_terminal() {
+    check_redraw_output_failure();
 }

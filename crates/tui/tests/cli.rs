@@ -244,7 +244,7 @@ mod pty_acceptance {
         })
     }
 
-    fn frame_at_geometry(screen: &str, rows: u16, columns: u16) -> bool {
+    pub(super) fn frame_at_geometry(screen: &str, rows: u16, columns: u16) -> bool {
         let Some(top) = screen.lines().next() else {
             return false;
         };
