@@ -1,7 +1,9 @@
 # TUI executable-preview resize acceptance plan
 
-Status: proposed; specification only. This adds real-terminal resize evidence
-while a successful executable restore preview and its acknowledgment are open.
+Status: accepted. The Linux-gated executable-preview resize acceptance passed
+in hosted run [41905441225](https://github.com/ajrudzitis/duplinaut/actions/runs/41905441225),
+including full assurance and Duvet Pages publication. That run compiled and
+executed the Linux-only production PTY test described here.
 
 ## Goal and scope
 
@@ -118,12 +120,11 @@ controller proofs.
   annotations MUST distinguish visible-preview/scroll evidence, empty-Enter
   refusal and Esc acknowledgment clearing from successful restoration or
   publication evidence.
-- Run the focused Linux PTY test and full `cargo test -p duplicity-tui` on
-  Linux, targeted Duvet queries, `cargo xtask trace-update`, `cargo xtask
-  trace`, formatting, and strict TUI Clippy. Require hosted Linux assurance
-  (`cargo xtask ci`), Duvet Pages publication and independent implementation
-  review. macOS execution of other Unix PTY cases does not count as this
-  Linux-gated case.
+- Hosted run [41905441225](https://github.com/ajrudzitis/duplinaut/actions/runs/41905441225)
+  passed Linux assurance (`cargo xtask ci`) and published the Duvet Pages
+  report. Its Linux job compiled and executed the gated PTY case, including
+  full TUI tests, Duvet trace, formatting, and strict Clippy. macOS execution
+  of other Unix PTY cases does not count as this Linux-gated case.
 
 ## Exclusions
 
@@ -138,13 +139,14 @@ separate scopes.
 
 ## Checklist
 
-- [ ] Create an actual production-browser whole-snapshot `r` preview and enter
+- [x] Create an actual production-browser whole-snapshot `r` preview and enter
       the exact acknowledgment without confirming it.
-- [ ] Prove 40x240 -> 18x96 -> 40x240 child-rendered frames and accessible
+- [x] Prove 40x240 -> 18x96 -> 40x240 child-rendered frames and accessible
       preview fields through production scrolling; acknowledgment remains
       armed and no Execute is sent.
-- [ ] Esc abandons the preview, destination/staging remain absent, source is
+- [x] Esc abandons the preview, destination/staging remain absent, source is
       unchanged, and terminal state is restored.
-- [ ] Focused/full Linux TUI tests, Duvet trace, formatting, strict Clippy,
-      hosted assurance, and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped evidence.
+- [x] Focused/full Linux TUI tests, Duvet trace, formatting, strict Clippy,
+      hosted assurance, and Duvet Pages pass in
+      [run 41905441225](https://github.com/ajrudzitis/duplinaut/actions/runs/41905441225).
+- [x] Independent implementation review accepts the scoped evidence.
