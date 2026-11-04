@@ -1,7 +1,8 @@
 # PARSE-ENV-010 test acceptance plan
 
 Status: accepted. The focused boundary, adapter, and official MDC-mutation tests
-pass; independent review and Duvet traceability are complete.
+pass; independent review, Duvet traceability, and hosted Linux assurance are
+complete.
 
 This plan closes the test-coverage gap for
 [PARSE-ENV-010](parsing-requirements.md#parse-env-010). It does not change the
@@ -21,6 +22,10 @@ Acceptance evidence:
   evidence.
 - Focused Rust tests, independent review, the PARSE-ENV-010 Duvet query, and
   `cargo xtask trace` pass. No Verus claim covers cryptographic primitives.
+- Full core tests and hosted Linux assurance pass in
+  [run 41799721617](https://github.com/ajrudzitis/duplinaut/actions/runs/41799721617).
+  That full assurance run is recorded by the subsequent ENV-011 acceptance and
+  includes these ENV-010 tests from its ancestor source commit.
 
 ## Acceptance requirements
 
