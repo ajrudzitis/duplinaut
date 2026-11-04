@@ -86,7 +86,7 @@ anchor choice.
 
 | Component | Specification review | Implementation | Proof | Integration tests | Independent acceptance |
 | --- | --- | --- | --- | --- | --- |
-| Browser and restore flow | Browse requirements written; restore interaction adopted before implementation | Read-only browsing and native Linux restore work; acceptance pending | Component proofs remain separate; display/I/O trusted | Escaping/CLI tests, official worker preview checks, manual official-chain PTY smoke, and automated Unix PTY history/chain/read-only preview tests pass | Pending |
+| Browser and restore flow | Browse requirements written; restore interaction adopted before implementation | Read-only browsing and native Linux restore work; acceptance pending | Component proofs remain separate; display/I/O trusted | Escaping/CLI tests, official worker preview checks, and Unix PTY history/chain/preview, scan-cancellation, and q-triggered output-failure cases pass | Pending |
 
 - [x] Create the executable crate with no unsupported feature claims.
 - [x] Escape terminal controls, non-ASCII bytes and literal escapes while retaining original path identity; native tests pass.
@@ -102,11 +102,12 @@ anchor choice.
 - [x] Complete the official-chain read-only PTY acceptance case: actual anchor/target/scan-confirmation keys, oracle-derived final snapshot count/payload, visible escaped non-UTF-8 path, whole `p` count and marked `a/b/child.txt` four-entry `p` count, restored terminal state and unchanged final source contents/empty working directory. Independent review and full macOS CI pass. Executable preview, acknowledgment, publication, cancellation, resize, terminal failure and S3 remain outside this case.
 - [x] Complete Unix PTY shrink/expand acceptance: actual OS window-size updates and explicit child `SIGWINCH`, fresh 18x96 and 40x240 frames, retained marked child/four-entry preview, then Space unmarks that same child and `p` reports the oracle's whole-snapshot count. Independent review and full macOS CI pass. Terminal restoration and final source-content/empty-working-directory checks remain included; automatic signal delivery, tiny dimensions, resize storms and executable-preview wrapping remain open.
 - [x] Complete deterministic production-browser read-only scan cancellation for `q` and Esc in isolated PTYs: initially uncancelled exact scan token, held-worker cancellation/waiting observation, explicit gate release and combined error result, browser-return marker after join, terminal restoration and final source-content/empty-working-directory checks. Both focused macOS parent cases, independent review and full macOS CI pass. The ignored internal child driver has no separate Duvet/gate claim; active restoration, cancellation latency and real blocking-call interruption remain open.
+- [x] Complete q-triggered PTY output-failure acceptance during a gated read-only scan: `q` cancels the exact scan token, then a changed-status redraw fails through closed stdout and produces controlled terminal shutdown. Focused macOS test, Duvet trace, independent review, full macOS assurance CI and hosted Linux assurance CI pass. This does not cover active restoration output failure or terminal restoration through failed output.
 - [x] Test one-shot RESTORE-UI-004 confirmation: the first Press Enter consumes and clears the armed acknowledgment, and a second Enter cannot confirm again; independent review and full macOS CI passed. This exercises the pure confirmation helper only; it does not test worker execution.
 - [x] Verify on macOS that ordinary local and S3 CLI configurations parse without a restore destination while native restore flags remain rejected; independent review and full CI passed. This is CLI parsing coverage only.
 - [x] Connect explicitly acknowledged selection to native Linux publication; use the existing SDK credential provider.
 - [ ] Test remaining display escaping, error and interaction paths.
-- [ ] Automate terminal interaction, cancellation, resize and S3 frontend tests. The bounded source-injected q-triggered redraw-output-failure case is implemented and independently reviewed; its focused macOS test and Duvet trace pass, while full macOS assurance CI and hosted Linux CI remain pending.
+- [ ] Automate remaining terminal interaction, cancellation, resize and S3 frontend tests. The q-triggered output-failure case is complete; broader cancellation and resize behavior and live S3 acceptance remain open.
 
 See [requirements](../../docs/parsing-requirements.md) and the [machine ledger](../../docs/assurance.toml).
 
