@@ -1,8 +1,10 @@
 # TUI raw destination identity PTY acceptance plan
 
-Status: proposed; specification only. This adds real Linux terminal evidence
-that raw destination and selected-path bytes remain identities while their
-preview and successful receipt render reversible, terminal-safe escapes.
+Status: accepted. The production Linux PTY case, full assurance gate, and Duvet
+Pages deployment passed in [run 41892380922](https://github.com/ajrudzitis/duplinaut/actions/runs/41892380922).
+This adds real Linux terminal evidence that raw destination and selected-path
+bytes remain identities while their preview and successful receipt render
+reversible, terminal-safe escapes.
 
 ## Goal, requirements, and prerequisite
 
@@ -114,12 +116,12 @@ requirements and acceptance obligations.
 
 ## Checklist
 
-- [ ] Restore the official raw-byte file through the production Linux browser
+- [x] Restore the official raw-byte file through the production Linux browser
       PTY using the exact raw destination leaf.
-- [ ] Assert exact reversible destination and selected-path escapes in the
+- [x] Assert exact reversible destination and selected-path escapes in the
       rendered preview and Published receipt, and exact raw filesystem names.
-- [ ] Verify the one-file oracle, unchanged source, staging absence, and
+- [x] Verify the one-file oracle, unchanged source, staging absence, and
       terminal restoration; preserve paths on uncertain outcomes.
-- [ ] Focused/full Linux TUI tests, Duvet trace, formatting, strict Clippy,
+- [x] Focused/full Linux TUI tests, Duvet trace, formatting, strict Clippy,
       hosted assurance, and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped evidence.
+- [x] Independent implementation review accepts the scoped evidence.
