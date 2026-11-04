@@ -57,11 +57,13 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Specify the remaining PARSE-ENV-010 test-coverage acceptance for stored-ciphertext bounds and authenticated MDC failure, including Duvet links and a same-credential positive control. See the [acceptance plan](../../docs/parse-env-010-acceptance.md).
 - [ ] Implement and independently review the PARSE-ENV-010 acceptance tests; require Duvet test coverage and preserve the stated cryptographic trust boundary.
 - [x] Specify PARSE-ENV-011 exact compression-stream completion and trailing-data acceptance, including truncation and normalized BZip2 parser errors. See the [acceptance plan](../../docs/parse-env-011-acceptance.md).
-- [ ] Implement and independently review PARSE-ENV-011 compression completion tests; preserve expansion limits, authentication classification and cancellation behavior.
+- [x] Implement and independently review PARSE-ENV-011 compression completion tests; preserve expansion limits, authentication classification and cancellation behavior. Focused/full core tests, Duvet trace, and hosted Linux assurance passed in [run 41799721617](https://github.com/ajrudzitis/duplinaut/actions/runs/41799721617).
 - [x] Specify PARSE-ENV-012 full primary-fingerprint authorization acceptance with an exact-fingerprint signed-fixture positive and a same-suffix collision negative. See the [acceptance plan](../../docs/parse-env-012-acceptance.md).
 - [ ] Implement and independently review the PARSE-ENV-012 Duvet mapping and fingerprint collision tests; no key-ID or issuer-hint authorization.
 - [x] Specify PARSE-ENV-009 caller-supplied passphrase and exported-secret-key acceptance against the official symmetric and public-key fixture chains. See the [acceptance plan](../../docs/parse-env-009-acceptance.md).
 - [ ] Implement and independently review the PARSE-ENV-009 Duvet mapping and credential-path source review; do not claim cryptographic primitive verification.
+- [x] Specify PARSE-ENV-013 offline signer-policy scope and evidence reporting using the existing official signed-chain fixture. See the [acceptance plan](../../docs/parse-env-013-acceptance.md).
+- [ ] Implement and independently review the PARSE-ENV-013 policy/evidence Duvet mapping; expired/revoked-certificate behavior remains a separate open test question.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 

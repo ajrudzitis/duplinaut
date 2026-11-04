@@ -1,7 +1,7 @@
 # PARSE-ENV-011 compressed-stream acceptance plan
 
-Status: implementation and focused verification complete; independent review
-and full core/assurance CI remain pending.
+Status: accepted. Implementation, focused/full core tests, independent review,
+Duvet trace, and hosted Linux assurance passed.
 
 This is a bounded core-reader test milestone for
 [PARSE-ENV-011](parsing-requirements.md#parse-env-011), with negative results
@@ -80,8 +80,10 @@ or nested-layer profile covered by the broader requirement.
 - `cargo fmt --all -- --check`, `git diff --check`, and
   `cargo clippy -p duplicity-core --all-targets -- -D warnings` pass. Clippy
   reports only pre-existing warnings in vendored `vest_lib`.
-- Independent review, full core native tests, and the required assurance CI
-  remain pending; this is not yet marked complete in the README checklist.
+- Independent review and full core native tests pass. Hosted Linux assurance
+  run [41799721617](https://github.com/ajrudzitis/duplinaut/actions/runs/41799721617)
+  passed and published the Duvet report. The README checklist records this
+  bounded acceptance; broader ENV-014 failure-class coverage remains open.
 
 ## Non-goals
 
