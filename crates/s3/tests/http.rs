@@ -612,6 +612,47 @@ fn official_repository_sdk_three_dates_restore_against_source_oracles() {
             fs::remove_dir_all(&self.0).unwrap();
         }
     }
+    fn decode_hex(value: &str) -> Vec<u8> {
+        assert_eq!(value.len() % 2, 0, "oracle hex value must have whole bytes");
+        (0..value.len())
+            .step_by(2)
+            .map(|offset| u8::from_str_radix(&value[offset..offset + 2], 16).unwrap())
+            .collect()
+    }
+    fn oracle_components(entry: &serde_json::Value) -> Vec<Vec<u8>> {
+        entry["components_hex"]
+            .as_array()
+            .expect("oracle component array")
+            .iter()
+            .map(|component| decode_hex(component.as_str().expect("oracle component hex")))
+            .collect()
+    }
+    fn enumerate_published_paths(
+        path: &std::path::Path,
+        components: &mut Vec<Vec<u8>>,
+        paths: &mut Vec<Vec<Vec<u8>>>,
+        max_paths: usize,
+        max_depth: usize,
+    ) {
+        let metadata = fs::symlink_metadata(path).unwrap();
+        assert!(
+            components.len() <= max_depth,
+            "published tree exceeded oracle depth"
+        );
+        assert!(
+            paths.len() < max_paths,
+            "published tree exceeded oracle path count"
+        );
+        paths.push(components.clone());
+        if metadata.file_type().is_dir() {
+            for entry in fs::read_dir(path).unwrap() {
+                let entry = entry.unwrap();
+                components.push(entry.file_name().as_bytes().to_vec());
+                enumerate_published_paths(&entry.path(), components, paths, max_paths, max_depth);
+                components.pop();
+            }
+        }
+    }
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let parent = Temp(std::env::temp_dir().join(format!(
         "duplicity-sdk-restore-{}-{}",
@@ -661,6 +702,8 @@ fn official_repository_sdk_three_dates_restore_against_source_oracles() {
             .as_array()
             .unwrap();
         assert_eq!(snapshot.state().len(), expected.len());
+        let mut expected_paths = expected.iter().map(oracle_components).collect::<Vec<_>>();
+        let max_depth = expected_paths.iter().map(Vec::len).max().unwrap_or(0);
         let leaf = format!("day{day}");
         let plan = snapshot.restore_all(RestorePlanLimits::default()).unwrap();
         let receipt = match restore(
@@ -674,6 +717,21 @@ fn official_repository_sdk_three_dates_restore_against_source_oracles() {
             other => panic!("SDK snapshot restore failed: {other:?}"),
         };
         assert_eq!(receipt.cleanup.failures, 0);
+        let published_root = parent.0.join(&leaf);
+        let mut published_paths = Vec::new();
+        enumerate_published_paths(
+            &published_root,
+            &mut Vec::new(),
+            &mut published_paths,
+            expected_paths.len(),
+            max_depth,
+        );
+        expected_paths.sort();
+        published_paths.sort();
+        assert_eq!(
+            published_paths, expected_paths,
+            "published tree path components differ from oracle for {leaf}"
+        );
         for (path, entry) in snapshot.state().entries() {
             let raw = path
                 .components()
@@ -689,6 +747,12 @@ fn official_repository_sdk_three_dates_restore_against_source_oracles() {
                 .iter()
                 .find(|item| item["path_hex"] == hex)
                 .unwrap();
+            let expected_components = oracle_components(expected);
+            assert_eq!(
+                path.components(),
+                expected_components.as_slice(),
+                "snapshot path components differ from oracle for {hex}"
+            );
             let mut actual = parent.0.join(&leaf);
             for component in path.components() {
                 actual.push(std::ffi::OsString::from_vec(component.clone()));

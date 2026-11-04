@@ -22,4 +22,4 @@ Tests inject public dummy credentials and contact only a loopback HTTP fixture. 
 Terminal stream failures remain errors on subsequent nonempty reads. Tests cover a missing EOF marker and an actual SDK checksum failure reported after exactly the expected body bytes; retries cannot convert either failure into successful EOF.
 
 - [x] Exercise the complete reader and Linux restorer through actual SDK HTTP transfers against original official three-date backups.
-- [ ] Independently review the new full-reader test fixture and oracle assertions.
+- [x] Independently review the new full-reader test fixture and oracle assertions. The review found and closed an exact-tree false-positive gap; Linux CI remains responsible for compiling and executing this `#[cfg(target_os = "linux")]` test.
