@@ -1,9 +1,9 @@
 # PARSE-ENV-019 public-key-encrypted unsigned incremental acceptance plan
 
-Status: locally implemented; focused/full core tests, Duvet query/full trace,
-formatting, strict Clippy, diff checks, local `cargo xtask ci`, provenance
-checks, and independent review pass. Hosted assurance remains pending. The
-backlog remains unchecked until all acceptance gates pass.
+Status: accepted. Focused/full core tests, Duvet query/full trace, formatting,
+strict Clippy, diff checks, local `cargo xtask ci`, provenance checks, and
+independent review pass. Hosted Linux assurance and Duvet Pages passed in
+[run 41818457786](https://github.com/ajrudzitis/duplinaut/actions/runs/41818457786).
 
 This local reader test extends
 [PARSE-ENV-019](parsing-requirements.md#parse-env-019) with a second encrypted
@@ -84,8 +84,9 @@ producer-fixture changes.
   empty `message_passwords` list. The read fails with exact `Unsigned` after
   three source opens. Since the API returns `Err`, no snapshot or authentication
   evidence is returned. The focused and full core test suites passed locally;
-  independent review and local assurance CI passed, with hosted assurance
-  remaining open as listed above.
+  independent review and local assurance CI passed. Hosted Linux assurance and
+  Duvet Pages passed in
+  [run 41818457786](https://github.com/ajrudzitis/duplinaut/actions/runs/41818457786).
 
 - Local verification passed: focused mixed-chain test, full `cargo test -p
   duplicity-core`, targeted Duvet implementation/test query, `cargo xtask
@@ -102,8 +103,8 @@ producer-fixture changes.
   annotation MUST identify chain-wide signer authorization; the test
   annotation MUST identify the PKESK-encrypted unsigned-incremental case.
 - Formatting, strict core Clippy, and local assurance CI (`cargo xtask ci`)
-  passed. Record hosted Linux CI evidence before marking this acceptance
-  complete.
+  passed. Hosted Linux assurance and Duvet Pages passed in
+  [run 41818457786](https://github.com/ajrudzitis/duplinaut/actions/runs/41818457786).
 - Independent review verified the unsigned status of both official incremental
   manifests from reference inspection, exact fixture selection, collision
   absence, credential/primary-fingerprint match, and exact third-open

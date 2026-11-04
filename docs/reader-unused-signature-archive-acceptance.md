@@ -1,8 +1,8 @@
 # Unused OpenPGP signature archive acceptance plan
 
-Status: implementation, local verification, independent review, and
-`cargo xtask ci` are complete. Required hosted Linux assurance remains pending;
-the backlog item stays open until assurance passes.
+Status: accepted. Implementation, local verification, independent review, and
+`cargo xtask ci` are complete. Hosted assurance passed in
+[run 41814935505](https://github.com/ajrudzitis/duplinaut/actions/runs/41814935505).
 
 This local reader-integration test checks one bounded catalog behavior: a
 malformed OpenPGP signature archive that is not required to reconstruct the
@@ -51,14 +51,12 @@ requirement.
   requirements, `cargo xtask trace-update`, and `cargo xtask trace`. Duvet
   provides traceability only; the bounded test does not prove complete reader
   controller behavior.
-- Run formatting and strict core Clippy checks, then required assurance CI
-  (`cargo xtask ci`). Record hosted Linux CI evidence before marking this
-  acceptance complete.
-- Independent review MUST confirm that only the synthetic archive bytes
-  change, the catalog object name/size remain stable, the valid credentials and
-  signer fingerprint match the official signed-chain positive control, and
-  the open count includes all required objects but excludes the auxiliary
-  archive.
+- Formatting, strict core Clippy, and required hosted assurance passed in
+  [run 41814935505](https://github.com/ajrudzitis/duplinaut/actions/runs/41814935505).
+- Independent review confirmed that only the synthetic archive bytes change,
+  the catalog object name/size remain stable, the valid credentials and signer
+  fingerprint match the official signed-chain positive control, and the open
+  count includes all required objects but excludes the auxiliary archive.
 
 ## Current local evidence
 
@@ -76,8 +74,9 @@ requirement.
   `cargo fmt --all -- --check`,
   `cargo clippy -p duplicity-core --all-targets -- -D warnings`, and
   `git diff --check` pass locally. Independent review and `cargo xtask ci` also
-  pass; hosted Linux assurance remains pending. This result covers only the
-  named unused archive and policy.
+  pass; hosted assurance passed in
+  [run 41814935505](https://github.com/ajrudzitis/duplinaut/actions/runs/41814935505).
+  This result covers only the named unused archive and policy.
 
 ## Scope limits
 

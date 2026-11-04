@@ -1,17 +1,17 @@
 # PARSE-ENV-019 unsigned OpenPGP incremental acceptance plan
 
-Status: regression test and Duvet links are implemented. Focused and full core
-tests, targeted Duvet query/full trace, formatting, and strict Clippy pass
-locally on macOS. Independent review and hosted Linux assurance remain
-pending. The broader mixed-envelope matrix remains open.
+Status: accepted. Focused/full core tests, targeted Duvet query/full trace,
+formatting, strict Clippy, independent review, hosted Linux assurance, and Duvet
+Pages passed in [run 41818457786](https://github.com/ajrudzitis/duplinaut/actions/runs/41818457786).
+The broader mixed-envelope matrix remains open.
 
 This local reader test closes one explicit gap in
 [PARSE-ENV-019](parsing-requirements.md#parse-env-019): configured signer
 authorization must remain required when a chain transitions from a signed full
 set to an unsigned, but still encrypted, incremental set. The broader
 [OpenPGP reader integration profile](openpgp-reader-integration.md) already
-defines chain-wide authorization and lists an unsigned OpenPGP incremental as
-pending. The test uses checked-in official 3.0.7 fixtures and needs no live AWS
+defines chain-wide authorization and now records this accepted bounded case.
+The test uses checked-in official 3.0.7 fixtures and needs no live AWS
 credentials.
 
 ## Acceptance requirements
@@ -52,13 +52,12 @@ credentials.
   `cargo xtask trace-update`, and `cargo xtask trace`. The implementation
   annotation MUST point to the chain-wide authorization decision; the test
   annotation MUST point to the mixed-chain regression.
-- Run formatting and strict core Clippy checks, then the repository's required
-  assurance CI (`cargo xtask ci`). Record hosted Linux CI evidence before
-  marking this acceptance complete.
-- Independent review MUST confirm fixture selection has no duplicate object
-  names, credentials and the exact primary fingerprint match the official
-  signed-chain control, and the failure occurs at the first unsigned
-  incremental manifest without returning provisional snapshot/evidence.
+- Formatting, strict core Clippy, and required hosted assurance passed in
+  [run 41818457786](https://github.com/ajrudzitis/duplinaut/actions/runs/41818457786).
+- Independent review confirmed fixture selection has no duplicate object names,
+  credentials and the exact primary fingerprint match the official signed-chain
+  control, and the failure occurs at the first unsigned incremental manifest
+  without returning provisional snapshot/evidence.
 - This is native integration evidence for policy continuity. It does not
   formally verify OpenPGP cryptography or the complete reader controller.
 
@@ -78,8 +77,9 @@ credentials.
   `cargo xtask trace-update`, `cargo xtask trace`,
   `cargo fmt --all -- --check`,
   `cargo clippy -p duplicity-core --all-targets -- -D warnings`, and
-  `git diff --check` pass locally. Independent review and hosted Linux
-  assurance remain pending; the backlog stays open until they pass.
+  `git diff --check` pass locally. Independent review, hosted Linux assurance,
+  and Duvet Pages passed in
+  [run 41818457786](https://github.com/ajrudzitis/duplinaut/actions/runs/41818457786).
 
 ## Scope limits
 

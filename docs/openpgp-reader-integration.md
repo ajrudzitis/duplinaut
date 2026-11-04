@@ -220,20 +220,26 @@ control explicit confirmation, staging, cancellation and uncertain publication.
       metadata-byte cap, certificate-version cap and comparison-work cap.
 - [x] Reject a plain incremental manifest after a signed encrypted full set under the
       same chain-wide signer policy.
-- [x] Locally test an official signed full set followed by symmetric-encrypted
+- [x] Test an official signed full set followed by symmetric-encrypted
       incremental sets under the same signer policy. The reader returns exact
       `Unsigned` when the third open reaches the first incremental manifest, after
       successfully opening the signed full manifest and volume; no snapshot or
-      evidence is returned. Independent review and hosted assurance remain
-      pending; see the
+      evidence is returned. Independent review, hosted Linux assurance, and Duvet
+      Pages passed in [run 41818457786](https://github.com/ajrudzitis/duplinaut/actions/runs/41818457786).
+      This leaves unsigned data-volume cases and the broader mixed-envelope matrix
+      open; crypto primitives, controller refinement, and filesystem publication
+      are outside this test's claim. See the
       [ENV-019 acceptance plan](parse-env-019-unsigned-openpgp-incremental-acceptance.md).
-- [x] Locally test an official signed full set followed by public-key-encrypted
+- [x] Test an official signed full set followed by public-key-encrypted
       unsigned incrementals under the unchanged signer policy and with no message
       passwords. The first unsigned incremental manifest returns exact `Unsigned`
       on the third open. Producer command/hash provenance is checked against
       `provenance.json`; this case does not cover data-volume failures or the full
-      mixed-envelope matrix. Independent review and local `cargo xtask ci` passed;
-      hosted assurance remains pending; see the
+      mixed-envelope matrix. Independent review, hosted Linux assurance, and Duvet
+      Pages passed in [run 41818457786](https://github.com/ajrudzitis/duplinaut/actions/runs/41818457786).
+      Unsigned data-volume cases and the broader mixed-envelope matrix remain open.
+      Crypto primitives, controller refinement, and filesystem publication remain
+      outside this test's claim; see the
       [public-key ENV-019 acceptance plan](parse-env-019-public-key-unsigned-incremental-acceptance.md).
 - [ ] Test unsigned encrypted data-volume cases, irrelevant catalog artifacts,
       and other mixed-envelope chain transitions.
