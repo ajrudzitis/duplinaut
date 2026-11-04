@@ -339,6 +339,7 @@ fn diagnostics_with_request(
 
 // The limit seam is private so only tests can exercise the byte boundary; all
 // production calls enter through `diagnostics` with the fixed 1 MiB cap.
+#[cfg(test)]
 #[cfg(target_os = "linux")]
 fn diagnostics_with_limit(
     outcome: &duplicity_core::restore_linux::RestoreOutcome,
