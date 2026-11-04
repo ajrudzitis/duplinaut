@@ -20,10 +20,12 @@ pagination, response faults, and source-change behavior.
 
 This plan traces to [PARSE-SOURCE-001](parsing-requirements.md#parse-source-001)
 (source identity consistency), [PARSE-CHAIN-001](parsing-requirements.md#parse-chain-001)
-(unique contiguous chain), [PARSE-CHAIN-002](parsing-requirements.md#parse-chain-002)
-(complete/missing-chain distinction), [PARSE-STATE-001](parsing-requirements.md#parse-state-001)
+(unique contiguous chain), and [PARSE-STATE-001](parsing-requirements.md#parse-state-001)
 (snapshot transitions). These are scoped to the live plain-source/catalog path
-and completed snapshot. The S3 fixture SHA-256 checks below compare remote bytes
+and completed snapshot. [PARSE-CHAIN-002](parsing-requirements.md#parse-chain-002)
+is explicitly outside the live test's trace: this positive mirror case does not
+exercise missing-set, missing-volume or ambiguous-branch error distinctions.
+Those remain covered by the existing offline reader tests. The S3 fixture SHA-256 checks below compare remote bytes
 with the checked-in provenance inventory; they do not claim OpenPGP ciphertext
 digest behavior. No RESTORE requirement is linked: this test reconstructs a
 snapshot but performs no filesystem restore.
@@ -128,8 +130,10 @@ fixture/account/inventory and live run are prerequisites for acceptance.
    fixture-relative object ID/index needed for diagnosis. The test MUST make
    no bucket mutation calls; successful execution consists only of list, head,
    and conditional object reads.
-8. Duvet MUST trace the live test only to the scoped source, chain, and state
-   requirements above. Do not tag filesystem RESTORE requirements or imply
+8. Duvet MUST trace the live test only to PARSE-SOURCE-001, PARSE-CHAIN-001,
+   and PARSE-STATE-001. Do not tag PARSE-CHAIN-002: this live positive case
+   does not exercise its missing-set/volume/ambiguity error cases. Do not tag
+   filesystem RESTORE requirements or imply
    the live test validates TUI, signer policy, encrypted profiles, complete AWS
    identity semantics, or controller proofs.
 
@@ -152,6 +156,16 @@ fixture/account/inventory and live run are prerequisites for acceptance.
   publication for code/trace gates; require the separate authorized live run
   for live acceptance. No live status may be marked complete until the external
   inputs and actual service run are recorded.
+
+## Current progress
+
+The default-off integration target and synthetic local gate/inventory tests
+are implemented in `crates/s3/tests/live_s3.rs`. Focused and full S3 crate
+tests, strict Clippy, formatting, Duvet trace and the SOURCE-001, CHAIN-001,
+and STATE-001 coverage queries pass locally. The ignored live case has not
+been run; hosted assurance for this implementation is pending. Bucket/account
+approval, the captured twelve-object inventory, and read-only credentials are
+still external prerequisites.
 
 ## Exclusions
 
