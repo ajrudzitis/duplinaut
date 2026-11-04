@@ -749,7 +749,7 @@ fn official_repository_sdk_three_dates_restore_against_source_oracles() {
                 .unwrap();
             let expected_components = oracle_components(expected);
             assert_eq!(
-                path.components(),
+                path.components().as_slice(),
                 expected_components.as_slice(),
                 "snapshot path components differ from oracle for {hex}"
             );
