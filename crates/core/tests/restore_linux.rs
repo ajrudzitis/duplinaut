@@ -338,10 +338,10 @@ fn official_three_dates_publish_both_profiles_exact_supported_metadata() {
 #[test]
 //= docs/parsing-requirements.md#parse-env-024
 //= type=test
-//# OpenPGP integration MUST complete configured signer checks before parsing manifest metadata or using volume records.
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
 //= docs/parsing-requirements.md#parse-state-001
 //= type=test
-//# A complete selected chain MUST reconstruct one internally consistent snapshot at the requested date.
+//# Snapshot interpretation MUST apply additions, replacement content, deltas, deletions, and file-type changes in chain order to the selected backup-relative path state.
 //= docs/parsing-requirements.md#restore-001
 //= type=test
 //# A restoration MUST preserve each selected entry's backup-relative path beneath a destination that did not exist when publication began.
