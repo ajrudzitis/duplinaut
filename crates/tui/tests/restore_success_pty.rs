@@ -16,7 +16,7 @@ use std::{
     os::{
         fd::{AsFd, AsRawFd},
         unix::{
-            ffi::OsStrExt,
+            ffi::{OsStrExt, OsStringExt},
             fs::{MetadataExt, PermissionsExt},
         },
     },
@@ -700,6 +700,341 @@ fn production_linux_tui_publishes_official_plain_snapshot_through_pty() {
     assert!(fs::read_dir(&destination_parent)
         .unwrap()
         .all(|entry| { entry.unwrap().file_name().as_bytes() == destination_name.as_bytes() }));
+    test_tree.cleanup_after_assertions();
+}
+
+fn displayed_value(screen: &str, label: &str) -> Option<String> {
+    let line = screen.lines().find(|line| line.contains(label))?;
+    let value = line.split_once(label)?.1.trim();
+    Some(value.strip_suffix('│').unwrap_or(value).trim().to_owned())
+}
+
+fn only_marked_raw_file_is_visible(screen: &str) -> bool {
+    screen.lines().any(|line| {
+        line.contains("* Regular") && line.trim_end_matches([' ', '│']).ends_with("raw-\\xff.bin")
+    })
+}
+
+// This acceptance covers one valid raw OS leaf, its reversible preview and
+// Published receipt rendering, and the exact byte names observed on disk.
+#[test]
+//= docs/parsing-requirements.md#restore-ui-001
+//= type=test
+//# The frontend MUST accept a restoration destination only as a complete pair of `--restore-parent PATH` and `--restore-name NAME`, preserving their original OS bytes and rejecting duplicate, missing, oversized or invalid destination values before starting restoration.
+//= docs/parsing-requirements.md#restore-ui-010
+//= type=test
+//# The frontend MUST render destination, selected paths, staging/candidate names and diagnostics using reversible terminal-safe byte escaping, preserving complete backend identity and warning fields in the accessible final result.
+//= docs/parsing-requirements.md#restore-ui-014
+//= type=test
+//# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+fn production_linux_tui_preserves_raw_destination_and_selected_path_identity() {
+    let oracle: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/duplicity-3.0.7/expected.json"
+    ))
+    .expect("parse official source oracle");
+    let final_snapshot = oracle["snapshots"]
+        .as_array()
+        .expect("oracle snapshots")
+        .iter()
+        .find(|snapshot| snapshot["mode"] == "plain" && snapshot["index"] == 2)
+        .expect("final plain snapshot");
+    let oracle_entries = final_snapshot["entries"]
+        .as_array()
+        .expect("final snapshot entries");
+    let raw_component = b"raw-\xff.bin".to_vec();
+    let raw_file = oracle_entries
+        .iter()
+        .find(|entry| {
+            entry["path_hex"] == "7261772dff2e62696e"
+                && oracle_components(entry) == vec![raw_component.clone()]
+        })
+        .expect("official final snapshot has the raw-byte regular file");
+    assert_eq!(raw_file["kind"], "file");
+    assert_eq!(raw_file["size"].as_u64(), Some(9));
+    assert_eq!(
+        raw_file["sha256"].as_str(),
+        Some("83e33998a9bc776bbe6bf39220f517734c5dc8b14168817e65b2a3b6edfee5f8")
+    );
+    let mut ordered_components: Vec<_> = oracle_entries.iter().map(oracle_components).collect();
+    ordered_components.sort();
+    let raw_file_index = ordered_components
+        .iter()
+        .position(|components| components == &vec![raw_component.clone()])
+        .expect("raw file has an entry in the snapshot order");
+
+    let destination_name = vec![0x1b, b'\\', 0xff, b'R'];
+    assert!(!destination_name.is_empty());
+    assert!(!destination_name.contains(&0));
+    assert!(!destination_name.contains(&b'/'));
+    assert_eq!(
+        duplicity_tui::display::bytes(&destination_name),
+        r"\x1b\\\xffR"
+    );
+    let source_display = duplicity_tui::display::bytes(&raw_component);
+    assert_eq!(source_display, r"raw-\xff.bin");
+
+    let fixture = fs::canonicalize(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7/plain"),
+    )
+    .expect("official plain fixture");
+    let mut source_before = BTreeMap::new();
+    observe_tree(&fixture, &mut Vec::new(), &mut source_before);
+
+    let mut test_tree = TestTree::new();
+    let destination_parent = test_tree.path.join("restore-parent");
+    fs::create_dir(&destination_parent).expect("create destination parent");
+    fs::set_permissions(&destination_parent, fs::Permissions::from_mode(0o700))
+        .expect("restrict destination parent permissions");
+    let destination =
+        destination_parent.join(std::ffi::OsString::from_vec(destination_name.clone()));
+    assert!(!destination.exists(), "raw destination leaf starts absent");
+
+    let winsize = Winsize {
+        ws_row: ROWS,
+        ws_col: COLS,
+        ws_xpixel: 0,
+        ws_ypixel: 0,
+    };
+    let pty = openpty(Some(&winsize), None).expect("open raw-identity production PTY");
+    fcntl_setfd(&pty.master, FdFlags::CLOEXEC).expect("make PTY master close-on-exec");
+    let slave = File::from(pty.slave);
+    fcntl_setfd(&slave, FdFlags::CLOEXEC).expect("make parent PTY slave close-on-exec");
+    let original_termios = tcgetattr(&slave).expect("read original PTY attributes");
+    let master = File::from(pty.master);
+    let mut command = Command::new("setsid");
+    command
+        .arg("--wait")
+        .arg(env!("CARGO_BIN_EXE_duplicity-tui"))
+        .arg("local")
+        .arg(&fixture)
+        .arg("--restore-parent")
+        .arg(&destination_parent)
+        .arg("--restore-name")
+        .arg(std::ffi::OsString::from_vec(destination_name.clone()))
+        .current_dir(&test_tree.path)
+        .env("TERM", "xterm-256color")
+        .env("COLUMNS", COLS.to_string())
+        .env("LINES", ROWS.to_string())
+        .stdin(Stdio::from(slave.try_clone().unwrap()))
+        .stdout(Stdio::from(slave.try_clone().unwrap()))
+        .stderr(Stdio::from(slave.try_clone().unwrap()));
+    let mut child = ChildGuard(
+        command
+            .spawn()
+            .expect("launch production TUI with raw destination bytes"),
+    );
+    let mut output = Vec::new();
+    let mut parser = vt100::Parser::new(ROWS, COLS, 0);
+
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "raw-identity history discovery",
+        PHASE_TIMEOUT,
+        |screen| {
+            screen.contains(std::str::from_utf8(HISTORY_MARKER).unwrap())
+                && screen.contains("Metadata only. a selects full anchor")
+                && frame_at_pty_geometry(screen)
+        },
+    );
+    assert_ne!(tcgetattr(&slave).unwrap(), original_termios);
+    write(&master, b"a").expect("select full anchor");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "raw-identity full-anchor selection",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Full anchor selected; choose target then Enter."),
+    );
+    write(&master, b"\x1b[B\x1b[B\r").expect("select final target and request scan");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "raw-identity scan confirmation",
+        PHASE_TIMEOUT,
+        |screen| {
+            screen.contains("Full volume scan required.") && screen.contains("Enter confirms.")
+        },
+    );
+    write(&master, b"\r").expect("confirm final scan");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "raw-identity validated snapshot",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Validated snapshot: 21 entries, 2621564 payload bytes."),
+    );
+    for _ in 0..raw_file_index {
+        write(&master, b"\x1b[B").expect("move snapshot selection to raw-byte file");
+    }
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "raw source file visible in snapshot list",
+        PHASE_TIMEOUT,
+        |screen| screen.contains(&source_display),
+    );
+    write(&master, b" ").expect("mark the selected raw-byte file");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "only raw source file marked",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("1 marked roots.") && only_marked_raw_file_is_visible(screen),
+    );
+    write(&master, b"r").expect("request marked-file restore preview");
+    let expected_root = format!("Root: {source_display}");
+    let expected_destination = duplicity_tui::display::bytes(&destination_name);
+    let parent_text = destination_parent.display().to_string();
+    let saw_unarmed = wait_preview_and_observe_initial_unarmed_ack(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        |screen| {
+            screen.contains("Snapshot target: 1700172800")
+                && screen.contains("Scope: marked roots")
+                && screen.contains(&expected_root)
+                && screen.contains("Entries: 2")
+                && screen.contains("Regular payload bytes: 9")
+                && screen.contains(&format!("Requested parent: {parent_text}"))
+                && displayed_value(screen, "New destination leaf:").as_deref()
+                    == Some(expected_destination.as_str())
+                && screen.contains("Atomic no-replacement publication")
+                && screen.contains("Preserves ordinary modes, supported exact modification times and raw symlink target bytes.")
+                && screen.contains("Acknowledgment [] ready")
+        },
+    );
+    assert!(
+        saw_unarmed,
+        "raw destination preview first appears empty/unarmed"
+    );
+    let preview_screen = parser.screen().contents();
+    assert_eq!(
+        displayed_value(&preview_screen, "Root:").as_deref(),
+        Some(source_display.as_str())
+    );
+    assert_eq!(
+        displayed_value(&preview_screen, "New destination leaf:").as_deref(),
+        Some(expected_destination.as_str())
+    );
+    assert!(expected_destination.bytes().all(|byte| byte.is_ascii()));
+    assert!(source_display.bytes().all(|byte| byte.is_ascii()));
+    assert!(!destination.exists());
+
+    // Empty acknowledgment cannot dispatch and must leave the raw leaf absent.
+    write(&master, b"\r").expect("send empty acknowledgment Enter");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "raw-identity empty acknowledgment refusal",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Acknowledgment must be exactly restore, then Enter."),
+    );
+    assert!(!screen_has(&parser, "Restoration running."));
+    assert!(!screen_has(&parser, "Published completed tree."));
+    assert!(!destination.exists());
+
+    write(&master, b"restore").expect("type exact ASCII acknowledgment");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "raw-identity armed acknowledgment",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Acknowledgment [restore] ready"),
+    );
+    test_tree.preserve();
+    write(&master, b"\r").expect("confirm raw-byte restore exactly once");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "raw-identity active restore",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Restoration running."),
+    );
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "Published raw destination receipt",
+        RESTORE_TIMEOUT,
+        |screen| {
+            screen.contains("Published completed tree.")
+                && screen.contains("Restore result. Up/Down scroll; Esc returns; q exits.")
+                && displayed_value(screen, "Destination:").as_deref()
+                    == Some(expected_destination.as_str())
+        },
+    );
+    let receipt_screen = parser.screen().contents();
+    assert_eq!(
+        displayed_value(&receipt_screen, "Destination:").as_deref(),
+        Some(expected_destination.as_str())
+    );
+    assert!(expected_destination.bytes().all(|byte| byte.is_ascii()));
+    let actual_names: Vec<Vec<u8>> = fs::read_dir(&destination_parent)
+        .expect("enumerate test-owned destination parent")
+        .map(|entry| entry.unwrap().file_name().as_bytes().to_vec())
+        .collect();
+    assert_eq!(actual_names, vec![destination_name.clone()]);
+    let root_metadata = fs::symlink_metadata(&destination).expect("inspect published raw leaf");
+    assert!(root_metadata.file_type().is_dir());
+    let raw_file_path = destination.join(std::ffi::OsString::from_vec(raw_component.clone()));
+    let raw_file_metadata =
+        fs::symlink_metadata(&raw_file_path).expect("inspect selected raw-byte file");
+    assert!(raw_file_metadata.file_type().is_file());
+    assert_eq!(raw_file_metadata.len(), 9);
+    let mut actual_tree = BTreeMap::new();
+    observe_tree(&destination, &mut Vec::new(), &mut actual_tree);
+    assert_eq!(actual_tree.len(), 2);
+    assert!(actual_tree.contains_key(&Vec::<Vec<u8>>::new()));
+    let restored_file = actual_tree
+        .get(&vec![raw_component.clone()])
+        .expect("published tree contains exact raw path component");
+    assert_eq!(restored_file.kind, EntryKind::File);
+    assert_eq!(restored_file.size, Some(9));
+    assert_eq!(
+        restored_file.sha256.as_deref(),
+        Some(raw_file["sha256"].as_str().unwrap())
+    );
+
+    write(&master, b"q").expect("quit through production Published result path");
+    let status = wait_exit(&master, &mut child, &mut output)
+        .expect("raw-identity TUI did not exit within its deadline");
+    assert!(status.success(), "raw-identity TUI exited with {status}");
+    assert_eq!(tcgetattr(&slave).unwrap(), original_termios);
+    assert!(output
+        .windows(b"\x1b[?1049l".len())
+        .any(|window| window == b"\x1b[?1049l"));
+    let mut source_after = BTreeMap::new();
+    observe_tree(&fixture, &mut Vec::new(), &mut source_after);
+    assert_eq!(
+        source_after, source_before,
+        "source fixture remained unchanged"
+    );
+    let final_names: Vec<Vec<u8>> = fs::read_dir(&destination_parent)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().as_bytes().to_vec())
+        .collect();
+    assert_eq!(final_names, vec![destination_name]);
     test_tree.cleanup_after_assertions();
 }
 
