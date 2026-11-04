@@ -147,9 +147,10 @@ fn observe_tree(
 }
 
 fn decode_hex_bytes(hex: &str) -> Vec<u8> {
-    assert_eq!(hex.len() % 2, 0, "oracle hex component has even length");
-    hex.as_bytes()
-        .chunks_exact(2)
+    let (pairs, remainder) = hex.as_bytes().as_chunks::<2>();
+    assert!(remainder.is_empty(), "oracle hex component has even length");
+    pairs
+        .iter()
         .map(|pair| {
             let digit = |byte: u8| match byte {
                 b'0'..=b'9' => byte - b'0',
