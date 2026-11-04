@@ -24,9 +24,12 @@ fails while stdin remains a TTY. This removes the inherited test-runner
 controlling terminal. Pinned Crossterm 0.29's Unix `window_size()` opens
 `/dev/tty` first and falls back to stdout when that open fails, on both macOS
 and Linux; this child-side check establishes that the output PTY is the size
-source. Keep the official 3.0.7 plain fixture and a gated identity-checked
-first-volume open. The exact scan token must be uncancelled at gate entry; the
-driver never cancels it.
+source. Before spawning the child, the parent must set and verify `FD_CLOEXEC`
+on both PTY master descriptors. This ensures the child cannot inherit a hidden
+master that would keep either PTY open after the parent closes its descriptor.
+Keep the official 3.0.7 plain fixture and a gated identity-checked first-volume
+open. The exact scan token must be uncancelled at gate entry; the driver never
+cancels it.
 
 The child reports bounded, fixed-field completion data through the separate
 IPC directory only after `browser::run` returns. It records whether the
