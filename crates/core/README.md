@@ -102,6 +102,7 @@ Stored-volume decoding checks SHA1 and MD5 declarations before decompression, re
 
 - [x] Plan metadata-only contiguous chains with explicit anchors and exact dates; reject missing links and ambiguous branches.
 - [x] Integrate original object identities, manifest/volume validation and snapshot states in a bounded plain/gzip reader.
+- [ ] Validate the read-only S3Source-to-Catalog path against an approved live mirror of all twelve official plain objects and the final snapshot oracle; credentials, bucket/prefix and captured identity inventory are external prerequisites. See [`docs/live-s3-reader-acceptance.md`](../../docs/live-s3-reader-acceptance.md).
 - [x] Prove chain-controller deterministic selection/errors and borrowed provenance: 17 fresh strict obligations pass; completed-name predicate passes separately.
 - [ ] Prove repository-reader refinement and thin chain iterator adaptation; complete same-source core acceptance.
 
