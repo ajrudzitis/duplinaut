@@ -1,7 +1,9 @@
 # PTY output failure acceptance plan
 
 Status: q-triggered acceptance stimulus independently reviewed and adopted
-before implementation.
+before implementation. The q-triggered implementation, focused macOS test,
+independent review, and Duvet trace pass. Full macOS assurance CI and hosted
+Linux CI for this exact variant remain pending.
 The earlier resize-only variant passed focused macOS PTY testing and local
 macOS CI, but its post-close PTY resize is not portable to Linux and does not
 validate this revised stimulus.

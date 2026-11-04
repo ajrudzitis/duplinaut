@@ -579,19 +579,10 @@ fn check_redraw_output_failure() {
     );
 
     // Preserve the output slave descriptor for the child, but remove the only
-    // reader. A second resize notification makes the next production draw
-    // write a complete frame to the closed output PTY.
+    // reader. One q key cancels the held scan and changes the status text, so
+    // the subsequent production redraw must write changed cells to broken stdout.
     drop(output_master);
-    let expanded = TerminalSize {
-        ws_row: size.ws_row,
-        ws_col: size.ws_col,
-        ws_xpixel: 0,
-        ws_ypixel: 0,
-    };
-    tcsetwinsize(&output_slave, expanded).expect("resize output PTY after master close");
-    assert_eq!(tcgetwinsize(&output_slave).unwrap(), expanded);
-    kill(nix::unistd::Pid::from_raw(child_pid), Signal::SIGWINCH)
-        .expect("notify isolated child of post-close output resize");
+    write(&input_master, b"q").expect("request cancellation through live input PTY");
     let deadline = Instant::now() + PHASE_TIMEOUT;
     while !marker_matches(&control.0, "cancel-observed", OBSERVED).unwrap() {
         assert!(
