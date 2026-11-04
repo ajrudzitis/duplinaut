@@ -54,6 +54,8 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [x] Prove exact digest duplicate/conflict detection; preserve first-conflict rejection and bounded append behavior.
 - [ ] Prove complete multipart controller refinement.
 - [x] Exercise the real multipart wrapper's post-digest and post-native-decode cancellation checkpoints using private, thread-local `cfg(test)` observation points and official ciphertext. The first test proves decode is not reached using wrong credentials; the second proves tar validation/commit are not reached using valid credentials. These hooks do not exist in release builds. Public-reader snapshot cancellation at those precise internal boundaries remains pending.
+- [x] Specify the remaining PARSE-ENV-010 test-coverage acceptance for stored-ciphertext bounds and authenticated MDC failure, including Duvet links and a same-credential positive control. See the [acceptance plan](../../docs/parse-env-010-acceptance.md).
+- [ ] Implement and independently review the PARSE-ENV-010 acceptance tests; require Duvet test coverage and preserve the stated cryptographic trust boundary.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 
