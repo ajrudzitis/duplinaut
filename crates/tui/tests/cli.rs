@@ -52,10 +52,12 @@ mod pty_acceptance {
         os::fd::{AsFd, AsRawFd},
         path::{Path, PathBuf},
         process::{Child, Command, ExitStatus, Stdio},
+        sync::{Arc, Mutex},
         time::{Duration, Instant},
     };
 
     pub(super) const HISTORY_MARKER: &[u8] = b"duplicity-full.20231114T221320Z.manifest";
+    pub(super) const STDERR_LIMIT: usize = 64 * 1024;
     const EXIT_TIMEOUT: Duration = Duration::from_secs(15);
     const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -201,6 +203,18 @@ mod pty_acceptance {
         phase: &str,
         expected: impl Fn(&str) -> bool,
     ) {
+        wait_for_screen_with_diagnostic(master, child, output, parser, phase, expected, String::new)
+    }
+
+    pub(super) fn wait_for_screen_with_diagnostic(
+        master: &File,
+        child: &mut ChildGuard,
+        output: &mut Vec<u8>,
+        parser: &mut vt100::Parser,
+        phase: &str,
+        expected: impl Fn(&str) -> bool,
+        diagnostic: impl Fn() -> String,
+    ) {
         let deadline = Instant::now() + STARTUP_TIMEOUT;
         loop {
             let previous = output.len();
@@ -209,15 +223,50 @@ mod pty_acceptance {
             let screen = parser.screen().contents();
             assert!(
                 child.0.try_wait().unwrap().is_none(),
-                "TUI exited during {phase}; current screen:\n{screen}"
+                "TUI exited during {phase}; current screen:\n{screen}{}",
+                diagnostic()
             );
             if expected(&screen) {
                 return;
             }
             assert!(
                 Instant::now() < deadline,
-                "timed out during {phase}; current screen:\n{screen}"
+                "timed out during {phase}; current screen:\n{screen}{}",
+                diagnostic()
             );
+        }
+    }
+
+    #[derive(Clone, Default)]
+    pub(super) struct BoundedStderr(Arc<Mutex<StderrState>>);
+
+    #[derive(Default)]
+    struct StderrState {
+        bytes: Vec<u8>,
+        overflow: bool,
+    }
+
+    impl BoundedStderr {
+        pub(super) fn append(&self, bytes: &[u8]) {
+            let mut state = self.0.lock().unwrap();
+            let remaining = STDERR_LIMIT - state.bytes.len();
+            let retained = bytes.len().min(remaining);
+            state.bytes.extend_from_slice(&bytes[..retained]);
+            state.overflow |= retained != bytes.len();
+        }
+
+        pub(super) fn snapshot(&self) -> (Vec<u8>, bool) {
+            let state = self.0.lock().unwrap();
+            (state.bytes.clone(), state.overflow)
+        }
+
+        pub(super) fn diagnostic(&self) -> String {
+            let (bytes, overflow) = self.snapshot();
+            format!(
+                "; child stderr ({} bytes, overflow={overflow}): {}",
+                bytes.len(),
+                String::from_utf8_lossy(&bytes)
+            )
         }
     }
 

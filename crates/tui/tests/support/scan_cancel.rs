@@ -3,7 +3,8 @@
 //! only that child owns crossterm's process-global terminal state.
 
 use crate::pty_acceptance::{
-    contains, fingerprint, wait_for_exit, wait_for_screen, ChildGuard, Scratch, HISTORY_MARKER,
+    contains, fingerprint, wait_for_exit, wait_for_screen, wait_for_screen_with_diagnostic,
+    BoundedStderr, ChildGuard, Scratch, HISTORY_MARKER,
 };
 use duplicity_core::{
     local::LocalSource,
@@ -44,7 +45,6 @@ const OUTPUT_CONFIG: &[u8] = b"duplinaut source-injected redraw-output-failure d
 const OUTPUT_COMPLETED: &[u8] = b"browser-returned; event=true teardown=true raw_failed=false screen_failed=true cursor_failed=true; entered=true observed=true released=true returned-cancelled=true failure=none\n";
 const PHASE_TIMEOUT: Duration = Duration::from_secs(30);
 const MARKER_LIMIT: u64 = 256;
-const STDERR_LIMIT: usize = 64 * 1024;
 
 // Markers have fixed private names and bounded bodies. Rename publishes each
 // complete body atomically; a partially written marker is never an accepted phase.
@@ -483,11 +483,11 @@ fn check_redraw_output_failure() {
         .stderr
         .take()
         .expect("capture isolated child stderr");
+    let stderr_capture = BoundedStderr::default();
+    let stderr_capture_writer = stderr_capture.clone();
     // Drain continuously so a faulty child cannot block on a full pipe. Keep
     // only a fixed diagnostic prefix and report whether the cap was exceeded.
-    let stderr_drain = std::thread::spawn(move || -> io::Result<(Vec<u8>, bool)> {
-        let mut stderr = Vec::new();
-        let mut overflow = false;
+    let stderr_drain = std::thread::spawn(move || -> io::Result<()> {
         let mut reader = stderr_reader;
         let mut chunk = [0u8; 4096];
         loop {
@@ -495,16 +495,13 @@ fn check_redraw_output_failure() {
             if count == 0 {
                 break;
             }
-            let remaining = STDERR_LIMIT.saturating_sub(stderr.len());
-            let retained = count.min(remaining);
-            stderr.extend_from_slice(&chunk[..retained]);
-            overflow |= retained != count;
+            stderr_capture_writer.append(&chunk[..count]);
         }
-        Ok((stderr, overflow))
+        Ok(())
     });
     let mut output_bytes = Vec::new();
     let mut parser = vt100::Parser::new(40, 240, 0);
-    wait_for_screen(
+    wait_for_screen_with_diagnostic(
         &output_master,
         &mut child,
         &mut output_bytes,
@@ -514,19 +511,21 @@ fn check_redraw_output_failure() {
             screen.contains(std::str::from_utf8(HISTORY_MARKER).unwrap())
                 && screen.contains("Metadata only. a selects full anchor")
         },
+        || stderr_capture.diagnostic(),
     );
     assert_ne!(tcgetattr(&input_slave).unwrap(), original_termios);
     write(&input_master, b"a").unwrap();
-    wait_for_screen(
+    wait_for_screen_with_diagnostic(
         &output_master,
         &mut child,
         &mut output_bytes,
         &mut parser,
         "output-failure anchor selection",
         |screen| screen.contains("Full anchor selected; choose target then Enter."),
+        || stderr_capture.diagnostic(),
     );
     write(&input_master, b"\x1b[B\x1b[B\r").unwrap();
-    wait_for_screen(
+    wait_for_screen_with_diagnostic(
         &output_master,
         &mut child,
         &mut output_bytes,
@@ -535,9 +534,10 @@ fn check_redraw_output_failure() {
         |screen| {
             screen.contains("Full volume scan required.") && screen.contains("Enter confirms.")
         },
+        || stderr_capture.diagnostic(),
     );
     write(&input_master, b"\r").unwrap();
-    wait_for_screen(
+    wait_for_screen_with_diagnostic(
         &output_master,
         &mut child,
         &mut output_bytes,
@@ -547,6 +547,7 @@ fn check_redraw_output_failure() {
             screen.contains("Reading and validating every required volume...")
                 && marker_matches(&control.0, "gate-entered", ENTERED).unwrap()
         },
+        || stderr_capture.diagnostic(),
     );
     assert!(!marker_matches(&control.0, "cancel-observed", OBSERVED).unwrap());
     assert!(!marker_matches(&control.0, "browser-returned", OUTPUT_COMPLETED).unwrap());
@@ -566,13 +567,14 @@ fn check_redraw_output_failure() {
     assert!(child_pid > 0, "never send a process-group signal");
     kill(nix::unistd::Pid::from_raw(child_pid), Signal::SIGWINCH)
         .expect("notify isolated child of compact output resize");
-    wait_for_screen(
+    wait_for_screen_with_diagnostic(
         &output_master,
         &mut child,
         &mut output_bytes,
         &mut parser,
         "compact output-failure scan frame",
         |screen| crate::pty_acceptance::frame_at_geometry(screen, compact.ws_row, compact.ws_col),
+        || stderr_capture.diagnostic(),
     );
 
     // Preserve the output slave descriptor for the child, but remove the only
@@ -593,11 +595,13 @@ fn check_redraw_output_failure() {
     while !marker_matches(&control.0, "cancel-observed", OBSERVED).unwrap() {
         assert!(
             child.0.try_wait().unwrap().is_none(),
-            "child exited before output-failure cancellation"
+            "child exited before output-failure cancellation{}",
+            stderr_capture.diagnostic()
         );
         assert!(
             Instant::now() < deadline,
-            "redraw failure did not cancel the gated scan"
+            "redraw failure did not cancel the gated scan{}",
+            stderr_capture.diagnostic()
         );
         std::thread::sleep(Duration::from_millis(5));
     }
@@ -615,14 +619,16 @@ fn check_redraw_output_failure() {
         }
         assert!(
             Instant::now() < deadline,
-            "output-failure child did not finish controlled teardown"
+            "output-failure child did not finish controlled teardown{}",
+            stderr_capture.diagnostic()
         );
         std::thread::sleep(Duration::from_millis(5));
     };
-    let (stderr, stderr_overflow) = stderr_drain
+    stderr_drain
         .join()
         .expect("stderr drainer thread panicked")
         .expect("read isolated child stderr");
+    let (stderr, stderr_overflow) = stderr_capture.snapshot();
     assert!(
         !stderr_overflow,
         "isolated child stderr exceeded its bounded diagnostic cap"
