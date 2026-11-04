@@ -23,11 +23,14 @@ evidence).
 
 1. Add a portable unit test in `crates/tui/src/browser.rs`, in the existing
    `duplicity_tui` test binary. Initialize browser reply state with one active
-   Prepare ID, no displayed `Preview`, and an empty/unarmed acknowledgment.
+   Prepare ID and no displayed `Preview`. Seed the acknowledgment with
+   `restore` and armed to make reply-matching effects observable; this is an
+   adversarial test state, since normal Prepare dispatch starts with it empty.
 2. Construct a matching `Reply::Preview { result: Err(Error::Selection) }`
-   (or another precise preview-construction error) and pass it through the
-   production reply dispatch and preview result mapping used by the browser
-   loop. The test and production path MUST share those transitions.
+   (or another precise preview-construction error) and a stale error reply
+   with a different ID. Pass both through the production reply dispatch and
+   preview result mapping used by the browser loop. The test and production
+   path MUST share those transitions.
 3. Record outgoing commands with a bounded test channel. Do not use sleeps,
    PTYs, a native backend, or filesystem operations.
 4. After the matching failure, submit a Press-Enter event through the shared
@@ -38,10 +41,12 @@ evidence).
 ## MUST-level acceptance requirements
 
 1. Require the matching reply ID to clear the active operation before mapping
-   the failed preview. Require the status to be `Executable preview failed; no
-   restore is armed.`, `preview == None`, and acknowledgment empty/unarmed.
-2. A stale error reply ID MUST leave the current active operation and state
-   unchanged; it MUST NOT clear the active ID or replace the status.
+   the failed preview. Require it to clear the seeded acknowledgment and
+   disarm confirmation, leave `preview == None`, and set status to
+   `Executable preview failed; no restore is armed.`
+2. A stale error reply ID MUST leave the current active operation, status, and
+   seeded acknowledgment unchanged; it MUST NOT clear active or disarm
+   confirmation.
 3. The failure transition itself MUST enqueue no command and MUST NOT display
    a confirmation prompt. Afterward, process Press Enter through the shared
    production idle-key dispatch or injected browser-loop harness; it MUST NOT
