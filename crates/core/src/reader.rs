@@ -128,6 +128,9 @@ impl AuthenticationEvidence {
         &self.certificates
     }
 }
+//= docs/parsing-requirements.md#parse-env-013
+//= type=implementation
+//# Historical signer verification MUST report its explicit offline fingerprint-authorization scope without claiming current certificate validity or Web-of-Trust validation.
 fn policy_summary(
     context: Option<&CryptoReadContext<'_>>,
 ) -> Result<(Option<AuthenticationPolicySummary>, usize), ReaderError> {

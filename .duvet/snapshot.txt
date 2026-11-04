@@ -96,7 +96,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
 
   SECTION: [PARSE-ENV-013](#parse-env-013)
-    TEXT[!MUST]: Historical signer verification MUST report its explicit offline fingerprint-authorization scope without claiming current certificate validity or Web-of-Trust validation.
+    TEXT[!MUST,implementation,test]: Historical signer verification MUST report its explicit offline fingerprint-authorization scope without claiming current certificate validity or Web-of-Trust validation.
 
   SECTION: [PARSE-ENV-014](#parse-env-014)
     TEXT[!MUST,implementation,test]: The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.

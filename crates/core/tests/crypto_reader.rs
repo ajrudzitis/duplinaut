@@ -172,6 +172,9 @@ impl ObjectSource for FixtureSource {
 //= docs/parsing-requirements.md#parse-env-023
 //= type=test
 //# Snapshot authentication evidence MUST distinguish integrity-only objects from configured signer authorization and preserve available complete signer fingerprints and certificate creation/expiry/revocation observations without implying current validity or Web-of-Trust acceptance.
+//= docs/parsing-requirements.md#parse-env-013
+//= type=test
+//# Historical signer verification MUST report its explicit offline fingerprint-authorization scope without claiming current certificate validity or Web-of-Trust validation.
 fn original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidence() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7");
     let secret = std::fs::read(root.join("test-keys/secret.asc")).unwrap();

@@ -1,12 +1,13 @@
 # PARSE-ENV-013 offline signer-scope acceptance plan
 
-Status: proposed before adding Duvet implementation and test links.
+Status: implementation, independent review, and full core verification pass;
+hosted assurance CI remains pending.
 
 This is a local traceability and regression-evidence slice for
 [PARSE-ENV-013](parsing-requirements.md#parse-env-013). The scoped Duvet query
-currently reports no implementation annotation. The core README records
-official signed-chain tests and authentication evidence, so the existing local
-fixture path can supply positive evidence without AWS.
+now traces the policy-summary construction and the official signed-chain
+evidence test. The existing local fixture path supplies positive evidence
+without AWS.
 
 ## Acceptance requirements
 
@@ -44,6 +45,22 @@ fixture path can supply positive evidence without AWS.
   unconfigured current-validity policy.
 - No Verus proof is claimed for upstream certificate parsing, fingerprint
   calculation, or signature verification.
+
+## Current evidence
+
+- The official signed-chain test checks the configured policy summary, exact
+  full permitted/authorized primary fingerprint, and certificate creation,
+  expiry, and revocation observations. It makes no current-validity or
+  Web-of-Trust claim.
+- The scoped implementation link is on `policy_summary`, which records
+  configured offline authorization inputs and policy bounds. Expired/revoked
+  certificate fixtures and time-based acceptance remain open as stated in the
+  non-goals.
+- The focused signed-chain test, `cargo test -p duplicity-core`, targeted
+  PARSE-ENV-013 Duvet query, `cargo xtask trace`, formatting checks, and strict
+  core Clippy pass. Clippy emits existing warnings in vendored `vest_lib`,
+  while `duplicity-core` passes `-D warnings`. Independent review passes;
+  hosted assurance CI remains pending.
 
 ## Non-goals
 
