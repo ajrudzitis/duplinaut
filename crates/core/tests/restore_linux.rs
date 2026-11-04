@@ -6,7 +6,7 @@ use duplicity_core::{
         AuthenticationKind, Catalog, CryptoCredentials, CryptoReadContext, OpenPgpLimits,
         OpenPgpPassword, ReaderLimits, SecretExport,
     },
-    restore_linux::{Cause, Profile, RestoreLimits, RestoreOutcome, restore},
+    restore_linux::{restore, Cause, Profile, RestoreLimits, RestoreOutcome},
     restore_plan::RestorePlanLimits,
     source::Cancellation,
     tar::EntryType,
@@ -178,11 +178,9 @@ fn fixture_fingerprint(directory: &Path) -> std::collections::BTreeMap<Vec<u8>, 
             }
             digest.update(&buffer[..read]);
         }
-        assert!(
-            files
-                .insert(name, (size, format!("{:x}", digest.finalize())))
-                .is_none()
-        );
+        assert!(files
+            .insert(name, (size, format!("{:x}", digest.finalize())))
+            .is_none());
     }
     files
 }
