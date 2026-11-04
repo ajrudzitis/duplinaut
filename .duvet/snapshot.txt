@@ -102,7 +102,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
 
   SECTION: [PARSE-ENV-015](#parse-env-015)
-    TEXT[!MUST]: The crypto adapter's trusted contract and limitations MUST be recorded with the pinned dependency identities and independent positive and negative integration evidence.
+    TEXT[!MUST,implementation,test]: The crypto adapter's trusted contract and limitations MUST be recorded with the pinned dependency identities and independent positive and negative integration evidence.
 
   SECTION: [PARSE-ENV-016](#parse-env-016)
     TEXT[!MUST]: The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.

@@ -54,6 +54,34 @@ Production additions are `pgp = "=0.21.0"` with default features disabled and `b
 
 Armor CRC24 checking remains disabled, matching [RFC9580 section 6.1](https://www.rfc-editor.org/rfc/rfc9580.html#section-6.1) and rPGP's default. CRC is not authentication. Independent test code uses manual base64 and the standard CRC24 initial value/polynomial, checks the `123456789` vector, matches both original key footers, and confirms original export SHA256 identities against `provenance.json`. For these valid inputs, rPGP 0.21.0's optional checker incorrectly reports the untouched initial CRC `0xb704ce`: [pinned `armor/reader.rs::read_body`](https://github.com/rpgp/rpgp/blob/c2b192e52b2e7f99777196539ea79b37f1f9ff30/src/armor/reader.rs#L546) updates a copied local hasher and does not store it back in `self.crc`. The adapter retains key binding verification, protected-secret integrity, complete MDC and required document signatures. No production library patch or checksum-based authentication claim is introduced.
 
+## PARSE-ENV-015 trust-boundary evidence
+
+The adapter pins `pgp = "=0.21.0"`; Cargo.lock resolves the crates.io archive
+with SHA-256
+`ae70f4d9325a391db30d115d6191a7bb67cec856aa0bba131290f0c4e09a532a`, whose
+`.cargo_vcs_info.json` identifies upstream source commit
+`c2b192e52b2e7f99777196539ea79b37f1f9ff30` (see the
+[profile provenance](openpgp-profile.md#pinned-upstream-reference)). Positive
+evidence comes from
+`original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidence`,
+which decrypts the official symmetric, public-key, and signed chains through
+the private native adapter and compares all three reconstructed dates per
+profile against independent source-content oracles. Negative evidence comes
+from `public_crypto_reader_rejects_wrong_symmetric_credentials_without_snapshot_or_secret_disclosure`:
+it supplies a controlled wrong passphrase for original producer ciphertext,
+requires a typed crypto error and no snapshot result, and asserts that the
+passphrase is absent from debug and display diagnostics.
+
+The dependency's packet parsing, certificate/fingerprint handling,
+cryptographic primitives, secret-key unlocking, compression internals, and
+signature verification are trusted upstream code. No Verus proof is claimed
+for these operations. The tests do not prove cryptographic correctness, every
+profile variant, resistance to the documented RSA timing/Marvin concern, or
+secure erasure. Core reader composition checks source identity and stored
+digests before decode and returns a snapshot only after the selected chain,
+but that controller has no Verus refinement proof. Encrypted filesystem
+restoration and its metadata acceptance remain out of scope.
+
 ## Repeatable native checks
 
 Run with the workspace's pinned Rust toolchain:

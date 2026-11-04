@@ -1,21 +1,20 @@
 # PARSE-ENV-015 trusted-boundary evidence acceptance plan
 
-Status: proposed before adding Duvet implementation and test links.
+Status: implementation and full core verification complete; independent review
+and hosted assurance CI remain pending.
 
 This is a bounded traceability slice for
-[PARSE-ENV-015](parsing-requirements.md#parse-env-015). A section-scoped Duvet
-query currently reports no implementation annotation. The repository already
-has a pinned OpenPGP profile, an implementation/trust-boundary record, and
-positive and negative tests using original local producer fixtures. No AWS
-access or new parser behavior is required.
+[PARSE-ENV-015](parsing-requirements.md#parse-env-015). The module trust-boundary
+documentation and positive/negative original-fixture integrations now carry
+scoped Duvet links. No AWS access or new parser behavior is required.
 
 ## Acceptance requirements
 
 1. An implementation annotation MUST link the native OpenPGP adapter's
-   documented trusted boundary to PARSE-ENV-015 and point reviewers to the
-   pinned dependency identity and limitations in the
+   documented trusted boundary to PARSE-ENV-015. The accompanying
    [OpenPGP profile](openpgp-profile.md) and
-   [implementation record](openpgp-implementation.md).
+   [implementation record](openpgp-implementation.md) MUST document the pinned
+   dependency identity and its limitations for reviewers.
 2. At least one positive integration test MUST link to PARSE-ENV-015 and
    exercise an original official encrypted chain through native decode and
    reader reconstruction with independent source-content expectations.
@@ -40,6 +39,27 @@ access or new parser behavior is required.
   before this evidence slice is recorded complete. Independent review MUST
   verify that the documentation matches the dependency pinned in the lockfile
   and that stated limitations are not broadened by the tests.
+
+## Current evidence
+
+- Positive: `original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidence`
+  runs original symmetric, public-key, and signed chains through the native
+  reader and compares all three dates per profile against independent source
+  content expectations.
+- Negative: `public_crypto_reader_rejects_wrong_symmetric_credentials_without_snapshot_or_secret_disclosure`
+  supplies a controlled wrong passphrase for original ciphertext, requires a
+  typed crypto error (and therefore no completed snapshot result), and checks
+  that the passphrase is absent from debug and display diagnostics.
+- The implementation record identifies locked `pgp` 0.21.0, the published
+  archive SHA-256 and source commit, trusted upstream operations, the RSA
+  timing/Marvin caveat, and the absence of Verus crypto proofs. It keeps
+  reader composition source-reviewed and encrypted filesystem restoration
+  outside this claim.
+- Focused positive and negative tests, `cargo test -p duplicity-core`, the
+  targeted PARSE-ENV-015 Duvet query, `cargo xtask trace`, formatting checks,
+  and strict core Clippy pass. Clippy emits existing warnings in vendored
+  `vest_lib`, while `duplicity-core` passes `-D warnings`. Independent review
+  and hosted assurance CI remain pending.
 
 ## Non-goals
 

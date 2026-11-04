@@ -154,6 +154,9 @@ impl ObjectSource for FixtureSource {
 //= docs/parsing-requirements.md#parse-env-017
 //= type=test
 //# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
+//= docs/parsing-requirements.md#parse-env-015
+//= type=test
+//# The crypto adapter's trusted contract and limitations MUST be recorded with the pinned dependency identities and independent positive and negative integration evidence.
 //= docs/parsing-requirements.md#parse-env-009
 //= type=test
 //# The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
@@ -450,6 +453,9 @@ fn corrupted_ciphertext_fails_declared_digest_before_missing_credentials() {
 //= docs/parsing-requirements.md#parse-env-018
 //= type=test
 //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+//= docs/parsing-requirements.md#parse-env-015
+//= type=test
+//# The crypto adapter's trusted contract and limitations MUST be recorded with the pinned dependency identities and independent positive and negative integration evidence.
 //= docs/parsing-requirements.md#parse-env-014
 //= type=test
 //# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.

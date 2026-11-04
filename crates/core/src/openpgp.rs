@@ -1,6 +1,9 @@
 //! Native SEIPDv1 recovery adapter. Crypto, key/packet primitives and compression
 //! are trusted dependencies; this bounded controller is native-tested, with
 //! formal refinement and full compatibility acceptance still pending.
+//= docs/parsing-requirements.md#parse-env-015
+//= type=implementation
+//# The crypto adapter's trusted contract and limitations MUST be recorded with the pinned dependency identities and independent positive and negative integration evidence.
 #[cfg(test)]
 pub(crate) mod adversarial_tests;
 #[cfg(test)]
