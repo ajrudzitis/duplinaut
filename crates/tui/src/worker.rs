@@ -964,7 +964,12 @@ mod tests {
             reader::{Catalog, ReaderLimits},
             source::Cancellation,
         };
-        use std::{ffi::OsString, os::unix::ffi::OsStringExt, path::PathBuf, time::Duration};
+        use std::{
+            ffi::OsString,
+            os::unix::ffi::{OsStrExt, OsStringExt},
+            path::PathBuf,
+            time::Duration,
+        };
 
         const OPERATION: u64 = 74;
         const EVENT_ERROR: &str = "injected unavailable-result event-loop error";
