@@ -627,6 +627,9 @@ fn public_crypto_reader_rejects_valid_signature_from_disallowed_primary_signer()
 }
 
 #[test]
+//= docs/parsing-requirements.md#parse-env-010
+//= type=test
+//# The adapter MUST enforce its configured ciphertext bound before materializing an encrypted object and authenticate the complete SEIPDv1 payload before releasing plaintext to message or duplicity parsers.
 //= docs/parsing-requirements.md#parse-env-018
 //= type=test
 //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
@@ -635,16 +638,66 @@ fn public_crypto_reader_rejects_valid_signature_from_disallowed_primary_signer()
 //# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
 fn public_crypto_reader_rejects_authenticated_manifest_ciphertext_mutation() {
     let manifest_name = "duplicity-full.20231114T221320Z.manifest.gpg";
+    let mut source = FixtureSource::new("symmetric", None);
+    let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords: std::slice::from_ref(&password),
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    let unmodified_catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .expect("unmodified official manifest is discoverable");
+    let anchor = unmodified_catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .expect("official full manifest")
+        .0;
+    let positive = unmodified_catalog
+        .read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1700000000),
+            &Cancellation::default(),
+            &context,
+        )
+        .expect("unmodified official manifest authenticates with fixture credentials");
+    assert!(positive.state().len() > 0);
+    assert!(positive
+        .authentication_evidence()
+        .objects()
+        .iter()
+        .any(|object| object.manifest && object.key.ends_with(manifest_name)));
+    drop(positive);
+
     // Mutate the stored OpenPGP MDC byte before discovery. This preserves the
     // filename and object length, so catalog structure remains valid and there
     // is no data-volume digest that could mask native message authentication.
-    let mut source = FixtureSource::new("symmetric", None);
     let (_, bytes) = source
         .values
         .iter_mut()
         .find(|(object, _)| object.key.ends_with(manifest_name))
         .expect("official full manifest fixture");
+    let original = bytes.clone();
     *bytes.last_mut().expect("nonempty OpenPGP fixture") ^= 0x01;
+    assert_eq!(
+        bytes.len(),
+        original.len(),
+        "MDC mutation preserves stored length"
+    );
+    assert_eq!(
+        &bytes[..bytes.len() - 1],
+        &original[..original.len() - 1],
+        "only the final MDC byte is mutated"
+    );
+    assert_ne!(bytes.last(), original.last());
     let object = source
         .values
         .iter_mut()
@@ -665,25 +718,22 @@ fn public_crypto_reader_rejects_authenticated_manifest_ciphertext_mutation() {
         .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
         .expect("full manifest remains discoverable")
         .0;
-    let password = OpenPgpPassword::from("duplicity-reader-public-test-fixture");
-    let context = CryptoReadContext {
-        credentials: CryptoCredentials {
-            message_passwords: std::slice::from_ref(&password),
-            ..CryptoCredentials::default()
-        },
-        crypto_limits: OpenPgpLimits::default(),
-        evidence_limits: EvidenceLimits::default(),
+    let result = catalog.read_snapshot_with_crypto(
+        anchor,
+        Timestamp(1700000000),
+        &Cancellation::default(),
+        &context,
+    );
+    let error = match result {
+        Ok(snapshot) => panic!(
+            "MDC-mutated manifest returned a snapshot with {} evidence objects",
+            snapshot.authentication_evidence().objects().len()
+        ),
+        Err(error) => error,
     };
     assert!(matches!(
-        catalog.read_snapshot_with_crypto(
-            anchor,
-            Timestamp(1700000000),
-            &Cancellation::default(),
-            &context,
-        ),
-        Err(ReaderError::Crypto(
-            duplicity_core::reader::OpenPgpError::AuthenticationFailed
-        ))
+        error,
+        ReaderError::Crypto(duplicity_core::reader::OpenPgpError::AuthenticationFailed)
     ));
 }
 

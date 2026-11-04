@@ -1,4 +1,6 @@
-use crate::openpgp::{decode, Credentials, CryptoError, CryptoLimits, Limit, SecretExport};
+use crate::openpgp::{
+    decode, read_ciphertext, Credentials, CryptoError, CryptoLimits, Limit, SecretExport,
+};
 use pgp::types::Password;
 use sha2::{Digest, Sha256};
 use std::path::Path;
@@ -17,6 +19,71 @@ fn fixture() -> std::path::PathBuf {
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
+
+struct CountingReader {
+    bytes: Vec<u8>,
+    consumed: usize,
+}
+
+impl CountingReader {
+    fn new(bytes: &[u8]) -> Self {
+        Self {
+            bytes: bytes.to_vec(),
+            consumed: 0,
+        }
+    }
+}
+
+impl Read for CountingReader {
+    fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+        let remaining = self.bytes.len() - self.consumed;
+        let count = output.len().min(remaining);
+        output[..count].copy_from_slice(&self.bytes[self.consumed..self.consumed + count]);
+        self.consumed += count;
+        Ok(count)
+    }
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-010
+//= type=test
+//# The adapter MUST enforce its configured ciphertext bound before materializing an encrypted object and authenticate the complete SEIPDv1 payload before releasing plaintext to message or duplicity parsers.
+fn read_ciphertext_accepts_exact_limit_and_probes_one_byte_for_overflow() {
+    let stored = b"exact-bound";
+    let limits = CryptoLimits {
+        stored_bytes: stored.len(),
+        ..CryptoLimits::default()
+    };
+    let mut exact = CountingReader::new(stored);
+    assert_eq!(read_ciphertext(&mut exact, limits).unwrap(), stored);
+    assert_eq!(exact.consumed, stored.len());
+
+    let excessive = b"exact-bound-plus";
+    let mut over = CountingReader::new(excessive);
+    assert!(matches!(
+        read_ciphertext(&mut over, limits),
+        Err(CryptoError::Limit(Limit::Stored))
+    ));
+    assert_eq!(over.consumed, stored.len() + 1);
+    assert!(over.consumed <= limits.stored_bytes + 1);
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-010
+//= type=test
+//# The adapter MUST enforce its configured ciphertext bound before materializing an encrypted object and authenticate the complete SEIPDv1 payload before releasing plaintext to message or duplicity parsers.
+fn decode_rejects_malformed_input_above_stored_limit_before_packet_parsing() {
+    let malformed = [0xff, 0x00, 0x80, 0x01];
+    let limits = CryptoLimits {
+        stored_bytes: malformed.len() - 1,
+        ..CryptoLimits::default()
+    };
+    assert!(matches!(
+        decode(&malformed, Credentials::default(), limits),
+        Err(CryptoError::Limit(Limit::Stored))
+    ));
+}
+
 fn source_oracle(mode: &str, objects: BTreeMap<String, Vec<u8>>) {
     let oracle: serde_json::Value =
         serde_json::from_slice(&std::fs::read(fixture().join("expected.json")).unwrap()).unwrap();

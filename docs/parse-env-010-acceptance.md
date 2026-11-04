@@ -1,12 +1,26 @@
 # PARSE-ENV-010 test acceptance plan
 
-Status: proposed before adding the missing Duvet test trace.
+Status: accepted. The focused boundary, adapter, and official MDC-mutation tests
+pass; independent review and Duvet traceability are complete.
 
 This plan closes the test-coverage gap for
 [PARSE-ENV-010](parsing-requirements.md#parse-env-010). It does not change the
 normative requirement or claim formal verification of cryptographic
-primitives. A section-scoped Duvet query currently reports the implementation
-covered and one test missing.
+primitives.
+
+Acceptance evidence:
+
+- `read_ciphertext` accepts the exact stored-byte bound and returns
+  `Limit::Stored` one byte over after consuming exactly one probe byte.
+- `decode` returns `Limit::Stored` for malformed input above the configured
+  bound, before packet parsing.
+- The correct fixture credential accepts the unmodified official encrypted
+  manifest and returns its snapshot and authentication evidence. After changing
+  only its final MDC byte and updating fixture identity metadata, the same
+  reader rejects it with `AuthenticationFailed` and returns no snapshot or
+  evidence.
+- Focused Rust tests, independent review, the PARSE-ENV-010 Duvet query, and
+  `cargo xtask trace` pass. No Verus claim covers cryptographic primitives.
 
 ## Acceptance requirements
 
