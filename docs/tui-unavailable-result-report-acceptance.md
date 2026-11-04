@@ -1,8 +1,13 @@
 # TUI unavailable-result diagnostic acceptance plan
 
-Status: proposed; specification only. This complements the accepted
-[active-restore shutdown case](tui-active-restore-shutdown-acceptance.md) by
-checking successful diagnostic delivery when the worker result is unavailable.
+Status: in progress. Local portable TUI tests, targeted Duvet queries/trace,
+formatting, strict Clippy, and implementation review passed. The Linux-gated
+test and hosted assurance (`cargo xtask ci`), plus Duvet report
+generation/artifact upload, passed in [run 41860735429](https://github.com/ajrudzitis/duplinaut/actions/runs/41860735429).
+Duvet Pages deployment remains queued, so acceptance is incomplete. This
+complements the accepted [active-restore shutdown case](tui-active-restore-shutdown-acceptance.md)
+by checking successful diagnostic delivery when the worker result is
+unavailable.
 
 ## Goal and scope
 
@@ -88,10 +93,13 @@ synthetic worker driver only tests frontend handling of a missing final reply.
 
 ## Checklist
 
-- [ ] Add a deterministic active-Execute worker-result-loss test in test-only
+- [x] Add a deterministic active-Execute worker-result-loss test in test-only
       code; native backend behavior remains outside scope.
-- [ ] Assert typed unavailability, exact operation/destination retention,
+- [x] Assert typed unavailability, exact operation/destination retention,
       successful escaped report, no inferred absence, and no retry or cleanup.
-- [ ] Focused/full Linux TUI tests, Duvet trace, formatting, and strict Clippy
-      pass; hosted Linux assurance and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped evidence.
+- [x] Local portable TUI tests, targeted Duvet queries and trace, formatting,
+      and strict Clippy passed.
+- [x] Linux-gated test and hosted assurance (`cargo xtask ci`), plus Duvet
+      report generation/artifact upload, passed in [run 41860735429](https://github.com/ajrudzitis/duplinaut/actions/runs/41860735429).
+- [ ] Duvet Pages deployment succeeds; currently queued for run 41860735429.
+- [x] Independent implementation review accepts the scoped evidence.
