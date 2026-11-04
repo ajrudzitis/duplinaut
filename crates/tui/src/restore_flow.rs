@@ -275,7 +275,6 @@ pub fn execute(
 pub fn retry_allowed(outcome: &duplicity_core::restore_linux::RestoreOutcome) -> bool {
     matches!(outcome,duplicity_core::restore_linux::RestoreOutcome::Unpublished(e)if e.uncertain_outer.is_none())
 }
-#[cfg(target_os = "linux")]
 //= docs/parsing-requirements.md#restore-ui-007
 //= type=implementation
 //# The frontend MUST run plan preparation and filesystem restoration outside the terminal event/render loop, with an operation-specific cancellation token and explicit running/cancellation-requested states.
@@ -288,11 +287,25 @@ pub fn retry_allowed(outcome: &duplicity_core::restore_linux::RestoreOutcome) ->
 //= docs/parsing-requirements.md#restore-ui-010
 //= type=implementation
 //# The frontend MUST render destination, selected paths, staging/candidate names and diagnostics using reversible terminal-safe byte escaping, preserving complete backend identity and warning fields in the accessible final result.
+//= docs/parsing-requirements.md#restore-ui-011
+//= type=implementation
+//# The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
+#[cfg(target_os = "linux")]
 pub fn diagnostics(
     outcome: &duplicity_core::restore_linux::RestoreOutcome,
 ) -> Result<String, Error> {
+    diagnostics_with_limit(outcome, DIAGNOSTIC_BYTES)
+}
+
+// The limit seam is private so only tests can exercise the byte boundary; all
+// production calls enter through `diagnostics` with the fixed 1 MiB cap.
+#[cfg(target_os = "linux")]
+fn diagnostics_with_limit(
+    outcome: &duplicity_core::restore_linux::RestoreOutcome,
+    limit: usize,
+) -> Result<String, Error> {
     use duplicity_core::restore_linux::RestoreOutcome;
-    let mut text = Text::new(DIAGNOSTIC_BYTES);
+    let mut text = Text::new(limit);
     let receipt = match outcome {
         RestoreOutcome::Published(r) => {
             text.push("Published completed tree. No second restore to this fixed destination.\n")?;
@@ -627,6 +640,98 @@ mod lifecycle_tests {
             assert!(failure.outcome.is_some());
             assert!(!failure.unavailable);
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-010
+    //= type=test
+    //# The frontend MUST render destination, selected paths, staging/candidate names and diagnostics using reversible terminal-safe byte escaping, preserving complete backend identity and warning fields in the accessible final result.
+    //= docs/parsing-requirements.md#restore-ui-011
+    //= type=test
+    //# The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
+    fn final_diagnostic_exact_fit_and_one_byte_overflow_fail_closed() {
+        use duplicity_core::restore_linux::{
+            Cause, Cleanup, Identity, Profile, Receipt, RestoreOutcome, Unpublished,
+        };
+        use std::ffi::CString;
+
+        assert_eq!(DIAGNOSTIC_BYTES, 1024 * 1024);
+        let receipt = Receipt {
+            destination: CString::new(b"dest\xff\n".to_vec()).unwrap(),
+            staging: CString::new(b"stage\\\xfe".to_vec()).unwrap(),
+            profile: Profile::PrivateParentSameParent,
+            parent: Identity {
+                device: 11,
+                inode: 12,
+            },
+            root: Identity {
+                device: 13,
+                inode: 14,
+            },
+            filesystem: 0xef53,
+            unspecified_empty_root_mtime: true,
+            cleanup: Cleanup {
+                attempted: 2,
+                failures: 1,
+                first_error: Some(rustix::io::Errno::IO),
+                budget_exhausted: true,
+                diagnostics_truncated: true,
+                ..Default::default()
+            },
+        };
+        let receipt_outcome = RestoreOutcome::Published(receipt);
+        let complete_receipt = diagnostics(&receipt_outcome).unwrap();
+        let receipt_size = complete_receipt.len();
+        assert!(receipt_size > 1);
+        let exact_receipt = diagnostics_with_limit(&receipt_outcome, receipt_size).unwrap();
+        assert_eq!(exact_receipt, complete_receipt);
+        assert!(exact_receipt
+            .contains("Published completed tree. No second restore to this fixed destination."));
+        assert!(exact_receipt.contains("Profile PrivateParentSameParent; filesystem 0xef53"));
+        assert!(exact_receipt.contains("Parent device=11 inode=12; root device=13 inode=14"));
+        assert!(exact_receipt.contains("Destination: dest\\xff\\x0a"));
+        assert!(exact_receipt.contains("Staging: stage\\\\\\xfe"));
+        assert!(exact_receipt.contains("Empty-root mtime unspecified=true"));
+        assert!(exact_receipt.contains(&format!(
+            "Cleanup warnings attempted=2 failures=1 first_errno=Some({}) exhausted=true detail_truncated=true",
+            rustix::io::Errno::IO.raw_os_error()
+        )));
+        assert!(!exact_receipt.contains('\x1b'));
+        assert!(matches!(
+            diagnostics_with_limit(&receipt_outcome, receipt_size - 1),
+            Err(Error::Limit)
+        ));
+
+        let uncertain_outcome = RestoreOutcome::Unpublished(Unpublished {
+            cause: Cause::Fidelity,
+            cleanup: Cleanup {
+                attempted: 3,
+                failures: 2,
+                first_error: Some(rustix::io::Errno::IO),
+                budget_exhausted: true,
+                diagnostics_truncated: true,
+                ..Default::default()
+            },
+            uncertain_outer: Some(CString::new(b"outer\xfd\n".to_vec()).unwrap()),
+        });
+        let complete_uncertain = diagnostics(&uncertain_outcome).unwrap();
+        let uncertain_size = complete_uncertain.len();
+        assert!(uncertain_size > 1);
+        let exact_uncertain = diagnostics_with_limit(&uncertain_outcome, uncertain_size).unwrap();
+        assert_eq!(exact_uncertain, complete_uncertain);
+        assert!(exact_uncertain.contains("Unpublished: cause Fidelity"));
+        assert!(exact_uncertain.contains(&format!(
+            "Cleanup attempted=3 failures=2 first_errno=Some({}) exhausted=true detail_truncated=true",
+            rustix::io::Errno::IO.raw_os_error()
+        )));
+        assert!(exact_uncertain
+            .contains("First-stage candidate uncertain; no session retry: outer\\xfd\\x0a"));
+        assert!(!exact_uncertain.contains('\x1b'));
+        assert!(matches!(
+            diagnostics_with_limit(&uncertain_outcome, uncertain_size - 1),
+            Err(Error::Limit)
+        ));
     }
 }
 pub fn unavailable(
