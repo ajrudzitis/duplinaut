@@ -1311,11 +1311,44 @@ mod pty_acceptance {
         let mut preview_frames = parser.screen().contents();
         let escaped_leaf = r"\x1b\\\xffR";
         let mut preview_saw_leaf = false;
+        let mut preview_saw_parent_prefix = false;
+        let mut preview_saw_parent_component = false;
+        let mut preview_saw_components = [false; 14];
+        let mut preview_saw_no_replace = false;
+        let mut preview_saw_backend_checks = false;
+        let mut preview_saw_modes = false;
+        let mut preview_saw_mtimes = false;
+        let mut preview_saw_symlink_targets = false;
+        let mut preview_saw_exclusions = false;
         for step in 0..80 {
             let screen = parser.screen().contents();
             preview_saw_leaf |= screen.contains(&format!("New destination leaf: {escaped_leaf}"));
+            preview_saw_parent_prefix |=
+                screen.contains(&format!("Requested parent: {}", workdir.display()));
+            preview_saw_parent_component |= screen.contains(r"p\x1b\\\xff");
+            for (index, byte) in (0x80..0x8e).enumerate() {
+                preview_saw_components[index] |= screen.contains(&escaped_byte(byte).repeat(20));
+            }
+            preview_saw_no_replace |= screen.contains("Atomic no-replacement publication");
+            preview_saw_backend_checks |=
+                screen.contains("Backend checks parent policy/filesystem");
+            preview_saw_modes |= screen.contains("Preserves ordinary modes");
+            preview_saw_mtimes |= screen.contains("supported exact modification times");
+            preview_saw_symlink_targets |= screen.contains("raw symlink target bytes");
+            preview_saw_exclusions |=
+                screen.contains("Ownership, source ACLs/xattrs and crash durability are excluded.");
             preview_frames.push_str(&screen);
-            if preview_saw_leaf {
+            if preview_saw_leaf
+                && preview_saw_parent_prefix
+                && preview_saw_parent_component
+                && preview_saw_components.iter().all(|seen| *seen)
+                && preview_saw_no_replace
+                && preview_saw_backend_checks
+                && preview_saw_modes
+                && preview_saw_mtimes
+                && preview_saw_symlink_targets
+                && preview_saw_exclusions
+            {
                 break;
             }
             let previous = screen;
@@ -1331,6 +1364,21 @@ mod pty_acceptance {
             assert!(step < 79, "preview did not expose configured leaf");
         }
         assert!(preview_saw_leaf, "preview shows exact escaped leaf");
+        assert!(
+            preview_saw_parent_prefix,
+            "preview shows requested parent prefix"
+        );
+        assert!(
+            preview_saw_parent_component,
+            "preview shows exact raw parent suffix"
+        );
+        assert!(preview_saw_components.iter().all(|seen| *seen));
+        assert!(preview_saw_no_replace);
+        assert!(preview_saw_backend_checks);
+        assert!(preview_saw_modes);
+        assert!(preview_saw_mtimes);
+        assert!(preview_saw_symlink_targets);
+        assert!(preview_saw_exclusions);
         assert!(preview_frames.contains("Atomic no-replacement publication"));
         assert!(preview_frames.contains("Backend checks parent policy/filesystem"));
         assert!(preview_frames.contains("Preserves ordinary modes"));
