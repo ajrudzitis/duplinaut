@@ -1,8 +1,11 @@
 # TUI executable-preview error acceptance plan
 
-Status: proposed; specification only. This covers a matching Prepare reply
-that reports preview construction failure, distinct from user abandonment or
-worker result loss.
+Status: accepted. Local portable TUI tests, Duvet trace, formatting, strict
+Clippy, and independent implementation review passed. Hosted Linux assurance
+(`cargo xtask ci`), Duvet report artifact upload, and Pages publication passed
+in [run 41871608268](https://github.com/ajrudzitis/duplinaut/actions/runs/41871608268).
+This covers a matching Prepare reply that reports preview construction
+failure, distinct from user abandonment or worker result loss.
 
 ## Goal and scope
 
@@ -79,10 +82,12 @@ proof.
 
 ## Checklist
 
-- [ ] Exercise matching and stale preview-error replies through production
+- [x] Exercise matching and stale preview-error replies through production
       reply dispatch and mapping.
-- [ ] Assert active clearing only for the matching ID, no armed preview, and
+- [x] Assert active clearing only for the matching ID, no armed preview, and
       no Execute dispatch.
-- [ ] Focused/full TUI tests, Duvet trace, formatting, and strict Clippy pass;
-      hosted Linux assurance and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped evidence.
+- [x] Local portable TUI tests, targeted Duvet queries/trace, formatting, and
+      strict Clippy passed.
+- [x] Hosted Linux assurance (`cargo xtask ci`), Duvet artifact upload, and
+      Pages publication passed in [run 41871608268](https://github.com/ajrudzitis/duplinaut/actions/runs/41871608268).
+- [x] Independent implementation review accepts the scoped evidence.

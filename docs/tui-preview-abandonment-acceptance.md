@@ -1,8 +1,11 @@
 # TUI active-preview abandonment acceptance plan
 
-Status: proposed; specification only. This covers cancellation of an
-in-flight executable preview and discarding a successful reply that arrives
-after the user abandons it.
+Status: accepted. Local portable TUI tests, Duvet trace, formatting, strict
+Clippy, and independent implementation review passed. Hosted Linux assurance
+(`cargo xtask ci`), Duvet report artifact upload, and Pages publication passed
+in [run 41871608268](https://github.com/ajrudzitis/duplinaut/actions/runs/41871608268).
+This covers cancellation of an in-flight executable preview and discarding a
+successful reply that arrives after the user abandons it.
 
 ## Goal and scope
 
@@ -85,10 +88,12 @@ check frontend state handling.
 
 ## Checklist
 
-- [ ] Exercise active Prepare cancellation for Esc and `q` through the
+- [x] Exercise active Prepare cancellation for Esc and `q` through the
       production key transition.
-- [ ] Assert stale reply isolation and discard of a matching late successful
+- [x] Assert stale reply isolation and discard of a matching late successful
       Preview, with empty/unarmed acknowledgment and no follow-up command.
-- [ ] Focused/full TUI tests, Duvet trace, formatting, and strict Clippy pass;
-      hosted Linux assurance and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped evidence.
+- [x] Local portable TUI tests, targeted Duvet queries/trace, formatting, and
+      strict Clippy passed.
+- [x] Hosted Linux assurance (`cargo xtask ci`), Duvet artifact upload, and
+      Pages publication passed in [run 41871608268](https://github.com/ajrudzitis/duplinaut/actions/runs/41871608268).
+- [x] Independent implementation review accepts the scoped evidence.
