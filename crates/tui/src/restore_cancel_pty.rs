@@ -219,11 +219,11 @@ fn gated_restore_browser_helper() {
         PathBuf::from(std::env::var_os("DUPLINAUT_RESTORE_CANCEL_DEST_PARENT").unwrap());
     let destination_name = b"restored".to_vec();
     let source = std::sync::Arc::new(LocalSource::new(source_path).unwrap());
-    let destination = std::sync::Arc::new(duplicity_tui::cli::Destination {
+    let destination = std::sync::Arc::new(crate::cli::Destination {
         parent: destination_parent,
         name: destination_name,
     });
-    duplicity_tui::browser::run_configured(
+    crate::browser::run_configured(
         source,
         String::new(),
         Cancellation::default(),
@@ -358,7 +358,7 @@ fn check_active_restore_cancel(key: &[u8], post_result: &[u8]) {
         |s| {
             s.contains("Restoration running.")
                 && marker(&control.0, "execute-entered").unwrap().as_deref()
-                    == Some(b"operation_id=3;cancelled=false\n")
+                    == Some(&b"operation_id=3;cancelled=false\n"[..])
         },
         &control.0,
     );
@@ -381,7 +381,7 @@ fn check_active_restore_cancel(key: &[u8], post_result: &[u8]) {
     }
     assert_eq!(
         marker(&control.0, "execute-entered").unwrap().as_deref(),
-        Some(b"operation_id=3;cancelled=false\n")
+        Some(&b"operation_id=3;cancelled=false\n"[..])
     );
     assert!(marker(&control.0, "cancel-observed").unwrap().is_none());
     assert!(marker(&control.0, "execute-result").unwrap().is_none());
@@ -396,7 +396,7 @@ fn check_active_restore_cancel(key: &[u8], post_result: &[u8]) {
         |s| {
             s.contains("Cancellation requested; waiting for operation outcome")
                 && marker(&control.0, "cancel-observed").unwrap().as_deref()
-                    == Some(b"operation_id=3;cancelled=true\n")
+                    == Some(&b"operation_id=3;cancelled=true\n"[..])
         },
         &control.0,
     );
@@ -412,7 +412,7 @@ fn check_active_restore_cancel(key: &[u8], post_result: &[u8]) {
         "typed cancelled result",
         |s| {
             s.contains("Restore result.") && s.contains("Unpublished: cause Cancelled")
-            && marker(&control.0, "execute-result").unwrap().as_deref() == Some(b"operation_id=3;outcome=Unpublished;cause=Cancelled;uncertain_outer=false\n")
+            && marker(&control.0, "execute-result").unwrap().as_deref() == Some(&b"operation_id=3;outcome=Unpublished;cause=Cancelled;uncertain_outer=false\n"[..])
         },
         &control.0,
     );
