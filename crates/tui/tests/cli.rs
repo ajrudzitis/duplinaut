@@ -44,6 +44,8 @@ mod pty_acceptance {
         },
         unistd::{read, write, Pid},
     };
+    #[cfg(target_os = "linux")]
+    use rustix::io::{fcntl_setfd, FdFlags};
     use rustix::termios::{tcgetwinsize, tcsetwinsize, Winsize as TerminalSize};
     use sha2::{Digest, Sha256};
     use std::{
@@ -72,7 +74,7 @@ mod pty_acceptance {
         }
     }
 
-    pub(super) struct Scratch(pub(super) PathBuf);
+    pub(super) struct Scratch(pub(super) PathBuf, bool);
 
     impl Scratch {
         pub(super) fn new() -> Self {
@@ -84,7 +86,7 @@ mod pty_acceptance {
                     std::process::id()
                 ));
                 match fs::create_dir(&path) {
-                    Ok(()) => return Self(path),
+                    Ok(()) => return Self(path, false),
                     Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
                     Err(error) => panic!("create PTY test working directory: {error}"),
                 }
@@ -93,9 +95,44 @@ mod pty_acceptance {
         }
     }
 
+    impl Scratch {
+        #[cfg(target_os = "linux")]
+        fn preserve(&mut self) {
+            self.1 = true;
+        }
+    }
+
     impl Drop for Scratch {
         fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
+            if self.1 {
+                eprintln!(
+                    "preserving PTY acceptance artifacts for inspection: {}",
+                    self.0.display()
+                );
+            } else {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    struct PreserveUnexpectedRestore<'a> {
+        scratch: &'a mut Scratch,
+        parent: PathBuf,
+        destination: PathBuf,
+    }
+
+    #[cfg(target_os = "linux")]
+    impl Drop for PreserveUnexpectedRestore<'_> {
+        fn drop(&mut self) {
+            let destination_exists = fs::symlink_metadata(&self.destination).is_ok();
+            let parent_nonempty = match fs::read_dir(&self.parent) {
+                Ok(entries) => entries.into_iter().next().is_some(),
+                Err(_) => true,
+            };
+            if destination_exists || parent_nonempty {
+                self.scratch.preserve();
+            }
         }
     }
 
@@ -567,6 +604,491 @@ mod pty_acceptance {
         assert!(contains(&output, b"\x1b[?1049l"));
         assert!(fs::read_dir(&scratch.0).unwrap().next().is_none());
         assert_eq!(fingerprint(&fixture), before_source);
+    }
+
+    #[cfg(target_os = "linux")]
+    fn wait_for_preview_ready_with_initial_unarmed_ack(
+        master: &File,
+        child: &mut ChildGuard,
+        output: &mut Vec<u8>,
+        parser: &mut vt100::Parser,
+        expected_ready: impl Fn(&str) -> bool,
+    ) -> bool {
+        let deadline = Instant::now() + STARTUP_TIMEOUT;
+        let mut saw_empty_unarmed = false;
+        loop {
+            let previous = output.len();
+            pump(master, output, 100);
+            let mut saw_ready = false;
+            // Process every byte in the PTY read, latching the first complete
+            // empty/unarmed screen before returning on the later ready frame.
+            for byte in &output[previous..] {
+                parser.process(std::slice::from_ref(byte));
+                let screen = parser.screen().contents();
+                saw_empty_unarmed |= screen.contains("Acknowledgment [] unarmed");
+                saw_ready |= expected_ready(&screen);
+            }
+            if saw_ready {
+                return saw_empty_unarmed;
+            }
+            let screen = parser.screen().contents();
+            assert!(
+                child.0.try_wait().unwrap().is_none(),
+                "TUI exited before executable preview was ready; current screen:\n{screen}"
+            );
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for executable preview; initial empty/unarmed acknowledgment observed={saw_empty_unarmed}; current screen:\n{screen}"
+            );
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn assert_preview_has_no_execute_side_effects(
+        screen: &str,
+        destination: &Path,
+        parent: &Path,
+        workdir: &Path,
+    ) {
+        assert!(screen.contains("Acknowledgment [restore] ready"));
+        assert!(!screen.contains("Restoration running."));
+        assert!(!screen.contains("Published completed tree."));
+        assert!(!destination.exists(), "preview must not create destination");
+        assert!(
+            fs::read_dir(parent).unwrap().next().is_none(),
+            "preview must not create a staging entry"
+        );
+        assert!(
+            fs::read_dir(workdir).unwrap().next().is_none(),
+            "preview must not write in the temporary working directory"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    fn production_linux_executable_preview_survives_pty_resize_without_execute() {
+        let oracle: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/duplicity-3.0.7/expected.json"
+        ))
+        .expect("parse official source oracle");
+        let snapshot_oracle = oracle["snapshots"]
+            .as_array()
+            .expect("snapshot records")
+            .iter()
+            .find(|snapshot| snapshot["mode"] == "plain" && snapshot["index"] == 2)
+            .expect("final plain snapshot oracle");
+        let entries = snapshot_oracle["entries"]
+            .as_array()
+            .expect("final snapshot entries");
+        assert_eq!(entries.len(), 21);
+        let payload_bytes: u64 = entries
+            .iter()
+            .filter(|entry| entry["kind"] == "file")
+            .map(|entry| entry["size"].as_u64().expect("file byte count"))
+            .sum();
+        assert_eq!(payload_bytes, 2_621_564);
+
+        let fixture = fs::canonicalize(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/duplicity-3.0.7/plain"),
+        )
+        .expect("official plain fixture");
+        let source_before = fingerprint(&fixture);
+        let mut scratch = Scratch::new();
+        let workdir = scratch.0.join("work");
+        let parent = scratch.0.join("restore-parent");
+        fs::create_dir(&workdir).expect("create empty work directory");
+        fs::create_dir(&parent).expect("create empty destination parent");
+        let destination_name = "preview-resize-tree";
+        let destination = parent.join(destination_name);
+        // Declared before ChildGuard so unwind first kills/reaps the child,
+        // then this guard preserves the scratch tree if it left any candidate
+        // or destination entry behind.
+        let _preserve_on_unexpected_restore = PreserveUnexpectedRestore {
+            scratch: &mut scratch,
+            parent: parent.clone(),
+            destination: destination.clone(),
+        };
+        assert!(fs::read_dir(&parent).unwrap().next().is_none());
+        assert!(!destination.exists());
+
+        let original_size = TerminalSize {
+            ws_row: 40,
+            ws_col: 240,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        let pty = openpty(
+            Some(&Winsize {
+                ws_row: original_size.ws_row,
+                ws_col: original_size.ws_col,
+                ws_xpixel: 0,
+                ws_ypixel: 0,
+            }),
+            None,
+        )
+        .expect("open production preview PTY");
+        fcntl_setfd(&pty.master, FdFlags::CLOEXEC).expect("close PTY master on exec");
+        let master = File::from(pty.master);
+        fcntl_setfd(&pty.slave, FdFlags::CLOEXEC).expect("close parent slave on exec");
+        let slave = File::from(pty.slave);
+        assert_eq!(tcgetwinsize(&slave).unwrap(), original_size);
+        let original_termios = tcgetattr(&slave).expect("read original terminal attributes");
+
+        // Start the production process in a session without an inherited
+        // controlling terminal; the test PTY is its only terminal geometry.
+        let mut command = Command::new("setsid");
+        command
+            .arg("--wait")
+            .arg(env!("CARGO_BIN_EXE_duplicity-tui"))
+            .arg("local")
+            .arg(&fixture)
+            .arg("--restore-parent")
+            .arg(&parent)
+            .arg("--restore-name")
+            .arg(destination_name)
+            .current_dir(&workdir)
+            .env("TERM", "xterm-256color")
+            .env("COLUMNS", "240")
+            .env("LINES", "40")
+            .stdin(Stdio::from(slave.try_clone().unwrap()))
+            .stdout(Stdio::from(slave.try_clone().unwrap()))
+            .stderr(Stdio::from(slave.try_clone().unwrap()));
+        let mut child = ChildGuard(command.spawn().expect("launch production TUI under setsid"));
+        let mut output = Vec::new();
+        let mut parser = vt100::Parser::new(original_size.ws_row, original_size.ws_col, 0);
+
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "history at 40x240",
+            |screen| {
+                screen.contains(std::str::from_utf8(HISTORY_MARKER).unwrap())
+                    && screen.contains("Metadata only. a selects full anchor")
+                    && frame_at_geometry(screen, original_size.ws_row, original_size.ws_col)
+            },
+        );
+        assert_ne!(tcgetattr(&slave).unwrap(), original_termios);
+        write(&master, b"a").expect("select visible full anchor");
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "full-anchor selection",
+            |screen| screen.contains("Full anchor selected; choose target then Enter."),
+        );
+        write(&master, b"\x1b[B\x1b[B\r").expect("select final snapshot target");
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "volume-scan disclosure",
+            |screen| {
+                screen.contains("Full volume scan required.") && screen.contains("Enter confirms.")
+            },
+        );
+        write(&master, b"\r").expect("confirm full volume scan");
+        let validated = format!(
+            "Validated snapshot: {} entries, {payload_bytes} payload bytes.",
+            entries.len()
+        );
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "validated final snapshot",
+            |screen| screen.contains(&validated),
+        );
+
+        write(&master, b"r").expect("request whole-snapshot executable preview");
+        let parent_text = parent.display().to_string();
+        let full_preview_content = |screen: &str| {
+            screen.contains("Restore preview / outcome / Up-Down scroll")
+                && screen.contains("Snapshot target: 1700172800")
+                && screen.contains("Scope: whole snapshot (no marks)")
+                && screen.contains("Include exact source directory ancestors; no flattening.")
+                && screen.contains("Entries: 21")
+                && screen.contains("Regular payload bytes: 2621564")
+                && screen.contains(&format!("Requested parent: {parent_text}"))
+                && screen.contains("New destination leaf: preview-resize-tree")
+                && screen.contains("Atomic no-replacement publication")
+                && screen.contains("Backend checks parent policy/filesystem")
+                && screen.contains("Preserves ordinary modes, supported exact modification times and raw symlink target bytes.")
+                && screen.contains("Ownership, source ACLs/xattrs and crash durability are excluded.")
+        };
+        let initial_preview_ready = |screen: &str| {
+            full_preview_content(screen) && screen.contains("Acknowledgment [] ready")
+        };
+        let saw_initial_unarmed = wait_for_preview_ready_with_initial_unarmed_ack(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            initial_preview_ready,
+        );
+        assert!(
+            saw_initial_unarmed,
+            "successful preview first renders with an empty unarmed acknowledgment"
+        );
+
+        // Empty Enter must be refused without Execute, a destination, or stage.
+        write(&master, b"\r").expect("submit empty acknowledgment");
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "empty acknowledgment refusal",
+            |screen| {
+                screen.contains("Acknowledgment must be exactly restore, then Enter.")
+                    && screen.contains("Restore preview / outcome / Up-Down scroll")
+            },
+        );
+        assert!(!parser.screen().contents().contains("Restoration running."));
+        assert!(!parser
+            .screen()
+            .contents()
+            .contains("Published completed tree."));
+        assert!(!destination.exists());
+        assert!(fs::read_dir(&parent).unwrap().next().is_none());
+        assert!(fs::read_dir(&workdir).unwrap().next().is_none());
+
+        write(&master, b"restore").expect("type exact acknowledgment");
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "exact acknowledgment ready",
+            |screen| {
+                full_preview_content(screen) && screen.contains("Acknowledgment [restore] ready")
+            },
+        );
+        assert_preview_has_no_execute_side_effects(
+            &parser.screen().contents(),
+            &destination,
+            &parent,
+            &workdir,
+        );
+
+        let compact = TerminalSize {
+            ws_row: 18,
+            ws_col: 96,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        let before_compact = resize_pty(
+            &master,
+            &slave,
+            &child,
+            &mut output,
+            &mut parser,
+            compact.ws_row,
+            compact.ws_col,
+        );
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "child redraw at 18x96",
+            |screen| {
+                frame_at_geometry(screen, compact.ws_row, compact.ws_col)
+                    && screen.contains("Restore preview / outcome / Up-Down scroll")
+                    && screen.contains("Snapshot target: 1700172800")
+                    && screen.contains("Scope: whole snapshot (no marks)")
+                    && screen.contains("Include exact source directory ancestors; no flattening.")
+                    && screen.contains("Entries: 21")
+                    && screen.contains("Regular payload bytes: 2621564")
+                    && screen.contains("Acknowledgment [restore] ready")
+            },
+        );
+        assert!(
+            output.len() > before_compact,
+            "shrink produced child output"
+        );
+        assert_eq!(parser.screen().size(), (compact.ws_row, compact.ws_col));
+        assert_preview_has_no_execute_side_effects(
+            &parser.screen().contents(),
+            &destination,
+            &parent,
+            &workdir,
+        );
+
+        let mut saw_parent = false;
+        let mut saw_leaf = false;
+        let mut saw_no_replace = false;
+        let mut saw_backend_validation = false;
+        let mut saw_mode_metadata = false;
+        for step in 0..12 {
+            let previous_screen = parser.screen().contents();
+            write(&master, b"\x1b[B").expect("scroll executable preview down");
+            wait_for_screen(
+                &master,
+                &mut child,
+                &mut output,
+                &mut parser,
+                "compact preview scroll down",
+                |screen| screen != previous_screen,
+            );
+            let screen = parser.screen().contents();
+            assert_preview_has_no_execute_side_effects(&screen, &destination, &parent, &workdir);
+            saw_parent |= screen.contains("Requested parent:") && screen.contains(&parent_text);
+            saw_leaf |= screen.contains("New destination leaf: preview-resize-tree");
+            saw_no_replace |= screen.contains("Atomic no-replacement publication");
+            saw_backend_validation |= screen.contains("Backend checks parent policy/filesystem");
+            saw_mode_metadata |= screen.contains("Preserves ordinary modes")
+                && screen.contains("supported exact modification times")
+                && screen.contains("raw symlink target bytes");
+            if saw_parent
+                && saw_leaf
+                && saw_no_replace
+                && saw_backend_validation
+                && saw_mode_metadata
+            {
+                break;
+            }
+            assert!(
+                step < 11,
+                "scroll did not expose every required preview detail"
+            );
+        }
+        assert!(saw_parent, "scrolled screen exposes the configured parent");
+        assert!(saw_leaf, "scrolled screen exposes the new leaf");
+        assert!(
+            saw_no_replace,
+            "scrolled screen exposes no-replacement policy"
+        );
+        assert!(
+            saw_backend_validation,
+            "scrolled screen exposes backend caveat"
+        );
+        assert!(saw_mode_metadata, "scrolled screen exposes metadata policy");
+
+        // Return to the top through production preview scrolling before the
+        // second resize; do not rely on the enlarged viewport clamping offset.
+        let mut saw_compact_summary = false;
+        for step in 0..12 {
+            let screen = parser.screen().contents();
+            if screen.contains("Snapshot target: 1700172800")
+                && screen.contains("Scope: whole snapshot (no marks)")
+                && screen.contains("Entries: 21")
+                && screen.contains("Regular payload bytes: 2621564")
+                && screen.contains("Acknowledgment [restore] ready")
+            {
+                saw_compact_summary = true;
+                break;
+            }
+            let previous_screen = screen;
+            write(&master, b"\x1b[A").expect("scroll executable preview up to summary");
+            wait_for_screen(
+                &master,
+                &mut child,
+                &mut output,
+                &mut parser,
+                "compact preview scroll back to summary",
+                |screen| screen != previous_screen,
+            );
+            assert_preview_has_no_execute_side_effects(
+                &parser.screen().contents(),
+                &destination,
+                &parent,
+                &workdir,
+            );
+            assert!(step < 11, "Up did not return to compact preview summary");
+        }
+        assert!(
+            saw_compact_summary,
+            "compact top summary is visible before expand"
+        );
+
+        let expanded = TerminalSize {
+            ws_row: 40,
+            ws_col: 240,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        let before_expanded = resize_pty(
+            &master,
+            &slave,
+            &child,
+            &mut output,
+            &mut parser,
+            expanded.ws_row,
+            expanded.ws_col,
+        );
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "child redraw at 40x240",
+            |screen| {
+                frame_at_geometry(screen, expanded.ws_row, expanded.ws_col)
+                    && full_preview_content(screen)
+                    && screen.contains("Acknowledgment [restore] ready")
+            },
+        );
+        assert!(
+            output.len() > before_expanded,
+            "expand produced child output"
+        );
+        assert_eq!(parser.screen().size(), (expanded.ws_row, expanded.ws_col));
+        assert_preview_has_no_execute_side_effects(
+            &parser.screen().contents(),
+            &destination,
+            &parent,
+            &workdir,
+        );
+
+        write(&master, b"\x1b").expect("abandon executable preview with Esc");
+        wait_for_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "preview abandonment",
+            |screen| {
+                screen.contains("Restore preview abandoned; nothing staged.")
+                    && !screen.contains("Restore preview / outcome / Up-Down scroll")
+                    && !screen.contains("Acknowledgment")
+                    && !screen.contains("Restoration running.")
+                    && !screen.contains("Published completed tree.")
+            },
+        );
+        assert!(!destination.exists());
+        assert!(fs::read_dir(&parent).unwrap().next().is_none());
+        assert!(fs::read_dir(&workdir).unwrap().next().is_none());
+
+        write(&master, b"q").expect("quit from snapshot browser");
+        let status = wait_for_exit(&master, &mut child, &mut output)
+            .expect("production TUI did not exit after q within timeout");
+        assert!(status.success(), "production TUI exited with {status}");
+        assert_eq!(tcgetattr(&slave).unwrap(), original_termios);
+        assert!(contains(&output, b"\x1b[?1049h"));
+        assert!(contains(&output, b"\x1b[?1049l"));
+        assert!(fs::read_dir(&parent).unwrap().next().is_none());
+        assert!(fs::read_dir(&workdir).unwrap().next().is_none());
+        assert_eq!(fingerprint(&fixture), source_before);
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    //= docs/parsing-requirements.md#restore-ui-003
+    //= type=test
+    //# The frontend MUST present a concrete restoration preview identifying the exact snapshot target, configured parent and new leaf, marked/all selection, included ancestors, resulting entry count, total regular payload bytes, no-replacement policy and supported metadata policy before offering publication confirmation.
+    //= docs/parsing-requirements.md#restore-ui-004
+    //= type=test
+    //# The frontend MUST start at most one restoration operation only when its displayed successful `r` preview receives the exact ASCII acknowledgment `restore` followed by Enter, and MUST clear that acknowledgment and disarm confirmation when its snapshot, roots or destination changes or the user leaves that preview.
+    //= docs/parsing-requirements.md#restore-ui-014
+    //= type=test
+    //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+    fn executable_preview_resizes_scrolls_and_abandons_without_execute() {
+        production_linux_executable_preview_survives_pty_resize_without_execute();
     }
 
     #[test]
