@@ -38,6 +38,25 @@ fn take_confirmation(ack: &mut Acknowledgment, code: KeyCode) -> bool {
         false
     }
 }
+fn active_key_transition(
+    code: KeyCode,
+    active: Option<u64>,
+    cancel: &Cancellation,
+    abandoning: &mut bool,
+    status: &mut String,
+) -> bool {
+    if active.is_none() {
+        return false;
+    }
+    if matches!(code, KeyCode::Esc | KeyCode::Char('q')) {
+        cancel.cancel();
+        *abandoning = true;
+        *status =
+            "Cancellation requested; waiting for operation outcome. q after the result exits."
+                .into();
+    }
+    true
+}
 struct RTransition<'a> {
     retry_allowed: bool,
     snapshot: Option<&'a Arc<ValidatedSnapshot>>,
@@ -409,12 +428,7 @@ pub fn run_configured(
                 let Some(code) = pressed_key(event::read()?) else {
                     continue;
                 };
-                if active.is_some() {
-                    if matches!(code, KeyCode::Esc | KeyCode::Char('q')) {
-                        cancel.cancel();
-                        abandoning = true;
-                        status="Cancellation requested; waiting for operation outcome. q after the result exits.".into();
-                    }
+                if active_key_transition(code, active, cancel, &mut abandoning, &mut status) {
                     continue;
                 }
                 if preview.is_some() {
@@ -659,6 +673,261 @@ mod tests {
         assert_eq!(accessible, text);
         assert!(accessible.ends_with("\\xff"));
         assert_eq!(wrapped_rows(&text, 1).count(), text.len());
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-004
+    //= type=test
+    //# The frontend MUST start at most one restoration operation only when its displayed successful `r` preview receives the exact ASCII acknowledgment `restore` followed by Enter, and MUST clear that acknowledgment and disarm confirmation when its snapshot, roots or destination changes or the user leaves that preview.
+    //= docs/parsing-requirements.md#restore-ui-006
+    //= type=test
+    //# The frontend MUST retain one frozen operation's exact snapshot, roots, destination and bounded plan summary across preview and confirmation, and keep at most one active scan, preview or restoration with bounded request/reply queues.
+    //= docs/parsing-requirements.md#restore-ui-007
+    //= type=test
+    //# The frontend MUST run plan preparation and filesystem restoration outside the terminal event/render loop, with an operation-specific cancellation token and explicit running/cancellation-requested states.
+    //= docs/parsing-requirements.md#restore-ui-014
+    //= type=test
+    //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+    // Synthetic Preview replies exercise browser state transitions only. The
+    // fixture is read to build the request/preview; no restore backend runs.
+    fn active_prepare_escape_and_q_discard_matching_late_preview() {
+        use crossterm::event::{KeyEvent, KeyEventKind, KeyModifiers};
+        use duplicity_core::{
+            chain::SetKind,
+            local::LocalSource,
+            names::{NameConfig, Timestamp},
+            reader::{Catalog, ReaderLimits},
+            source::Cancellation,
+        };
+        use std::path::PathBuf;
+
+        let source = LocalSource::new(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/duplicity-3.0.7/plain"),
+        )
+        .unwrap();
+        let cancellation = Cancellation::default();
+        let catalog = Catalog::discover(
+            &source,
+            "duplicity-",
+            NameConfig::default(),
+            ReaderLimits::default(),
+            &cancellation,
+        )
+        .unwrap();
+        let anchor = catalog
+            .manifests()
+            .find(|(_, _, set)| {
+                set.kind() == SetKind::Full
+                    && set.start() == Timestamp(1700000000)
+                    && set.end() == Timestamp(1700000000)
+            })
+            .unwrap()
+            .0;
+        let snapshot = Arc::new(
+            catalog
+                .read_snapshot(anchor, Timestamp(1700172800), &cancellation)
+                .unwrap(),
+        );
+        let destination = Arc::new(Destination {
+            parent: PathBuf::from("/tmp/preview-abandon-parent"),
+            name: b"preview-abandon-leaf".to_vec(),
+        });
+        let marked = vec![0usize];
+
+        for (operation, key_code) in [(70, KeyCode::Esc), (80, KeyCode::Char('q'))] {
+            let mut serial = operation - 1;
+            let mut cancel = Cancellation::default();
+            let mut active = None;
+            let mut document = None;
+            let mut ack = Acknowledgment::default();
+            let mut abandoning = false;
+            let mut status = String::new();
+            let mut preview = None;
+            let mut offset = 17;
+            let retry = true;
+            let (prepare_tx, prepare_rx) = mpsc::sync_channel(1);
+            let r_event = Event::Key(KeyEvent::new_with_kind(
+                KeyCode::Char('r'),
+                KeyModifiers::NONE,
+                KeyEventKind::Press,
+            ));
+            let r_key = pressed_key(r_event).expect("press-r starts the active Prepare");
+            assert_eq!(r_key, KeyCode::Char('r'));
+            assert!(r_transition(
+                r_key,
+                RTransition {
+                    retry_allowed: retry,
+                    snapshot: Some(&snapshot),
+                    marked: &marked,
+                    destination: Some(&destination),
+                    serial: &mut serial,
+                    cancel: &mut cancel,
+                    active: &mut active,
+                    document: &mut document,
+                    ack: &mut ack,
+                    abandoning: &mut abandoning,
+                    status: &mut status,
+                },
+                move |command| prepare_tx.send(command).map_err(io::Error::other),
+            )
+            .unwrap());
+            let Command::Prepare {
+                id,
+                snapshot: prepared_snapshot,
+                marked: prepared_marked,
+                destination: prepared_destination,
+                cancel: prepared_token,
+            } = prepare_rx.recv().unwrap()
+            else {
+                panic!("Press-r records a Prepare command")
+            };
+            assert_eq!(id, operation);
+            assert_eq!(active, Some(operation));
+            assert!(!prepared_token.is_cancelled());
+            assert!(matches!(
+                prepare_rx.try_recv(),
+                Err(mpsc::TryRecvError::Disconnected)
+            ));
+
+            let late_preview = crate::restore_flow::prepare(
+                prepared_snapshot.clone(),
+                prepared_marked.clone(),
+                prepared_destination.clone(),
+                &prepared_token,
+            )
+            .unwrap();
+            let matching_preview = crate::restore_flow::prepare(
+                prepared_snapshot,
+                prepared_marked,
+                prepared_destination,
+                &prepared_token,
+            )
+            .unwrap();
+
+            let other_token = Cancellation::default();
+            assert!(!other_token.is_cancelled());
+            let key_event = Event::Key(KeyEvent::new_with_kind(
+                key_code,
+                KeyModifiers::NONE,
+                KeyEventKind::Press,
+            ));
+            let key = pressed_key(key_event).expect("Press Esc/q normalizes to a key");
+            assert_eq!(key, key_code);
+            assert!(active_key_transition(
+                key,
+                active,
+                &cancel,
+                &mut abandoning,
+                &mut status,
+            ));
+            assert!(cancel.is_cancelled());
+            assert!(prepared_token.is_cancelled());
+            assert!(!other_token.is_cancelled());
+            assert_eq!(
+                active,
+                Some(operation),
+                "cancellation retains active ID until reply"
+            );
+            assert!(abandoning);
+            assert!(preview.is_none());
+            assert_eq!(ack.text(), "");
+            assert!(!ack.armed);
+            assert_eq!(
+                status,
+                "Cancellation requested; waiting for operation outcome. q after the result exits."
+            );
+
+            let mut selected = 5;
+            let mut scan_confirm = true;
+            let stale_reply = Reply::Preview {
+                id: operation + 1,
+                result: Ok(late_preview),
+            };
+            assert!(dispatch_reply(
+                stale_reply,
+                ReplyDispatchState {
+                    active: &mut active,
+                    scan_confirm: &mut scan_confirm,
+                    selected: &mut selected,
+                    preview: &mut preview,
+                    offset: &mut offset,
+                    ack: &mut ack,
+                    abandoning: &mut abandoning,
+                    status: &mut status,
+                },
+            )
+            .is_none());
+            assert_eq!(active, Some(operation));
+            assert_eq!(selected, 5);
+            assert!(scan_confirm);
+            assert_eq!(offset, 17);
+            assert!(abandoning);
+            assert!(preview.is_none());
+            assert_eq!(ack.text(), "");
+            assert!(!ack.armed);
+            assert_eq!(
+                status,
+                "Cancellation requested; waiting for operation outcome. q after the result exits."
+            );
+
+            let matching_reply = Reply::Preview {
+                id: operation,
+                result: Ok(matching_preview),
+            };
+            assert!(dispatch_reply(
+                matching_reply,
+                ReplyDispatchState {
+                    active: &mut active,
+                    scan_confirm: &mut scan_confirm,
+                    selected: &mut selected,
+                    preview: &mut preview,
+                    offset: &mut offset,
+                    ack: &mut ack,
+                    abandoning: &mut abandoning,
+                    status: &mut status,
+                },
+            )
+            .is_none());
+            assert_eq!(active, None);
+            assert_eq!(selected, 0);
+            assert!(!scan_confirm);
+            assert!(!abandoning);
+            assert!(
+                preview.is_none(),
+                "late success is discarded after abandonment"
+            );
+            assert_eq!(ack.text(), "");
+            assert!(!ack.armed);
+            assert_eq!(status, "Preview abandoned; nothing staged.");
+
+            let enter_event = Event::Key(KeyEvent::new_with_kind(
+                KeyCode::Enter,
+                KeyModifiers::NONE,
+                KeyEventKind::Press,
+            ));
+            let enter = pressed_key(enter_event).expect("Press Enter normalizes to a key");
+            let (execute_tx, execute_rx) = mpsc::sync_channel(1);
+            assert!(!preview_enter_transition(
+                enter,
+                PreviewEnterState {
+                    preview: &mut preview,
+                    ack: &mut ack,
+                    serial: &mut serial,
+                    cancel: &mut cancel,
+                    active: &mut active,
+                    status: &mut status,
+                },
+                move |command| execute_tx.send(command).map_err(io::Error::other),
+            )
+            .unwrap());
+            assert!(preview.is_none());
+            assert_eq!(active, None);
+            assert!(matches!(
+                execute_rx.try_recv(),
+                Err(mpsc::TryRecvError::Disconnected)
+            ));
+        }
     }
 
     #[cfg(target_os = "linux")]
