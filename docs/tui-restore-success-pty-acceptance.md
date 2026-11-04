@@ -1,7 +1,9 @@
 # TUI successful restore PTY acceptance plan
 
-Status: proposed; specification only. This adds one real-browser, successful
-Linux filesystem publication case using the official plain fixture.
+Status: accepted. The production Linux PTY case, full assurance gate, and Duvet
+Pages deployment passed in [run 41886697516](https://github.com/ajrudzitis/duplinaut/actions/runs/41886697516).
+This is one real-browser, successful Linux filesystem publication case using
+the official plain fixture.
 
 ## Goal and scope
 
@@ -137,14 +139,14 @@ acceptances retain their separate responsibilities.
 
 ## Checklist
 
-- [ ] Drive the production Linux browser through preview, exact acknowledgment,
+- [x] Drive the production Linux browser through preview, exact acknowledgment,
       one Execute, and a visible Published result using the official plain
       final-date snapshot.
-- [ ] Compare the complete published tree with the independent 21-entry
+- [x] Compare the complete published tree with the independent 21-entry
       oracle, including raw paths, kinds, modes, file size/hash, regular
       file/directory mtimes, and symlink target bytes; omit symlink mtime.
-- [ ] Assert destination-parent/staging state, unchanged source, and PTY
+- [x] Assert destination-parent/staging state, unchanged source, and PTY
       restoration.
-- [ ] Focused/full Linux TUI tests, Duvet trace, formatting, and strict Clippy
+- [x] Focused/full Linux TUI tests, Duvet trace, formatting, and strict Clippy
       pass; hosted Linux assurance and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped evidence.
+- [x] Independent implementation review accepts the scoped evidence.
