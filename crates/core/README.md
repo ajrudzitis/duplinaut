@@ -60,6 +60,8 @@ Native deterministic format parsing and reconstruction. Delta decoding/applicati
 - [ ] Implement and independently review PARSE-ENV-011 compression completion tests; preserve expansion limits, authentication classification and cancellation behavior.
 - [x] Specify PARSE-ENV-012 full primary-fingerprint authorization acceptance with an exact-fingerprint signed-fixture positive and a same-suffix collision negative. See the [acceptance plan](../../docs/parse-env-012-acceptance.md).
 - [ ] Implement and independently review the PARSE-ENV-012 Duvet mapping and fingerprint collision tests; no key-ID or issuer-hint authorization.
+- [x] Specify PARSE-ENV-009 caller-supplied passphrase and exported-secret-key acceptance against the official symmetric and public-key fixture chains. See the [acceptance plan](../../docs/parse-env-009-acceptance.md).
+- [ ] Implement and independently review the PARSE-ENV-009 Duvet mapping and credential-path source review; do not claim cryptographic primitive verification.
 - [ ] Establish independent semantic proofs and adversarial tests.
 - [ ] Validate actual official-producer archives and restoration.
 
