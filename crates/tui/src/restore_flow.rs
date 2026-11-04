@@ -677,7 +677,6 @@ mod lifecycle_tests {
                 first_error: Some(rustix::io::Errno::IO),
                 budget_exhausted: true,
                 diagnostics_truncated: true,
-                ..Default::default()
             },
         };
         let receipt_outcome = RestoreOutcome::Published(receipt);
@@ -711,7 +710,6 @@ mod lifecycle_tests {
                 first_error: Some(rustix::io::Errno::IO),
                 budget_exhausted: true,
                 diagnostics_truncated: true,
-                ..Default::default()
             },
             uncertain_outer: Some(CString::new(b"outer\xfd\n".to_vec()).unwrap()),
         });
