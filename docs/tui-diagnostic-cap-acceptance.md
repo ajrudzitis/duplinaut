@@ -1,7 +1,11 @@
 # TUI final-diagnostic size acceptance plan
 
-Status: proposed; specification only. This acceptance is independent of the
-active-restore PTY cancellation test and encrypted filesystem restore test.
+Status: accepted. Local portable TUI tests, Duvet trace, formatting, and strict
+Clippy passed. The Linux-gated diagnostic-cap test, independent review, hosted
+Linux assurance (`cargo xtask ci`), and Duvet Pages publication passed in [run
+41835819167](https://github.com/ajrudzitis/duplinaut/actions/runs/41835819167).
+This acceptance remains independent of the active-restore PTY cancellation test
+and encrypted filesystem restore test.
 
 ## Goal and scope
 
@@ -46,15 +50,18 @@ rendering boundary only; it does not establish a global allocation bound.
 
 ## Verification and evidence
 
-- Run the focused diagnostic-cap test and the full `cargo test -p
-  duplicity-tui` suite on Linux.
-- Run targeted Duvet queries for RESTORE-UI-010 and RESTORE-UI-011, then run
-  `cargo xtask trace-update` and `cargo xtask trace`.
-- Run workspace formatting, strict TUI Clippy, and `cargo xtask ci` locally.
+- In the hosted Linux run, the focused diagnostic-cap test and full
+  `cargo test -p duplicity-tui` suite passed. The new boundary test is
+  Linux-gated and was not run on macOS.
+- Targeted Duvet queries for RESTORE-UI-010 and RESTORE-UI-011,
+  `cargo xtask trace-update`, `cargo xtask trace`, workspace formatting, strict
+  TUI Clippy passed locally.
 - Independent review must confirm production still uses the fixed 1 MiB cap,
   exact-fit output is complete, one-byte overflow returns `Error::Limit`, and
   no API returns or exposes partial diagnostics on failure.
-- Record hosted Linux assurance before marking this acceptance complete.
+- Hosted Linux assurance and Duvet Pages publication passed in [run
+  41835819167](https://github.com/ajrudzitis/duplinaut/actions/runs/41835819167).
+  The hosted Linux assurance workflow ran `cargo xtask ci`.
 
 ## Exclusions
 
@@ -67,10 +74,11 @@ the encrypted restore implementation/test files.
 
 ## Checklist
 
-- [ ] Add the test-local diagnostic cap seam without changing the fixed
+- [x] Add the test-local diagnostic cap seam without changing the fixed
       production limit.
-- [ ] Add exact-fit and one-byte-overflow tests for typed receipt and
+- [x] Add exact-fit and one-byte-overflow tests for typed receipt and
       uncertain-candidate diagnostics; link implementation/test to Duvet.
-- [ ] Focused/full TUI tests, Duvet trace, formatting, strict Clippy, and local
-      Linux assurance CI pass.
-- [ ] Independent review and hosted Linux assurance pass.
+- [x] Portable TUI tests, Duvet trace, formatting, and strict Clippy pass
+      locally; the Linux-gated boundary test and hosted assurance
+      (`cargo xtask ci`) pass in the hosted Linux run.
+- [x] Independent review and hosted Linux assurance pass.

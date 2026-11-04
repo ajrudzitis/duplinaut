@@ -1,7 +1,10 @@
 # Official encrypted snapshot restoration acceptance plan
 
-Status: proposed; this is specification only and makes no implementation or
-backlog status change.
+Status: accepted. Local formatting, strict Clippy, and Duvet checks passed.
+The Linux-only signed-profile three-date integration, full Linux tests,
+independent review, hosted assurance (`cargo xtask ci`), and Duvet Pages
+publication passed in [run
+41835819167](https://github.com/ajrudzitis/duplinaut/actions/runs/41835819167).
 
 ## Goal and scope
 
@@ -96,19 +99,19 @@ traceability and do not claim complete controller proofs.
 
 ## Verification and evidence
 
-- First require the hosted encrypted-reader oracle gate and existing native
-  Linux restore tests to pass.
-- On Linux, run the focused encrypted restore test for all three signed-profile
-  dates and the complete
-  `cargo test -p duplicity-core` suite. The focused test MUST verify that its
+- The hosted encrypted-reader oracle gate and existing native Linux restore
+  tests passed in the acceptance run.
+- In the hosted Linux run, the focused encrypted restore test for all three
+  signed-profile dates and the complete `cargo test -p duplicity-core` suite
+  passed. The Linux-only focused test verifies that its
   destination parent is on a filesystem accepted by the existing test profile;
   it MUST fail explicitly rather than silently skip if that condition is not
   met.
-- Run the targeted Duvet implementation/test queries for the linked
-  requirements, `cargo xtask trace-update`, and `cargo xtask trace`. Run
-  formatting and strict core Clippy checks, followed by required assurance CI
-  (`cargo xtask ci`). Record hosted Linux CI evidence before marking this
-  acceptance complete.
+- Targeted Duvet implementation/test queries, `cargo xtask trace-update`,
+  `cargo xtask trace`, formatting, and strict core Clippy passed locally. The
+  hosted Linux assurance workflow (`cargo xtask ci`)
+  and Duvet Pages publication passed in [run
+  41835819167](https://github.com/ajrudzitis/duplinaut/actions/runs/41835819167).
 - Independent review MUST confirm caller credentials and signer policy are
   correct, the exact evidence count/key set is asserted before checking that
   each record is authorized, the normal
@@ -130,9 +133,10 @@ the reader controller, or the filesystem publication controller.
 
 ## Checklist
 
-- [ ] Encrypted-reader official oracle hosted gate passes.
-- [ ] Existing native Linux restore suite passes on the supported filesystem.
-- [ ] Implement the signed-profile three-date integration case and Duvet links.
-- [ ] Focused/full Linux tests, Duvet trace, formatting, strict Clippy, and
-      local assurance CI pass.
-- [ ] Independent review and hosted Linux assurance pass.
+- [x] Encrypted-reader official oracle hosted gate passes.
+- [x] Existing native Linux restore suite passes on the supported filesystem.
+- [x] Implement the signed-profile three-date integration case and Duvet links.
+- [x] Local Duvet trace, formatting, and strict core Clippy pass; focused/full
+      Linux tests and hosted assurance (`cargo xtask ci`) passed in [run
+      41835819167](https://github.com/ajrudzitis/duplinaut/actions/runs/41835819167).
+- [x] Independent review and hosted Linux assurance pass.

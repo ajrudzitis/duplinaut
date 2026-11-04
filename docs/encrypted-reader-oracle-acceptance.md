@@ -1,9 +1,9 @@
 # Encrypted reader official snapshot-oracle acceptance plan
 
-Status: locally implemented; focused/full core tests, targeted Duvet queries,
-full trace, formatting, strict Clippy, diff checks, local `cargo xtask ci`, and
-independent review pass. Hosted assurance remains pending; the backlog is
-unchecked.
+Status: accepted. Focused/full core tests, targeted Duvet queries, full trace,
+formatting, strict Clippy, diff checks, local `cargo xtask ci`, independent
+review, hosted Linux assurance, and Duvet Pages publication passed in [run
+41835819167](https://github.com/ajrudzitis/duplinaut/actions/runs/41835819167).
 
 The existing encrypted-reader source-oracle test checks snapshot entry count
 and regular-file paths/content hashes. This acceptance extends it to compare
@@ -75,12 +75,9 @@ complete controller proof.
 - `cargo fmt --all -- --check`,
   `cargo clippy -p duplicity-core --all-targets -- -D warnings`, and
   `git diff --check` passed. Independent review and local `cargo xtask ci`
-  passed; hosted assurance remains pending.
-
-- Focused/full core tests, targeted Duvet checks, full trace, formatting, strict
-  Clippy, diff checks, and local assurance CI (`cargo xtask ci`) passed using
-  checked-in fixtures only. Record hosted Linux CI evidence before marking this
-  acceptance complete.
+  passed using checked-in fixtures only. Hosted Linux assurance and Duvet Pages
+  publication passed in [run
+  41835819167](https://github.com/ajrudzitis/duplinaut/actions/runs/41835819167).
 - Independent review verified path-component preservation, exact timestamp
   conversion, entry-kind mapping, and participation of every expected entry for
   every profile/date pair.

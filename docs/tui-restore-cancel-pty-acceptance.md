@@ -1,7 +1,10 @@
 # TUI active-restoration cancellation acceptance plan
 
-Status: proposed; specification only. This is independent of encrypted-reader
-and filesystem-integration work.
+Status: accepted. Local portable TUI tests, Duvet trace, formatting, and strict
+Clippy passed. The Linux-gated active-restore PTY cases, independent review,
+hosted Linux assurance (`cargo xtask ci`), and Duvet Pages publication passed
+in [run 41835819167](https://github.com/ajrudzitis/duplinaut/actions/runs/41835819167).
+This remains independent of encrypted-reader and filesystem-integration work.
 
 ## Goal and scope
 
@@ -84,14 +87,15 @@ scenario in RESTORE-UI-012.
 
 ## Verification and evidence
 
-- Run the focused Linux PTY parent cases and the full
-  `cargo test -p duplicity-tui` suite. The test MUST use the existing local
-  official fixture and MUST NOT change producer data or source contents.
-- Run targeted Duvet test queries for RESTORE-UI-004, -006, -007, -008, and
-  -014; then run `cargo xtask trace-update` and `cargo xtask trace`.
-- Run formatting and strict TUI Clippy checks, then required assurance CI
-  (`cargo xtask ci`) on Linux. Record hosted Linux CI evidence before marking
-  acceptance complete. macOS checks may compile/run portable TUI unit tests,
+- In the hosted Linux run, the focused PTY parent cases and full
+  `cargo test -p duplicity-tui` suite passed using the checked-in official
+  fixture without changing producer data or source contents. The Linux-gated
+  PTY cases were not run on macOS.
+- Targeted Duvet test queries for RESTORE-UI-004, -006, -007, -008, and -014,
+  `cargo xtask trace-update`, `cargo xtask trace`, formatting, and strict TUI
+  Clippy passed locally. Hosted Linux assurance (`cargo xtask ci`) and Duvet
+  Pages publication passed in [run 41835819167](https://github.com/ajrudzitis/duplinaut/actions/runs/41835819167).
+  macOS checks may compile/run portable TUI unit tests,
   but do not substitute for the Linux backend/PTy acceptance.
 - Independent review MUST confirm that the driver is isolated, gate code is
   test-only, cancellation is observed on the exact Execute token, the UI
@@ -108,9 +112,10 @@ fixtures, restore destination policy, or the encrypted-restore acceptance.
 
 ## Checklist
 
-- [ ] Add the isolated ignored driver and `cfg(test)` Execute gate in the TUI
+- [x] Add the isolated ignored driver and `cfg(test)` Execute gate in the TUI
       crate only.
-- [ ] Implement and Duvet-link the q/Esc active-restore PTY cases.
-- [ ] Focused/full TUI tests, Duvet trace, formatting, strict Clippy, and local
-      Linux assurance CI pass.
-- [ ] Independent review and hosted Linux assurance pass.
+- [x] Implement and Duvet-link the q/Esc active-restore PTY cases.
+- [x] Portable TUI tests, Duvet trace, formatting, and strict Clippy pass
+      locally; Linux-gated PTY cases and hosted assurance (`cargo xtask ci`)
+      pass in the hosted Linux run.
+- [x] Independent review and hosted Linux assurance pass.
