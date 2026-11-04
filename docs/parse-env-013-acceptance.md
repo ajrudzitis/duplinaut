@@ -1,7 +1,9 @@
 # PARSE-ENV-013 offline signer-scope acceptance plan
 
-Status: implementation, independent review, and full core verification pass;
-hosted assurance CI remains pending.
+Status: accepted as a bounded offline signer-scope evidence slice. Implementation,
+independent review, full core verification, hosted Linux assurance, and Duvet
+report publication pass. Expired/revoked fixture and time-based behavior tests
+remain open.
 
 This is a local traceability and regression-evidence slice for
 [PARSE-ENV-013](parsing-requirements.md#parse-env-013). The scoped Duvet query
@@ -59,8 +61,11 @@ without AWS.
 - The focused signed-chain test, `cargo test -p duplicity-core`, targeted
   PARSE-ENV-013 Duvet query, `cargo xtask trace`, formatting checks, and strict
   core Clippy pass. Clippy emits existing warnings in vendored `vest_lib`,
-  while `duplicity-core` passes `-D warnings`. Independent review passes;
-  hosted assurance CI remains pending.
+  while `duplicity-core` passes `-D warnings`. Independent review passes.
+  Hosted Linux assurance run
+  [41804239776](https://github.com/ajrudzitis/duplinaut/actions/runs/41804239776)
+  passed and published the Duvet report. This bounded slice does not close
+  expired/revoked fixture or time-based behavior testing.
 
 ## Non-goals
 
