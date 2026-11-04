@@ -1,12 +1,15 @@
 # PTY output failure acceptance plan
 
-Status: implementation and independent review are complete. The focused
-macOS PTY acceptance test, Duvet trace, and full macOS assurance CI pass.
-Hosted Linux assurance CI remains pending before this milestone is accepted.
+Status: q-triggered acceptance stimulus independently reviewed and adopted
+before implementation.
+The earlier resize-only variant passed focused macOS PTY testing and local
+macOS CI, but its post-close PTY resize is not portable to Linux and does not
+validate this revised stimulus.
 
-Local full-CI receipt: source SHA-256
+Previous-variant local full-CI receipt: source SHA-256
 `d5b4e7031b851f113055f0628d2be885a282671a31db88f6b3f930b38a22d422`;
 fresh Verus/Vest/core proof counts were 2,047/3,183/1,274 with zero errors.
+These results do not establish acceptance of the revised q-triggered case.
 
 This records one controlled terminal output failure while a read-only scan is
 active. It exercises the production browser and terminal lifecycle for
@@ -61,40 +64,39 @@ shutdown completion. Never put source paths or credentials in diagnostics.
    expanded frame does not satisfy this check. This proves the child observes
    the output PTY resize and completes a full frame before the fault.
 3. Close only the parent’s stdout PTY master, retaining the stdout slave
-   descriptor used by the child and the stdin master/slave pair. While the
-   output gate remains held, restore the retained output slave to the original
-   expanded dimensions using safe rustix; require `tcsetwinsize` to succeed
-   and `tcgetwinsize` to read back the expanded dimensions after master close.
-   This post-close ioctl is a required macOS/Linux feasibility check, not an
-   assumed PTY property. If either target platform rejects it, stop and design
-   another deterministic changed-frame trigger before implementing this case.
-   Send `SIGWINCH` directly to the same positive child PID only after the
-   post-close size change. The child has no controlling terminal, so the
-   harness does not rely on automatic foreground-group signal delivery.
-   Crossterm's resize query falls back to stdout. Ratatui checks backend size
-   on every `draw` and resets the previous buffer after a viewport change, so
-   the next production draw must write a full frame. Because the geometry is
-   changed only after closing the sole output reader, there is no opportunity
-   for a successful expanded redraw before the fault; the full frame must fail
-   through the real terminal writer. This plan claims a controlled
-   resize-triggered redraw failure only; it does not claim that close alone
-   fails, that resize notification is automatic, or that all output failures
-   behave identically.
-4. Require the real scan token to become cancelled while the source gate stays
-   blocked. This establishes that the terminal-loop redraw failure, rather
-   than the test driver or a normal quit key, initiated shutdown. Require the
-   child to remain alive until the parent releases the gate.
-5. Release the gate and require bounded child exit with its expected controlled
+   descriptor used by the child and the stdin master/slave pair. The explicit
+   `FD_CLOEXEC` assertions ensure the child inherited no hidden master. Do not
+   issue an ioctl or signal after closing the output master. Send exactly one
+   `q` on the still-live input PTY while the source gate remains held. The
+   production key handler requests scan cancellation and changes the visible
+   status to
+   `Cancellation requested; waiting for operation outcome. q after the result exits.`
+   If the next loop runs before gate release, this status is drawn. If the
+   parent releases the gate first and the worker result is polled first, the
+   failure-result status is drawn instead. Either path changes the visible
+   status from the last successfully drawn compact frame; the next production
+   draw writes changed cells to the closed stdout PTY. Do not require the
+   cancellation-requested text specifically to be the failed frame. The
+   stimulus avoids a post-close PTY resize, which returns `EIO` on Linux.
+4. Require the exact scan token to become cancelled while the source gate stays
+   blocked. In this case `q` initiates scan cancellation; the later failed
+   status draw causes controlled browser shutdown. Do not claim the output
+   fault initiated cancellation. The test driver never cancels the token.
+   Require the child to remain alive until the parent releases the gate and
+   require no browser-return marker before release.
+5. After gate release, require bounded child exit with its expected controlled
    browser error. In the helper, downcast the returned error payload to
    `terminal::Completion` and require `event.is_some()` and `teardown.is_some()`.
-   Downcast the teardown error payload to `terminal::TeardownFaults`; record
-   explicit `raw_failed`, `screen_failed`, and `cursor_failed` booleans. Raw
-   mode is restored through the live input PTY and is expected to have no fault;
-   alternate-screen and cursor output faults are expected on the closed output
-   PTY. The marker records attempts and observed faults, without claiming
-   alternate-screen or cursor restoration succeeded. Publish the completion
-   marker only after `browser::run` returned, which follows the production
-   worker close/drain/join path.
+   This retained event error is evidence that the changed-status draw—not the
+   successful `q` handler—caused controlled shutdown. Downcast the teardown
+   error payload to `terminal::TeardownFaults`; record explicit `raw_failed`,
+   `screen_failed`, and `cursor_failed` booleans. Raw mode is restored through
+   the live input PTY and is expected to have no fault; alternate-screen and
+   cursor output faults are expected on the closed output PTY. The marker
+   records attempts and observed faults, without claiming alternate-screen or
+   cursor restoration succeeded. Publish the completion marker only after
+   `browser::run` returned, which follows the production worker close/drain/join
+   path.
 6. The parent has closed the output PTY master, so libtest cannot safely print
    its normal success line afterward. Once the helper has validated `Completion`
    and atomically published the completion marker, it calls `process::exit(0)`.
@@ -113,10 +115,12 @@ IPC error, or fabricated completion marker must fail the parent test.
 
 ## Evidence limits
 
-This case covers a controlled redraw/output failure during a source-injected
-read-only scan. It does not cover active restoration cancellation, typed restore
-outcomes, successful restoration reporting, alternate-screen restoration over
-the failed output, input failure, both stdout and stderr unavailable, real
+This case covers a q-triggered scan cancellation followed by a controlled
+status-redraw/output failure during a source-injected read-only scan. It does
+not claim the output failure initiated cancellation. It does not cover active
+restoration cancellation, typed restore outcomes, successful restoration
+reporting, alternate-screen restoration over the failed output, input failure,
+both stdout and stderr unavailable, real
 controlling-terminal job control, arbitrary faults, live S3, or frontend formal
 controller proofs. The source cancellation wait is cooperative; no fixed
 cancellation latency or interruption of a real blocking operating-system call
