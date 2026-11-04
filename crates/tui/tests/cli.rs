@@ -1,5 +1,9 @@
 use std::process::{Command, Stdio};
 
+#[cfg(unix)]
+#[path = "support/scan_cancel.rs"]
+mod scan_cancel;
+
 #[test]
 fn help_describes_capabilities_without_requiring_a_terminal() {
     let output = Command::new(env!("CARGO_BIN_EXE_duplicity-tui"))
@@ -51,11 +55,11 @@ mod pty_acceptance {
         time::{Duration, Instant},
     };
 
-    const HISTORY_MARKER: &[u8] = b"duplicity-full.20231114T221320Z.manifest";
+    pub(super) const HISTORY_MARKER: &[u8] = b"duplicity-full.20231114T221320Z.manifest";
     const EXIT_TIMEOUT: Duration = Duration::from_secs(15);
     const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 
-    struct ChildGuard(Child);
+    pub(super) struct ChildGuard(pub(super) Child);
 
     impl Drop for ChildGuard {
         fn drop(&mut self) {
@@ -66,10 +70,10 @@ mod pty_acceptance {
         }
     }
 
-    struct Scratch(PathBuf);
+    pub(super) struct Scratch(pub(super) PathBuf);
 
     impl Scratch {
-        fn new() -> Self {
+        pub(super) fn new() -> Self {
             static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
             for _ in 0..100 {
                 let serial = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -97,7 +101,7 @@ mod pty_acceptance {
         Sha256::digest(bytes).into()
     }
 
-    fn fingerprint(root: &Path) -> Vec<(PathBuf, Option<[u8; 32]>)> {
+    pub(super) fn fingerprint(root: &Path) -> Vec<(PathBuf, Option<[u8; 32]>)> {
         fn visit(root: &Path, directory: &Path, result: &mut Vec<(PathBuf, Option<[u8; 32]>)>) {
             let mut entries: Vec<_> = fs::read_dir(directory)
                 .unwrap()
@@ -149,7 +153,7 @@ mod pty_acceptance {
         }
     }
 
-    fn contains(output: &[u8], marker: &[u8]) -> bool {
+    pub(super) fn contains(output: &[u8], marker: &[u8]) -> bool {
         output.windows(marker.len()).any(|window| window == marker)
     }
 
@@ -168,7 +172,7 @@ mod pty_acceptance {
         false
     }
 
-    fn wait_for_exit(
+    pub(super) fn wait_for_exit(
         master: &File,
         child: &mut ChildGuard,
         output: &mut Vec<u8>,
@@ -189,7 +193,7 @@ mod pty_acceptance {
 
     // Ratatui redraws only changed cells. Keep a zero-scrollback screen model
     // so later assertions observe the current display, not stale transcript text.
-    fn wait_for_screen(
+    pub(super) fn wait_for_screen(
         master: &File,
         child: &mut ChildGuard,
         output: &mut Vec<u8>,
