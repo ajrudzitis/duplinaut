@@ -668,14 +668,18 @@ fn production_linux_tui_publishes_official_plain_snapshot_through_pty() {
     );
     test_tree.preserve();
     write(&master, b"\r").expect("confirm one restore operation");
+    // Fast local restores can finish before the PTY observes an intermediate
+    // running frame, so accept either that frame or the completed result here.
     wait_screen(
         &master,
         &mut child,
         &mut output,
         &mut parser,
-        "one running Execute operation",
+        "restore operation started or already completed",
         PHASE_TIMEOUT,
-        |screen| screen.contains("Restoration running."),
+        |screen| {
+            screen.contains("Restoration running.") || screen.contains("Published completed tree.")
+        },
     );
     wait_screen(
         &master,
@@ -1395,14 +1399,17 @@ fn production_linux_tui_preserves_raw_destination_and_selected_path_identity() {
     );
     test_tree.preserve();
     write(&master, b"\r").expect("confirm raw-byte restore exactly once");
+    // A fast restore can publish before the PTY exposes an intermediate frame.
     wait_screen(
         &master,
         &mut child,
         &mut output,
         &mut parser,
-        "raw-identity active restore",
+        "raw-identity restore started or already completed",
         PHASE_TIMEOUT,
-        |screen| screen.contains("Restoration running."),
+        |screen| {
+            screen.contains("Restoration running.") || screen.contains("Published completed tree.")
+        },
     );
     wait_screen(
         &master,

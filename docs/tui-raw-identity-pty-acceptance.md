@@ -61,7 +61,9 @@ repeat the successful case's full 21-entry oracle matrix.
 2. Require the acknowledgment to be initially empty/unarmed. An Enter before
    acknowledgment MUST leave the destination absent and start no Execute.
    Type exactly ASCII `restore`, observe the armed state, and press Enter once.
-   Require the production UI to show a running restoration; send no retry.
+   Wait for either the production running frame or direct Published completion;
+   a fast restore may finish before an intermediate frame is observable. Send no
+   retry.
 3. Wait for a retained `Published` result. Scroll the production result document
    to its `Destination:` receipt field and require the exact same visible
    escape `\x1b\\\xffR`. The test MUST separately establish raw identity:
