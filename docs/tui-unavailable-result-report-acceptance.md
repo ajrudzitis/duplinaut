@@ -1,11 +1,10 @@
 # TUI unavailable-result diagnostic acceptance plan
 
-Status: in progress. Local portable TUI tests, targeted Duvet queries/trace,
+Status: accepted. Local portable TUI tests, targeted Duvet queries/trace,
 formatting, strict Clippy, and implementation review passed. The Linux-gated
-test and hosted assurance (`cargo xtask ci`), plus Duvet report
-generation/artifact upload, passed in [run 41860735429](https://github.com/ajrudzitis/duplinaut/actions/runs/41860735429).
-Duvet Pages deployment is waiting for environment approval, so acceptance is
-incomplete. This complements the accepted
+test, hosted assurance (`cargo xtask ci`), Duvet report artifact upload, and
+Pages publication passed in [run 41860735429](https://github.com/ajrudzitis/duplinaut/actions/runs/41860735429).
+This complements the accepted
 [active-restore shutdown case](tui-active-restore-shutdown-acceptance.md)
 by checking successful diagnostic delivery when the worker result is
 unavailable.
@@ -102,6 +101,5 @@ synthetic worker driver only tests frontend handling of a missing final reply.
       and strict Clippy passed.
 - [x] Linux-gated test and hosted assurance (`cargo xtask ci`), plus Duvet
       report generation/artifact upload, passed in [run 41860735429](https://github.com/ajrudzitis/duplinaut/actions/runs/41860735429).
-- [ ] Duvet Pages deployment succeeds; the Publish job for run 41860735429 is
-      waiting for environment approval.
+- [x] Duvet Pages deployment succeeds in [run 41860735429](https://github.com/ajrudzitis/duplinaut/actions/runs/41860735429).
 - [x] Independent implementation review accepts the scoped evidence.
