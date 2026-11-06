@@ -1,6 +1,6 @@
 # PARSE-NAME-001 Long IncrementalVolume Reverse-Success Acceptance
 
-**Status:** Specification accepted after independent review; implementation and proof remain pending.
+**Status:** Specification and implementation passed independent review; full local workspace CI passed. Hosted Linux assurance and Duvet publication remain pending.
 
 ## Goal and scope
 
@@ -49,7 +49,9 @@ This acceptance does not prove malformed-input/error completeness, scanner/raw s
 ## Checklist
 
 - [x] Independent specification review accepts the theorem scope and witness-alignment obligation.
-- [ ] Implementation, concrete antecedent witness, and strict Verus implication pass independent review.
-- [ ] Existing exact-result regression tests, Duvet trace, formatting, strict Clippy, and full core tests pass.
-- [ ] Local full assurance and hosted Linux assurance plus Duvet publication pass.
-- [ ] Scoped acceptance is recorded without closing broader filename-parser/controller work.
+- [x] Implementation, concrete antecedent witness, and strict Verus implication pass independent review.
+- [x] Existing exact-result regression tests, Duvet trace, formatting, strict Clippy, and full core tests pass.
+- [x] Local full assurance passes; hosted Linux assurance plus Duvet publication remain pending.
+- [x] Scoped acceptance is recorded without closing broader filename-parser/controller work.
+
+Verification note: the Long IncrementalManifest concrete witness uses a scoped Verus rlimit of 300 (previously 200) after the module grew; its proof body and postcondition are unchanged.
