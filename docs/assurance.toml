@@ -3146,6 +3146,38 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-full-manifest-reverse-success"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves the positive raw-model-to-production `ObjectName` implication for
+# long FullManifest bodies. Existential timestamp/trailer/suffix witnesses are
+# aligned with deterministic production splits, and a concrete canonical UTC
+# witness establishes a non-vacuous antecedent. The existing exact 24-case
+# production matrix remains native regression evidence. This adds no
+# PARSE-NAME-004 or PARSE-NAME-007 claim; malformed-input completeness, other
+# routes, and broader filename-controller refinement remain open. Independent
+# proof review and full local CI passed; hosted Linux and report publication
+# remain tracked separately.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "long_full_manifest_raw_body_model" },
+  { path = "crates/core/src/names.rs", symbol = "long_full_manifest_body" },
+  { path = "crates/core/src/names.rs", symbol = "long_full_manifest_raw_body_concrete_witness" }
+]
+proofs = [
+  { id = "name-long-full-manifest-reverse-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "long_full_manifest_body", kind = "contract" },
+  { id = "name-long-full-manifest-model-witness", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "long_full_manifest_raw_body_concrete_witness", kind = "lemma" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::long_full_manifest_body_raw_result_matrix" }
+]
+
+[[milestone]]
 id = "name-short-full-signatures-reverse-success"
 gate = true
 requirements = ["PARSE-NAME-001"]

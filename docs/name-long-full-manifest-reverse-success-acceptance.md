@@ -1,6 +1,6 @@
 # PARSE-NAME-001 Long FullManifest Reverse-Success Acceptance
 
-**Status:** Proposed; pending independent specification review. No implementation or proof has been accepted for this slice.
+**Status:** Specification and implementation passed independent review; focused proof and full local `cargo xtask ci` passed. Hosted Linux assurance and Duvet publication remain pending.
 
 ## Goal and scope
 
@@ -47,8 +47,8 @@ This acceptance does not prove malformed-input/error completeness, scanner/raw s
 
 ## Checklist
 
-- [ ] Independent specification review accepts the theorem scope and witness-alignment obligation.
-- [ ] Implementation, concrete antecedent witness, and strict Verus implication pass independent review.
-- [ ] Existing exact-result regression tests, Duvet trace, formatting, strict Clippy, and full core tests pass.
-- [ ] Local full assurance and hosted Linux assurance plus Duvet publication pass.
-- [ ] Scoped acceptance is recorded without closing broader filename-parser/controller work.
+- [x] Independent specification review accepts the theorem scope and witness-alignment obligation.
+- [x] Implementation, concrete antecedent witness, and strict Verus implication pass independent review.
+- [x] Existing exact-result regression test, focused Duvet trace, formatting, and strict Clippy pass. Full core tests remain part of the full assurance gate.
+- [x] Local full assurance passes; hosted Linux assurance plus Duvet publication remain pending.
+- [x] Scoped acceptance is recorded without closing broader filename-parser/controller work.
