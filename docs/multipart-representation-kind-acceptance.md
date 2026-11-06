@@ -1,7 +1,8 @@
 # Multipart representation-kind guard acceptance plan
 
-Status: local implementation, proof, tests, Duvet, full CI, and independent
-review are complete; hosted Linux assurance and Duvet Pages are pending.
+Status: this scoped acceptance is complete. Local implementation, proof,
+tests, Duvet, full CI, independent review, hosted Linux assurance, and Duvet
+Pages publication passed. The broader multipart controller remains open.
 
 ## Goal and scope
 
@@ -104,8 +105,8 @@ outside this two-Boolean proof and remains a call-site review obligation.
   and full local `cargo xtask ci` passed at commit `8683482`, source SHA-256
   `82eeac51e83c99f78b9fecfc918353ff7535eb3ae3c2d2947250e03e6503e18f`.
   Independent specification and implementation reviews are complete. Hosted
-  Linux assurance and Duvet Pages remain pending; do not mark overall
-  acceptance complete until both hosted gates pass.
+  Linux assurance and Duvet Pages passed in
+  [run 42195013933](https://github.com/ajrudzitis/duplinaut/actions/runs/42195013933).
 - Independent verifier review MUST check each truth-table case and the
   Boolean marker semantics. Independent implementation review MUST confirm that the
   production helper is called at only the two stated branch decisions and
@@ -133,6 +134,7 @@ supported backup-set profile stated by PARSE-MULTI-006.
       focused/full tests, and full `cargo xtask ci` pass at commit `8683482`
       with source SHA-256
       `82eeac51e83c99f78b9fecfc918353ff7535eb3ae3c2d2947250e03e6503e18f`.
-- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [x] Hosted Linux assurance and Duvet Pages pass in
+      [run 42195013933](https://github.com/ajrudzitis/duplinaut/actions/runs/42195013933).
 - [x] Independent specification and implementation reviews accept the local
       evidence.
