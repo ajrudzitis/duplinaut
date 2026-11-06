@@ -1,7 +1,7 @@
 # Multipart final-publication gate acceptance plan
 
-Status: proposed; specification only. Independent specification review,
-implementation, and verification are pending.
+Status: local implementation, proof, tests, Duvet, and independent reviews are
+complete; hosted Linux assurance and Duvet Pages are pending.
 
 ## Goal and scope
 
@@ -87,10 +87,12 @@ pending entry may produce `Ready`.
 - Add the helper and relevant test names to the `multipart-assembly`
   `docs/assurance.toml` evidence mapping. Do not mark the complete multipart
   controller milestone accepted by adding this bounded proof.
-- Run focused Verus obligations and focused multipart tests, targeted Duvet
-  queries, `cargo xtask trace-update`, `cargo xtask trace`, formatting, strict
-  Clippy, and full `cargo xtask ci`. Require hosted Linux assurance and Duvet
-  Pages publication before marking this acceptance complete.
+- Focused Verus obligations and multipart tests, targeted Duvet queries,
+  `cargo xtask trace-update`, `cargo xtask trace`, formatting, strict Clippy,
+  and full local `cargo xtask ci` passed at commit `0ac14ef`, source SHA-256
+  `5f2cc41ebb4255096e10e1d2b217a1e83bf75e56ec5ffd08a221bf607a0e9002`.
+  Independent specification, verifier, and implementation reviews are
+  complete. Hosted Linux assurance and Duvet Pages remain pending.
 - Independent verifier review MUST check all eight model combinations and
   exact precedence. Independent implementation review MUST check that the
   production `finish()` calls the helper and only constructs an archive on
@@ -108,12 +110,15 @@ final three-condition decision over supplied boolean observations.
 
 ## Checklist
 
-- [ ] Specify and verify the three-way decision for all eight boolean inputs.
-- [ ] Test all helper truth-table rows and the `finish()` result mapping for
+- [x] Specify and verify the three-way decision for all eight boolean inputs.
+- [x] Test all helper truth-table rows and the `finish()` result mapping for
       Poisoned, Incomplete, and Ready.
-- [ ] Preserve official multipart, boundary, poisoning, and OpenPGP regression
+- [x] Preserve official multipart, boundary, poisoning, and OpenPGP regression
       coverage.
-- [ ] Duvet links/queries, trace, formatting, strict Clippy, focused/full CI,
-      hosted Linux assurance, and Duvet Pages pass.
-- [ ] Independent specification, verifier, and implementation reviews accept
+- [x] Local Duvet links/queries and trace, formatting, strict Clippy,
+      focused/full tests, and full `cargo xtask ci` pass at commit `0ac14ef`
+      with source SHA-256
+      `5f2cc41ebb4255096e10e1d2b217a1e83bf75e56ec5ffd08a221bf607a0e9002`.
+- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [x] Independent specification, verifier, and implementation reviews accept
       the scoped evidence.
