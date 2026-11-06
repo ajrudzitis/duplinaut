@@ -1,7 +1,7 @@
 # Official Plain Reader PKCS#7 Full-Signature Archive Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Implementation and independent review passed. Full local
+`cargo xtask ci` passed. Hosted Linux assurance and Duvet Pages remain pending.
 
 ## Goal and scope
 
@@ -143,12 +143,13 @@ claim that duplicity signature archives are unnecessary in other operations.
 
 - [x] Independent specification review accepts the scope, fixture mutation,
       opened-key set, and snapshot oracle.
-- [ ] The renamed archive remains visible as parsed
+- [x] The renamed archive remains visible as parsed
       `FullSignatures`/`Pkcs7`/`UnsupportedEnvelope`, with exact inventory and
       byte/size/identity preservation.
-- [ ] Public final snapshot exactly matches the documented oracle fields and
+- [x] Public final snapshot exactly matches the documented oracle fields and
       the opened-key set equals the three manifests plus six data volumes.
-- [ ] Targeted Duvet queries/full trace, focused/full core tests, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Targeted Duvet queries/full trace, focused/full core tests, formatting,
+      and strict Clippy pass.
+- [x] Independent implementation/test review passes.
+- [x] Full local `cargo xtask ci` passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.

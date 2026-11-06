@@ -664,6 +664,9 @@ impl<'a> Catalog<'a> {
     //= docs/parsing-requirements.md#parse-env-024
     //= type=implementation
     //# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+    //= docs/parsing-requirements.md#assure-test-001
+    //= type=implementation
+    //# Compatibility tests MUST restore supported snapshots produced by official duplicity and compare contents and supported metadata with both their source tree and official restoration.
     /// Reconstruct the explicit full-anchor/exact-date chain. Every normalized
     /// volume is read; raw interval hints never skip required integrity evidence.
     pub fn read_snapshot(
