@@ -1262,6 +1262,41 @@ pub proof fn base36_model_failure_is_sticky(bytes: Seq<u8>, prefix_len: int)
     }
 }
 
+proof fn base36_value_model_is_bounded(bytes: Seq<u8>, prefix_len: int)
+    requires 0 <= prefix_len <= bytes.len(),
+    ensures match base36_value_model(bytes, prefix_len) {
+        Some(value) => 0 <= value && value <= u64::MAX as int,
+        None => true,
+    },
+    decreases prefix_len,
+{
+    if prefix_len > 0 {
+        base36_value_model_is_bounded(bytes, prefix_len - 1);
+    }
+    assert(match base36_value_model(bytes, prefix_len) {
+        Some(value) => 0 <= value && value <= u64::MAX as int,
+        None => true,
+    }) by {
+        reveal(base36_value_model);
+        if prefix_len <= 0 {
+            assert(base36_value_model(bytes, prefix_len) == Some(0));
+        } else {
+            let previous = base36_value_model(bytes, prefix_len - 1);
+            let digit = base36_digit_model(bytes[prefix_len - 1]);
+            match (previous, digit) {
+                (Some(prior), Some(current)) if prior * 36 + current <= u64::MAX as int => {
+                    assert(0 <= prior && prior <= u64::MAX as int);
+                    reveal(base36_digit_model);
+                    assert(0 <= current && current <= 35);
+                    assert(0 <= prior * 36 + current);
+                    assert(prior * 36 + current <= u64::MAX as int);
+                },
+                _ => {},
+            }
+        }
+    }
+}
+
 //= docs/parsing-requirements.md#parse-name-003
 //= type=implementation
 //# Short-name timestamps and volume numbers MUST be decoded as unsigned base36 numbers using the digits `0-9` and `a-z`.
@@ -5886,13 +5921,16 @@ proof fn short_incremental_signatures_raw_body_from_fields(
     reveal(short_incremental_signatures_fields_model);
 }
 
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 #[verifier::spinoff_prover]
 #[verifier::rlimit(40)]
 fn short_incremental_manifest_body(
     input: &[u8],
     separator: u8,
 ) -> (result: Result<ObjectName, NameError>)
-    ensures match result {
+    ensures (match result {
         Err(error) => error == NameError::Malformed,
         Ok(name) => name.kind == ObjectKind::IncrementalManifest
             && name.short
@@ -5904,7 +5942,19 @@ fn short_incremental_manifest_body(
                 name.envelope,
                 name.partial,
             ),
-    },
+    })
+        && forall|start: int, end: int, envelope: Envelope, partial: bool|
+            short_incremental_manifest_raw_body_model(
+                input@, start, end, envelope, partial,
+            ) ==> result == Ok(ObjectName {
+                kind: ObjectKind::IncrementalManifest,
+                start: Timestamp(start as i128),
+                end: Timestamp(end as i128),
+                volume: None,
+                envelope,
+                partial,
+                short: true,
+            }),
 {
     let _ = separator; // Short incremental-manifest bodies do not consume the time separator.
     let mut fields = Some(input);
@@ -5912,10 +5962,64 @@ fn short_incremental_manifest_body(
     let _after_start = fields;
     let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
     let _after_end = fields;
+    proof {
+        assert forall|start: int, end: int, envelope: Envelope, partial: bool|
+            short_incremental_manifest_raw_body_model(
+                input@, start, end, envelope, partial,
+            ) implies fields.is_some() by {
+            if short_incremental_manifest_raw_body_model(
+                input@, start, end, envelope, partial,
+            ) {
+                short_incremental_manifest_raw_body_model_has_trailer_input(
+                    input@,
+                    start,
+                    end,
+                    envelope,
+                    partial,
+                    start_field@,
+                    optional_body_field_model(_after_start),
+                    end_field@,
+                    optional_body_field_model(_after_end),
+                );
+            }
+        }
+    }
     let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
     let _after_trailer = fields;
     let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
     if third.is_some() || extra.is_some() || fields.is_some() {
+        proof {
+            assert forall|start: int, end: int, envelope: Envelope, partial: bool|
+                short_incremental_manifest_raw_body_model(
+                    input@, start, end, envelope, partial,
+                ) implies false by {
+                if short_incremental_manifest_raw_body_model(
+                    input@, start, end, envelope, partial,
+                ) {
+                    short_incremental_manifest_raw_body_model_aligns_fields(
+                        input@,
+                        start,
+                        end,
+                        envelope,
+                        partial,
+                        start_field@,
+                        optional_body_field_model(_after_start),
+                        end_field@,
+                        optional_body_field_model(_after_end),
+                        trailer@,
+                        optional_body_field_model(_after_trailer),
+                        optional_body_field_model(first),
+                        optional_body_field_model(second),
+                        optional_body_field_model(third),
+                        optional_body_field_model(extra),
+                        optional_body_field_model(fields),
+                    );
+                    assert(third.is_none());
+                    assert(extra.is_none());
+                    assert(fields.is_none());
+                }
+            }
+        }
         return Err(NameError::Malformed);
     }
     let result = short_incremental_manifest_body_fields(
@@ -5926,6 +6030,51 @@ fn short_incremental_manifest_body(
         second,
     );
     proof {
+        assert forall|start: int, end: int, envelope: Envelope, partial: bool|
+            short_incremental_manifest_raw_body_model(
+                input@, start, end, envelope, partial,
+            ) implies result == Ok(ObjectName {
+                kind: ObjectKind::IncrementalManifest,
+                start: Timestamp(start as i128),
+                end: Timestamp(end as i128),
+                volume: None,
+                envelope,
+                partial,
+                short: true,
+            }) by {
+            if short_incremental_manifest_raw_body_model(
+                input@, start, end, envelope, partial,
+            ) {
+                short_incremental_manifest_raw_body_model_aligns_fields(
+                    input@,
+                    start,
+                    end,
+                    envelope,
+                    partial,
+                    start_field@,
+                    optional_body_field_model(_after_start),
+                    end_field@,
+                    optional_body_field_model(_after_end),
+                    trailer@,
+                    optional_body_field_model(_after_trailer),
+                    optional_body_field_model(first),
+                    optional_body_field_model(second),
+                    optional_body_field_model(third),
+                    optional_body_field_model(extra),
+                    optional_body_field_model(fields),
+                );
+                reveal(short_incremental_manifest_fields_model);
+                assert(result == Ok(ObjectName {
+                    kind: ObjectKind::IncrementalManifest,
+                    start: Timestamp(start as i128),
+                    end: Timestamp(end as i128),
+                    volume: None,
+                    envelope,
+                    partial,
+                    short: true,
+                }));
+            }
+        }
         if let Ok(name) = result {
             short_incremental_manifest_raw_body_from_fields(
                 input@,
@@ -5945,6 +6094,298 @@ fn short_incremental_manifest_body(
         }
     }
     result
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn short_incremental_manifest_raw_body_model_has_trailer_input(
+    input: Seq<u8>,
+    start: int,
+    end: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Seq<u8>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_end: Seq<u8>,
+    actual_after_end: Option<Seq<u8>>,
+)
+    requires short_incremental_manifest_raw_body_model(
+            input, start, end, envelope, partial,
+        ),
+        body_field_split_model(Some(input), Some(actual_start), actual_after_start),
+        body_field_split_model(
+            actual_after_start, Some(actual_end), actual_after_end,
+        ),
+    ensures actual_after_end.is_some()
+        && 0 <= start && start <= u64::MAX as int
+        && 0 <= end && end <= u64::MAX as int,
+{
+    reveal(short_incremental_manifest_raw_body_model);
+    let (model_start, model_end, model_trailer, model_first, model_second,
+        model_after_start, model_after_end, model_after_trailer, model_third,
+        model_extra) = choose|
+        start_field: Seq<u8>,
+        end_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_end: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(end_field), after_end),
+            body_field_split_model(after_end, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            short_incremental_manifest_fields_model(
+                start_field, end_field, trailer, first, second,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(end_field), after_end)
+            && body_field_split_model(after_end, Some(trailer), after_trailer)
+            && body_suffix_fields_model(
+                after_trailer, first, second, third, extra, None,
+            )
+            && third.is_none()
+            && extra.is_none()
+            && short_incremental_manifest_fields_model(
+                start_field, end_field, trailer, first, second,
+            ) == Some((start, end, envelope, partial));
+
+    body_field_split_model_unique(
+        input,
+        model_start,
+        model_after_start,
+        actual_start,
+        actual_after_start,
+    );
+    body_field_split_model_unique(
+        model_after_start.unwrap(),
+        model_end,
+        model_after_end,
+        actual_end,
+        actual_after_end,
+    );
+    reveal(body_field_split_model);
+    assert(model_after_end.is_some());
+    assert(actual_after_end == model_after_end);
+    assert(short_incremental_manifest_fields_model(
+        model_start,
+        model_end,
+        model_trailer,
+        model_first,
+        model_second,
+    ) == Some((start, end, envelope, partial)));
+    reveal(short_incremental_manifest_fields_model);
+    reveal(short_interval_model);
+    reveal(short_timestamp_seconds_model);
+    assert(short_timestamp_seconds_model(model_start) == Some(start));
+    assert(short_timestamp_seconds_model(model_end) == Some(end));
+    reveal(short_timestamp_seconds_model);
+    base36_value_model_is_bounded(model_start, model_start.len() as int);
+    base36_value_model_is_bounded(model_end, model_end.len() as int);
+    assert(0 <= start && start <= u64::MAX as int);
+    assert(0 <= end && end <= u64::MAX as int);
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn short_incremental_manifest_raw_body_model_aligns_fields(
+    input: Seq<u8>,
+    start: int,
+    end: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Seq<u8>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_end: Seq<u8>,
+    actual_after_end: Option<Seq<u8>>,
+    actual_trailer: Seq<u8>,
+    actual_after_trailer: Option<Seq<u8>>,
+    actual_first: Option<Seq<u8>>,
+    actual_second: Option<Seq<u8>>,
+    actual_third: Option<Seq<u8>>,
+    actual_extra: Option<Seq<u8>>,
+    actual_remaining: Option<Seq<u8>>,
+)
+    requires short_incremental_manifest_raw_body_model(
+            input, start, end, envelope, partial,
+        ),
+        body_field_split_model(Some(input), Some(actual_start), actual_after_start),
+        body_field_split_model(actual_after_start, Some(actual_end), actual_after_end),
+        body_field_split_model(actual_after_end, Some(actual_trailer), actual_after_trailer),
+        body_suffix_fields_model(
+            actual_after_trailer,
+            actual_first,
+            actual_second,
+            actual_third,
+            actual_extra,
+            actual_remaining,
+        ),
+    ensures actual_third.is_none()
+        && actual_extra.is_none()
+        && actual_remaining.is_none()
+        && short_incremental_manifest_fields_model(
+            actual_start,
+            actual_end,
+            actual_trailer,
+            actual_first,
+            actual_second,
+        ) == Some((start, end, envelope, partial)),
+{
+    reveal(short_incremental_manifest_raw_body_model);
+    let (model_start, model_end, model_trailer, model_first, model_second,
+        model_after_start, model_after_end, model_after_trailer, model_third, model_extra) = choose|
+        start_field: Seq<u8>,
+        end_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_end: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(end_field), after_end),
+            body_field_split_model(after_end, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            short_incremental_manifest_fields_model(
+                start_field, end_field, trailer, first, second,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(end_field), after_end)
+            && body_field_split_model(after_end, Some(trailer), after_trailer)
+            && body_suffix_fields_model(
+                after_trailer, first, second, third, extra, None,
+            )
+            && third.is_none()
+            && extra.is_none()
+            && short_incremental_manifest_fields_model(
+                start_field, end_field, trailer, first, second,
+            ) == Some((start, end, envelope, partial));
+
+    body_field_split_model_unique(
+        input,
+        model_start,
+        model_after_start,
+        actual_start,
+        actual_after_start,
+    );
+    body_field_split_model_unique(
+        model_after_start.unwrap(),
+        model_end,
+        model_after_end,
+        actual_end,
+        actual_after_end,
+    );
+    body_field_split_model_unique(
+        model_after_end.unwrap(),
+        model_trailer,
+        model_after_trailer,
+        actual_trailer,
+        actual_after_trailer,
+    );
+    body_suffix_fields_model_unique(
+        model_after_trailer,
+        model_first,
+        model_second,
+        model_third,
+        model_extra,
+        None,
+        actual_first,
+        actual_second,
+        actual_third,
+        actual_extra,
+        actual_remaining,
+    );
+    reveal(short_incremental_manifest_fields_model);
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn short_incremental_manifest_raw_body_concrete_witness()
+    ensures short_incremental_manifest_raw_body_model(
+        seq![b'1', b'.', b'2', b'.', b'm'],
+        1,
+        2,
+        Envelope::Plain,
+        false,
+    ),
+{
+    reveal(short_incremental_manifest_raw_body_model);
+    reveal(body_suffix_fields_model);
+    reveal(body_field_split_model);
+    reveal(short_incremental_manifest_fields_model);
+    reveal(short_interval_model);
+    reveal(short_timestamp_seconds_model);
+    reveal(short_trailer_model);
+    reveal(short_trailer_matches_model);
+    reveal(single_short_token_model);
+    reveal(base36_value_model);
+    reveal(base36_digit_model);
+    reveal(dot_field_boundary_model);
+
+    let raw: Seq<u8> = seq![b'1', b'.', b'2', b'.', b'm'];
+    let start: Seq<u8> = seq![b'1'];
+    let after_start: Seq<u8> = seq![b'2', b'.', b'm'];
+    let end: Seq<u8> = seq![b'2'];
+    let after_end: Seq<u8> = seq![b'm'];
+    let trailer: Seq<u8> = seq![b'm'];
+    assert(raw.len() == 5);
+    assert(raw.subrange(0, 1) == start);
+    assert(raw.subrange(2, 5) == after_start);
+    assert(raw.subrange(0, 1) == start);
+    assert(body_field_split_model(Some(raw), Some(start), Some(after_start)));
+    assert(after_start.subrange(0, 1) == end);
+    assert(after_start.subrange(2, 3) == after_end);
+    assert(body_field_split_model(Some(after_start), Some(end), Some(after_end))) by {
+        reveal(body_field_split_model);
+        assert(end.len() <= after_start.len());
+        assert(end == after_start.subrange(0, end.len() as int));
+        assert(forall|index: int| 0 <= index < end.len() as int
+            ==> end[index] != b'.');
+        assert(end.len() < after_start.len());
+        assert(after_start[end.len() as int] == b'.');
+        assert(after_end == after_start.subrange(end.len() as int + 1, after_start.len() as int));
+    }
+    assert(trailer == after_end);
+    assert(trailer.len() == 1 && trailer[0] == b'm');
+    assert(body_field_split_model(Some(after_end), Some(trailer), None)) by {
+        reveal(body_field_split_model);
+        assert(trailer.len() <= after_end.len());
+        assert(trailer == after_end.subrange(0, trailer.len() as int));
+        assert(forall|index: int| 0 <= index < trailer.len() as int
+            ==> trailer[index] != b'.');
+        assert(trailer.len() == after_end.len());
+    }
+    assert(body_suffix_fields_model(None, None, None, None, None, None)) by {
+        reveal(body_suffix_fields_model);
+        reveal(body_field_split_model);
+        assert(body_field_split_model(None, None, None));
+    }
+    assert(base36_value_model(start, 1) == Some(1)) by (compute);
+    assert(base36_value_model(end, 1) == Some(2)) by (compute);
+    assert(short_timestamp_seconds_model(start) == Some(1));
+    assert(short_timestamp_seconds_model(end) == Some(2));
+    assert(short_interval_model(
+        ObjectKind::IncrementalManifest, start, Some(end),
+    ) == Some((1, 2)));
+    assert(short_trailer_matches_model(ObjectKind::IncrementalManifest, trailer));
+    assert(short_trailer_model(
+        ObjectKind::IncrementalManifest, trailer, None, None, None,
+    ) == Some((Envelope::Plain, false)));
+    assert(short_incremental_manifest_fields_model(
+        start, end, trailer, None, None,
+    ) == Some((1, 2, Envelope::Plain, false)));
 }
 
 proof fn short_incremental_manifest_raw_body_from_fields(

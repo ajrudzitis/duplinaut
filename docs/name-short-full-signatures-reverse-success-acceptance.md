@@ -1,6 +1,6 @@
 # PARSE-NAME-001 Short FullSignatures Reverse-Success Acceptance
 
-**Status:** Specification and independent implementation/proof reviews passed. The strict names-module proof, concrete witness, existing production result matrix, focused Duvet query/full trace, formatting, strict Clippy, full core tests, and full local `cargo xtask ci` pass. Hosted Linux assurance with Duvet Pages remains pending. Broader filename-parser/controller work remains open.
+**Status:** Specification and independent implementation/proof reviews, strict proof, tests, local full `cargo xtask ci`, hosted Linux assurance, and Duvet Pages publication passed in [GitHub Actions run 42216748228](https://github.com/ajrudzitis/duplinaut/actions/runs/42216748228). Broader filename-parser/controller work remains open.
 
 ## Goal and scope
 
@@ -51,5 +51,5 @@ This acceptance does not prove malformed-input/error completeness, scanner/raw s
 - [x] Implementation, concrete antecedent witness, and strict Verus implication pass independent review.
 - [x] Strict names-module verification passes with 135 declarations verified and zero errors; the focused `short_full_signatures_body_` tests pass (two unit tests and the integration composition test), the full core suite passes, and the targeted PARSE-NAME-001 Duvet query passes implementation and test coverage (56/56 tests). The complete Duvet trace, formatting, and strict core Clippy pass.
 - [x] Full local `cargo xtask ci` passes, including Duvet, fresh strict workspace Verus, formatting, Clippy, and tests.
-- [ ] Hosted Linux assurance and Duvet Pages publication pass.
+- [x] Hosted Linux assurance and Duvet Pages publication pass in [run 42216748228](https://github.com/ajrudzitis/duplinaut/actions/runs/42216748228).
 - [x] Scoped acceptance is recorded without closing broader filename-parser/controller work.
