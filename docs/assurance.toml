@@ -1792,9 +1792,10 @@ proof_required = true
 # Successful Short FullSignatures body parsing implies exact dot/suffix field
 # extraction and the semantic timestamp/signature-trailer model. A direct
 # 18-case raw-body result matrix exercises timestamps `1`, `z`, and `10` across
-# six suffix profiles, but does not prove raw-model-to-parser success because
-# split-model projection remains open. Malformed raw-body error completeness
-# and other parser routes remain outside this checkpoint.
+# six suffix profiles. The positive raw-model-to-parser implication is covered
+# separately by `name-short-full-signatures-reverse-success`; malformed
+# raw-body error completeness and other parser routes remain outside this
+# checkpoint.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "body" },
   { path = "crates/core/src/names.rs", symbol = "short_full_signatures_body_fields" }
@@ -3042,6 +3043,37 @@ proofs = [
 ]
 tests = [
   { package = "duplicity-core", name = "names::tests::short_full_manifest_body_raw_result_matrix" }
+]
+
+[[milestone]]
+id = "name-short-full-signatures-reverse-success"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves the positive raw-model-to-production `ObjectName` implication for the
+# short FullSignatures body. Existential field/suffix witnesses are aligned to
+# deterministic production extraction by split uniqueness. A separate strict
+# witness establishes the antecedent for `1.st`. The existing exact 18-case
+# production matrix remains native regression evidence. This adds no
+# PARSE-NAME-003 or PARSE-NAME-010 claim; malformed-input completeness, other
+# routes, and broader filename-controller refinement remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "short_full_signatures_raw_body_model" },
+  { path = "crates/core/src/names.rs", symbol = "short_full_signatures_body" },
+  { path = "crates/core/src/names.rs", symbol = "short_full_signatures_raw_body_model_aligns_fields" },
+  { path = "crates/core/src/names.rs", symbol = "short_full_signatures_raw_body_concrete_witness" }
+]
+proofs = [
+  { id = "name-short-full-signatures-reverse-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_full_signatures_body", kind = "contract" },
+  { id = "name-short-full-signatures-model-witness", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_full_signatures_raw_body_concrete_witness", kind = "lemma" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::short_full_signatures_body_raw_result_matrix" }
 ]
 
 [[milestone]]

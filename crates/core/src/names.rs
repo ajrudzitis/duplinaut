@@ -6318,13 +6318,16 @@ proof fn short_full_manifest_raw_body_from_fields(
     reveal(short_full_manifest_fields_model);
 }
 
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 #[verifier::spinoff_prover]
 #[verifier::rlimit(40)]
 fn short_full_signatures_body(
     input: &[u8],
     separator: u8,
 ) -> (result: Result<ObjectName, NameError>)
-    ensures match result {
+    ensures (match result {
         Err(error) => error == NameError::Malformed,
         Ok(name) => name.kind == ObjectKind::FullSignatures
             && name.short
@@ -6336,7 +6339,19 @@ fn short_full_signatures_body(
                 name.envelope,
                 name.partial,
             ),
-    },
+    })
+        && forall|start: int, end: int, envelope: Envelope, partial: bool|
+            short_full_signatures_raw_body_model(
+                input@, start, end, envelope, partial,
+            ) ==> result == Ok(ObjectName {
+                kind: ObjectKind::FullSignatures,
+                start: Timestamp(start as i128),
+                end: Timestamp(end as i128),
+                volume: None,
+                envelope,
+                partial,
+                short: true,
+            }),
 {
     let _ = separator; // Short full-signatures bodies do not consume the time separator.
     let mut fields = Some(input);
@@ -6346,10 +6361,83 @@ fn short_full_signatures_body(
     let _after_trailer = fields;
     let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
     if third.is_some() || extra.is_some() || fields.is_some() {
+        proof {
+            assert forall|start: int, end: int, envelope: Envelope, partial: bool|
+                short_full_signatures_raw_body_model(
+                    input@, start, end, envelope, partial,
+                ) implies false by {
+                if short_full_signatures_raw_body_model(
+                    input@, start, end, envelope, partial,
+                ) {
+                    short_full_signatures_raw_body_model_aligns_fields(
+                        input@,
+                        start,
+                        end,
+                        envelope,
+                        partial,
+                        start_field@,
+                        optional_body_field_model(_after_start),
+                        trailer@,
+                        optional_body_field_model(_after_trailer),
+                        optional_body_field_model(first),
+                        optional_body_field_model(second),
+                        optional_body_field_model(third),
+                        optional_body_field_model(extra),
+                        optional_body_field_model(fields),
+                    );
+                    assert(third.is_none());
+                    assert(extra.is_none());
+                    assert(fields.is_none());
+                }
+            }
+        }
         return Err(NameError::Malformed);
     }
     let result = short_full_signatures_body_fields(start_field, trailer, first, second);
     proof {
+        assert forall|start: int, end: int, envelope: Envelope, partial: bool|
+            short_full_signatures_raw_body_model(
+                input@, start, end, envelope, partial,
+            ) implies result == Ok(ObjectName {
+                kind: ObjectKind::FullSignatures,
+                start: Timestamp(start as i128),
+                end: Timestamp(end as i128),
+                volume: None,
+                envelope,
+                partial,
+                short: true,
+            }) by {
+            if short_full_signatures_raw_body_model(
+                input@, start, end, envelope, partial,
+            ) {
+                short_full_signatures_raw_body_model_aligns_fields(
+                    input@,
+                    start,
+                    end,
+                    envelope,
+                    partial,
+                    start_field@,
+                    optional_body_field_model(_after_start),
+                    trailer@,
+                    optional_body_field_model(_after_trailer),
+                    optional_body_field_model(first),
+                    optional_body_field_model(second),
+                    optional_body_field_model(third),
+                    optional_body_field_model(extra),
+                    optional_body_field_model(fields),
+                );
+                reveal(short_full_signatures_fields_model);
+                assert(result == Ok(ObjectName {
+                    kind: ObjectKind::FullSignatures,
+                    start: Timestamp(start as i128),
+                    end: Timestamp(end as i128),
+                    volume: None,
+                    envelope,
+                    partial,
+                    short: true,
+                }));
+            }
+        }
         if let Ok(name) = result {
             short_full_signatures_raw_body_from_fields(
                 input@,
@@ -6367,6 +6455,170 @@ fn short_full_signatures_body(
         }
     }
     result
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn short_full_signatures_raw_body_model_aligns_fields(
+    input: Seq<u8>,
+    start: int,
+    end: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Seq<u8>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_trailer: Seq<u8>,
+    actual_after_trailer: Option<Seq<u8>>,
+    actual_first: Option<Seq<u8>>,
+    actual_second: Option<Seq<u8>>,
+    actual_third: Option<Seq<u8>>,
+    actual_extra: Option<Seq<u8>>,
+    actual_remaining: Option<Seq<u8>>,
+)
+    requires short_full_signatures_raw_body_model(
+            input, start, end, envelope, partial,
+        ),
+        body_field_split_model(Some(input), Some(actual_start), actual_after_start),
+        body_field_split_model(actual_after_start, Some(actual_trailer), actual_after_trailer),
+        body_suffix_fields_model(
+            actual_after_trailer,
+            actual_first,
+            actual_second,
+            actual_third,
+            actual_extra,
+            actual_remaining,
+        ),
+    ensures actual_third.is_none()
+        && actual_extra.is_none()
+        && actual_remaining.is_none()
+        && short_full_signatures_fields_model(
+            actual_start,
+            actual_trailer,
+            actual_first,
+            actual_second,
+        ) == Some((start, end, envelope, partial)),
+{
+    reveal(short_full_signatures_raw_body_model);
+    let (model_start, model_trailer, model_first, model_second,
+        model_after_start, model_after_trailer, model_third, model_extra) = choose|
+        start_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            short_full_signatures_fields_model(start_field, trailer, first, second)
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(trailer), after_trailer)
+            && body_suffix_fields_model(
+                after_trailer, first, second, third, extra, None,
+            )
+            && third.is_none()
+            && extra.is_none()
+            && short_full_signatures_fields_model(
+                start_field, trailer, first, second,
+            ) == Some((start, end, envelope, partial));
+
+    body_field_split_model_unique(
+        input,
+        model_start,
+        model_after_start,
+        actual_start,
+        actual_after_start,
+    );
+    body_field_split_model_unique(
+        model_after_start.unwrap(),
+        model_trailer,
+        model_after_trailer,
+        actual_trailer,
+        actual_after_trailer,
+    );
+    body_suffix_fields_model_unique(
+        model_after_trailer,
+        model_first,
+        model_second,
+        model_third,
+        model_extra,
+        None,
+        actual_first,
+        actual_second,
+        actual_third,
+        actual_extra,
+        actual_remaining,
+    );
+    reveal(short_full_signatures_fields_model);
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn short_full_signatures_raw_body_concrete_witness()
+    ensures short_full_signatures_raw_body_model(
+        seq![b'1', b'.', b's', b't'],
+        1,
+        1,
+        Envelope::Plain,
+        false,
+    ),
+{
+    reveal(short_full_signatures_raw_body_model);
+    reveal(body_suffix_fields_model);
+    reveal(body_field_split_model);
+    reveal(short_full_signatures_fields_model);
+    reveal(short_interval_model);
+    reveal(short_timestamp_seconds_model);
+    reveal(short_trailer_model);
+    reveal(short_trailer_matches_model);
+    reveal(single_short_token_model);
+    reveal(base36_value_model);
+    reveal(base36_digit_model);
+    reveal(dot_field_boundary_model);
+
+    let raw: Seq<u8> = seq![b'1', b'.', b's', b't'];
+    let start: Seq<u8> = seq![b'1'];
+    let after_start: Seq<u8> = seq![b's', b't'];
+    let trailer: Seq<u8> = seq![b's', b't'];
+    assert(raw.len() == 4);
+    assert(raw.subrange(0, 1) == start);
+    assert(raw.subrange(2, 4) == after_start);
+    assert(body_field_split_model(Some(raw), Some(start), Some(after_start)));
+    assert(trailer == after_start);
+    assert(trailer.len() == 2 && trailer[0] == b's' && trailer[1] == b't');
+    assert forall|index: int| 0 <= index < trailer.len() as int
+        implies trailer[index] != b'.' by {
+        assert(trailer[index] == b's' || trailer[index] == b't');
+    }
+    assert(body_field_split_model(Some(after_start), Some(trailer), None)) by {
+        reveal(body_field_split_model);
+        assert(trailer.len() == after_start.len());
+        assert(trailer == after_start.subrange(0, trailer.len() as int));
+        assert(forall|index: int| 0 <= index < trailer.len() as int
+            ==> trailer[index] != b'.');
+    }
+    assert(body_suffix_fields_model(None, None, None, None, None, None)) by {
+        reveal(body_suffix_fields_model);
+        assert(body_field_split_model(None, None, None));
+    }
+    assert(base36_value_model(start, 1) == Some(1)) by (compute);
+    assert(short_timestamp_seconds_model(start) == Some(1));
+    assert(short_interval_model(ObjectKind::FullSignatures, start, None) == Some((1, 1)));
+    assert(short_trailer_matches_model(ObjectKind::FullSignatures, trailer));
+    assert(short_trailer_model(ObjectKind::FullSignatures, trailer, None, None, None)
+        == Some((Envelope::Plain, false)));
+    assert(short_full_signatures_fields_model(
+        start,
+        trailer,
+        None,
+        None,
+    ) == Some((1, 1, Envelope::Plain, false)));
 }
 
 proof fn short_full_signatures_raw_body_from_fields(

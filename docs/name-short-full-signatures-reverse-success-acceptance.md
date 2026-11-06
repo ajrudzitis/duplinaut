@@ -1,6 +1,6 @@
 # PARSE-NAME-001 Short FullSignatures Reverse-Success Acceptance
 
-**Status:** Proposed; pending independent specification review. No implementation or proof has been accepted for this slice.
+**Status:** Specification and independent implementation/proof reviews passed. The strict names-module proof, concrete witness, existing production result matrix, focused Duvet query/full trace, formatting, strict Clippy, full core tests, and full local `cargo xtask ci` pass. Hosted Linux assurance with Duvet Pages remains pending. Broader filename-parser/controller work remains open.
 
 ## Goal and scope
 
@@ -38,7 +38,7 @@ The raw-body predicate existentially chooses splits, while production uses deter
 - Focused strict Verus proof of the reverse-success implication and concrete antecedent witness.
 - Existing `names::tests::short_full_signatures_body_raw_result_matrix` and relevant edge tests pass without weakened assertions.
 - Focused Duvet queries and complete trace show the new proof and positive-result test under `PARSE-NAME-001`, with no change to separate `PARSE-NAME-003` or `PARSE-NAME-010` evidence.
-- Formatting, strict Clippy, full core tests, full `cargo xtask ci`, hosted Linux assurance, and Duvet report publication pass.
+- Formatting, strict Clippy, full core tests, and full local `cargo xtask ci` pass. Hosted Linux assurance and Duvet report publication remain pending.
 - Independent proof review examines witness alignment, non-vacuity, exact field correspondence, and absence of assumptions or weakened conditions. Independent implementation/test review confirms the tests exercise production parsing.
 
 ## Exclusions
@@ -47,8 +47,9 @@ This acceptance does not prove malformed-input/error completeness, scanner/raw s
 
 ## Checklist
 
-- [ ] Independent specification review accepts the theorem scope and witness-alignment obligation.
-- [ ] Implementation, concrete antecedent witness, and strict Verus implication pass independent review.
-- [ ] Existing exact-result regression tests, Duvet trace, formatting, strict Clippy, and full core tests pass.
-- [ ] Local full assurance and hosted Linux assurance plus Duvet publication pass.
-- [ ] Scoped acceptance is recorded without closing broader filename-parser/controller work.
+- [x] Independent specification review accepts the theorem scope and witness-alignment obligation.
+- [x] Implementation, concrete antecedent witness, and strict Verus implication pass independent review.
+- [x] Strict names-module verification passes with 135 declarations verified and zero errors; the focused `short_full_signatures_body_` tests pass (two unit tests and the integration composition test), the full core suite passes, and the targeted PARSE-NAME-001 Duvet query passes implementation and test coverage (56/56 tests). The complete Duvet trace, formatting, and strict core Clippy pass.
+- [x] Full local `cargo xtask ci` passes, including Duvet, fresh strict workspace Verus, formatting, Clippy, and tests.
+- [ ] Hosted Linux assurance and Duvet Pages publication pass.
+- [x] Scoped acceptance is recorded without closing broader filename-parser/controller work.
