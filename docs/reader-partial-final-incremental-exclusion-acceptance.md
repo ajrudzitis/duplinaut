@@ -1,7 +1,7 @@
 # Official Plain Reader Partial Final-Incremental Manifest Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Implementation and independent review passed. Full local
+`cargo xtask ci` passed. Hosted Linux assurance and Duvet Pages remain pending.
 
 ## Goal and scope
 
@@ -124,12 +124,13 @@ refinement, or a formal reader proof.
 
 - [x] Independent specification review accepts scope, mutation, and both
       public outcomes.
-- [ ] Exact twelve-object inventory relation and byte/size/identity
+- [x] Exact twelve-object inventory relation and byte/size/identity
       preservation pass; the renamed object remains visibly Partial.
-- [ ] Completed descriptor membership is exactly Full plus first
+- [x] Completed descriptor membership is exactly Full plus first
       Incremental; prior-date snapshot matches expected.json and later target
       returns exact `Chain(Missing)`.
-- [ ] Targeted Duvet queries/full trace, focused/full core tests, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Targeted Duvet queries/full trace, focused/full core tests, formatting,
+      strict Clippy, and diff checks pass.
+- [x] Independent implementation/test review passes.
+- [x] Full local `cargo xtask ci` passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
