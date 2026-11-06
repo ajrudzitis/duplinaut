@@ -1,7 +1,8 @@
 # Official Plain Reader PKCS#7 Full-Manifest Exclusion Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-Duvet evidence, and CI remain pending.
+**Status:** The bounded fixture test and local scoped verification pass.
+Independent implementation review, full local `cargo xtask ci`, and hosted
+Linux assurance/Pages remain pending.
 
 ## Goal and scope
 
@@ -100,9 +101,34 @@ refinement, or a formal reader proof. It adds no `PARSE-NAME-005` or
 ## Checklist
 
 - [x] Independent specification review accepts scope, mutation, and oracle.
-- [ ] Exact inventory, visible unsupported diagnostic, descriptor exclusions,
-      and public invalid-anchor result pass.
-- [ ] Duvet links, focused/full tests, formatting, strict Clippy, and local
-      `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Exact inventory rename relation and byte/identity preservation pass;
+      the PKCS#7 diagnostic remains visible, exactly two Incremental
+      descriptors remain, and iterator-derived anchor selection returns exact
+      `Chain(InvalidAnchor)` before any object is opened.
+- [x] Targeted `PARSE-NAME-001` and `PARSE-CHAIN-001` Duvet queries, full
+      `cargo xtask trace`, focused test, full core suite, formatting, strict
+      Clippy, and diff check pass locally.
+- [x] Independent implementation/test review passes.
+- [x] Full local `cargo xtask ci` passes with 2,047, 3,183, and 1,329 verified
+      declarations and zero errors; Duvet, strict Clippy, formatting, and
+      workspace tests pass.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
+
+## Current local evidence
+
+- `cargo test -p duplicity-core --test reader
+  official_pkcs7_full_manifest_is_visible_but_cannot_be_a_chain_anchor`:
+  passed.
+- `cargo test -p duplicity-core`: passed.
+- `.tools/bin/duvet query --check implementation,test --section
+  docs/parsing-requirements.md#parse-name-001`: passed.
+- `.tools/bin/duvet query --check implementation,test --section
+  docs/parsing-requirements.md#parse-chain-001`: passed.
+- `DUVET="$PWD/.tools/bin/duvet" cargo xtask trace-update` and `cargo xtask
+  trace`: passed.
+- `cargo fmt --all -- --check`, `cargo clippy -p duplicity-core --all-targets
+  -- -D warnings`, and `git diff --check`: passed.
+- Full pinned CI wrote `target/assurance/ci.json` with source digest
+  `7bd08291be55ad8b3abc104b63de60d27e52abc036a7c2ae263439442595a1a2`.
+- This test makes no CMS/PKCS#7 decoding, authentication, or crypto-support
+  claim.
