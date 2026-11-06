@@ -3178,6 +3178,38 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-full-signatures-reverse-success"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves the positive raw-model-to-production `ObjectName` implication for
+# long FullSignatures bodies. Existential timestamp/trailer/suffix witnesses
+# align with deterministic production extraction, and a concrete canonical UTC
+# `.sigtar` witness establishes a non-vacuous antecedent. The existing exact
+# 24-case matrix remains native regression evidence. This adds no
+# PARSE-NAME-004 or PARSE-NAME-007 claim; malformed-input completeness, other
+# routes, and broader filename-controller refinement remain open. Independent
+# proof/behavior review and full local CI passed; hosted Linux and report
+# publication remain tracked separately.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "long_full_signatures_raw_body_model" },
+  { path = "crates/core/src/names.rs", symbol = "long_full_signatures_body" },
+  { path = "crates/core/src/names.rs", symbol = "long_full_signatures_raw_body_concrete_witness" }
+]
+proofs = [
+  { id = "name-long-full-signatures-reverse-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "long_full_signatures_body", kind = "contract" },
+  { id = "name-long-full-signatures-model-witness", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "long_full_signatures_raw_body_concrete_witness", kind = "lemma" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::long_full_signatures_body_raw_result_matrix" }
+]
+
+[[milestone]]
 id = "name-short-full-signatures-reverse-success"
 gate = true
 requirements = ["PARSE-NAME-001"]

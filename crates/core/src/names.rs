@@ -8725,6 +8725,540 @@ proof fn long_full_manifest_raw_body_concrete_witness()
     ) == Some((0, 0, Envelope::Plain, false)));
 }
 
+//= docs/parsing-requirements.md#parse-name-010
+//= type=implementation
+//# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+#[verifier::spinoff_prover]
+#[verifier::rlimit(40)]
+fn long_full_signatures_body(
+    input: &[u8],
+    separator: u8,
+) -> (result: Result<ObjectName, NameError>)
+    ensures (match result {
+        Err(error) => error == NameError::Malformed
+            || (!time_separator_valid_model(separator)
+                && error == NameError::Configuration),
+        Ok(name) => name.kind == ObjectKind::FullSignatures
+            && !name.short
+            && name.volume.is_none()
+            && long_full_signatures_raw_body_model(
+                input@,
+                separator,
+                name.start.0 as int,
+                name.end.0 as int,
+                name.envelope,
+                name.partial,
+            ),
+    }) && forall|start: int, end: int, envelope: Envelope, partial: bool|
+        long_full_signatures_raw_body_model(
+            input@, separator, start, end, envelope, partial,
+        ) ==> result == Ok(ObjectName {
+            kind: ObjectKind::FullSignatures,
+            start: Timestamp(start as i128),
+            end: Timestamp(end as i128),
+            volume: None,
+            envelope,
+            partial,
+            short: false,
+        }),
+{
+    let mut fields = Some(input);
+    let start_option = take_dot_field(&mut fields);
+    proof {
+        assert forall|start: int, end: int, envelope: Envelope, partial: bool|
+            long_full_signatures_raw_body_model(
+                input@, separator, start, end, envelope, partial,
+            ) implies start_option.is_some() by {
+            if long_full_signatures_raw_body_model(
+                input@, separator, start, end, envelope, partial,
+            ) {
+                long_full_signatures_raw_body_model_has_start_field(
+                    input@,
+                    separator,
+                    start,
+                    end,
+                    envelope,
+                    partial,
+                    optional_body_field_model(start_option),
+                    optional_body_field_model(fields),
+                );
+            }
+        }
+    }
+    let start_field = start_option.ok_or(NameError::Malformed)?;
+    let _after_start = fields;
+    let trailer_option = take_dot_field(&mut fields);
+    proof {
+        assert forall|start: int, end: int, envelope: Envelope, partial: bool|
+            long_full_signatures_raw_body_model(
+                input@, separator, start, end, envelope, partial,
+            ) implies trailer_option.is_some() by {
+            if long_full_signatures_raw_body_model(
+                input@, separator, start, end, envelope, partial,
+            ) {
+                long_full_signatures_raw_body_model_has_trailer_field(
+                    input@,
+                    separator,
+                    start,
+                    end,
+                    envelope,
+                    partial,
+                    start_field@,
+                    optional_body_field_model(_after_start),
+                    optional_body_field_model(trailer_option),
+                    optional_body_field_model(fields),
+                );
+            }
+        }
+    }
+    let trailer = trailer_option.ok_or(NameError::Malformed)?;
+    let _after_trailer = fields;
+    let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+    proof {
+        assert forall|start: int, end: int, envelope: Envelope, partial: bool|
+            long_full_signatures_raw_body_model(
+                input@, separator, start, end, envelope, partial,
+            ) implies third.is_none() && extra.is_none() && fields.is_none()
+                && long_full_signatures_fields_model(
+                    start_field@,
+                    separator,
+                    trailer@,
+                    optional_short_token(first),
+                    optional_short_token(second),
+                    optional_short_token(third),
+                ) == Some((start, end, envelope, partial)) by {
+            if long_full_signatures_raw_body_model(
+                input@, separator, start, end, envelope, partial,
+            ) {
+                long_full_signatures_raw_body_model_aligns_fields(
+                    input@,
+                    separator,
+                    start,
+                    end,
+                    envelope,
+                    partial,
+                    start_field@,
+                    optional_body_field_model(_after_start),
+                    trailer@,
+                    optional_body_field_model(_after_trailer),
+                    optional_short_token(first),
+                    optional_short_token(second),
+                    optional_short_token(third),
+                    optional_short_token(extra),
+                    optional_body_field_model(fields),
+                );
+            }
+        }
+    }
+    if extra.is_some() || fields.is_some() {
+        return Err(NameError::Malformed);
+    }
+    let result = long_full_signatures_body_fields(
+        start_field,
+        separator,
+        trailer,
+        first,
+        second,
+        third,
+    );
+    proof {
+        if let Ok(name) = result {
+            reveal(long_full_signatures_raw_body_model);
+            assert(long_full_signatures_raw_body_model(
+                input@,
+                separator,
+                name.start.0 as int,
+                name.end.0 as int,
+                name.envelope,
+                name.partial,
+            ));
+        }
+    }
+    result
+}
+
+proof fn long_full_signatures_raw_body_model_has_start_field(
+    input: Seq<u8>,
+    separator: u8,
+    start: int,
+    end: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Option<Seq<u8>>,
+    actual_after_start: Option<Seq<u8>>,
+)
+    requires
+        long_full_signatures_raw_body_model(input, separator, start, end, envelope, partial),
+        body_field_split_model(
+            Some(input), actual_start, actual_after_start,
+        ),
+    ensures actual_start.is_some(),
+{
+    reveal(long_full_signatures_raw_body_model);
+    let (model_start, model_trailer, model_first, model_second, model_third,
+        model_after_start, model_after_trailer, model_extra) = choose|
+        start_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            long_full_signatures_fields_model(
+                start_field, separator, trailer, first, second, third,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(trailer), after_trailer)
+            && body_suffix_fields_model(after_trailer, first, second, third, extra, None)
+            && extra.is_none()
+            && long_full_signatures_fields_model(
+                start_field, separator, trailer, first, second, third,
+            ) == Some((start, end, envelope, partial));
+
+    body_field_split_optional_unique(
+        Some(input),
+        Some(model_start),
+        model_after_start,
+        actual_start,
+        actual_after_start,
+    );
+}
+
+proof fn long_full_signatures_raw_body_model_has_trailer_field(
+    input: Seq<u8>,
+    separator: u8,
+    start: int,
+    end: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Seq<u8>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_trailer: Option<Seq<u8>>,
+    actual_after_trailer: Option<Seq<u8>>,
+)
+    requires
+        long_full_signatures_raw_body_model(input, separator, start, end, envelope, partial),
+        body_field_split_model(Some(input), Some(actual_start), actual_after_start),
+        body_field_split_model(actual_after_start, actual_trailer, actual_after_trailer),
+    ensures actual_trailer.is_some(),
+{
+    reveal(long_full_signatures_raw_body_model);
+    let (model_start, model_trailer, model_first, model_second, model_third,
+        model_after_start, model_after_trailer, model_extra) = choose|
+        start_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            long_full_signatures_fields_model(
+                start_field, separator, trailer, first, second, third,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(trailer), after_trailer)
+            && body_suffix_fields_model(after_trailer, first, second, third, extra, None)
+            && extra.is_none()
+            && long_full_signatures_fields_model(
+                start_field, separator, trailer, first, second, third,
+            ) == Some((start, end, envelope, partial));
+
+    body_field_split_model_unique(
+        input, model_start, model_after_start, actual_start, actual_after_start,
+    );
+    body_field_split_optional_unique(
+        model_after_start,
+        Some(model_trailer),
+        model_after_trailer,
+        actual_trailer,
+        actual_after_trailer,
+    );
+}
+
+proof fn long_full_signatures_raw_body_model_aligns_fields(
+    input: Seq<u8>,
+    separator: u8,
+    start: int,
+    end: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Seq<u8>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_trailer: Seq<u8>,
+    actual_after_trailer: Option<Seq<u8>>,
+    actual_first: Option<Seq<u8>>,
+    actual_second: Option<Seq<u8>>,
+    actual_third: Option<Seq<u8>>,
+    actual_extra: Option<Seq<u8>>,
+    actual_remaining: Option<Seq<u8>>,
+)
+    requires
+        long_full_signatures_raw_body_model(input, separator, start, end, envelope, partial),
+        body_field_split_model(Some(input), Some(actual_start), actual_after_start),
+        body_field_split_model(actual_after_start, Some(actual_trailer), actual_after_trailer),
+        body_suffix_fields_model(
+            actual_after_trailer,
+            actual_first,
+            actual_second,
+            actual_third,
+            actual_extra,
+            actual_remaining,
+        ),
+    ensures actual_third.is_none()
+        && actual_extra.is_none()
+        && actual_remaining.is_none()
+        && long_full_signatures_fields_model(
+            actual_start,
+            separator,
+            actual_trailer,
+            actual_first,
+            actual_second,
+            actual_third,
+        ) == Some((start, end, envelope, partial)),
+{
+    reveal(long_full_signatures_raw_body_model);
+    let (model_start, model_trailer, model_first, model_second, model_third,
+        model_after_start, model_after_trailer, model_extra) = choose|
+        start_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            long_full_signatures_fields_model(
+                start_field, separator, trailer, first, second, third,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(trailer), after_trailer)
+            && body_suffix_fields_model(after_trailer, first, second, third, extra, None)
+            && extra.is_none()
+            && long_full_signatures_fields_model(
+                start_field, separator, trailer, first, second, third,
+            ) == Some((start, end, envelope, partial));
+
+    body_field_split_model_unique(
+        input, model_start, model_after_start, actual_start, actual_after_start,
+    );
+    body_field_split_model_unique(
+        model_after_start.unwrap(),
+        model_trailer,
+        model_after_trailer,
+        actual_trailer,
+        actual_after_trailer,
+    );
+    body_suffix_fields_model_unique(
+        model_after_trailer,
+        model_first,
+        model_second,
+        model_third,
+        model_extra,
+        None,
+        actual_first,
+        actual_second,
+        actual_third,
+        actual_extra,
+        actual_remaining,
+    );
+    reveal(long_full_signatures_fields_model);
+    reveal(long_timestamp_numeric_components_model);
+    reveal(long_timestamp_numeric_field_model);
+    reveal(long_timestamp_field_bounds_model);
+    reveal(canonical_timestamp_components_model);
+    reveal(long_timestamp_components_model);
+    reveal(long_timestamp_framing_model);
+    reveal(zone_offset_token_model);
+    reveal(compose_timestamp_fields_model);
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn long_full_signatures_raw_body_concrete_witness()
+    ensures long_full_signatures_raw_body_model(
+        seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+            b'0', b'0', b'0', b'0', b'0', b'0', b'Z', b'.',
+            b's', b'i', b'g', b't', b'a', b'r'],
+        b':',
+        0,
+        0,
+        Envelope::Plain,
+        false,
+    ),
+{
+    reveal(long_full_signatures_raw_body_model);
+    reveal(body_suffix_fields_model);
+    reveal(body_field_split_model);
+    reveal(long_full_signatures_fields_model);
+    reveal(long_timestamp_result_model);
+    reveal(long_trailer_suffix_model);
+    reveal(long_trailer_matches_model);
+    reveal(dot_field_boundary_model);
+    let raw: Seq<u8> = seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'0', b'Z', b'.',
+        b's', b'i', b'g', b't', b'a', b'r'];
+    let timestamp: Seq<u8> = seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'0', b'Z'];
+    let trailer: Seq<u8> = seq![b's', b'i', b'g', b't', b'a', b'r'];
+    let after_timestamp: Seq<u8> = trailer;
+    let canonical = CanonicalTimestampSpec {
+        year: seq![b'1', b'9', b'7', b'0'],
+        month: seq![b'0', b'1'],
+        day: seq![b'0', b'1'],
+        separator: b'T',
+        hour: seq![b'0', b'0'],
+        minute: seq![b'0', b'0'],
+        second: seq![b'0', b'0'],
+        zone: b'Z',
+    };
+    let canonical_fmt = CanonicalTimestampFmt::spec_inner();
+    assert(raw.len() == 23);
+    assert(timestamp.len() == 16);
+    assert(trailer.len() == 6);
+    assert(raw.subrange(0, 16) == timestamp);
+    assert(raw.subrange(17, 23) == trailer);
+    assert(body_field_split_model(Some(raw), Some(timestamp), Some(after_timestamp)));
+    assert(body_field_split_model(Some(after_timestamp), Some(trailer), None)) by {
+        reveal(body_field_split_model);
+        assert(trailer == after_timestamp);
+        assert(trailer == after_timestamp.subrange(0, after_timestamp.len() as int));
+        assert forall|index: int| 0 <= index < trailer.len()
+            implies trailer[index] != b'.' by { }
+    }
+    assert(body_suffix_fields_model(None, None, None, None, None, None)) by {
+        reveal(body_suffix_fields_model);
+        assert(body_field_split_model(None, None, None));
+    }
+    assert(CanonicalTimestampFmt.consistent(canonical)) by {
+        reveal(<CanonicalTimestampFmt as Consistency>::consistent);
+        reveal(CanonicalTimestampFmt::spec_inner);
+        canonical.lemma_into_structural_fields();
+        let structural = canonical.into_structural();
+        assert(canonical_fmt.1.mapper.1.spec_map(canonical) == structural) by {
+            reveal(CanonicalTimestampSpec::into_structural);
+        }
+        assert(canonical_fmt.1.inner.consistent(structural)) by {
+            reveal(<DateDigitFmt as Consistency>::consistent);
+            reveal(DateDigitFmt::spec_inner);
+            reveal(<DateTFmt as Consistency>::consistent);
+            reveal(DateTFmt::spec_inner);
+            reveal(<DateZFmt as Consistency>::consistent);
+            reveal(DateZFmt::spec_inner);
+            reveal(<vest_lib::combinators::Star<DateDigitFmt> as Consistency>::consistent);
+            assert forall|index: int| 0 <= index < structural.0.len()
+                implies DateDigitFmt.consistent(structural.0[index]) by {
+                reveal(<DateDigitFmt as Consistency>::consistent);
+                reveal(DateDigitFmt::spec_inner);
+                assert(DateDigitFmt.consistent(structural.0[index]));
+            }
+            assert forall|index: int| 0 <= index < structural.1.0.len()
+                implies DateDigitFmt.consistent(structural.1.0[index]) by {
+                reveal(<DateDigitFmt as Consistency>::consistent);
+                reveal(DateDigitFmt::spec_inner);
+                assert(DateDigitFmt.consistent(structural.1.0[index]));
+            }
+            assert forall|index: int| 0 <= index < structural.1.1.0.len()
+                implies DateDigitFmt.consistent(structural.1.1.0[index]) by {
+                reveal(<DateDigitFmt as Consistency>::consistent);
+                reveal(DateDigitFmt::spec_inner);
+                assert(DateDigitFmt.consistent(structural.1.1.0[index]));
+            }
+            assert forall|index: int| 0 <= index < structural.1.1.1.1.0.len()
+                implies DateDigitFmt.consistent(structural.1.1.1.1.0[index]) by {
+                reveal(<DateDigitFmt as Consistency>::consistent);
+                reveal(DateDigitFmt::spec_inner);
+                assert(DateDigitFmt.consistent(structural.1.1.1.1.0[index]));
+            }
+            assert forall|index: int| 0 <= index < structural.1.1.1.1.1.0.len()
+                implies DateDigitFmt.consistent(structural.1.1.1.1.1.0[index]) by {
+                reveal(<DateDigitFmt as Consistency>::consistent);
+                reveal(DateDigitFmt::spec_inner);
+                assert(DateDigitFmt.consistent(structural.1.1.1.1.1.0[index]));
+            }
+            assert forall|index: int| 0 <= index < structural.1.1.1.1.1.1.0.len()
+                implies DateDigitFmt.consistent(structural.1.1.1.1.1.1.0[index]) by {
+                reveal(<DateDigitFmt as Consistency>::consistent);
+                reveal(DateDigitFmt::spec_inner);
+                assert(DateDigitFmt.consistent(structural.1.1.1.1.1.1.0[index]));
+            }
+            assert(canonical_fmt.1.inner.consistent(structural)) by (compute);
+        }
+    }
+    CanonicalTimestampFmt.theorem_serialize_dps_parse_roundtrip(canonical, Seq::empty());
+    let serialized = CanonicalTimestampFmt.spec_serialize_dps(canonical, Seq::empty());
+    assert(serialized == timestamp) by {
+        reveal(<CanonicalTimestampFmt as SpecSerializerDps>::spec_serialize_dps);
+        reveal(CanonicalTimestampFmt::spec_inner);
+        canonical.lemma_into_structural_fields();
+        assert(canonical_fmt.1.mapper.1.spec_map(canonical) == canonical.into_structural()) by {
+            reveal(CanonicalTimestampSpec::into_structural);
+        }
+        reveal(<vest_lib::combinators::Star<DateDigitFmt> as SpecSerializerDps>::spec_serialize_dps);
+        reveal(vest_lib::combinators::Star::<DateDigitFmt>::rfold_serialize_dps);
+        reveal_with_fuel(Seq::fold_right_alt, 5);
+        reveal(<DateDigitFmt as SpecSerializerDps>::spec_serialize_dps);
+        reveal(<DateTFmt as SpecSerializerDps>::spec_serialize_dps);
+        reveal(<DateZFmt as SpecSerializerDps>::spec_serialize_dps);
+        reveal(DateDigitFmt::spec_inner);
+        reveal(DateTFmt::spec_inner);
+        reveal(DateZFmt::spec_inner);
+        reveal(<vest_lib::combinators::U8 as SpecSerializerDps>::spec_serialize_dps);
+        assert(canonical_fmt.1.inner.0.spec_serialize_dps(canonical.year, Seq::empty())
+            == canonical.year);
+    }
+    CanonicalTimestampFmt.lemma_serialize_dps_len(canonical, Seq::empty());
+    assert(CanonicalTimestampFmt.byte_len(canonical) == timestamp.len());
+    assert(CanonicalTimestampFmt.spec_parse(serialized)
+        == Some((CanonicalTimestampFmt.byte_len(canonical) as int, canonical)));
+    assert(canonical_timestamp_spec_parse(timestamp)
+        == CanonicalTimestampFmt.spec_parse(serialized)) by {
+        reveal(canonical_timestamp_spec_parse);
+        reveal(<CanonicalTimestampFmt as SpecParser>::spec_parse);
+    }
+    assert(serialized == timestamp);
+    assert(canonical_timestamp_spec_parse(timestamp)
+        == Some((timestamp.len() as int, canonical)));
+    assert(decimal_value_model(timestamp.subrange(0, 4), 4) == Some(1970)) by (compute);
+    assert(decimal_value_model(timestamp.subrange(4, 6), 2) == Some(1)) by (compute);
+    assert(decimal_value_model(timestamp.subrange(6, 8), 2) == Some(1)) by (compute);
+    assert(decimal_value_model(timestamp.subrange(9, 11), 2) == Some(0)) by (compute);
+    assert(decimal_value_model(timestamp.subrange(11, 13), 2) == Some(0)) by (compute);
+    assert(decimal_value_model(timestamp.subrange(13, 15), 2) == Some(0)) by (compute);
+    assert(long_timestamp_numeric_components_model(timestamp, b':')
+        == Some((1970, 1, 1, 0, 0, 0)));
+    assert(zone_offset_token_model(timestamp.subrange(15, 16), b':') == Some(0));
+    assert(compose_timestamp_fields_model(1970, 1, 1, 0, 0, 0, 0) == Some(0)) by (compute);
+    assert(canonical_timestamp_components_model(timestamp, b':')
+        == Some((1970, 1, 1, 0, 0, 0, 0)));
+    assert(long_timestamp_result_model(timestamp, b':') == Some(0));
+    assert(long_trailer_suffix_model(ObjectKind::FullSignatures, trailer, None, None, None)
+        == Some((Envelope::Plain, false)));
+    assert(long_full_signatures_fields_model(
+        timestamp, b':', trailer, None, None, None,
+    ) == Some((0, 0, Envelope::Plain, false)));
+}
+
 #[verifier::spinoff_prover]
 #[verifier::rlimit(80)]
 //= docs/parsing-requirements.md#parse-name-010
@@ -8803,44 +9337,14 @@ fn body(
             result
         }
         crate::name_dispatch::BodyRoute::LongFullSignatures => {
-            let mut fields = Some(input);
-            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_start = fields;
-            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_trailer = fields;
-            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-            if extra.is_some() || fields.is_some() {
-                return Err(NameError::Malformed);
-            }
-            let result = long_full_signatures_body_fields(
-                start_field,
-                separator,
-                trailer,
-                first,
-                second,
-                third,
-            );
+            let result = long_full_signatures_body(input, separator);
             proof {
                 if let Ok(name) = result {
-                    reveal(long_full_signatures_raw_body_model);
-                    reveal(long_full_signatures_fields_model);
-                    reveal(body_suffix_fields_model);
-                    reveal(body_field_split_model);
-                    assert(body_field_split_model(
-                        Some(input@), Some(start_field@),
-                        optional_body_field_model(_after_start),
-                    ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_start), Some(trailer@),
-                        optional_body_field_model(_after_trailer),
-                    ));
-                    assert(body_suffix_fields_model(
-                        optional_body_field_model(_after_trailer),
-                        optional_body_field_model(first),
-                        optional_body_field_model(second),
-                        optional_body_field_model(third),
-                        optional_body_field_model(extra),
-                        optional_body_field_model(fields),
+                    reveal(body_success_result_model);
+                    assert(kind == ObjectKind::FullSignatures);
+                    assert(!short);
+                    assert(body_success_result_model(
+                        input@, kind, short, separator, name,
                     ));
                 }
             }
