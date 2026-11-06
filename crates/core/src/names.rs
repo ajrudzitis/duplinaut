@@ -8725,6 +8725,147 @@ proof fn long_full_manifest_raw_body_concrete_witness()
     ) == Some((0, 0, Envelope::Plain, false)));
 }
 
+proof fn canonical_epoch_zero_timestamp_model_witness()
+    ensures long_timestamp_result_model(
+        seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+            b'0', b'0', b'0', b'0', b'0', b'0', b'Z'],
+        b':',
+    ) == Some(0),
+{
+    long_full_manifest_raw_body_concrete_witness();
+    let input: Seq<u8> = seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'0', b'Z', b'.',
+        b'm', b'a', b'n', b'i', b'f', b'e', b's', b't'];
+    let timestamp: Seq<u8> = input.subrange(0, 16);
+    let after_timestamp: Seq<u8> = input.subrange(17, input.len() as int);
+    assert(timestamp == seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'0', b'Z']);
+    assert(body_field_split_model(
+        Some(input), Some(timestamp), Some(after_timestamp),
+    ));
+
+    reveal(long_full_manifest_raw_body_model);
+    let (model_start, model_trailer, model_first, model_second, model_third,
+        model_after_start, model_after_trailer, model_extra) = choose|
+        start_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        model_after_start: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), model_after_start),
+            body_field_split_model(model_after_start, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            long_full_manifest_fields_model(
+                start_field, b':', trailer, first, second, third,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), model_after_start)
+            && body_field_split_model(model_after_start, Some(trailer), after_trailer)
+            && body_suffix_fields_model(after_trailer, first, second, third, extra, None)
+            && extra.is_none()
+            && long_full_manifest_fields_model(
+                start_field, b':', trailer, first, second, third,
+            ) == Some((0, 0, Envelope::Plain, false));
+    body_field_split_optional_unique(
+        Some(input),
+        Some(model_start),
+        model_after_start,
+        Some(timestamp),
+        Some(after_timestamp),
+    );
+    reveal(long_full_manifest_fields_model);
+    assert(long_timestamp_result_model(model_start, b':') == Some(0));
+    assert(model_start == timestamp);
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn long_full_volume_raw_body_concrete_witness()
+    ensures long_full_volume_raw_body_model(
+        seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+            b'0', b'0', b'0', b'0', b'0', b'0', b'Z', b'.',
+            b'v', b'o', b'l', b'4', b'2', b'.',
+            b'd', b'i', b'f', b'f', b't', b'a', b'r'],
+        b':',
+        0,
+        0,
+        42,
+        Envelope::Plain,
+        false,
+    ),
+{
+    canonical_epoch_zero_timestamp_model_witness();
+    reveal(long_full_volume_raw_body_model);
+    reveal(long_full_volume_fields_model);
+    reveal(long_volume_number_model);
+    reveal(decimal_value_model);
+    reveal(long_trailer_suffix_model);
+    reveal(long_trailer_matches_model);
+    reveal(body_suffix_fields_model);
+    reveal(body_field_split_model);
+
+    let raw: Seq<u8> = seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'0', b'Z', b'.',
+        b'v', b'o', b'l', b'4', b'2', b'.',
+        b'd', b'i', b'f', b'f', b't', b'a', b'r'];
+    let start_field: Seq<u8> = raw.subrange(0, 16);
+    let after_start: Seq<u8> = raw.subrange(17, 30);
+    let volume_field: Seq<u8> = raw.subrange(17, 22);
+    let after_volume: Seq<u8> = raw.subrange(23, 30);
+    let trailer: Seq<u8> = raw.subrange(23, 30);
+    assert(raw.len() == 30);
+    assert(start_field.len() == 16);
+    assert(start_field == seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'0', b'Z']);
+    assert(volume_field == seq![b'v', b'o', b'l', b'4', b'2']);
+    assert(trailer == seq![b'd', b'i', b'f', b'f', b't', b'a', b'r']);
+    assert(body_field_split_model(Some(raw), Some(start_field), Some(after_start)));
+    assert(body_field_split_model(Some(after_start), Some(volume_field), Some(after_volume))) by {
+        reveal(body_field_split_model);
+        assert(volume_field == after_start.subrange(0, volume_field.len() as int));
+        assert forall|index: int| 0 <= index < volume_field.len()
+            implies volume_field[index] != b'.' by {
+            assert(index < 5);
+        }
+        assert(after_start[5] == b'.');
+        assert(after_volume == after_start.subrange(6, after_start.len() as int));
+    }
+    assert(body_field_split_model(Some(after_volume), Some(trailer), None)) by {
+        reveal(body_field_split_model);
+        assert(trailer == after_volume);
+        assert(trailer == after_volume.subrange(0, after_volume.len() as int));
+        assert forall|index: int| 0 <= index < trailer.len()
+            implies trailer[index] != b'.' by { }
+    }
+    assert(body_suffix_fields_model(None, None, None, None, None, None)) by {
+        reveal(body_suffix_fields_model);
+        assert(body_field_split_model(None, None, None));
+    }
+    assert(long_timestamp_result_model(start_field, b':') == Some(0));
+    assert(decimal_value_model(volume_field.subrange(3, 5), 2) == Some(42)) by (compute);
+    assert(long_volume_number_model(volume_field) == Some(42));
+    assert(long_trailer_suffix_model(
+        ObjectKind::FullVolume, trailer, None, None, None,
+    ) == Some((Envelope::Plain, false)));
+    assert(long_full_volume_fields_model(
+        start_field,
+        b':',
+        volume_field,
+        trailer,
+        None,
+        None,
+        None,
+    ) == Some((0, 0, 42, Envelope::Plain, false)));
+    assert(long_full_volume_raw_body_model(
+        raw, b':', 0, 0, 42, Envelope::Plain, false,
+    ));
+}
+
 //= docs/parsing-requirements.md#parse-name-010
 //= type=implementation
 //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
@@ -9008,6 +9149,290 @@ fn long_incremental_signatures_body(
     result
 }
 
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+fn long_full_volume_body(
+    input: &[u8],
+    separator: u8,
+) -> (result: Result<ObjectName, NameError>)
+    ensures (match result {
+        Err(error) => error == NameError::Malformed
+            || (!time_separator_valid_model(separator)
+                && error == NameError::Configuration),
+        Ok(name) => name.kind == ObjectKind::FullVolume
+            && !name.short
+            && match name.volume {
+                Some(volume) => long_full_volume_raw_body_model(
+                    input@,
+                    separator,
+                    name.start.0 as int,
+                    name.end.0 as int,
+                    volume as int,
+                    name.envelope,
+                    name.partial,
+                ),
+                None => false,
+            },
+    }) && forall|start: int, end: int, volume: int,
+        envelope: Envelope, partial: bool|
+        long_full_volume_raw_body_model(
+            input@, separator, start, end, volume, envelope, partial,
+        ) ==> result == Ok(ObjectName {
+            kind: ObjectKind::FullVolume,
+            start: Timestamp(start as i128),
+            end: Timestamp(end as i128),
+            volume: Some(volume as u64),
+            envelope,
+            partial,
+            short: false,
+        }),
+{
+    let mut fields = Some(input);
+    let start_option = take_dot_field(&mut fields);
+    let _after_start = fields;
+    let volume_option = take_dot_field(&mut fields);
+    let _after_volume = fields;
+    let trailer_option = take_dot_field(&mut fields);
+    let _after_trailer = fields;
+    let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+
+    proof {
+        assert forall|start: int, end: int, volume: int,
+            envelope: Envelope, partial: bool|
+            long_full_volume_raw_body_model(
+                input@, separator, start, end, volume, envelope, partial,
+            ) implies start_option.is_some()
+                && volume_option.is_some()
+                && trailer_option.is_some()
+                && third.is_none()
+                && extra.is_none()
+                && fields.is_none()
+                && long_full_volume_fields_model(
+                    start_option.unwrap()@,
+                    separator,
+                    volume_option.unwrap()@,
+                    trailer_option.unwrap()@,
+                    optional_short_token(first),
+                    optional_short_token(second),
+                    optional_short_token(third),
+                ) == Some((start, end, volume, envelope, partial)) by {
+            if long_full_volume_raw_body_model(
+                input@, separator, start, end, volume, envelope, partial,
+            ) {
+                long_full_volume_raw_body_model_aligns_fields(
+                    input@,
+                    separator,
+                    start,
+                    end,
+                    volume,
+                    envelope,
+                    partial,
+                    optional_body_field_model(start_option),
+                    optional_body_field_model(_after_start),
+                    optional_body_field_model(volume_option),
+                    optional_body_field_model(_after_volume),
+                    optional_body_field_model(trailer_option),
+                    optional_body_field_model(_after_trailer),
+                    optional_short_token(first),
+                    optional_short_token(second),
+                    optional_short_token(third),
+                    optional_short_token(extra),
+                    optional_body_field_model(fields),
+                );
+            }
+        }
+    }
+
+    let start_field = start_option.ok_or(NameError::Malformed)?;
+    let volume_field = volume_option.ok_or(NameError::Malformed)?;
+    let trailer = trailer_option.ok_or(NameError::Malformed)?;
+    if extra.is_some() || fields.is_some() {
+        return Err(NameError::Malformed);
+    }
+    let result = long_full_volume_body_fields(
+        start_field,
+        separator,
+        volume_field,
+        trailer,
+        first,
+        second,
+        third,
+    );
+    proof {
+        if let Ok(name) = result {
+            let volume = match name.volume {
+                Some(value) => value,
+                None => 0,
+            };
+            reveal(long_full_volume_raw_body_model);
+            reveal(long_full_volume_fields_model);
+            reveal(long_timestamp_result_model);
+            reveal(long_volume_number_model);
+            reveal(long_trailer_suffix_model);
+            reveal(body_suffix_fields_model);
+            reveal(body_field_split_model);
+            assert(body_field_split_model(
+                Some(input@), Some(start_field@),
+                optional_body_field_model(_after_start),
+            ));
+            assert(body_field_split_model(
+                optional_body_field_model(_after_start), Some(volume_field@),
+                optional_body_field_model(_after_volume),
+            ));
+            assert(body_field_split_model(
+                optional_body_field_model(_after_volume), Some(trailer@),
+                optional_body_field_model(_after_trailer),
+            ));
+            assert(body_suffix_fields_model(
+                optional_body_field_model(_after_trailer),
+                optional_body_field_model(first),
+                optional_body_field_model(second),
+                optional_body_field_model(third),
+                optional_body_field_model(extra),
+                optional_body_field_model(fields),
+            ));
+            assert(name.volume matches Some(_));
+            assert(long_full_volume_fields_model(
+                start_field@,
+                separator,
+                volume_field@,
+                trailer@,
+                optional_short_token(first),
+                optional_short_token(second),
+                optional_short_token(third),
+            ) == Some((
+                name.start.0 as int,
+                name.end.0 as int,
+                volume as int,
+                name.envelope,
+                name.partial,
+            )));
+            assert(long_full_volume_raw_body_model(
+                input@,
+                separator,
+                name.start.0 as int,
+                name.end.0 as int,
+                volume as int,
+                name.envelope,
+                name.partial,
+            ));
+        }
+    }
+    result
+}
+
+proof fn long_full_volume_raw_body_model_aligns_fields(
+    input: Seq<u8>,
+    separator: u8,
+    start: int,
+    end: int,
+    volume: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Option<Seq<u8>>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_volume: Option<Seq<u8>>,
+    actual_after_volume: Option<Seq<u8>>,
+    actual_trailer: Option<Seq<u8>>,
+    actual_after_trailer: Option<Seq<u8>>,
+    actual_first: Option<Seq<u8>>,
+    actual_second: Option<Seq<u8>>,
+    actual_third: Option<Seq<u8>>,
+    actual_extra: Option<Seq<u8>>,
+    actual_remaining: Option<Seq<u8>>,
+)
+    requires
+        long_full_volume_raw_body_model(
+            input, separator, start, end, volume, envelope, partial,
+        ),
+        body_field_split_model(Some(input), actual_start, actual_after_start),
+        body_field_split_model(actual_after_start, actual_volume, actual_after_volume),
+        body_field_split_model(actual_after_volume, actual_trailer, actual_after_trailer),
+        body_suffix_fields_model(
+            actual_after_trailer,
+            actual_first,
+            actual_second,
+            actual_third,
+            actual_extra,
+            actual_remaining,
+        ),
+    ensures actual_start.is_some()
+        && actual_volume.is_some()
+        && actual_trailer.is_some()
+        && actual_third.is_none()
+        && actual_extra.is_none()
+        && actual_remaining.is_none()
+        && long_full_volume_fields_model(
+            actual_start.unwrap(),
+            separator,
+            actual_volume.unwrap(),
+            actual_trailer.unwrap(),
+            actual_first,
+            actual_second,
+            actual_third,
+        ) == Some((start, end, volume, envelope, partial)),
+{
+    reveal(long_full_volume_raw_body_model);
+    let (model_start, model_volume, model_trailer,
+        model_first, model_second, model_third,
+        model_after_start, model_after_volume, model_after_trailer, model_extra) = choose|
+        start_field: Seq<u8>,
+        volume_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_volume: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(volume_field), after_volume),
+            body_field_split_model(after_volume, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            long_full_volume_fields_model(
+                start_field, separator, volume_field, trailer, first, second, third,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(volume_field), after_volume)
+            && body_field_split_model(after_volume, Some(trailer), after_trailer)
+            && body_suffix_fields_model(after_trailer, first, second, third, extra, None)
+            && extra.is_none()
+            && long_full_volume_fields_model(
+                start_field, separator, volume_field, trailer, first, second, third,
+            ) == Some((start, end, volume, envelope, partial));
+
+    body_field_split_optional_unique(
+        Some(input), Some(model_start), model_after_start,
+        actual_start, actual_after_start,
+    );
+    body_field_split_optional_unique(
+        model_after_start, Some(model_volume), model_after_volume,
+        actual_volume, actual_after_volume,
+    );
+    body_field_split_optional_unique(
+        model_after_volume, Some(model_trailer), model_after_trailer,
+        actual_trailer, actual_after_trailer,
+    );
+    body_suffix_fields_model_unique(
+        model_after_trailer,
+        model_first,
+        model_second,
+        model_third,
+        model_extra,
+        None,
+        actual_first,
+        actual_second,
+        actual_third,
+        actual_extra,
+        actual_remaining,
+    );
+    reveal(long_full_volume_fields_model);
+}
 
 //= docs/parsing-requirements.md#parse-name-001
 //= type=implementation
@@ -10754,75 +11179,15 @@ fn body(
             short_full_volume_body(input, separator)
         }
         crate::name_dispatch::BodyRoute::LongFullVolume => {
-            let mut fields = Some(input);
-            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_start = fields;
-            let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_volume = fields;
-            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_trailer = fields;
-            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-            if extra.is_some() || fields.is_some() {
-                return Err(NameError::Malformed);
-            }
-            let result = long_full_volume_body_fields(
-                start_field,
-                separator,
-                volume_field,
-                trailer,
-                first,
-                second,
-                third,
-            );
+            let result = long_full_volume_body(input, separator);
             proof {
                 if let Ok(name) = result {
-                    let volume = match name.volume {
-                        Some(value) => value,
-                        None => 0,
-                    };
-                    reveal(long_full_volume_raw_body_model);
-                    reveal(long_full_volume_fields_model);
-                    reveal(long_timestamp_result_model);
-                    reveal(long_volume_number_model);
-                    reveal(long_trailer_suffix_model);
-                    reveal(body_suffix_fields_model);
-                    reveal(body_field_split_model);
-                    assert(body_field_split_model(
-                        Some(input@), Some(start_field@),
-                        optional_body_field_model(_after_start),
+                    reveal(body_success_result_model);
+                    assert(kind == ObjectKind::FullVolume);
+                    assert(!short);
+                    assert(body_success_result_model(
+                        input@, kind, short, separator, name,
                     ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_start), Some(volume_field@),
-                        optional_body_field_model(_after_volume),
-                    ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_volume), Some(trailer@),
-                        optional_body_field_model(_after_trailer),
-                    ));
-                    assert(body_suffix_fields_model(
-                        optional_body_field_model(_after_trailer),
-                        optional_body_field_model(first),
-                        optional_body_field_model(second),
-                        optional_body_field_model(third),
-                        optional_body_field_model(extra),
-                        optional_body_field_model(fields),
-                    ));
-                    assert(name.volume matches Some(_));
-                    assert(long_full_volume_fields_model(
-                        start_field@,
-                        separator,
-                        volume_field@,
-                        trailer@,
-                        optional_short_token(first),
-                        optional_short_token(second),
-                        optional_short_token(third),
-                    ) == Some((
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        volume as int,
-                        name.envelope,
-                        name.partial,
-                    )));
                 }
             }
             result

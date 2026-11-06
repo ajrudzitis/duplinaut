@@ -3350,6 +3350,41 @@ tests = [
 ]
 
 [[milestone]]
+id = "name-long-full-volume-reverse-success"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves the positive raw-model-to-production ObjectName implication for
+# long FullVolume bodies. Existential timestamp/volume/trailer and suffix
+# witnesses align with deterministic production extraction. A concrete
+# canonical UTC epoch-zero, decimal vol42, difftar witness establishes a
+# non-vacuous antecedent. This adds no PARSE-NAME-004/007/GEN-003/010 claim;
+# malformed-input completeness, other routes, and broader controller
+# refinement remain open. Independent review and full local CI passed; hosted
+# Linux and report publication remain tracked separately.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "long_full_volume_raw_body_model" },
+  { path = "crates/core/src/names.rs", symbol = "long_full_volume_body" },
+  { path = "crates/core/src/names.rs", symbol = "long_full_volume_raw_body_model_aligns_fields" },
+  { path = "crates/core/src/names.rs", symbol = "long_full_volume_raw_body_concrete_witness" },
+  { path = "crates/core/src/names.rs", symbol = "canonical_epoch_zero_timestamp_model_witness" }
+]
+proofs = [
+  { id = "name-long-full-volume-reverse-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "long_full_volume_body", kind = "contract" },
+  { id = "name-long-full-volume-model-witness", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "long_full_volume_raw_body_concrete_witness", kind = "lemma" },
+  { id = "name-long-full-volume-epoch-zero-timestamp", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "canonical_epoch_zero_timestamp_model_witness", kind = "lemma" }
+]
+tests = [
+  { package = "duplicity-core", name = "names::tests::long_full_volume_body_raw_result_matrix" },
+  { package = "duplicity-core", name = "names::tests::long_full_volume_body_exact_error_edge_matrix" }
+]
+
+[[milestone]]
 id = "name-candidate-controller-match"
 gate = true
 requirements = ["PARSE-NAME-001", "PARSE-NAME-002"]
