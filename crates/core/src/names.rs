@@ -8885,6 +8885,135 @@ fn long_full_signatures_body(
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 #[verifier::spinoff_prover]
 #[verifier::rlimit(60)]
+fn long_incremental_signatures_body(
+    input: &[u8],
+    separator: u8,
+) -> (result: Result<ObjectName, NameError>)
+    ensures (match result {
+        Err(error) => error == NameError::Malformed
+            || (!time_separator_valid_model(separator)
+                && error == NameError::Configuration),
+        Ok(name) => name.kind == ObjectKind::IncrementalSignatures
+            && !name.short
+            && name.volume.is_none()
+            && long_incremental_signatures_raw_body_model(
+                input@,
+                separator,
+                name.start.0 as int,
+                name.end.0 as int,
+                name.envelope,
+                name.partial,
+            ),
+    }) && forall|start: int, end: int, envelope: Envelope, partial: bool|
+        long_incremental_signatures_raw_body_model(
+            input@, separator, start, end, envelope, partial,
+        ) ==> result == Ok(ObjectName {
+            kind: ObjectKind::IncrementalSignatures,
+            start: Timestamp(start as i128),
+            end: Timestamp(end as i128),
+            volume: None,
+            envelope,
+            partial,
+            short: false,
+        }),
+{
+    let mut fields = Some(input);
+    let start_option = take_dot_field(&mut fields);
+    let _after_start = fields;
+    let marker_option = take_dot_field(&mut fields);
+    let _after_marker = fields;
+    let end_option = take_dot_field(&mut fields);
+    let _after_end = fields;
+    let trailer_option = take_dot_field(&mut fields);
+    let _after_trailer = fields;
+    let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+    proof {
+        assert forall|start: int, end: int, envelope: Envelope, partial: bool|
+            long_incremental_signatures_raw_body_model(
+                input@, separator, start, end, envelope, partial,
+            ) implies start_option.is_some()
+                && marker_option.is_some()
+                && end_option.is_some()
+                && trailer_option.is_some()
+                && third.is_none()
+                && extra.is_none()
+                && fields.is_none()
+                && long_incremental_signatures_fields_model(
+                    start_option.unwrap()@,
+                    separator,
+                    marker_option.unwrap()@,
+                    end_option.unwrap()@,
+                    trailer_option.unwrap()@,
+                    optional_short_token(first),
+                    optional_short_token(second),
+                    optional_short_token(third),
+                ) == Some((start, end, envelope, partial)) by {
+            if long_incremental_signatures_raw_body_model(
+                input@, separator, start, end, envelope, partial,
+            ) {
+                long_incremental_signatures_raw_body_model_aligns_fields(
+                    input@,
+                    separator,
+                    start,
+                    end,
+                    envelope,
+                    partial,
+                    optional_body_field_model(start_option),
+                    optional_body_field_model(_after_start),
+                    optional_body_field_model(marker_option),
+                    optional_body_field_model(_after_marker),
+                    optional_body_field_model(end_option),
+                    optional_body_field_model(_after_end),
+                    optional_body_field_model(trailer_option),
+                    optional_body_field_model(_after_trailer),
+                    optional_short_token(first),
+                    optional_short_token(second),
+                    optional_short_token(third),
+                    optional_short_token(extra),
+                    optional_body_field_model(fields),
+                );
+            }
+        }
+    }
+    let start_field = start_option.ok_or(NameError::Malformed)?;
+    let marker = marker_option.ok_or(NameError::Malformed)?;
+    let end_field = end_option.ok_or(NameError::Malformed)?;
+    let trailer = trailer_option.ok_or(NameError::Malformed)?;
+    if extra.is_some() || fields.is_some() {
+        return Err(NameError::Malformed);
+    }
+    let result = long_incremental_signatures_body_fields(
+        start_field,
+        separator,
+        marker,
+        end_field,
+        trailer,
+        first,
+        second,
+        third,
+    );
+    proof {
+        if let Ok(name) = result {
+            reveal(long_incremental_signatures_raw_body_model);
+            assert(long_incremental_signatures_raw_body_model(
+                input@,
+                separator,
+                name.start.0 as int,
+                name.end.0 as int,
+                name.envelope,
+                name.partial,
+            ));
+        }
+    }
+    result
+}
+
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+#[verifier::spinoff_prover]
+#[verifier::rlimit(60)]
 fn long_incremental_manifest_body(
     input: &[u8],
     separator: u8,
@@ -9130,6 +9259,131 @@ proof fn long_incremental_manifest_raw_body_model_aligns_fields(
         actual_remaining,
     );
     reveal(long_incremental_manifest_fields_model);
+}
+
+
+proof fn long_incremental_signatures_raw_body_model_aligns_fields(
+    input: Seq<u8>,
+    separator: u8,
+    start: int,
+    end: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Option<Seq<u8>>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_marker: Option<Seq<u8>>,
+    actual_after_marker: Option<Seq<u8>>,
+    actual_end: Option<Seq<u8>>,
+    actual_after_end: Option<Seq<u8>>,
+    actual_trailer: Option<Seq<u8>>,
+    actual_after_trailer: Option<Seq<u8>>,
+    actual_first: Option<Seq<u8>>,
+    actual_second: Option<Seq<u8>>,
+    actual_third: Option<Seq<u8>>,
+    actual_extra: Option<Seq<u8>>,
+    actual_remaining: Option<Seq<u8>>,
+)
+    requires
+        long_incremental_signatures_raw_body_model(
+            input, separator, start, end, envelope, partial,
+        ),
+        body_field_split_model(Some(input), actual_start, actual_after_start),
+        body_field_split_model(actual_after_start, actual_marker, actual_after_marker),
+        body_field_split_model(actual_after_marker, actual_end, actual_after_end),
+        body_field_split_model(actual_after_end, actual_trailer, actual_after_trailer),
+        body_suffix_fields_model(
+            actual_after_trailer,
+            actual_first,
+            actual_second,
+            actual_third,
+            actual_extra,
+            actual_remaining,
+        ),
+    ensures actual_start.is_some()
+        && actual_marker.is_some()
+        && actual_end.is_some()
+        && actual_trailer.is_some()
+        && actual_third.is_none()
+        && actual_extra.is_none()
+        && actual_remaining.is_none()
+        && long_incremental_signatures_fields_model(
+            actual_start.unwrap(),
+            separator,
+            actual_marker.unwrap(),
+            actual_end.unwrap(),
+            actual_trailer.unwrap(),
+            actual_first,
+            actual_second,
+            actual_third,
+        ) == Some((start, end, envelope, partial)),
+{
+    reveal(long_incremental_signatures_raw_body_model);
+    let (model_start, model_marker, model_end, model_trailer,
+        model_first, model_second, model_third,
+        model_after_start, model_after_marker, model_after_end,
+        model_after_trailer, model_extra) = choose|
+        start_field: Seq<u8>,
+        marker: Seq<u8>,
+        end_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_marker: Option<Seq<u8>>,
+        after_end: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(marker), after_marker),
+            body_field_split_model(after_marker, Some(end_field), after_end),
+            body_field_split_model(after_end, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            long_incremental_signatures_fields_model(
+                start_field, separator, marker, end_field, trailer, first, second, third,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(marker), after_marker)
+            && body_field_split_model(after_marker, Some(end_field), after_end)
+            && body_field_split_model(after_end, Some(trailer), after_trailer)
+            && body_suffix_fields_model(after_trailer, first, second, third, extra, None)
+            && extra.is_none()
+            && long_incremental_signatures_fields_model(
+                start_field, separator, marker, end_field, trailer, first, second, third,
+            ) == Some((start, end, envelope, partial));
+
+    body_field_split_optional_unique(
+        Some(input), Some(model_start), model_after_start,
+        actual_start, actual_after_start,
+    );
+    body_field_split_optional_unique(
+        model_after_start, Some(model_marker), model_after_marker,
+        actual_marker, actual_after_marker,
+    );
+    body_field_split_optional_unique(
+        model_after_marker, Some(model_end), model_after_end,
+        actual_end, actual_after_end,
+    );
+    body_field_split_optional_unique(
+        model_after_end, Some(model_trailer), model_after_trailer,
+        actual_trailer, actual_after_trailer,
+    );
+    body_suffix_fields_model_unique(
+        model_after_trailer,
+        model_first,
+        model_second,
+        model_third,
+        model_extra,
+        None,
+        actual_first,
+        actual_second,
+        actual_third,
+        actual_extra,
+        actual_remaining,
+    );
+    reveal(long_incremental_signatures_fields_model);
 }
 
 proof fn long_full_signatures_raw_body_model_has_start_field(
@@ -9792,6 +10046,149 @@ proof fn long_incremental_manifest_raw_body_concrete_witness()
     ));
 }
 
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+#[verifier::rlimit(200)]
+proof fn long_incremental_signatures_raw_body_concrete_witness()
+    ensures long_incremental_signatures_raw_body_model(
+        seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+            b'0', b'0', b'0', b'0', b'0', b'0', b'Z', b'.',
+            b't', b'o', b'.',
+            b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+            b'0', b'0', b'0', b'0', b'0', b'1', b'Z', b'.',
+            b's', b'i', b'g', b't', b'a', b'r'],
+        b':',
+        0,
+        1,
+        Envelope::Plain,
+        false,
+    ),
+{
+    long_full_signatures_raw_body_concrete_witness();
+    canonical_epoch_one_timestamp_model_witness();
+
+    reveal(long_incremental_signatures_raw_body_model);
+    reveal(long_incremental_signatures_fields_model);
+    reveal(long_interval_model);
+    reveal(long_to_marker_model);
+    reveal(long_trailer_suffix_model);
+    reveal(long_trailer_matches_model);
+    reveal(body_suffix_fields_model);
+    reveal(body_field_split_model);
+
+    let raw: Seq<u8> = seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'0', b'Z', b'.',
+        b't', b'o', b'.',
+        b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'1', b'Z', b'.',
+        b's', b'i', b'g', b't', b'a', b'r'];
+    let start_field: Seq<u8> = seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'0', b'Z'];
+    let marker: Seq<u8> = seq![b't', b'o'];
+    let end_field: Seq<u8> = seq![b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'1', b'Z'];
+    let trailer: Seq<u8> = seq![b's', b'i', b'g', b't', b'a', b'r'];
+    let after_start: Seq<u8> = seq![b't', b'o', b'.',
+        b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'1', b'Z', b'.',
+        b's', b'i', b'g', b't', b'a', b'r'];
+    let after_marker: Seq<u8> = seq![
+        b'1', b'9', b'7', b'0', b'0', b'1', b'0', b'1', b'T',
+        b'0', b'0', b'0', b'0', b'0', b'1', b'Z', b'.',
+        b's', b'i', b'g', b't', b'a', b'r'];
+    let after_end: Seq<u8> = trailer;
+
+    assert(raw.len() == 43);
+    assert(start_field.len() == 16);
+    assert(marker.len() == 2);
+    assert(end_field.len() == 16);
+    assert(trailer.len() == 6);
+    assert(raw.subrange(0, 16) == start_field);
+    assert(raw.subrange(17, 19) == marker);
+    assert(raw.subrange(20, 36) == end_field);
+    assert(raw.subrange(37, 43) == trailer);
+    assert(raw.subrange(17, 43) == after_start);
+    assert(raw.subrange(20, 43) == after_marker);
+    assert(body_field_split_model(Some(raw), Some(start_field), Some(after_start))) by {
+        reveal(body_field_split_model);
+        assert(start_field.len() == 16);
+        assert(raw.subrange(0, 16) == start_field);
+        assert forall|index: int| 0 <= index < start_field.len()
+            implies start_field[index] != b'.' by {
+            assert(index < 16);
+        }
+        assert(raw[16] == b'.');
+        assert(after_start == raw.subrange(17, 43));
+    }
+    assert(body_field_split_model(Some(after_start), Some(marker), Some(after_marker))) by {
+        reveal(body_field_split_model);
+        assert(marker.len() == 2);
+        assert(after_start.subrange(0, 2) == marker);
+        assert forall|index: int| 0 <= index < marker.len()
+            implies marker[index] != b'.' by {
+            assert(index == 0 || index == 1);
+        }
+        assert(after_start[2] == b'.');
+        assert(after_marker == after_start.subrange(3, after_start.len() as int));
+    }
+    assert(body_field_split_model(Some(after_marker), Some(end_field), Some(after_end))) by {
+        reveal(body_field_split_model);
+        assert(end_field.len() == 16);
+        assert(after_marker.subrange(0, 16) == end_field);
+        assert forall|index: int| 0 <= index < end_field.len()
+            implies end_field[index] != b'.' by {
+            assert(index < 16);
+        }
+        assert(after_marker[16] == b'.');
+        assert(after_end == after_marker.subrange(17, after_marker.len() as int));
+    }
+    assert(body_field_split_model(Some(after_end), Some(trailer), None)) by {
+        reveal(body_field_split_model);
+        assert(trailer.len() == after_end.len());
+        assert(trailer == after_end);
+        assert(trailer == after_end.subrange(0, after_end.len() as int));
+        assert forall|index: int| 0 <= index < trailer.len()
+            implies trailer[index] != b'.' by {
+            assert(index < 6);
+        }
+    }
+    assert(body_suffix_fields_model(None, None, None, None, None, None)) by {
+        reveal(body_suffix_fields_model);
+        assert(body_field_split_model(None, None, None));
+    }
+    assert(long_timestamp_result_model(start_field, b':') == Some(0));
+    assert(long_timestamp_result_model(end_field, b':') == Some(1));
+    assert(long_interval_model(
+        ObjectKind::IncrementalSignatures,
+        start_field,
+        b':',
+        Some(marker),
+        Some(end_field),
+    ) == Some((0, 1)));
+    assert(long_trailer_suffix_model(
+        ObjectKind::IncrementalSignatures,
+        trailer,
+        None,
+        None,
+        None,
+    ) == Some((Envelope::Plain, false)));
+    assert(long_incremental_signatures_fields_model(
+        start_field,
+        b':',
+        marker,
+        end_field,
+        trailer,
+        None,
+        None,
+        None,
+    ) == Some((0, 1, Envelope::Plain, false)));
+    assert(long_incremental_signatures_raw_body_model(
+        raw, b':', 0, 1, Envelope::Plain, false,
+    ));
+}
+
 #[verifier::spinoff_prover]
 #[verifier::rlimit(80)]
 //= docs/parsing-requirements.md#parse-name-010
@@ -9887,81 +10284,7 @@ fn body(
             long_incremental_manifest_body(input, separator)
         }
         crate::name_dispatch::BodyRoute::LongIncrementalSignatures => {
-            let mut fields = Some(input);
-            let start_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_start = fields;
-            let marker = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_marker = fields;
-            let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_end = fields;
-            let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
-            let _after_trailer = fields;
-            let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
-            if extra.is_some() || fields.is_some() {
-                return Err(NameError::Malformed);
-            }
-            let result = long_incremental_signatures_body_fields(
-                start_field,
-                separator,
-                marker,
-                end_field,
-                trailer,
-                first,
-                second,
-                third,
-            );
-            proof {
-                if let Ok(name) = result {
-                    reveal(long_incremental_signatures_raw_body_model);
-                    reveal(long_incremental_signatures_fields_model);
-                    reveal(long_interval_model);
-                    reveal(long_timestamp_result_model);
-                    reveal(long_trailer_suffix_model);
-                    reveal(body_suffix_fields_model);
-                    reveal(body_field_split_model);
-                    assert(body_field_split_model(
-                        Some(input@), Some(start_field@),
-                        optional_body_field_model(_after_start),
-                    ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_start), Some(marker@),
-                        optional_body_field_model(_after_marker),
-                    ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_marker), Some(end_field@),
-                        optional_body_field_model(_after_end),
-                    ));
-                    assert(body_field_split_model(
-                        optional_body_field_model(_after_end), Some(trailer@),
-                        optional_body_field_model(_after_trailer),
-                    ));
-                    assert(body_suffix_fields_model(
-                        optional_body_field_model(_after_trailer),
-                        optional_body_field_model(first),
-                        optional_body_field_model(second),
-                        optional_body_field_model(third),
-                        optional_body_field_model(extra),
-                        optional_body_field_model(fields),
-                    ));
-                    assert(name.volume.is_none());
-                    assert(long_incremental_signatures_fields_model(
-                        start_field@,
-                        separator,
-                        marker@,
-                        end_field@,
-                        trailer@,
-                        optional_short_token(first),
-                        optional_short_token(second),
-                        optional_short_token(third),
-                    ) == Some((
-                        name.start.0 as int,
-                        name.end.0 as int,
-                        name.envelope,
-                        name.partial,
-                    )));
-                }
-            }
-            result
+            long_incremental_signatures_body(input, separator)
         }
         crate::name_dispatch::BodyRoute::ShortFullSignatures => {
             let result = short_full_signatures_body(input, separator);
