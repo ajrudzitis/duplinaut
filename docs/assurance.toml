@@ -2015,10 +2015,10 @@ reviewed = true
 proof_required = true
 # A successful short IncrementalVolume body result implies the exact raw field/
 # suffix decomposition and semantic interval, positive base36 volume, trailer
-# and partial-profile model. A direct 18-case raw-body result matrix is tested,
-# but the raw-model-to-parser converse remains open because split-model
-# projection is unproved. Malformed raw-body error completeness and complete
-# filename grammar also remain open.
+# and partial-profile model. A direct 18-case raw-body result matrix is tested;
+# the positive raw-model-to-parser converse is covered separately by
+# `name-short-incremental-volume-reverse-success`. Malformed raw-body error
+# completeness and complete filename grammar also remain open.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body" },
   { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body_fields" },
@@ -2029,6 +2029,40 @@ proofs = [
 ]
 tests = [
   { package = "duplicity-core", name = "names::tests::short_incremental_volume_success_route_composes_interval_volume_and_trailer" },
+  { package = "duplicity-core", name = "names::tests::short_incremental_volume_body_raw_result_matrix" }
+]
+
+[[milestone]]
+id = "name-short-incremental-volume-reverse-success"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves the positive raw-model-to-production `ObjectName` implication for the
+# short IncrementalVolume body. Existential start/end/volume/trailer and suffix
+# witnesses align with deterministic extraction through split uniqueness; a
+# pre-volume-input and trailer-input lemma establish required later fields. A
+# strict witness establishes the antecedent for `1.2.10.dt`. The existing exact
+# 18-case matrix remains regression evidence. This does not expand
+# PARSE-NAME-003/006 or PARSE-NAME-010; error completeness, other routes, and
+# broader filename-controller refinement remain open.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_raw_body_model" },
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body" },
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_raw_body_model_has_volume_input" },
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_raw_body_model_has_trailer_input" },
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_raw_body_model_aligns_fields" },
+  { path = "crates/core/src/names.rs", symbol = "short_incremental_volume_raw_body_concrete_witness" }
+]
+proofs = [
+  { id = "name-short-incremental-volume-reverse-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_incremental_volume_body", kind = "contract" },
+  { id = "name-short-incremental-volume-model-witness", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_incremental_volume_raw_body_concrete_witness", kind = "lemma" }
+]
+tests = [
   { package = "duplicity-core", name = "names::tests::short_incremental_volume_body_raw_result_matrix" }
 ]
 

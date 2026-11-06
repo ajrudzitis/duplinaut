@@ -5701,13 +5701,16 @@ pub closed spec fn name_success_candidates_match_model(
 //= docs/parsing-requirements.md#parse-name-010
 //= type=implementation
 //# The body parser MUST return `Malformed` for body parse failures. It MAY return `Configuration` only when the configured time separator is invalid, and MUST NOT return `Limit` or `Ambiguous`.
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 #[verifier::spinoff_prover]
 #[verifier::rlimit(40)]
 fn short_incremental_volume_body(
     input: &[u8],
     separator: u8,
 ) -> (result: Result<ObjectName, NameError>)
-    ensures match result {
+    ensures (match result {
         Err(error) => error == NameError::Malformed,
         Ok(name) => name.kind == ObjectKind::IncrementalVolume
             && name.short
@@ -5722,7 +5725,20 @@ fn short_incremental_volume_body(
                 ),
                 None => false,
             }),
-    },
+    })
+        && forall|start: int, end: int, volume: int,
+            envelope: Envelope, partial: bool|
+            short_incremental_volume_raw_body_model(
+                input@, start, end, volume, envelope, partial,
+            ) ==> result == Ok(ObjectName {
+                kind: ObjectKind::IncrementalVolume,
+                start: Timestamp(start as i128),
+                end: Timestamp(end as i128),
+                volume: Some(volume as u64),
+                envelope,
+                partial,
+                short: true,
+            }),
 {
     let _ = separator; // Short incremental-volume bodies do not consume the time separator.
     let mut fields = Some(input);
@@ -5730,12 +5746,98 @@ fn short_incremental_volume_body(
     let _after_start = fields;
     let end_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
     let _after_end = fields;
+    proof {
+        assert forall|start: int, end: int, volume: int,
+            envelope: Envelope, partial: bool|
+            short_incremental_volume_raw_body_model(
+                input@, start, end, volume, envelope, partial,
+            ) implies fields.is_some() by {
+            if short_incremental_volume_raw_body_model(
+                input@, start, end, volume, envelope, partial,
+            ) {
+                short_incremental_volume_raw_body_model_has_volume_input(
+                    input@,
+                    start,
+                    end,
+                    volume,
+                    envelope,
+                    partial,
+                    start_field@,
+                    optional_body_field_model(_after_start),
+                    end_field@,
+                    optional_body_field_model(_after_end),
+                );
+            }
+        }
+    }
     let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
     let _after_volume = fields;
+    proof {
+        assert forall|start: int, end: int, volume: int,
+            envelope: Envelope, partial: bool|
+            short_incremental_volume_raw_body_model(
+                input@, start, end, volume, envelope, partial,
+            ) implies fields.is_some() by {
+            if short_incremental_volume_raw_body_model(
+                input@, start, end, volume, envelope, partial,
+            ) {
+                short_incremental_volume_raw_body_model_has_trailer_input(
+                    input@,
+                    start,
+                    end,
+                    volume,
+                    envelope,
+                    partial,
+                    start_field@,
+                    optional_body_field_model(_after_start),
+                    end_field@,
+                    optional_body_field_model(_after_end),
+                    volume_field@,
+                    optional_body_field_model(_after_volume),
+                );
+            }
+        }
+    }
     let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
     let _after_trailer = fields;
     let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
     if third.is_some() || extra.is_some() || fields.is_some() {
+        proof {
+            assert forall|start: int, end: int, volume: int,
+                envelope: Envelope, partial: bool|
+                short_incremental_volume_raw_body_model(
+                    input@, start, end, volume, envelope, partial,
+                ) implies false by {
+                if short_incremental_volume_raw_body_model(
+                    input@, start, end, volume, envelope, partial,
+                ) {
+                    short_incremental_volume_raw_body_model_aligns_fields(
+                        input@,
+                        start,
+                        end,
+                        volume,
+                        envelope,
+                        partial,
+                        start_field@,
+                        optional_body_field_model(_after_start),
+                        end_field@,
+                        optional_body_field_model(_after_end),
+                        volume_field@,
+                        optional_body_field_model(_after_volume),
+                        trailer@,
+                        optional_body_field_model(_after_trailer),
+                        optional_body_field_model(first),
+                        optional_body_field_model(second),
+                        optional_body_field_model(third),
+                        optional_body_field_model(extra),
+                        optional_body_field_model(fields),
+                    );
+                    assert(third.is_none());
+                    assert(extra.is_none());
+                    assert(fields.is_none());
+                }
+            }
+        }
         return Err(NameError::Malformed);
     }
     let result = short_incremental_volume_body_fields(
@@ -5747,6 +5849,55 @@ fn short_incremental_volume_body(
         second,
     );
     proof {
+        assert forall|start: int, end: int, volume: int,
+            envelope: Envelope, partial: bool|
+            short_incremental_volume_raw_body_model(
+                input@, start, end, volume, envelope, partial,
+            ) implies result == Ok(ObjectName {
+                kind: ObjectKind::IncrementalVolume,
+                start: Timestamp(start as i128),
+                end: Timestamp(end as i128),
+                volume: Some(volume as u64),
+                envelope,
+                partial,
+                short: true,
+            }) by {
+            if short_incremental_volume_raw_body_model(
+                input@, start, end, volume, envelope, partial,
+            ) {
+                short_incremental_volume_raw_body_model_aligns_fields(
+                    input@,
+                    start,
+                    end,
+                    volume,
+                    envelope,
+                    partial,
+                    start_field@,
+                    optional_body_field_model(_after_start),
+                    end_field@,
+                    optional_body_field_model(_after_end),
+                    volume_field@,
+                    optional_body_field_model(_after_volume),
+                    trailer@,
+                    optional_body_field_model(_after_trailer),
+                    optional_body_field_model(first),
+                    optional_body_field_model(second),
+                    optional_body_field_model(third),
+                    optional_body_field_model(extra),
+                    optional_body_field_model(fields),
+                );
+                reveal(short_incremental_volume_fields_model);
+                assert(result == Ok(ObjectName {
+                    kind: ObjectKind::IncrementalVolume,
+                    start: Timestamp(start as i128),
+                    end: Timestamp(end as i128),
+                    volume: Some(volume as u64),
+                    envelope,
+                    partial,
+                    short: true,
+                }));
+            }
+        }
         if let Ok(name) = result {
             if let Some(volume) = name.volume {
                 short_incremental_volume_raw_body_from_fields(
@@ -5821,6 +5972,380 @@ proof fn short_incremental_volume_raw_body_from_fields(
 {
     reveal(short_incremental_volume_raw_body_model);
     reveal(short_incremental_volume_fields_model);
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn short_incremental_volume_raw_body_model_has_volume_input(
+    input: Seq<u8>,
+    start: int,
+    end: int,
+    volume: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Seq<u8>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_end: Seq<u8>,
+    actual_after_end: Option<Seq<u8>>,
+)
+    requires short_incremental_volume_raw_body_model(
+            input, start, end, volume, envelope, partial,
+        ),
+        body_field_split_model(Some(input), Some(actual_start), actual_after_start),
+        body_field_split_model(actual_after_start, Some(actual_end), actual_after_end),
+    ensures actual_after_end.is_some(),
+{
+    reveal(short_incremental_volume_raw_body_model);
+    let (model_start, model_end, model_volume, model_trailer,
+        model_first, model_second, model_after_start, model_after_end,
+        model_after_volume, model_after_trailer, model_third, model_extra) = choose|
+        start_field: Seq<u8>,
+        end_field: Seq<u8>,
+        volume_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_end: Option<Seq<u8>>,
+        after_volume: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(end_field), after_end),
+            body_field_split_model(after_end, Some(volume_field), after_volume),
+            body_field_split_model(after_volume, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            short_incremental_volume_fields_model(
+                start_field, end_field, volume_field, trailer, first, second,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(end_field), after_end)
+            && body_field_split_model(after_end, Some(volume_field), after_volume)
+            && body_field_split_model(after_volume, Some(trailer), after_trailer)
+            && body_suffix_fields_model(
+                after_trailer, first, second, third, extra, None,
+            )
+            && third.is_none()
+            && extra.is_none()
+            && short_incremental_volume_fields_model(
+                start_field, end_field, volume_field, trailer, first, second,
+            ) == Some((start, end, volume, envelope, partial));
+
+    body_field_split_model_unique(input, model_start, model_after_start,
+        actual_start, actual_after_start);
+    body_field_split_model_unique(model_after_start.unwrap(), model_end,
+        model_after_end, actual_end, actual_after_end);
+    reveal(body_field_split_model);
+    assert(model_after_end.is_some());
+    assert(actual_after_end == model_after_end);
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn short_incremental_volume_raw_body_model_has_trailer_input(
+    input: Seq<u8>,
+    start: int,
+    end: int,
+    volume: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Seq<u8>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_end: Seq<u8>,
+    actual_after_end: Option<Seq<u8>>,
+    actual_volume: Seq<u8>,
+    actual_after_volume: Option<Seq<u8>>,
+)
+    requires short_incremental_volume_raw_body_model(
+            input, start, end, volume, envelope, partial,
+        ),
+        body_field_split_model(Some(input), Some(actual_start), actual_after_start),
+        body_field_split_model(actual_after_start, Some(actual_end), actual_after_end),
+        body_field_split_model(actual_after_end, Some(actual_volume), actual_after_volume),
+    ensures actual_after_volume.is_some()
+        && 0 <= start && start <= u64::MAX as int
+        && 0 <= end && end <= u64::MAX as int
+        && 0 < volume && volume <= u64::MAX as int,
+{
+    reveal(short_incremental_volume_raw_body_model);
+    let (model_start, model_end, model_volume, model_trailer,
+        model_first, model_second, model_after_start, model_after_end,
+        model_after_volume, model_after_trailer, model_third, model_extra) = choose|
+        start_field: Seq<u8>,
+        end_field: Seq<u8>,
+        volume_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_end: Option<Seq<u8>>,
+        after_volume: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(end_field), after_end),
+            body_field_split_model(after_end, Some(volume_field), after_volume),
+            body_field_split_model(after_volume, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            short_incremental_volume_fields_model(
+                start_field, end_field, volume_field, trailer, first, second,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(end_field), after_end)
+            && body_field_split_model(after_end, Some(volume_field), after_volume)
+            && body_field_split_model(after_volume, Some(trailer), after_trailer)
+            && body_suffix_fields_model(
+                after_trailer, first, second, third, extra, None,
+            )
+            && third.is_none()
+            && extra.is_none()
+            && short_incremental_volume_fields_model(
+                start_field, end_field, volume_field, trailer, first, second,
+            ) == Some((start, end, volume, envelope, partial));
+
+    body_field_split_model_unique(input, model_start, model_after_start,
+        actual_start, actual_after_start);
+    body_field_split_model_unique(model_after_start.unwrap(), model_end,
+        model_after_end, actual_end, actual_after_end);
+    body_field_split_model_unique(model_after_end.unwrap(), model_volume,
+        model_after_volume, actual_volume, actual_after_volume);
+    reveal(body_field_split_model);
+    assert(model_after_volume.is_some());
+    assert(actual_after_volume == model_after_volume);
+    assert(short_incremental_volume_fields_model(
+        model_start, model_end, model_volume, model_trailer,
+        model_first, model_second,
+    ) == Some((start, end, volume, envelope, partial)));
+    reveal(short_incremental_volume_fields_model);
+    reveal(short_interval_model);
+    reveal(short_timestamp_seconds_model);
+    reveal(short_volume_number_model);
+    assert(short_timestamp_seconds_model(model_start) == Some(start));
+    assert(short_timestamp_seconds_model(model_end) == Some(end));
+    assert(short_volume_number_model(model_volume) == Some(volume));
+    base36_value_model_is_bounded(model_start, model_start.len() as int);
+    base36_value_model_is_bounded(model_end, model_end.len() as int);
+    base36_value_model_is_bounded(model_volume, model_volume.len() as int);
+    assert(0 <= start && start <= u64::MAX as int);
+    assert(0 <= end && end <= u64::MAX as int);
+    assert(0 < volume && volume <= u64::MAX as int);
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn short_incremental_volume_raw_body_model_aligns_fields(
+    input: Seq<u8>,
+    start: int,
+    end: int,
+    volume: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Seq<u8>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_end: Seq<u8>,
+    actual_after_end: Option<Seq<u8>>,
+    actual_volume: Seq<u8>,
+    actual_after_volume: Option<Seq<u8>>,
+    actual_trailer: Seq<u8>,
+    actual_after_trailer: Option<Seq<u8>>,
+    actual_first: Option<Seq<u8>>,
+    actual_second: Option<Seq<u8>>,
+    actual_third: Option<Seq<u8>>,
+    actual_extra: Option<Seq<u8>>,
+    actual_remaining: Option<Seq<u8>>,
+)
+    requires short_incremental_volume_raw_body_model(
+            input, start, end, volume, envelope, partial,
+        ),
+        body_field_split_model(Some(input), Some(actual_start), actual_after_start),
+        body_field_split_model(actual_after_start, Some(actual_end), actual_after_end),
+        body_field_split_model(actual_after_end, Some(actual_volume), actual_after_volume),
+        body_field_split_model(actual_after_volume, Some(actual_trailer), actual_after_trailer),
+        body_suffix_fields_model(
+            actual_after_trailer, actual_first, actual_second,
+            actual_third, actual_extra, actual_remaining,
+        ),
+    ensures actual_third.is_none()
+        && actual_extra.is_none()
+        && actual_remaining.is_none()
+        && short_incremental_volume_fields_model(
+            actual_start, actual_end, actual_volume, actual_trailer,
+            actual_first, actual_second,
+        ) == Some((start, end, volume, envelope, partial))
+        && 0 <= start && start <= u64::MAX as int
+        && 0 <= end && end <= u64::MAX as int
+        && 0 < volume && volume <= u64::MAX as int,
+{
+    reveal(short_incremental_volume_raw_body_model);
+    let (model_start, model_end, model_volume, model_trailer,
+        model_first, model_second, model_after_start, model_after_end,
+        model_after_volume, model_after_trailer, model_third, model_extra) = choose|
+        start_field: Seq<u8>,
+        end_field: Seq<u8>,
+        volume_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_end: Option<Seq<u8>>,
+        after_volume: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(end_field), after_end),
+            body_field_split_model(after_end, Some(volume_field), after_volume),
+            body_field_split_model(after_volume, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            short_incremental_volume_fields_model(
+                start_field, end_field, volume_field, trailer, first, second,
+            )
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(end_field), after_end)
+            && body_field_split_model(after_end, Some(volume_field), after_volume)
+            && body_field_split_model(after_volume, Some(trailer), after_trailer)
+            && body_suffix_fields_model(
+                after_trailer, first, second, third, extra, None,
+            )
+            && third.is_none()
+            && extra.is_none()
+            && short_incremental_volume_fields_model(
+                start_field, end_field, volume_field, trailer, first, second,
+            ) == Some((start, end, volume, envelope, partial));
+
+    body_field_split_model_unique(input, model_start, model_after_start,
+        actual_start, actual_after_start);
+    body_field_split_model_unique(model_after_start.unwrap(), model_end,
+        model_after_end, actual_end, actual_after_end);
+    body_field_split_model_unique(model_after_end.unwrap(), model_volume,
+        model_after_volume, actual_volume, actual_after_volume);
+    body_field_split_model_unique(model_after_volume.unwrap(), model_trailer,
+        model_after_trailer, actual_trailer, actual_after_trailer);
+    body_suffix_fields_model_unique(
+        model_after_trailer, model_first, model_second, model_third,
+        model_extra, None, actual_first, actual_second, actual_third,
+        actual_extra, actual_remaining,
+    );
+    reveal(short_incremental_volume_fields_model);
+    reveal(short_interval_model);
+    reveal(short_timestamp_seconds_model);
+    reveal(short_volume_number_model);
+    assert(short_timestamp_seconds_model(model_start) == Some(start));
+    assert(short_timestamp_seconds_model(model_end) == Some(end));
+    assert(short_volume_number_model(model_volume) == Some(volume));
+    base36_value_model_is_bounded(model_start, model_start.len() as int);
+    base36_value_model_is_bounded(model_end, model_end.len() as int);
+    base36_value_model_is_bounded(model_volume, model_volume.len() as int);
+    assert(0 <= start && start <= u64::MAX as int);
+    assert(0 <= end && end <= u64::MAX as int);
+    assert(0 < volume && volume <= u64::MAX as int);
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn short_incremental_volume_raw_body_concrete_witness()
+    ensures short_incremental_volume_raw_body_model(
+        seq![b'1', b'.', b'2', b'.', b'1', b'0', b'.', b'd', b't'],
+        1,
+        2,
+        36,
+        Envelope::Plain,
+        false,
+    ),
+{
+    reveal(short_incremental_volume_raw_body_model);
+    reveal(body_suffix_fields_model);
+    reveal(body_field_split_model);
+    reveal(short_incremental_volume_fields_model);
+    reveal(short_interval_model);
+    reveal(short_timestamp_seconds_model);
+    reveal(short_volume_number_model);
+    reveal(short_trailer_model);
+    reveal(short_trailer_matches_model);
+    reveal(single_short_token_model);
+    reveal(base36_value_model);
+    reveal(base36_digit_model);
+    reveal(dot_field_boundary_model);
+
+    let raw: Seq<u8> = seq![b'1', b'.', b'2', b'.', b'1', b'0', b'.', b'd', b't'];
+    let start: Seq<u8> = seq![b'1'];
+    let after_start: Seq<u8> = seq![b'2', b'.', b'1', b'0', b'.', b'd', b't'];
+    let end: Seq<u8> = seq![b'2'];
+    let after_end: Seq<u8> = seq![b'1', b'0', b'.', b'd', b't'];
+    let volume_field: Seq<u8> = seq![b'1', b'0'];
+    let after_volume: Seq<u8> = seq![b'd', b't'];
+    let trailer: Seq<u8> = seq![b'd', b't'];
+    assert(raw.len() == 9);
+    assert(raw.subrange(0, 1) == start);
+    assert(raw.subrange(2, 9) == after_start);
+    assert(body_field_split_model(Some(raw), Some(start), Some(after_start)));
+    assert(after_start.subrange(0, 1) == end);
+    assert(after_start.subrange(2, 7) == after_end);
+    assert(body_field_split_model(Some(after_start), Some(end), Some(after_end))) by {
+        reveal(body_field_split_model);
+        assert(end.len() <= after_start.len());
+        assert(end == after_start.subrange(0, end.len() as int));
+        assert(forall|index: int| 0 <= index < end.len() as int
+            ==> end[index] != b'.');
+        assert(end.len() < after_start.len());
+        assert(after_start[end.len() as int] == b'.');
+        assert(after_end == after_start.subrange(end.len() as int + 1, after_start.len() as int));
+    }
+    assert(after_end.subrange(0, 2) == volume_field);
+    assert(after_end.subrange(3, 5) == after_volume);
+    assert(body_field_split_model(Some(after_end), Some(volume_field), Some(after_volume))) by {
+        reveal(body_field_split_model);
+        assert(volume_field.len() <= after_end.len());
+        assert(volume_field == after_end.subrange(0, volume_field.len() as int));
+        assert(forall|index: int| 0 <= index < volume_field.len() as int
+            ==> volume_field[index] != b'.');
+        assert(volume_field.len() < after_end.len());
+        assert(after_end[volume_field.len() as int] == b'.');
+        assert(after_volume == after_end.subrange(volume_field.len() as int + 1, after_end.len() as int));
+    }
+    assert(trailer == after_volume);
+    assert(trailer.len() == 2 && trailer[0] == b'd' && trailer[1] == b't');
+    assert(body_field_split_model(Some(after_volume), Some(trailer), None)) by {
+        reveal(body_field_split_model);
+        assert(trailer.len() <= after_volume.len());
+        assert(trailer == after_volume.subrange(0, trailer.len() as int));
+        assert(forall|index: int| 0 <= index < trailer.len() as int
+            ==> trailer[index] != b'.');
+        assert(trailer.len() == after_volume.len());
+    }
+    assert(body_suffix_fields_model(None, None, None, None, None, None)) by {
+        reveal(body_suffix_fields_model);
+        reveal(body_field_split_model);
+        assert(body_field_split_model(None, None, None));
+    }
+    assert(base36_value_model(start, 1) == Some(1)) by (compute);
+    assert(base36_value_model(end, 1) == Some(2)) by (compute);
+    assert(base36_value_model(volume_field, 2) == Some(36)) by (compute);
+    assert(short_timestamp_seconds_model(start) == Some(1));
+    assert(short_timestamp_seconds_model(end) == Some(2));
+    assert(short_interval_model(
+        ObjectKind::IncrementalVolume, start, Some(end),
+    ) == Some((1, 2)));
+    assert(short_volume_number_model(volume_field) == Some(36));
+    assert(short_trailer_matches_model(ObjectKind::IncrementalVolume, trailer));
+    assert(short_trailer_model(
+        ObjectKind::IncrementalVolume, trailer, None, None, None,
+    ) == Some((Envelope::Plain, false)));
+    assert(short_incremental_volume_fields_model(
+        start, end, volume_field, trailer, None, None,
+    ) == Some((1, 2, 36, Envelope::Plain, false)));
 }
 
 //= docs/parsing-requirements.md#parse-name-001
