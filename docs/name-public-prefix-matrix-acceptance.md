@@ -1,7 +1,9 @@
 # Public `parse_name` Configured-Prefix Matrix Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-Duvet evidence, and CI remain pending.
+**Status:** Specification and implementation/test independently reviewed. The
+12-row public matrix, 24 prefix near-misses, Duvet links, formatting, strict
+Clippy, full workspace tests, and local full `cargo xtask ci` pass. Hosted Linux
+assurance and Duvet Pages publication remain pending.
 
 ## Goal and scope
 
@@ -95,9 +97,9 @@ obligation; those broader assurance items remain open.
 ## Checklist
 
 - [x] Independent specification review accepts the bounded matrix and oracle.
-- [ ] Twelve public parser expectations and twenty-four one-byte near misses
+- [x] Twelve public parser expectations and twenty-four one-byte near misses
       pass; Duvet links are independently reviewed.
-- [ ] Focused/full tests, Duvet queries/trace, formatting, strict Clippy, and
+- [x] Focused/full tests, Duvet queries/trace, formatting, strict Clippy, and
       local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.

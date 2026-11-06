@@ -2,6 +2,241 @@ use duplicity_core::names::{
     parse_long_timestamp, parse_name, Envelope, NameConfig, NameError, ObjectKind, Timestamp,
 };
 
+struct ConfiguredPrefixCase {
+    input: &'static [u8],
+    kind_prefix_first: u8,
+    expected: duplicity_core::names::ObjectName,
+}
+
+const CONFIGURED_PREFIX_CASES: [ConfiguredPrefixCase; 12] = [
+    ConfiguredPrefixCase {
+        input: b"root-archive+duplicity-full.19700101T000000Z.vol42.difftar",
+        kind_prefix_first: b'a',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::FullVolume,
+            start: Timestamp(0),
+            end: Timestamp(0),
+            volume: Some(42),
+            envelope: Envelope::Plain,
+            partial: false,
+            short: false,
+        },
+    },
+    ConfiguredPrefixCase {
+        input: b"root-archive+df.1.10.dt",
+        kind_prefix_first: b'a',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::FullVolume,
+            start: Timestamp(1),
+            end: Timestamp(1),
+            volume: Some(36),
+            envelope: Envelope::Plain,
+            partial: false,
+            short: true,
+        },
+    },
+    ConfiguredPrefixCase {
+        input: b"root-archive+duplicity-inc.19700101T000000Z.to.19700101T000001Z.vol42.difftar",
+        kind_prefix_first: b'a',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::IncrementalVolume,
+            start: Timestamp(0),
+            end: Timestamp(1),
+            volume: Some(42),
+            envelope: Envelope::Plain,
+            partial: false,
+            short: false,
+        },
+    },
+    ConfiguredPrefixCase {
+        input: b"root-archive+di.1.2.10.dt",
+        kind_prefix_first: b'a',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::IncrementalVolume,
+            start: Timestamp(1),
+            end: Timestamp(2),
+            volume: Some(36),
+            envelope: Envelope::Plain,
+            partial: false,
+            short: true,
+        },
+    },
+    ConfiguredPrefixCase {
+        input: b"root-manifest?duplicity-full.19700101T000000Z.manifest",
+        kind_prefix_first: b'm',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::FullManifest,
+            start: Timestamp(0),
+            end: Timestamp(0),
+            volume: None,
+            envelope: Envelope::Plain,
+            partial: false,
+            short: false,
+        },
+    },
+    ConfiguredPrefixCase {
+        input: b"root-manifest?df.1.m",
+        kind_prefix_first: b'm',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::FullManifest,
+            start: Timestamp(1),
+            end: Timestamp(1),
+            volume: None,
+            envelope: Envelope::Plain,
+            partial: false,
+            short: true,
+        },
+    },
+    ConfiguredPrefixCase {
+        input: b"root-manifest?duplicity-inc.19700101T000000Z.to.19700101T000001Z.manifest",
+        kind_prefix_first: b'm',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::IncrementalManifest,
+            start: Timestamp(0),
+            end: Timestamp(1),
+            volume: None,
+            envelope: Envelope::Plain,
+            partial: false,
+            short: false,
+        },
+    },
+    ConfiguredPrefixCase {
+        input: b"root-manifest?di.1.2.m",
+        kind_prefix_first: b'm',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::IncrementalManifest,
+            start: Timestamp(1),
+            end: Timestamp(2),
+            volume: None,
+            envelope: Envelope::Plain,
+            partial: false,
+            short: true,
+        },
+    },
+    ConfiguredPrefixCase {
+        input: b"root-signature!duplicity-full-signatures.19700101T000000Z.sigtar",
+        kind_prefix_first: b's',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::FullSignatures,
+            start: Timestamp(0),
+            end: Timestamp(0),
+            volume: None,
+            envelope: Envelope::Plain,
+            partial: false,
+            short: false,
+        },
+    },
+    ConfiguredPrefixCase {
+        input: b"root-signature!dfs.1.st",
+        kind_prefix_first: b's',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::FullSignatures,
+            start: Timestamp(1),
+            end: Timestamp(1),
+            volume: None,
+            envelope: Envelope::Plain,
+            partial: false,
+            short: true,
+        },
+    },
+    ConfiguredPrefixCase {
+        input:
+            b"root-signature!duplicity-new-signatures.19700101T000000Z.to.19700101T000001Z.sigtar",
+        kind_prefix_first: b's',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::IncrementalSignatures,
+            start: Timestamp(0),
+            end: Timestamp(1),
+            volume: None,
+            envelope: Envelope::Plain,
+            partial: false,
+            short: false,
+        },
+    },
+    ConfiguredPrefixCase {
+        input: b"root-signature!dns.1.2.st",
+        kind_prefix_first: b's',
+        expected: duplicity_core::names::ObjectName {
+            kind: ObjectKind::IncrementalSignatures,
+            start: Timestamp(1),
+            end: Timestamp(2),
+            volume: None,
+            envelope: Envelope::Plain,
+            partial: false,
+            short: true,
+        },
+    },
+];
+
+fn configured_prefix_config() -> NameConfig<'static> {
+    NameConfig {
+        global_prefix: b"root-",
+        archive_prefix: b"archive+",
+        manifest_prefix: b"manifest?",
+        signature_prefix: b"signature!",
+        time_separator: b':',
+        max_name_bytes: 4096,
+    }
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-name-002
+//= type=test
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
+fn public_parse_name_matches_all_configured_prefix_rows() {
+    let config = configured_prefix_config();
+    for case in CONFIGURED_PREFIX_CASES {
+        assert_eq!(
+            parse_name(case.input, config),
+            Ok(Some(case.expected)),
+            "input {:?}",
+            case.input
+        );
+    }
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-name-002
+//= type=test
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
+fn public_parse_name_rejects_one_byte_global_and_kind_prefix_near_misses() {
+    let config = configured_prefix_config();
+    const GLOBAL_PREFIX_LEN: usize = b"root-".len();
+
+    for case in CONFIGURED_PREFIX_CASES {
+        assert_eq!(&case.input[..GLOBAL_PREFIX_LEN], b"root-");
+        assert_eq!(case.input[GLOBAL_PREFIX_LEN], case.kind_prefix_first);
+
+        let mut global_near_miss = case.input.to_vec();
+        assert_eq!(global_near_miss[0], b'r');
+        global_near_miss[0] = b'x';
+        assert_eq!(global_near_miss.len(), case.input.len());
+        for (index, byte) in global_near_miss.iter().enumerate() {
+            if index == 0 {
+                assert_eq!(*byte, b'x');
+            } else {
+                assert_eq!(*byte, case.input[index], "global near miss at {index}");
+            }
+        }
+        assert_eq!(parse_name(&global_near_miss, config), Ok(None));
+
+        let mut kind_near_miss = case.input.to_vec();
+        kind_near_miss[GLOBAL_PREFIX_LEN] = b'x';
+        assert_eq!(kind_near_miss.len(), case.input.len());
+        for (index, byte) in kind_near_miss.iter().enumerate() {
+            if index == GLOBAL_PREFIX_LEN {
+                assert_eq!(*byte, b'x');
+            } else {
+                assert_eq!(*byte, case.input[index], "kind near miss at {index}");
+            }
+        }
+        assert_eq!(parse_name(&kind_near_miss, config), Ok(None));
+    }
+}
+
 //= docs/parsing-requirements.md#parse-name-004
 //= type=test
 //# The long timestamp parser MUST recognize canonical UTC `YYYYMMDDTHHMMSSZ` dates independently of the host timezone.
