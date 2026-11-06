@@ -18,8 +18,21 @@ use vstd::prelude::*;
 verus! {
 closed spec fn dot_field_boundary_model(input: Seq<u8>, boundary: nat) -> bool {
     boundary <= input.len()
-        && forall|index: int| 0 <= index < boundary ==> input[index] != b'.'
+        && (forall|index: int| 0 <= index < boundary ==> input[index] != b'.')
         && (boundary == input.len() || input[boundary as int] == b'.')
+}
+
+proof fn dot_field_boundary_model_empty_and_delimiter_truth_table()
+    ensures dot_field_boundary_model(seq![], 0)
+        && !dot_field_boundary_model(seq![b'x'], 0)
+        && dot_field_boundary_model(seq![b'.', b'x'], 0)
+        && !dot_field_boundary_model(seq![b'a', b'x'], 1),
+{
+    reveal(dot_field_boundary_model);
+    assert(dot_field_boundary_model(seq![], 0));
+    assert(!dot_field_boundary_model(seq![b'x'], 0));
+    assert(dot_field_boundary_model(seq![b'.', b'x'], 0));
+    assert(!dot_field_boundary_model(seq![b'a', b'x'], 1));
 }
 
 /// Return the first dot offset, or the input length if no dot occurs.
@@ -102,11 +115,31 @@ fn take_dot_field<'a>(remaining: &mut Option<&'a [u8]>) -> (field: Option<&'a [u
                 reveal(body_field_split_model);
                 reveal(dot_field_boundary_model);
                 match rest {
-                    Some(bytes) => assert(body_field_split_model(
-                        Some(input@),
-                        Some(field@),
-                        Some(bytes@),
-                    )),
+                    Some(bytes) => {
+                        assert(body_field_split_model(
+                            Some(input@),
+                            Some(field@),
+                            Some(bytes@),
+                        )) by {
+                            assert(field@.len() <= input@.len());
+                            assert(field@ == input@.subrange(0, field@.len() as int));
+                            assert(dot_field_boundary_model(
+                                input@, field@.len() as nat,
+                            ));
+                            assert forall|index: int| #![auto]
+                                0 <= index < field@.len() as int
+                                implies field@[index] != b'.' by {
+                                assert(input@[index] != b'.');
+                                assert(field@[index] == input@[index]);
+                            }
+                            assert(input@[field@.len() as int] == b'.');
+                            assert(field@.len() < input@.len());
+                            assert(bytes@ == input@.subrange(
+                                field@.len() as int + 1,
+                                input@.len() as int,
+                            ));
+                        }
+                    },
                     None => assert(body_field_split_model(
                         Some(input@),
                         Some(field@),
@@ -155,8 +188,8 @@ closed spec fn body_field_split_model(
         (Some(bytes), Some(value)) => {
             value.len() <= bytes.len()
                 && value == bytes.subrange(0, value.len() as int)
-                && forall|index: int| 0 <= index < value.len()
-                    ==> value[index] != b'.'
+                && (forall|index: int| 0 <= index < value.len()
+                    ==> value[index] != b'.')
                 && match remaining {
                     None => value.len() == bytes.len(),
                     Some(rest) => {
@@ -167,6 +200,151 @@ closed spec fn body_field_split_model(
                 }
         }
         _ => false,
+    }
+}
+
+proof fn body_field_split_model_components(
+    input: Seq<u8>,
+    field: Seq<u8>,
+    remaining: Option<Seq<u8>>,
+)
+    requires body_field_split_model(Some(input), Some(field), remaining),
+    ensures field.len() <= input.len()
+        && field == input.subrange(0, field.len() as int)
+        && (forall|index: int| 0 <= index < field.len() as int ==> field[index] != b'.')
+        && match remaining {
+            None => field.len() == input.len(),
+            Some(rest) => field.len() < input.len()
+                && input[field.len() as int] == b'.'
+                && rest == input.subrange(field.len() as int + 1, input.len() as int),
+        },
+{
+    reveal(body_field_split_model);
+    assert(field.len() <= input.len());
+    assert(field == input.subrange(0, field.len() as int));
+    assert(forall|index: int| 0 <= index < field.len() as int ==> field[index] != b'.');
+    match remaining {
+        None => {
+            reveal(body_field_split_model);
+            assert(remaining == None);
+            assert(body_field_split_model(Some(input), Some(field), None)
+                == (field.len() <= input.len()
+                    && field == input.subrange(0, field.len() as int)
+                    && (forall|index: int| 0 <= index < field.len() as int
+                        ==> field[index] != b'.')
+                    && field.len() == input.len())) by {
+                reveal(body_field_split_model);
+            }
+            assert(field.len() == input.len());
+        },
+        Some(rest) => {
+            reveal(body_field_split_model);
+            assert(remaining == Some(rest));
+            assert(body_field_split_model(Some(input), Some(field), Some(rest))
+                == (field.len() <= input.len()
+                    && field == input.subrange(0, field.len() as int)
+                    && (forall|index: int| 0 <= index < field.len() as int
+                        ==> field[index] != b'.')
+                    && field.len() < input.len()
+                    && input[field.len() as int] == b'.'
+                    && rest == input.subrange(
+                        field.len() as int + 1, input.len() as int,
+                    ))) by {
+                reveal(body_field_split_model);
+            }
+            assert(field.len() < input.len());
+            assert(input[field.len() as int] == b'.');
+            assert(rest == input.subrange(field.len() as int + 1, input.len() as int));
+        },
+    }
+}
+
+proof fn body_field_split_model_empty_field_truth_table()
+    ensures body_field_split_model(Some(seq![b'.', b'x']), Some(seq![]), Some(seq![b'x']))
+        && body_field_split_model(Some(seq![]), Some(seq![]), None)
+        && !body_field_split_model(Some(seq![b'x']), Some(seq![]), None)
+        && !body_field_split_model(Some(seq![b'x']), Some(seq![]), Some(seq![])),
+{
+    let empty: Seq<u8> = seq![];
+    let dot_x: Seq<u8> = seq![b'.', b'x'];
+    let x: Seq<u8> = seq![b'x'];
+    assert(empty.len() == 0);
+    assert(dot_x.len() == 2);
+    assert(x.len() == 1);
+    assert(dot_x.subrange(0, 0) == empty);
+    assert(dot_x.subrange(1, 2) == x);
+    assert(x.subrange(0, 0) == empty);
+    assert(x.subrange(1, 1) == empty);
+    assert forall|index: int| #![auto] 0 <= index < empty.len()
+        implies empty[index] != b'.' by { }
+    assert(body_field_split_model(Some(seq![b'.', b'x']), Some(seq![]), Some(seq![b'x']))) by {
+        reveal(body_field_split_model);
+    }
+    assert(body_field_split_model(Some(empty), Some(empty), None)) by {
+        reveal(body_field_split_model);
+        assert(body_field_split_model(Some(empty), Some(empty), None)
+            == (empty.len() <= empty.len()
+                && empty == empty.subrange(0, empty.len() as int)
+                && (forall|index: int| 0 <= index < empty.len()
+                    ==> empty[index] != b'.')
+                && empty.len() == empty.len()));
+        assert(empty.len() <= empty.len());
+        assert(empty == empty.subrange(0, empty.len() as int));
+        assert forall|index: int| #![auto] 0 <= index < empty.len()
+            implies empty[index] != b'.' by { }
+        assert(empty.len() == empty.len());
+    }
+    assert(!body_field_split_model(Some(seq![b'x']), Some(seq![]), None)) by {
+        reveal(body_field_split_model);
+    }
+    assert(!body_field_split_model(Some(seq![b'x']), Some(seq![]), Some(seq![]))) by {
+        reveal(body_field_split_model);
+    }
+}
+
+proof fn body_field_split_model_unique(
+    input: Seq<u8>,
+    left_field: Seq<u8>,
+    left_remaining: Option<Seq<u8>>,
+    right_field: Seq<u8>,
+    right_remaining: Option<Seq<u8>>,
+)
+    requires body_field_split_model(Some(input), Some(left_field), left_remaining),
+        body_field_split_model(Some(input), Some(right_field), right_remaining),
+    ensures left_field == right_field && left_remaining == right_remaining,
+{
+    body_field_split_model_components(input, left_field, left_remaining);
+    body_field_split_model_components(input, right_field, right_remaining);
+    if left_field.len() < right_field.len() {
+        assert(left_remaining.is_some());
+        assert(input[left_field.len() as int] == b'.');
+        assert(right_field[left_field.len() as int] != b'.');
+        assert(right_field[left_field.len() as int] == input[left_field.len() as int]);
+        assert(false);
+    } else if right_field.len() < left_field.len() {
+        assert(right_remaining.is_some());
+        assert(input[right_field.len() as int] == b'.');
+        assert(left_field[right_field.len() as int] != b'.');
+        assert(left_field[right_field.len() as int] == input[right_field.len() as int]);
+        assert(false);
+    } else {
+        assert(left_field == input.subrange(0, left_field.len() as int));
+        assert(right_field == input.subrange(0, right_field.len() as int));
+        assert(left_field == right_field);
+        match (left_remaining, right_remaining) {
+            (Some(left), Some(right)) => assert(left == right),
+            (None, None) => {},
+            (Some(_), None) => {
+                assert(left_field.len() < input.len());
+                assert(right_field.len() == input.len());
+                assert(false);
+            },
+            (None, Some(_)) => {
+                assert(left_field.len() == input.len());
+                assert(right_field.len() < input.len());
+                assert(false);
+            },
+        }
     }
 }
 
@@ -185,6 +363,104 @@ closed spec fn body_suffix_fields_model(
                     && exists|after_third: Option<Seq<u8>>|
                         body_field_split_model(after_second, third, after_third)
                             && body_field_split_model(after_third, extra, remaining)
+}
+
+proof fn body_field_split_optional_unique(
+    input: Option<Seq<u8>>,
+    left_field: Option<Seq<u8>>,
+    left_remaining: Option<Seq<u8>>,
+    right_field: Option<Seq<u8>>,
+    right_remaining: Option<Seq<u8>>,
+)
+    requires body_field_split_model(input, left_field, left_remaining),
+        body_field_split_model(input, right_field, right_remaining),
+    ensures left_field == right_field && left_remaining == right_remaining,
+{
+    reveal(body_field_split_model);
+    match (input, left_field, right_field) {
+        (None, None, None) => assert(left_remaining == right_remaining),
+        (Some(bytes), Some(left), Some(right)) => {
+            body_field_split_model_unique(
+                bytes, left, left_remaining, right, right_remaining,
+            );
+        },
+        _ => assert(false),
+    }
+}
+
+proof fn body_suffix_fields_model_unique(
+    input: Option<Seq<u8>>,
+    left_first: Option<Seq<u8>>,
+    left_second: Option<Seq<u8>>,
+    left_third: Option<Seq<u8>>,
+    left_extra: Option<Seq<u8>>,
+    left_remaining: Option<Seq<u8>>,
+    right_first: Option<Seq<u8>>,
+    right_second: Option<Seq<u8>>,
+    right_third: Option<Seq<u8>>,
+    right_extra: Option<Seq<u8>>,
+    right_remaining: Option<Seq<u8>>,
+)
+    requires body_suffix_fields_model(
+            input, left_first, left_second, left_third, left_extra, left_remaining,
+        ),
+        body_suffix_fields_model(
+            input, right_first, right_second, right_third, right_extra, right_remaining,
+        ),
+    ensures left_first == right_first
+        && left_second == right_second
+        && left_third == right_third
+        && left_extra == right_extra
+        && left_remaining == right_remaining,
+{
+    reveal(body_suffix_fields_model);
+    let left_after_first = choose|after: Option<Seq<u8>>|
+        body_field_split_model(input, left_first, after)
+            && exists|after_second: Option<Seq<u8>>|
+                body_field_split_model(after, left_second, after_second)
+                    && exists|after_third: Option<Seq<u8>>|
+                        body_field_split_model(after_second, left_third, after_third)
+                            && body_field_split_model(
+                                after_third, left_extra, left_remaining,
+                            );
+    let left_after_second = choose|after: Option<Seq<u8>>|
+        body_field_split_model(left_after_first, left_second, after)
+            && exists|after_third: Option<Seq<u8>>|
+                body_field_split_model(after, left_third, after_third)
+                    && body_field_split_model(after_third, left_extra, left_remaining);
+    let left_after_third = choose|after: Option<Seq<u8>>|
+        body_field_split_model(left_after_second, left_third, after)
+            && body_field_split_model(after, left_extra, left_remaining);
+    let right_after_first = choose|after: Option<Seq<u8>>|
+        body_field_split_model(input, right_first, after)
+            && exists|after_second: Option<Seq<u8>>|
+                body_field_split_model(after, right_second, after_second)
+                    && exists|after_third: Option<Seq<u8>>|
+                        body_field_split_model(after_second, right_third, after_third)
+                            && body_field_split_model(
+                                after_third, right_extra, right_remaining,
+                            );
+    let right_after_second = choose|after: Option<Seq<u8>>|
+        body_field_split_model(right_after_first, right_second, after)
+            && exists|after_third: Option<Seq<u8>>|
+                body_field_split_model(after, right_third, after_third)
+                    && body_field_split_model(after_third, right_extra, right_remaining);
+    let right_after_third = choose|after: Option<Seq<u8>>|
+        body_field_split_model(right_after_second, right_third, after)
+            && body_field_split_model(after, right_extra, right_remaining);
+
+    body_field_split_optional_unique(
+        input, left_first, left_after_first, right_first, right_after_first,
+    );
+    body_field_split_optional_unique(
+        left_after_first, left_second, left_after_second, right_second, right_after_second,
+    );
+    body_field_split_optional_unique(
+        left_after_second, left_third, left_after_third, right_third, right_after_third,
+    );
+    body_field_split_optional_unique(
+        left_after_third, left_extra, left_remaining, right_extra, right_remaining,
+    );
 }
 
 type BodySuffixFields<'a> = (
@@ -2312,6 +2588,305 @@ closed spec fn short_full_volume_raw_body_model(
             && extra.is_none()
             && short_full_volume_fields_model(start_field, volume_field, trailer, first, second)
                 == Some((start, end, volume, envelope, partial))
+}
+
+proof fn short_full_volume_raw_body_model_aligns_fields(
+    input: Seq<u8>,
+    start: int,
+    end: int,
+    volume: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Seq<u8>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_volume: Seq<u8>,
+    actual_after_volume: Option<Seq<u8>>,
+    actual_trailer: Seq<u8>,
+    actual_after_trailer: Option<Seq<u8>>,
+    actual_first: Option<Seq<u8>>,
+    actual_second: Option<Seq<u8>>,
+    actual_third: Option<Seq<u8>>,
+    actual_extra: Option<Seq<u8>>,
+    actual_remaining: Option<Seq<u8>>,
+)
+    requires short_full_volume_raw_body_model(
+            input, start, end, volume, envelope, partial,
+        ),
+        body_field_split_model(Some(input), Some(actual_start), actual_after_start),
+        body_field_split_model(
+            actual_after_start, Some(actual_volume), actual_after_volume,
+        ),
+        body_field_split_model(
+            actual_after_volume, Some(actual_trailer), actual_after_trailer,
+        ),
+        body_suffix_fields_model(
+            actual_after_trailer,
+            actual_first,
+            actual_second,
+            actual_third,
+            actual_extra,
+            actual_remaining,
+        ),
+    ensures actual_third.is_none()
+        && actual_extra.is_none()
+        && actual_remaining.is_none()
+        && short_full_volume_fields_model(
+            actual_start,
+            actual_volume,
+            actual_trailer,
+            actual_first,
+            actual_second,
+        ) == Some((start, end, volume, envelope, partial)),
+{
+    reveal(short_full_volume_raw_body_model);
+    let (model_start, model_volume, model_trailer, model_first, model_second,
+        model_after_start, model_after_volume, model_after_trailer, model_third,
+        model_extra) = choose|
+        start_field: Seq<u8>,
+        volume_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_volume: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(volume_field), after_volume),
+            body_field_split_model(after_volume, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            short_full_volume_fields_model(start_field, volume_field, trailer, first, second)
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(volume_field), after_volume)
+            && body_field_split_model(after_volume, Some(trailer), after_trailer)
+            && body_suffix_fields_model(
+                after_trailer, first, second, third, extra, None,
+            )
+            && third.is_none()
+            && extra.is_none()
+            && short_full_volume_fields_model(
+                start_field, volume_field, trailer, first, second,
+            ) == Some((start, end, volume, envelope, partial));
+
+    body_field_split_model_unique(
+        input,
+        model_start,
+        model_after_start,
+        actual_start,
+        actual_after_start,
+    );
+    body_field_split_model_unique(
+        model_after_start.unwrap(),
+        model_volume,
+        model_after_volume,
+        actual_volume,
+        actual_after_volume,
+    );
+    body_field_split_model_unique(
+        model_after_volume.unwrap(),
+        model_trailer,
+        model_after_trailer,
+        actual_trailer,
+        actual_after_trailer,
+    );
+    body_suffix_fields_model_unique(
+        model_after_trailer,
+        model_first,
+        model_second,
+        model_third,
+        model_extra,
+        None,
+        actual_first,
+        actual_second,
+        actual_third,
+        actual_extra,
+        actual_remaining,
+    );
+    reveal(short_full_volume_fields_model);
+}
+
+proof fn short_full_volume_raw_body_model_has_third_input(
+    input: Seq<u8>,
+    start: int,
+    end: int,
+    volume: int,
+    envelope: Envelope,
+    partial: bool,
+    actual_start: Seq<u8>,
+    actual_after_start: Option<Seq<u8>>,
+    actual_volume: Seq<u8>,
+    actual_after_volume: Option<Seq<u8>>,
+)
+    requires short_full_volume_raw_body_model(
+            input, start, end, volume, envelope, partial,
+        ),
+        body_field_split_model(Some(input), Some(actual_start), actual_after_start),
+        body_field_split_model(
+            actual_after_start, Some(actual_volume), actual_after_volume,
+        ),
+    ensures actual_after_volume.is_some(),
+{
+    reveal(short_full_volume_raw_body_model);
+    let (model_start, model_volume, model_trailer, model_first, model_second,
+        model_after_start, model_after_volume, model_after_trailer, model_third,
+        model_extra) = choose|
+        start_field: Seq<u8>,
+        volume_field: Seq<u8>,
+        trailer: Seq<u8>,
+        first: Option<Seq<u8>>,
+        second: Option<Seq<u8>>,
+        after_start: Option<Seq<u8>>,
+        after_volume: Option<Seq<u8>>,
+        after_trailer: Option<Seq<u8>>,
+        third: Option<Seq<u8>>,
+        extra: Option<Seq<u8>>|
+        #![trigger
+            body_field_split_model(Some(input), Some(start_field), after_start),
+            body_field_split_model(after_start, Some(volume_field), after_volume),
+            body_field_split_model(after_volume, Some(trailer), after_trailer),
+            body_suffix_fields_model(after_trailer, first, second, third, extra, None),
+            short_full_volume_fields_model(start_field, volume_field, trailer, first, second)
+        ]
+        body_field_split_model(Some(input), Some(start_field), after_start)
+            && body_field_split_model(after_start, Some(volume_field), after_volume)
+            && body_field_split_model(after_volume, Some(trailer), after_trailer)
+            && body_suffix_fields_model(
+                after_trailer, first, second, third, extra, None,
+            )
+            && third.is_none()
+            && extra.is_none()
+            && short_full_volume_fields_model(
+                start_field, volume_field, trailer, first, second,
+            ) == Some((start, end, volume, envelope, partial));
+
+    body_field_split_model_unique(
+        input,
+        model_start,
+        model_after_start,
+        actual_start,
+        actual_after_start,
+    );
+    body_field_split_model_unique(
+        model_after_start.unwrap(),
+        model_volume,
+        model_after_volume,
+        actual_volume,
+        actual_after_volume,
+    );
+    reveal(body_field_split_model);
+    assert(model_after_volume.is_some());
+    assert(actual_after_volume == model_after_volume);
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=implementation
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+proof fn short_full_volume_raw_body_concrete_witness()
+    ensures short_full_volume_raw_body_model(
+        seq![b'1', b'.', b'1', b'0', b'.', b'd', b't'],
+        1,
+        1,
+        36,
+        Envelope::Plain,
+        false,
+    ),
+{
+    reveal(short_full_volume_raw_body_model);
+    reveal(body_suffix_fields_model);
+    reveal(body_field_split_model);
+    reveal(short_full_volume_fields_model);
+    reveal(short_interval_model);
+    reveal(short_timestamp_seconds_model);
+    reveal(short_volume_number_model);
+    reveal(short_trailer_model);
+    reveal(short_trailer_matches_model);
+    reveal(single_short_token_model);
+    reveal(base36_value_model);
+    reveal(base36_digit_model);
+    reveal(dot_field_boundary_model);
+    let raw: Seq<u8> = seq![b'1', b'.', b'1', b'0', b'.', b'd', b't'];
+    let start: Seq<u8> = seq![b'1'];
+    let after_start: Seq<u8> = seq![b'1', b'0', b'.', b'd', b't'];
+    let volume: Seq<u8> = seq![b'1', b'0'];
+    let after_volume: Seq<u8> = seq![b'd', b't'];
+    let trailer: Seq<u8> = seq![b'd', b't'];
+    assert(raw.len() == 7);
+    assert(raw[0] == b'1' && raw[1] == b'.');
+    assert(raw.subrange(0, 1) == start);
+    assert(raw.subrange(2, 7) == after_start);
+    assert(raw.subrange(2, 4) == volume);
+    assert(raw.subrange(5, 7) == trailer);
+    assert(trailer.len() == 2);
+    assert(body_field_split_model(
+        Some(raw),
+        Some(start),
+        Some(after_start),
+    ));
+    assert(volume.len() == 2 && after_start.len() == 5);
+    assert(volume == after_start.subrange(0, 2));
+    assert forall|index: int| 0 <= index < volume.len() as int
+        implies volume[index] != b'.' by {
+        if index == 0 {
+            assert(volume[index] == b'1');
+        } else {
+            assert(index == 1);
+            assert(volume[index] == b'0');
+        }
+    }
+    assert(after_start[2] == b'.');
+    assert(after_volume == after_start.subrange(3, 5));
+    assert(body_field_split_model(Some(after_start), Some(volume), Some(after_volume))) by {
+        reveal(body_field_split_model);
+    }
+    assert(trailer.len() == 2 && after_volume.len() == 2);
+    assert(trailer == after_volume);
+    assert(after_volume.subrange(0, 2) == after_volume);
+    assert forall|index: int| 0 <= index < trailer.len() as int
+        implies trailer[index] != b'.' by {
+        if index == 0 {
+            assert(trailer[index] == b'd');
+        } else {
+            assert(index == 1);
+            assert(trailer[index] == b't');
+        }
+    }
+    assert(body_field_split_model(
+        Some(after_volume),
+        Some(trailer),
+        None,
+    )) by {
+        reveal(body_field_split_model);
+        assert(trailer.len() == after_volume.len());
+        assert(trailer == after_volume);
+        assert(trailer == after_volume.subrange(0, trailer.len() as int));
+        assert forall|index: int| 0 <= index < trailer.len() as int
+            implies trailer[index] != b'.' by {
+            if index == 0 { assert(trailer[index] == b'd'); }
+            else { assert(index == 1); assert(trailer[index] == b't'); }
+        }
+    }
+    assert(body_suffix_fields_model(None, None, None, None, None, None)) by {
+        reveal(body_suffix_fields_model);
+        assert(body_field_split_model(None, None, None));
+    }
+    assert(base36_value_model(start, 1) == Some(1)) by (compute);
+    assert(base36_value_model(volume, 2) == Some(36)) by (compute);
+    assert(short_timestamp_seconds_model(start) == Some(1));
+    assert(short_interval_model(ObjectKind::FullVolume, start, None) == Some((1, 1)));
+    assert(short_volume_number_model(volume) == Some(36));
+    assert(short_trailer_matches_model(ObjectKind::FullVolume, trailer));
+    assert(short_trailer_model(ObjectKind::FullVolume, trailer, None, None, None)
+        == Some((Envelope::Plain, false)));
+    assert(short_full_volume_fields_model(
+        start,
+        volume,
+        trailer,
+        None,
+        None,
+    ) == Some((1, 1, 36, Envelope::Plain, false)));
 }
 
 closed spec fn long_full_volume_fields_model(
@@ -5594,7 +6169,17 @@ fn short_full_volume_body(
         Ok(name) => body_success_result_model(
             input@, ObjectKind::FullVolume, true, separator, name,
         ),
-    },
+    } && forall|start: int, end: int, volume: int, envelope: Envelope, partial: bool|
+        short_full_volume_raw_body_model(input@, start, end, volume, envelope, partial)
+            ==> result == Ok(ObjectName {
+                kind: ObjectKind::FullVolume,
+                start: Timestamp(start as i128),
+                end: Timestamp(end as i128),
+                volume: Some(volume as u64),
+                envelope,
+                partial,
+                short: true,
+            }),
 {
     let _ = separator; // Short full-volume bodies do not consume the time separator.
     let mut fields = Some(input);
@@ -5602,9 +6187,71 @@ fn short_full_volume_body(
     let _after_start = fields;
     let volume_field = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
     let _after_volume = fields;
-    let trailer = take_dot_field(&mut fields).ok_or(NameError::Malformed)?;
+    let trailer_option = take_dot_field(&mut fields);
+    proof {
+        assert forall|start: int, end: int, volume: int,
+            envelope: Envelope, partial: bool|
+            short_full_volume_raw_body_model(input@, start, end, volume, envelope, partial)
+                implies trailer_option.is_some()
+            by {
+            short_full_volume_raw_body_model_has_third_input(
+                input@,
+                start,
+                end,
+                volume,
+                envelope,
+                partial,
+                start_field@,
+                optional_body_field_model(_after_start),
+                volume_field@,
+                optional_body_field_model(_after_volume),
+            );
+            reveal(body_field_split_model);
+            assert(body_field_split_model(
+                optional_body_field_model(_after_volume),
+                optional_body_field_model(trailer_option),
+                optional_body_field_model(fields),
+            ));
+            assert(trailer_option.is_some());
+        }
+    }
+    let trailer = trailer_option.ok_or(NameError::Malformed)?;
     let _after_trailer = fields;
     let (first, second, third, extra) = take_body_suffix_fields(&mut fields);
+    proof {
+        assert forall|start: int, end: int, volume: int,
+            envelope: Envelope, partial: bool|
+            short_full_volume_raw_body_model(input@, start, end, volume, envelope, partial)
+                implies third.is_none() && extra.is_none() && fields.is_none()
+                    && short_full_volume_fields_model(
+                        start_field@,
+                        volume_field@,
+                        trailer@,
+                        optional_short_token(first),
+                        optional_short_token(second),
+                    ) == Some((start, end, volume, envelope, partial))
+            by {
+            short_full_volume_raw_body_model_aligns_fields(
+                input@,
+                start,
+                end,
+                volume,
+                envelope,
+                partial,
+                start_field@,
+                optional_body_field_model(_after_start),
+                volume_field@,
+                optional_body_field_model(_after_volume),
+                trailer@,
+                optional_body_field_model(_after_trailer),
+                optional_short_token(first),
+                optional_short_token(second),
+                optional_short_token(third),
+                optional_short_token(extra),
+                optional_body_field_model(fields),
+            );
+        }
+    }
     if third.is_some() || extra.is_some() || fields.is_some() {
         return Err(NameError::Malformed);
     }

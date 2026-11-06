@@ -1656,12 +1656,11 @@ proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Successful Short FullVolume body parsing composes exact dot/suffix extraction
-# with short timestamp, positive base36 volume, and trailer/suffix models. A
-# direct 18-case raw-body result matrix tests timestamps `1`, `z`, and `10`
-# with volume `10` across all six suffix profiles; it does not prove raw-model
-# to-parser success because split-model projection remains open. Malformed
-# raw-body error completeness and other parser routes remain outside.
+# Historical forward-direction checkpoint: the direct 18-case raw-body result
+# matrix tests timestamps `1`, `z`, and `10` with volume `10` across all six
+# suffix profiles. The reverse raw-model implication is covered separately by
+# `name-short-full-volume-reverse-success` below. Malformed raw-body error
+# completeness and other parser routes remain outside.
 implementations = [
   { path = "crates/core/src/names.rs", symbol = "body" },
   { path = "crates/core/src/names.rs", symbol = "short_full_volume_body_fields" }
@@ -1671,6 +1670,39 @@ proofs = [
 ]
 tests = [
   { package = "duplicity-core", name = "short_full_volume_body_composes_fields_and_rejects_malformed_fields" },
+  { package = "duplicity-core", name = "names::tests::short_full_volume_body_raw_result_matrix" }
+]
+
+[[milestone]]
+id = "name-short-full-volume-reverse-success"
+gate = true
+requirements = ["PARSE-NAME-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves the exact positive implication from the short FullVolume raw-body
+# model to the production ObjectName, including a separate concrete `1.10.dt`
+# antecedent witness. The field/suffix witness is aligned to deterministic
+# extraction by split uniqueness. The split-model forall clauses are grouped
+# explicitly in both the model and its projection contract: in Verus the
+# quantified expression otherwise absorbs subsequent conjunctions and leaves
+# boundary clauses vacuous for an empty field. The dot-boundary model uses the
+# same grouping correction. Strict truth tables cover valid empty splits and
+# invalid non-boundary cases; runtime parsing and error behavior are unchanged.
+# Other body routes, malformed completeness, and the complete filename grammar
+# remain outside.
+implementations = [
+  { path = "crates/core/src/names.rs", symbol = "short_full_volume_raw_body_model" },
+  { path = "crates/core/src/names.rs", symbol = "short_full_volume_body" }
+]
+proofs = [
+  { id = "name-short-full-volume-reverse-success", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_full_volume_body", kind = "contract" },
+  { id = "name-short-full-volume-model-witness", requirement = "PARSE-NAME-001", path = "crates/core/src/names.rs", symbol = "short_full_volume_raw_body_concrete_witness", kind = "lemma" }
+]
+tests = [
   { package = "duplicity-core", name = "names::tests::short_full_volume_body_raw_result_matrix" }
 ]
 
