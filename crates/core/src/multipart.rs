@@ -13,6 +13,7 @@ use crate::tar::{
     Termination,
 };
 use crate::verified::multipart_empty_volume::{admit_empty_volume, EmptyVolumeStateView};
+use crate::verified::multipart_finish::{finish_gate, FinishGate};
 use crate::verified::multipart_metadata::reserve_multipart_metadata;
 use crate::verified::openpgp_admission::{
     AuthenticatedPermit, OpenPgpAdmission, TarValidatedPermit,
@@ -758,16 +759,21 @@ impl<'a> MultipartAssembler<'a> {
         }
         Ok(())
     }
+    //= docs/parsing-requirements.md#parse-multi-003
+    //= type=implementation
+    //# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
     pub fn finish(self) -> Result<AssembledArchive, AssemblyError> {
-        if self.failed {
-            return Err(AssemblyError::Poisoned);
+        match finish_gate(
+            self.failed,
+            self.admission.is_complete(),
+            self.pending.is_some(),
+        ) {
+            FinishGate::Poisoned => Err(AssemblyError::Poisoned),
+            FinishGate::Incomplete => Err(AssemblyError::Incomplete),
+            FinishGate::Ready => Ok(AssembledArchive {
+                entries: self.entries,
+            }),
         }
-        if !self.admission.is_complete() || self.pending.is_some() {
-            return Err(AssemblyError::Incomplete);
-        }
-        Ok(AssembledArchive {
-            entries: self.entries,
-        })
     }
 }
 

@@ -100,6 +100,10 @@ fn multipart_metadata_budget_admits_exact_charge_and_rejects_before_normalizatio
 //= docs/parsing-requirements.md#parse-multi-001
 //= type=test
 //# Multipart assembly MUST concatenate payloads for one operation and path in consecutive part-number order starting at 1.
+// This also observes the Ready result after a complete multipart assembly.
+//= docs/parsing-requirements.md#parse-multi-003
+//= type=test
+//# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
 //= docs/parsing-requirements.md#parse-multi-004
 //= type=test
 //# Assembly MUST preserve pending logical-entry state across an empty volume while validating its supported empty-boundary marker shape.
@@ -178,6 +182,29 @@ fn empty_volume_after_nonfinal_part_does_not_complete_logical_entry() {
     // The empty volume preserves the pending part but cannot satisfy its
     // missing final short part.
     assert!(matches!(assembler.finish(), Err(AssemblyError::Incomplete)));
+}
+
+// This test observes Poisoned precedence with a pending entry after a later
+// volume fails; it does not claim the rejected volume was otherwise valid.
+//= docs/parsing-requirements.md#parse-multi-003
+//= type=test
+//# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+#[test]
+fn finish_poisoned_precedes_incomplete_when_pending_entry_remains() {
+    let first = member("multivol_snapshot/file/1", &vec![b'a'; 65536]);
+    let malformed = first[..511].to_vec();
+    let volumes = [first, malformed];
+    let manifest = make_manifest(&volumes, &[("file 1", "file 1"), (".", "file 1")]);
+    let mut assembler = MultipartAssembler::new(&manifest, AssemblyLimits::default()).unwrap();
+
+    assembler
+        .push_stored_volume(1, &volumes[0], Envelope::Plain)
+        .unwrap();
+    assert!(matches!(
+        assembler.push_stored_volume(2, &volumes[1], Envelope::Plain),
+        Err(AssemblyError::Tar(_))
+    ));
+    assert!(matches!(assembler.finish(), Err(AssemblyError::Poisoned)));
 }
 
 //= docs/parsing-requirements.md#parse-multi-002
