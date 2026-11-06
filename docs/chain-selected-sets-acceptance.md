@@ -1,7 +1,7 @@
 # Selected chain-set adapter acceptance plan
 
-Status: specification accepted after independent review; implementation is
-pending.
+Status: accepted after independent specification, verifier, and implementation
+review; hosted Linux assurance and Duvet Pages pass in run 42181068479.
 
 ## Goal and scope
 
@@ -88,9 +88,11 @@ a native-tested boundary. In that case, do not claim a Verus proof of
   or source provenance requirements.
 - Add/update targeted Duvet queries and run `cargo xtask trace-update` and
   `cargo xtask trace`; review the resulting requirement-to-evidence links.
-- Run the focused Verus proof/test, focused `duplicity-core` chain tests,
-  formatting, strict Clippy, and full `cargo xtask ci`. Require hosted Linux
-  assurance and Duvet Pages publication before marking the acceptance complete.
+- Local focused evidence passed: chain tests (7/7), the focused Verus accessor
+  proof (one verified obligation, zero errors), targeted CHAIN-001/-002 Duvet
+  queries, full Duvet trace, formatting, strict Clippy, and diff check. Hosted
+  Linux `cargo xtask ci` and Duvet Pages passed in
+  [run 42181068479](https://github.com/ajrudzitis/duplinaut/actions/runs/42181068479).
 - Independent verifier review MUST check model independence and index bounds.
   Independent implementation review MUST check the adapter preserves exact
   source references/order and that private construction remains the only way
@@ -108,14 +110,14 @@ source complete-core acceptance.
 
 ## Checklist
 
-- [ ] Specify and verify the independent selected-index-to-descriptor model
+- [x] Specify and verify the independent selected-index-to-descriptor model
       and checked position boundary.
-- [ ] Test `sets()` exact count, order, and original-reference identity for
+- [x] Test `sets()` exact count, order, and original-reference identity for
       full-only and nontrivial multi-hop plans.
-- [ ] Preserve existing chain-selection failure tests and confirm invalid
+- [x] Preserve existing chain-selection failure tests and confirm invalid
       plans do not expose a selected-set adapter.
-- [ ] Duvet links/queries, trace, formatting, strict Clippy, focused/full CI,
-      hosted Linux assurance, and Duvet Pages pass.
+- [x] Local focused tests, Verus, Duvet, formatting, and strict Clippy pass;
+      hosted Linux assurance and Duvet Pages pass in run 42181068479.
 - [x] Independent specification review accepts the scoped plan.
-- [ ] Independent verifier and implementation reviews accept the scoped
+- [x] Independent verifier and implementation reviews accept the scoped
       evidence.

@@ -1,7 +1,7 @@
 # Empty-volume multipart state acceptance plan
 
-Status: specification accepted after independent review; implementation is
-pending.
+Status: implementation, formal proof, local tests, and independent review are
+complete; hosted Linux assurance and Duvet Pages are pending.
 
 ## Goal and implementation prerequisite
 
@@ -107,8 +107,13 @@ boundary equality.
   completion condition, not full container or reader completion proof.
 - Run focused Verus obligations and focused multipart tests, targeted Duvet
   queries, `cargo xtask trace-update`, `cargo xtask trace`, formatting, strict
-  Clippy, and full `cargo xtask ci`. Require hosted Linux assurance and Duvet
-  Pages publication before marking this acceptance complete.
+  Clippy, and full `cargo xtask ci`. Local implementation, focused/full tests,
+  Verus, Duvet, formatting, strict Clippy, and independent verifier/implementation
+  reviews passed at commit `a3ac918`, source SHA-256
+  `767914182c1dbb51001ec7bb3f655b8fa02f9c729a06facd867fbdbeb0982e3e`.
+  Hosted Linux assurance and Duvet Pages remain pending in
+  [run 42187054602](https://github.com/ajrudzitis/duplinaut/actions/runs/42187054602);
+  do not mark overall acceptance complete until both hosted gates pass.
 - Independent verifier review MUST check the model against the project
   `Boundary`/`BackupPath` types, initial/previous-boundary cases, and the
   pending block relation. Independent implementation review MUST confirm the
@@ -129,15 +134,18 @@ profile.
 
 - [x] Hosted Linux assurance and Duvet Pages prerequisite gates for required-
       volume identity and selected-set adapter pass in run 42181068479.
-- [ ] Verify the empty-volume boundary admission model and project-type
+- [x] Verify the empty-volume boundary admission model and project-type
       refinement.
-- [ ] Test initial empty acceptance, pending-state preservation across an
+- [x] Test initial empty acceptance, pending-state preservation across an
       empty volume, non-completion without a final part, and malformed
       boundaries.
-- [ ] Preserve official multipart and queued-restart oracle/regression tests.
-- [ ] Duvet links/queries, trace, formatting, strict Clippy, focused/full CI,
-      hosted Linux assurance, and Duvet Pages pass.
+- [x] Preserve official multipart and queued-restart oracle/regression tests.
+- [x] Local Duvet links/queries and trace, formatting, strict Clippy,
+      focused/full tests, full `cargo xtask ci`, and independent verifier and
+      implementation reviews pass at commit `a3ac918` (source SHA-256
+      `767914182c1dbb51001ec7bb3f655b8fa02f9c729a06facd867fbdbeb0982e3e`).
+- [ ] Hosted Linux assurance and Duvet Pages pass in run 42187054602.
 - [x] Independent specification review accepts this scope before
       implementation.
-- [ ] Independent verifier and implementation reviews accept the evidence
-      before completion.
+- [x] Independent verifier and implementation reviews accept the local
+      evidence; hosted completion remains pending.

@@ -1,7 +1,7 @@
 # Required-volume identity acceptance plan
 
-Status: specification accepted after independent review; implementation is
-pending.
+Status: accepted after independent specification, verifier, and implementation
+review; local full CI and hosted Linux assurance/Duvet Pages pass.
 
 ## Goal and scope
 
@@ -116,9 +116,12 @@ wrong-field cases.
   validation.
 - Run the focused Verus test/obligations and reader integration test, targeted
   Duvet queries, `cargo xtask trace-update`, `cargo xtask trace`, formatting,
-  strict Clippy, and the full `cargo xtask ci` gate. Require hosted Linux
-  assurance and Duvet Pages publication before marking the acceptance
-  complete.
+  strict Clippy, and the full `cargo xtask ci` gate. Local full CI passed with
+  source SHA-256
+  `d4d2728…`; hosted Linux assurance and Duvet Pages passed in descendant
+  [run 42181068479](https://github.com/ajrudzitis/duplinaut/actions/runs/42181068479).
+  The PTY stability fix in `b6cf3c6` is a separate follow-up and is not part of
+  this core predicate proof.
 - Independent review MUST confirm the actual production scan calls the
   verified helper with unmodified project identity fields, every predicate
   clause is present in model and implementation, envelope policy stays
@@ -136,14 +139,15 @@ refinement.
 
 ## Checklist
 
-- [ ] Specify the project-type identity predicate and prove exact model
+- [x] Specify the project-type identity predicate and prove exact model
       equivalence for full and incremental required volumes.
-- [ ] Exercise both positive cases and individual kind/interval/ordinal and
+- [x] Exercise both positive cases and individual kind/interval/ordinal and
       partial-status negative cases in Verus/native tests.
-- [ ] Strengthen the existing missing-vol2 integration case with an explicit
+- [x] Strengthen the existing missing-vol2 integration case with an explicit
       vol3-retained assertion and exact `MissingVolume { number: 2 }` result.
-- [ ] Duvet trace, formatting, strict Clippy, focused/full tests, hosted Linux
-      assurance, and Duvet Pages pass.
+- [x] Focused/full tests, Duvet trace, formatting, strict Clippy, and local
+      full `cargo xtask ci` pass; hosted Linux assurance and Duvet Pages pass
+      in run 42181068479.
 - [x] Independent specification review accepts the scoped evidence.
-- [ ] Independent implementation review accepts the production refinement
+- [x] Independent implementation review accepts the production refinement
       and test evidence.

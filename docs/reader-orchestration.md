@@ -73,8 +73,10 @@ existing integration tests exercise the exact object-check boundary.
 This checkpoint is linked to [PARSE-GEN-005](parsing-requirements.md#parse-gen-005) and
 [PARSE-CHAIN-002](parsing-requirements.md#parse-chain-002). It proves one
 per-object budget transition only. It does not prove the enclosing nested scan,
-volume identity predicate, cancellation timing, global resource accounting,
-allocator behavior, or complete repository reader. Independent review accepted
+the call-site ordering of all volume checks, cancellation timing, global
+resource accounting, allocator behavior, or complete repository reader. The
+required-volume identity predicate has a separate accepted proof in
+[the volume identity record](reader-volume-identity-acceptance.md). Independent review accepted
 candidate `dd0ca3e`, and the exact-source full `cargo xtask ci` gate passed with
 source SHA-256 `5c9428d96d7d8d0fa5548a9cbda82e8d79b4d7d27c849acd85a13cb532631087`.
 The README milestone stays unchecked because the surrounding controller and
@@ -92,10 +94,11 @@ covered by integration tests; a direct transition test covers the exact limit
 and duplicate cases.
 
 These contracts prove the budget-before-predicate call and one-step candidate
-accumulation only. They do not prove that enumeration visits each object once
-or in order, that the native object-identity predicate is correct, cancellation
-timing, the entire nested matcher, or global resource accounting. The
-reader-volume-scan assurance milestone remains `proved=false`; complete reader
+accumulation only. The native required-volume identity predicate is separately
+refined in [the volume identity acceptance](reader-volume-identity-acceptance.md).
+These scan contracts do not prove that enumeration visits each object once or
+in order, cancellation timing, the entire nested matcher, or global resource
+accounting. The reader-volume-scan assurance milestone remains `proved=false`; complete reader
 orchestration remains unproved. Independent review accepted candidate
 `414bc04`, and exact-source `cargo xtask ci` passed with source SHA-256
 `ba779ed291613a2fbf65f9f8a240221f45ad2e239fe72813ce40fa9d94d3b9e8`. Verus
@@ -139,9 +142,10 @@ skipped, reordered, repeated, or extra positions; the official reader test
 covers preserved successful scan behavior and the exact/short work budget.
 
 The proof covers the cursor transition and the production gates only. It does
-not prove Rust iterator semantics, that the native identity predicate is
-correct, cancellation timing, the entire reader controller, or global resource
-accounting. The `reader-volume-scan-cursor` milestone remains unproved. The
+not prove Rust iterator semantics, cancellation timing, the entire reader
+controller, or global resource accounting. Required-volume identity is covered
+separately by [its accepted proof](reader-volume-identity-acceptance.md). The
+`reader-volume-scan-cursor` milestone remains unproved. The
 candidate `f1b7244` was independently accepted, and exact-source `cargo xtask
 ci` passed with source SHA-256
 `e32ccd5939de104017c8fdfb7a83f9cf597166868b0d5d725000bb625a776c35`. Verus,
@@ -402,8 +406,8 @@ links to [PARSE-GEN-005](parsing-requirements.md#parse-gen-005) and
 [PARSE-CHAIN-002](parsing-requirements.md#parse-chain-002).
 
 This is a bounded publication-progress contract. It does not prove ChainPlan
-selection or Rust iterator semantics, per-object volume matching correctness,
-cancellation races/timing, or complete reader-controller refinement. The
+selection or Rust iterator semantics, complete composition of per-volume scans
+into the reader result, cancellation races/timing, or complete reader-controller refinement.
 This checkpoint does not complete the reader proof. Candidate `66c777f` was
 independently accepted, and exact-source `cargo xtask ci` passed with SHA-256
 `f645b1e4b04efe51b22ab08f6645c9e9981893ee2d578151972b0cc26fc38b3e`. Verus
