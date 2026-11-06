@@ -725,6 +725,129 @@ fn official_partial_first_incremental_manifest_leaves_missing_chain_transition()
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=test
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+#[test]
+fn official_pkcs7_first_incremental_manifest_is_visible_but_leaves_missing_transition() {
+    const ORIGINAL: &str = "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest";
+    const UNSUPPORTED: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest.p7m";
+
+    let mut source = Source::official();
+    assert_eq!(source.objects.len(), 12);
+    let original_inventory = source.objects.clone();
+    let mut expected_keys = original_inventory
+        .iter()
+        .map(|(object, _)| object.key.clone())
+        .collect::<Vec<_>>();
+    expected_keys.sort();
+    let (original_manifest, original_manifest_bytes) = source
+        .objects
+        .iter()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .map(|(object, bytes)| (object.clone(), bytes.clone()))
+        .expect("official fixture contains the first incremental manifest");
+    let (renamed_manifest, renamed_manifest_bytes) = source
+        .objects
+        .iter_mut()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .expect("official fixture contains the first incremental manifest");
+    renamed_manifest.key = UNSUPPORTED.into();
+    assert_eq!(renamed_manifest_bytes, &original_manifest_bytes);
+    assert_eq!(renamed_manifest.size, original_manifest.size);
+    assert_eq!(renamed_manifest.identity, original_manifest.identity);
+
+    let old_key = expected_keys
+        .iter_mut()
+        .find(|key| key.as_str() == ORIGINAL)
+        .expect("original inventory contains the first incremental manifest");
+    *old_key = UNSUPPORTED.into();
+    expected_keys.sort();
+    let mut actual_keys = source
+        .objects
+        .iter()
+        .map(|(object, _)| object.key.clone())
+        .collect::<Vec<_>>();
+    actual_keys.sort();
+    assert_eq!(actual_keys, expected_keys);
+    assert_eq!(source.objects.len(), 12);
+    for (original_object, original_bytes) in &original_inventory {
+        let expected_key = if original_object.key == ORIGINAL {
+            UNSUPPORTED
+        } else {
+            original_object.key.as_str()
+        };
+        let (actual_object, actual_bytes) = source
+            .objects
+            .iter()
+            .find(|(object, _)| object.key == expected_key)
+            .expect("each original object remains under its expected key");
+        let mut expected_object = original_object.clone();
+        expected_object.key = expected_key.into();
+        assert_eq!(actual_object, &expected_object);
+        assert_eq!(actual_bytes, original_bytes);
+    }
+
+    let catalog = discover(&source);
+    let unsupported_entry = catalog
+        .objects()
+        .iter()
+        .find(|entry| entry.object().key == UNSUPPORTED)
+        .expect("renamed unsupported manifest remains visible in discovery");
+    let unsupported_name = unsupported_entry.name().expect("key is parsed");
+    assert_eq!(
+        unsupported_name.kind,
+        duplicity_core::names::ObjectKind::IncrementalManifest
+    );
+    assert_eq!(
+        (unsupported_name.start.0, unsupported_name.end.0),
+        (1700000000, 1700086400)
+    );
+    assert_eq!(
+        unsupported_name.envelope,
+        duplicity_core::names::Envelope::Pkcs7
+    );
+    assert_eq!(
+        unsupported_entry.status(),
+        DiscoveryStatus::UnsupportedEnvelope
+    );
+
+    let descriptors = catalog.manifests().collect::<Vec<_>>();
+    assert_eq!(descriptors.len(), 2);
+    let mut intervals = descriptors
+        .iter()
+        .map(|(_, _, descriptor)| {
+            (
+                match descriptor.kind() {
+                    SetKind::Full => 0,
+                    SetKind::Incremental => 1,
+                },
+                descriptor.start().0,
+                descriptor.end().0,
+            )
+        })
+        .collect::<Vec<_>>();
+    intervals.sort_unstable();
+    assert_eq!(
+        intervals,
+        vec![(0, 1700000000, 1700000000), (1, 1700086400, 1700172800)]
+    );
+    let (full_index, _, full_descriptor) = descriptors
+        .iter()
+        .find(|(_, _, descriptor)| descriptor.kind() == SetKind::Full)
+        .expect("the completed full manifest remains a public anchor");
+    assert_eq!(full_descriptor.start().0, 1700000000);
+    assert_eq!(full_descriptor.end().0, 1700000000);
+    assert!(matches!(
+        catalog.read_snapshot(*full_index, Timestamp(1700172800), &Cancellation::default()),
+        Err(ReaderError::Chain(ChainError::Missing))
+    ));
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 //= docs/parsing-requirements.md#parse-chain-001
 //= type=test
 //# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
