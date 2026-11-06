@@ -2,7 +2,7 @@
 //! metadata-only; successful reads retain explicit envelope/authentication
 //! observations but do not prove external signer validity or publish files.
 //! Whole-reader controller refinement is pending.
-use crate::chain::{ChainError, ChainLimits, ChainPlan, DescriptorError, SetDescriptor, SetKind};
+use crate::chain::{ChainError, ChainLimits, ChainPlan, DescriptorError, SetDescriptor};
 use crate::envelope::{decode_metadata, EnvelopeError, EnvelopeLimits};
 use crate::manifest::{Manifest, ManifestError, ManifestLimits};
 use crate::multipart::{AssemblyError, AssemblyLimits, MultipartAssembler};
@@ -36,8 +36,9 @@ use crate::verified::reader_completion::{
     start_set_completion,
 };
 use crate::verified::reader_volume_scan::{
-    advance_volume_scan_cursor, charge_volume_object, record_volume_candidate, reserve_volume_scan,
-    start_volume_scan_cursor, volume_scan_cursor_complete, VolumeScan, VolumeScanError,
+    advance_volume_scan_cursor, charge_volume_object, record_volume_candidate,
+    required_volume_identity_matches, reserve_volume_scan, start_volume_scan_cursor,
+    volume_scan_cursor_complete, VolumeScan, VolumeScanError,
 };
 pub use pgp::types::Password as OpenPgpPassword;
 use std::io::Read;
@@ -838,15 +839,7 @@ impl<'a> Catalog<'a> {
                         VolumeScanError::Duplicate => ReaderError::DuplicateArtifact,
                     })?;
                     let matches = object.name.is_some_and(|volume| {
-                        volume.completed()
-                            && volume.start == descriptor.start()
-                            && volume.end == descriptor.end()
-                            && volume.volume == Some(record.number)
-                            && matches!(
-                                (descriptor.kind(), volume.kind),
-                                (SetKind::Full, ObjectKind::FullVolume)
-                                    | (SetKind::Incremental, ObjectKind::IncrementalVolume)
-                            )
+                        required_volume_identity_matches(volume, descriptor, record.number)
                     });
                     scan =
                         record_volume_candidate(charged, matches).map_err(|error| match error {

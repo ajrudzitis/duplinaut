@@ -101,14 +101,18 @@ fn take_dot_field<'a>(remaining: &mut Option<&'a [u8]>) -> (field: Option<&'a [u
                 reveal(optional_body_field_model);
                 reveal(body_field_split_model);
                 reveal(dot_field_boundary_model);
-                assert(body_field_split_model(
-                    Some(input@),
-                    Some(field@),
-                    match rest {
-                        Some(bytes) => Some(bytes@),
-                        None => None,
-                    },
-                ));
+                match rest {
+                    Some(bytes) => assert(body_field_split_model(
+                        Some(input@),
+                        Some(field@),
+                        Some(bytes@),
+                    )),
+                    None => assert(body_field_split_model(
+                        Some(input@),
+                        Some(field@),
+                        None,
+                    )),
+                }
             }
             *remaining = rest;
             Some(field)

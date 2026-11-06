@@ -1,4 +1,8 @@
 //! Budget-before-inspection and unique-candidate transitions for volume scans.
+use crate::chain::{SetDescriptor, SetKind};
+#[cfg(verus_keep_ghost)]
+use crate::names::Envelope;
+use crate::names::{ObjectKind, ObjectName};
 use crate::verified::reader_accounting::charge_object_check;
 use vstd::prelude::*;
 
@@ -35,6 +39,66 @@ pub struct VolumeScanCursor {
     pub object_count: usize,
     pub planned_positions: usize,
     pub next_position: usize,
+}
+
+/// Fieldwise model for one already-parsed catalog name and one required
+/// manifest volume. Name parsing, manifest parsing, source identity, and later
+/// envelope handling are outside this predicate.
+pub open spec fn required_volume_identity_model(
+    name: ObjectName,
+    descriptor: SetDescriptor,
+    required_volume: u64,
+) -> bool {
+    !name.partial
+        && name.envelope != Envelope::Pkcs7
+        && name.start.0 == descriptor.start_value().0
+        && name.end.0 == descriptor.end_value().0
+        && name.volume == Some(required_volume)
+        && match (descriptor.kind_value(), name.kind) {
+            (SetKind::Full, ObjectKind::FullVolume)
+            | (SetKind::Incremental, ObjectKind::IncrementalVolume) => true,
+            _ => false,
+        }
+}
+
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=implementation
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+//= docs/parsing-requirements.md#parse-name-005
+//= type=implementation
+//# Objects marked partial MUST be excluded from completed restore sets.
+/// Match an already-parsed object name to the exact required manifest volume.
+/// The name's envelope is not otherwise part of identity; `completed()` only
+/// excludes partial and PKCS#7 names. Authentication and decoding occur later.
+pub fn required_volume_identity_matches(
+    name: ObjectName,
+    descriptor: SetDescriptor,
+    required_volume: u64,
+) -> (result: bool)
+    ensures result == required_volume_identity_model(name, descriptor, required_volume),
+{
+    let completed = name.completed();
+    let start_matches = name.start.0 == descriptor.start().0;
+    let end_matches = name.end.0 == descriptor.end().0;
+    let ordinal_matches = name.volume == Some(required_volume);
+    let kind_matches = matches!(
+        (descriptor.kind(), name.kind),
+        (SetKind::Full, ObjectKind::FullVolume)
+            | (SetKind::Incremental, ObjectKind::IncrementalVolume)
+    );
+    let result = completed && start_matches && end_matches && ordinal_matches && kind_matches;
+    proof {
+        reveal(required_volume_identity_model);
+        assert(completed == (!name.partial && name.envelope != Envelope::Pkcs7));
+        assert(start_matches == (name.start.0 == descriptor.start_value().0));
+        assert(end_matches == (name.end.0 == descriptor.end_value().0));
+        assert(kind_matches == match (descriptor.kind_value(), name.kind) {
+            (SetKind::Full, ObjectKind::FullVolume)
+            | (SetKind::Incremental, ObjectKind::IncrementalVolume) => true,
+            _ => false,
+        });
+    }
+    result
 }
 
 pub open spec fn reserve_volume_scan_model(
@@ -283,9 +347,179 @@ pub fn record_volume_candidate(
 mod tests {
     use super::{
         advance_volume_scan_cursor, charge_volume_object, record_volume_candidate,
-        reserve_volume_scan, start_volume_scan_cursor, volume_scan_cursor_complete, VolumeScan,
-        VolumeScanError, VolumeScanReservation,
+        required_volume_identity_matches, reserve_volume_scan, start_volume_scan_cursor,
+        volume_scan_cursor_complete, VolumeScan, VolumeScanError, VolumeScanReservation,
     };
+    use crate::chain::{SetDescriptor, SetKind};
+    use crate::names::{Envelope, ObjectKind, ObjectName, Timestamp};
+
+    fn volume_name(
+        kind: ObjectKind,
+        start: i128,
+        end: i128,
+        volume: u64,
+        envelope: Envelope,
+        partial: bool,
+    ) -> ObjectName {
+        ObjectName {
+            kind,
+            start: Timestamp(start),
+            end: Timestamp(end),
+            volume: Some(volume),
+            envelope,
+            partial,
+            short: false,
+        }
+    }
+
+    fn descriptor(kind: SetKind, start: i128, end: i128) -> SetDescriptor {
+        let name = ObjectName {
+            kind: match kind {
+                SetKind::Full => ObjectKind::FullManifest,
+                SetKind::Incremental => ObjectKind::IncrementalManifest,
+            },
+            start: Timestamp(start),
+            end: Timestamp(end),
+            volume: None,
+            envelope: Envelope::Plain,
+            partial: false,
+            short: false,
+        };
+        SetDescriptor::from_manifest_name(name).unwrap()
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-chain-002
+    //= type=test
+    //# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+    //= docs/parsing-requirements.md#parse-name-005
+    //= type=test
+    //# Objects marked partial MUST be excluded from completed restore sets.
+    fn required_volume_identity_matches_exact_project_fields() {
+        let full = descriptor(SetKind::Full, 100, 100);
+        let full_name = volume_name(ObjectKind::FullVolume, 100, 100, 3, Envelope::Plain, false);
+        assert!(required_volume_identity_matches(full_name, full, 3));
+
+        // Each supported envelope retains the same post-parse identity rule.
+        for envelope in [Envelope::Plain, Envelope::Gzip, Envelope::OpenPgp] {
+            assert!(required_volume_identity_matches(
+                volume_name(ObjectKind::FullVolume, 100, 100, 3, envelope, false),
+                full,
+                3
+            ));
+        }
+
+        // Isolated full-set field mismatches: kind, start, end, and ordinal.
+        assert!(!required_volume_identity_matches(
+            volume_name(
+                ObjectKind::IncrementalVolume,
+                100,
+                100,
+                3,
+                Envelope::Plain,
+                false
+            ),
+            full,
+            3
+        ));
+        assert!(!required_volume_identity_matches(
+            volume_name(ObjectKind::FullVolume, 99, 100, 3, Envelope::Plain, false),
+            full,
+            3
+        ));
+        assert!(!required_volume_identity_matches(
+            volume_name(ObjectKind::FullVolume, 100, 101, 3, Envelope::Plain, false),
+            full,
+            3
+        ));
+        assert!(!required_volume_identity_matches(
+            volume_name(ObjectKind::FullVolume, 100, 100, 4, Envelope::Plain, false),
+            full,
+            3
+        ));
+
+        let incremental = descriptor(SetKind::Incremental, 100, 120);
+        assert!(required_volume_identity_matches(
+            volume_name(
+                ObjectKind::IncrementalVolume,
+                100,
+                120,
+                7,
+                Envelope::Plain,
+                false
+            ),
+            incremental,
+            7
+        ));
+        for envelope in [Envelope::Plain, Envelope::Gzip, Envelope::OpenPgp] {
+            assert!(required_volume_identity_matches(
+                volume_name(ObjectKind::IncrementalVolume, 100, 120, 7, envelope, false),
+                incremental,
+                7
+            ));
+        }
+
+        // Isolated incremental-set field mismatches: kind, start, end, ordinal.
+        assert!(!required_volume_identity_matches(
+            volume_name(ObjectKind::FullVolume, 100, 120, 7, Envelope::Plain, false),
+            incremental,
+            7
+        ));
+        assert!(!required_volume_identity_matches(
+            volume_name(
+                ObjectKind::IncrementalVolume,
+                99,
+                120,
+                7,
+                Envelope::Plain,
+                false
+            ),
+            incremental,
+            7
+        ));
+        assert!(!required_volume_identity_matches(
+            volume_name(
+                ObjectKind::IncrementalVolume,
+                100,
+                121,
+                7,
+                Envelope::Plain,
+                false
+            ),
+            incremental,
+            7
+        ));
+        assert!(!required_volume_identity_matches(
+            volume_name(
+                ObjectKind::IncrementalVolume,
+                100,
+                120,
+                8,
+                Envelope::Plain,
+                false
+            ),
+            incremental,
+            7
+        ));
+
+        assert!(!required_volume_identity_matches(
+            volume_name(ObjectKind::FullVolume, 100, 100, 3, Envelope::Plain, true),
+            full,
+            3
+        ));
+        assert!(!required_volume_identity_matches(
+            volume_name(
+                ObjectKind::IncrementalVolume,
+                100,
+                120,
+                7,
+                Envelope::Gzip,
+                true
+            ),
+            incremental,
+            7
+        ));
+    }
 
     #[test]
     //= docs/parsing-requirements.md#parse-gen-005

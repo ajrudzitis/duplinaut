@@ -286,11 +286,17 @@ fn identity_cancellation_and_exact_body_failures_publish_no_snapshot() {
 }
 
 #[test]
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=test
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
 fn missing_corrupt_and_ambiguous_objects_fail_explicitly() {
     let mut missing = Source::official();
     missing.objects.retain(|(object, _)| {
         !object.key.ends_with("vol2.difftar.gz") || !object.key.contains("full")
     });
+    assert!(missing.objects.iter().any(|(object, _)| {
+        object.key.contains("full") && object.key.ends_with("vol3.difftar.gz")
+    }));
     let catalog = discover(&missing);
     assert!(matches!(
         catalog.read_snapshot(
