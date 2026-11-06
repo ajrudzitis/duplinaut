@@ -1,7 +1,7 @@
 # Multipart representation-kind guard acceptance plan
 
-Status: proposed; specification only. Independent specification review,
-implementation, and verification are pending.
+Status: local implementation, proof, tests, Duvet, full CI, and independent
+review are complete; hosted Linux assurance and Duvet Pages are pending.
 
 ## Goal and scope
 
@@ -99,10 +99,13 @@ outside this two-Boolean proof and remains a call-site review obligation.
 - Add the helper and relevant test evidence to the `multipart-assembly`
   mapping in `docs/assurance.toml`. This does not accept the full multipart
   controller milestone.
-- Run focused Verus obligations and multipart tests, targeted Duvet queries,
+- Focused Verus obligations and multipart tests, targeted Duvet queries,
   `cargo xtask trace-update`, `cargo xtask trace`, formatting, strict Clippy,
-  full `cargo xtask ci`, hosted Linux assurance, and Duvet Pages before marking
-  this acceptance complete.
+  and full local `cargo xtask ci` passed at commit `8683482`, source SHA-256
+  `82eeac51e83c99f78b9fecfc918353ff7535eb3ae3c2d2947250e03e6503e18f`.
+  Independent specification and implementation reviews are complete. Hosted
+  Linux assurance and Duvet Pages remain pending; do not mark overall
+  acceptance complete until both hosted gates pass.
 - Independent verifier review MUST check each truth-table case and the
   Boolean marker semantics. Independent implementation review MUST confirm that the
   production helper is called at only the two stated branch decisions and
@@ -121,12 +124,15 @@ supported backup-set profile stated by PARSE-MULTI-006.
 
 ## Checklist
 
-- [ ] Specify and prove the six-case Boolean marker/kind decision.
-- [ ] Exercise all six helper rows and production mixed/repeated multipart
+- [x] Specify and prove the six-case Boolean marker/kind decision.
+- [x] Exercise all six helper rows and production mixed/repeated multipart
       rejection cases with exact error assertions.
-- [ ] Preserve first-use and repeated-ordinary production behavior and all
+- [x] Preserve first-use and repeated-ordinary production behavior and all
       existing multipart regressions.
-- [ ] Duvet mapping/queries, trace, formatting, strict Clippy, focused/full CI,
-      hosted Linux assurance, and Duvet Pages pass.
-- [ ] Independent specification, verifier, and implementation reviews accept
-      the scoped evidence.
+- [x] Local Duvet mapping/queries and trace, formatting, strict Clippy,
+      focused/full tests, and full `cargo xtask ci` pass at commit `8683482`
+      with source SHA-256
+      `82eeac51e83c99f78b9fecfc918353ff7535eb3ae3c2d2947250e03e6503e18f`.
+- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [x] Independent specification and implementation reviews accept the local
+      evidence.

@@ -1,7 +1,7 @@
 # Multipart final-publication gate acceptance plan
 
-Status: local implementation, proof, tests, Duvet, and independent reviews are
-complete; hosted Linux assurance and Duvet Pages are pending.
+Status: accepted. Local and hosted Linux assurance, Duvet Pages, and
+independent review are complete for this scoped finish-gate slice.
 
 ## Goal and scope
 
@@ -92,7 +92,10 @@ pending entry may produce `Ready`.
   and full local `cargo xtask ci` passed at commit `0ac14ef`, source SHA-256
   `5f2cc41ebb4255096e10e1d2b217a1e83bf75e56ec5ffd08a221bf607a0e9002`.
   Independent specification, verifier, and implementation reviews are
-  complete. Hosted Linux assurance and Duvet Pages remain pending.
+  complete. Hosted Linux assurance and Duvet Pages passed in
+  [run 42191678687](https://github.com/ajrudzitis/duplinaut/actions/runs/42191678687).
+  This accepts only the finish-gate decision; full multipart-controller
+  refinement remains open.
 - Independent verifier review MUST check all eight model combinations and
   exact precedence. Independent implementation review MUST check that the
   production `finish()` calls the helper and only constructs an archive on
@@ -119,6 +122,7 @@ final three-condition decision over supplied boolean observations.
       focused/full tests, and full `cargo xtask ci` pass at commit `0ac14ef`
       with source SHA-256
       `5f2cc41ebb4255096e10e1d2b217a1e83bf75e56ec5ffd08a221bf607a0e9002`.
-- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [x] Hosted Linux assurance and Duvet Pages pass in
+      [run 42191678687](https://github.com/ajrudzitis/duplinaut/actions/runs/42191678687).
 - [x] Independent specification, verifier, and implementation reviews accept
       the scoped evidence.
