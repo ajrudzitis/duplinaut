@@ -10,7 +10,7 @@ use nix::{
 use rustix::io::{fcntl_setfd, FdFlags};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs::{self, File},
     io::Read,
     os::{
@@ -326,21 +326,7 @@ fn frame_at_pty_geometry(screen: &str) -> bool {
         && bottom.ends_with('┘')
 }
 
-fn assert_matches_oracle(root: &Path, oracle_entries: &[serde_json::Value]) {
-    assert_eq!(oracle_entries.len(), 21);
-    let expected_payload: u64 = oracle_entries
-        .iter()
-        .filter(|entry| entry["kind"] == "file")
-        .map(|entry| entry["size"].as_u64().expect("file size"))
-        .sum();
-    assert_eq!(expected_payload, 2_621_564);
-    let expected = expected_tree(oracle_entries);
-    assert_eq!(
-        expected.len(),
-        oracle_entries.len(),
-        "oracle paths are unique"
-    );
-
+fn assert_matches_expected_tree(root: &Path, expected: BTreeMap<Vec<Vec<u8>>, &serde_json::Value>) {
     let mut actual = BTreeMap::new();
     observe_tree(root, &mut Vec::new(), &mut actual);
     assert_eq!(
@@ -403,6 +389,49 @@ fn assert_matches_oracle(root: &Path, oracle_entries: &[serde_json::Value]) {
             );
         }
     }
+}
+
+fn assert_matches_oracle(root: &Path, oracle_entries: &[serde_json::Value]) {
+    assert_eq!(oracle_entries.len(), 21);
+    let expected_payload: u64 = oracle_entries
+        .iter()
+        .filter(|entry| entry["kind"] == "file")
+        .map(|entry| entry["size"].as_u64().expect("file size"))
+        .sum();
+    assert_eq!(expected_payload, 2_621_564);
+    let expected = expected_tree(oracle_entries);
+    assert_eq!(
+        expected.len(),
+        oracle_entries.len(),
+        "oracle paths are unique"
+    );
+    assert_matches_expected_tree(root, expected);
+}
+
+fn assert_matches_oracle_subset(
+    root: &Path,
+    oracle_entries: &[serde_json::Value],
+    expected_paths: BTreeSet<Vec<Vec<u8>>>,
+    expected_payload: u64,
+) {
+    let all = expected_tree(oracle_entries);
+    let selected: BTreeMap<_, _> = all
+        .into_iter()
+        .filter(|(components, _)| expected_paths.contains(components))
+        .collect();
+    assert_eq!(
+        selected.keys().cloned().collect::<BTreeSet<_>>(),
+        expected_paths,
+        "all expected raw paths are represented in the official oracle"
+    );
+    assert_eq!(selected.len(), 6, "selected restore oracle has six entries");
+    let payload = selected
+        .values()
+        .filter(|entry| entry["kind"] == "file")
+        .map(|entry| entry["size"].as_u64().expect("oracle file size"))
+        .sum::<u64>();
+    assert_eq!(payload, expected_payload);
+    assert_matches_expected_tree(root, selected);
 }
 
 #[test]
@@ -713,6 +742,411 @@ fn only_marked_raw_file_is_visible(screen: &str) -> bool {
     screen.lines().any(|line| {
         line.contains("* Regular") && line.trim_end_matches([' ', '│']).ends_with("raw-\\xff.bin")
     })
+}
+
+fn has_marked_file(screen: &str, path: &str) -> bool {
+    screen
+        .lines()
+        .any(|line| line.contains("* Regular") && line.trim_end_matches([' ', '│']).ends_with(path))
+}
+
+fn has_unmarked_file(screen: &str, path: &str) -> bool {
+    screen.lines().any(|line| {
+        line.contains("Regular")
+            && !line.contains("* Regular")
+            && line.trim_end_matches([' ', '│']).ends_with(path)
+    })
+}
+
+#[test]
+//= docs/parsing-requirements.md#restore-ui-003
+//= type=test
+//# The frontend MUST present a concrete restoration preview identifying the exact snapshot target, configured parent and new leaf, marked/all selection, included ancestors, resulting entry count, total regular payload bytes, no-replacement policy and supported metadata policy before offering publication confirmation.
+//= docs/parsing-requirements.md#restore-ui-004
+//= type=test
+//# The frontend MUST start at most one restoration operation only when its displayed successful `r` preview receives the exact ASCII acknowledgment `restore` followed by Enter, and MUST clear that acknowledgment and disarm confirmation when its snapshot, roots or destination changes or the user leaves that preview.
+//= docs/parsing-requirements.md#restore-ui-005
+//= type=test
+//# The frontend MUST execute restoration through the adopted native `restore` API with its reviewed limits and profile policy, without implementing its own path extraction, destination replacement, staging cleanup or filesystem eligibility fallback.
+//= docs/parsing-requirements.md#restore-ui-008
+//= type=test
+//# The frontend MUST preserve the backend's published, unpublished and publication-indeterminate outcome distinction, including successful-publication precedence over racing cancellation and all reported cleanup warnings or uncertainty.
+//= docs/parsing-requirements.md#restore-ui-014
+//= type=test
+//# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+fn production_linux_tui_restores_two_marked_roots_with_exact_oracle_subset() {
+    let oracle: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/duplicity-3.0.7/expected.json"
+    ))
+    .expect("parse official source oracle");
+    let final_snapshot = oracle["snapshots"]
+        .as_array()
+        .expect("oracle snapshots")
+        .iter()
+        .find(|snapshot| snapshot["mode"] == "plain" && snapshot["index"] == 2)
+        .expect("final plain snapshot");
+    let oracle_entries = final_snapshot["entries"]
+        .as_array()
+        .expect("final snapshot entries")
+        .clone();
+    let child_path = vec![b"a".to_vec(), b"b".to_vec(), b"child.txt".to_vec()];
+    let sibling_path = vec![b"a!".to_vec(), b"sibling.txt".to_vec()];
+    let all_components: Vec<_> = oracle_entries.iter().map(oracle_components).collect();
+    let mut ordered_components = all_components.clone();
+    ordered_components.sort();
+    let child_index = ordered_components
+        .iter()
+        .position(|components| components == &child_path)
+        .expect("official child path is in the snapshot");
+    let sibling_index = ordered_components
+        .iter()
+        .position(|components| components == &sibling_path)
+        .expect("official sibling path is in the snapshot");
+    assert_eq!(child_index, 3, "fixture row order for a/b/child.txt");
+    assert_eq!(sibling_index, 5, "fixture row order for a!/sibling.txt");
+
+    let expected = expected_tree(&oracle_entries);
+    let child_record = expected.get(&child_path).expect("oracle child file");
+    let sibling_record = expected.get(&sibling_path).expect("oracle sibling file");
+    assert_eq!(child_record["kind"], "file");
+    assert_eq!(child_record["size"].as_u64(), Some(16));
+    assert_eq!(
+        child_record["sha256"].as_str(),
+        Some("0d52c47f7783d2887fc36b0ab7657533cad3b748e12793a13837b19e9ff80965")
+    );
+    assert_eq!(sibling_record["kind"], "file");
+    assert_eq!(sibling_record["size"].as_u64(), Some(12));
+    assert_eq!(
+        sibling_record["sha256"].as_str(),
+        Some("ad319e8ad90014e64d573d16f3594fcf1fe52fe767cea9f4e5caf2b9b17fcd2b")
+    );
+    let expected_paths = BTreeSet::from([
+        Vec::<Vec<u8>>::new(),
+        vec![b"a".to_vec()],
+        vec![b"a".to_vec(), b"b".to_vec()],
+        child_path.clone(),
+        vec![b"a!".to_vec()],
+        sibling_path.clone(),
+    ]);
+
+    let fixture = fs::canonicalize(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7/plain"),
+    )
+    .expect("official plain fixture");
+    let mut source_before = BTreeMap::new();
+    observe_tree(&fixture, &mut Vec::new(), &mut source_before);
+
+    let mut test_tree = TestTree::new();
+    let destination_parent = test_tree.path.join("restore-parent");
+    fs::create_dir(&destination_parent).expect("create destination parent");
+    fs::set_permissions(&destination_parent, fs::Permissions::from_mode(0o700))
+        .expect("restrict destination parent permissions");
+    let destination_name = "selective-two-roots";
+    let destination = destination_parent.join(destination_name);
+    assert!(!destination.exists(), "selective destination starts absent");
+    assert!(fs::read_dir(&destination_parent).unwrap().next().is_none());
+
+    let pty = openpty(
+        Some(&Winsize {
+            ws_row: ROWS,
+            ws_col: COLS,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        }),
+        None,
+    )
+    .expect("open selective restore production PTY");
+    fcntl_setfd(&pty.master, FdFlags::CLOEXEC).expect("make PTY master close-on-exec");
+    let slave = File::from(pty.slave);
+    fcntl_setfd(&slave, FdFlags::CLOEXEC).expect("make parent PTY slave close-on-exec");
+    let original_termios = tcgetattr(&slave).expect("read original PTY termios");
+    let master = File::from(pty.master);
+    let mut command = Command::new("setsid");
+    command
+        .arg("--wait")
+        .arg(env!("CARGO_BIN_EXE_duplicity-tui"))
+        .arg("local")
+        .arg(&fixture)
+        .arg("--restore-parent")
+        .arg(&destination_parent)
+        .arg("--restore-name")
+        .arg(destination_name)
+        .current_dir(&test_tree.path)
+        .env("TERM", "xterm-256color")
+        .env("COLUMNS", COLS.to_string())
+        .env("LINES", ROWS.to_string())
+        .stdin(Stdio::from(slave.try_clone().unwrap()))
+        .stdout(Stdio::from(slave.try_clone().unwrap()))
+        .stderr(Stdio::from(slave.try_clone().unwrap()));
+    let mut child = ChildGuard(
+        command
+            .spawn()
+            .expect("launch production TUI under setsid --wait"),
+    );
+    let mut output = Vec::new();
+    let mut parser = vt100::Parser::new(ROWS, COLS, 0);
+
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "selective restore history",
+        PHASE_TIMEOUT,
+        |screen| {
+            screen.contains(std::str::from_utf8(HISTORY_MARKER).unwrap())
+                && screen.contains("Metadata only. a selects full anchor")
+                && frame_at_pty_geometry(screen)
+        },
+    );
+    assert_ne!(tcgetattr(&slave).unwrap(), original_termios);
+    write(&master, b"a").expect("select full anchor");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "selective restore anchor",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Full anchor selected; choose target then Enter."),
+    );
+    write(&master, b"\x1b[B\x1b[B\r").expect("select final target and request scan");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "selective restore full scan disclosure",
+        PHASE_TIMEOUT,
+        |screen| {
+            screen.contains("Full volume scan required.") && screen.contains("Enter confirms.")
+        },
+    );
+    write(&master, b"\r").expect("confirm required volume scan");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "selective restore validated snapshot",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Validated snapshot: 21 entries, 2621564 payload bytes."),
+    );
+
+    // Snapshot row order is checked against the oracle above. Mark the first
+    // regular file, then the second, and observe exactly those two visible
+    // stars through the live production screen.
+    for _ in 0..child_index {
+        write(&master, b"\x1b[B").expect("navigate to a/b/child.txt");
+    }
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "child file selected",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("a/b/child.txt") && !screen.contains("1 marked roots."),
+    );
+    write(&master, b" ").expect("mark a/b/child.txt");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "first marked root",
+        PHASE_TIMEOUT,
+        |screen| {
+            screen.contains("1 marked roots.")
+                && has_marked_file(screen, "a/b/child.txt")
+                && has_unmarked_file(screen, "a!/sibling.txt")
+        },
+    );
+    for _ in 0..(sibling_index - child_index) {
+        write(&master, b"\x1b[B").expect("navigate to a!/sibling.txt");
+    }
+    write(&master, b" ").expect("mark a!/sibling.txt");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "exactly two marked roots",
+        PHASE_TIMEOUT,
+        |screen| {
+            screen.contains("2 marked roots.")
+                && has_marked_file(screen, "a/b/child.txt")
+                && has_marked_file(screen, "a!/sibling.txt")
+                && screen
+                    .lines()
+                    .filter(|line| line.contains("* Regular"))
+                    .count()
+                    == 2
+        },
+    );
+
+    write(&master, b"r").expect("request selective executable preview");
+    let parent_text = destination_parent.display().to_string();
+    let expected_roots_visible = |screen: &str| {
+        screen.contains("Snapshot target: 1700172800")
+            && screen.contains("Scope: marked roots")
+            && screen.contains("Root: a/b/child.txt")
+            && screen.contains("Root: a!/sibling.txt")
+            && screen.contains("Entries: 6")
+            && screen.contains("Regular payload bytes: 28")
+            && screen.contains("Include exact source directory ancestors; no flattening.")
+            && screen.contains("Acknowledgment [] ready")
+    };
+    let saw_empty_unarmed = wait_preview_and_observe_initial_unarmed_ack(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        expected_roots_visible,
+    );
+    assert!(
+        saw_empty_unarmed,
+        "selective preview began empty and unarmed"
+    );
+    let mut saw_parent = false;
+    let mut saw_leaf = false;
+    let mut saw_no_replace = false;
+    let mut saw_backend_check = false;
+    let mut saw_mode_metadata = false;
+    let mut saw_scope_summary = false;
+    for step in 0..8 {
+        let screen = parser.screen().contents();
+        saw_parent |= screen.contains(&format!("Requested parent: {parent_text}"));
+        saw_leaf |= screen.contains(&format!("New destination leaf: {destination_name}"));
+        saw_no_replace |= screen.contains("Atomic no-replacement publication");
+        saw_backend_check |= screen.contains("Backend checks parent policy/filesystem");
+        saw_mode_metadata |= screen.contains(
+            "Preserves ordinary modes, supported exact modification times and raw symlink target bytes.",
+        );
+        saw_scope_summary |= expected_roots_visible(screen);
+        if saw_parent
+            && saw_leaf
+            && saw_no_replace
+            && saw_backend_check
+            && saw_mode_metadata
+            && saw_scope_summary
+        {
+            break;
+        }
+        let previous = screen;
+        write(&master, b"\x1b[B").expect("scroll selective preview details");
+        wait_screen(
+            &master,
+            &mut child,
+            &mut output,
+            &mut parser,
+            "selective preview details",
+            PHASE_TIMEOUT,
+            |screen| screen != previous,
+        );
+        assert!(
+            step < 7,
+            "preview scroll reached its bound before all fields"
+        );
+    }
+    assert!(saw_parent, "preview shows the requested parent");
+    assert!(saw_leaf, "preview shows the requested leaf");
+    assert!(saw_no_replace, "preview shows no-replacement behavior");
+    assert!(saw_backend_check, "preview shows backend validation caveat");
+    assert!(saw_mode_metadata, "preview shows metadata fidelity policy");
+    assert!(
+        saw_scope_summary,
+        "preview showed both roots and six-entry summary"
+    );
+    let preview_screen = parser.screen().contents();
+    assert!(preview_screen.contains("Restore preview / outcome / Up-Down scroll"));
+    assert!(preview_screen.contains("Acknowledgment [] ready"));
+    assert!(!destination.exists(), "preview has not executed restore");
+    assert!(fs::read_dir(&destination_parent).unwrap().next().is_none());
+
+    write(&master, b"\r").expect("submit empty acknowledgment");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "empty selective acknowledgment refusal",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Acknowledgment must be exactly restore, then Enter."),
+    );
+    assert!(!screen_has(&parser, "Restoration running."));
+    assert!(!screen_has(&parser, "Published completed tree."));
+    assert!(!destination.exists());
+    assert!(fs::read_dir(&destination_parent).unwrap().next().is_none());
+
+    write(&master, b"restore").expect("type exact ASCII acknowledgment");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "selective acknowledgment armed",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Acknowledgment [restore] ready"),
+    );
+    test_tree.preserve();
+    write(&master, b"\r").expect("execute exactly one selective restore");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "Published selective restore result",
+        RESTORE_TIMEOUT,
+        |screen| {
+            screen.contains("Published completed tree.")
+                && screen.contains("Restore result. Up/Down scroll; Esc returns; q exits.")
+                && displayed_value(screen, "Destination:").as_deref() == Some(destination_name)
+        },
+    );
+    assert!(destination.is_dir());
+    let siblings: Vec<Vec<u8>> = fs::read_dir(&destination_parent)
+        .expect("enumerate selective restore parent")
+        .map(|entry| {
+            entry
+                .expect("read selective restore parent entry")
+                .file_name()
+                .as_bytes()
+                .to_vec()
+        })
+        .collect();
+    assert_eq!(siblings, vec![destination_name.as_bytes().to_vec()]);
+    assert_matches_oracle_subset(&destination, &oracle_entries, expected_paths, 28);
+
+    write(&master, b"q").expect("quit through Published result screen");
+    let status = wait_exit(&master, &mut child, &mut output)
+        .expect("selective restore TUI did not exit within its deadline");
+    assert!(
+        status.success(),
+        "selective restore TUI exited with {status}"
+    );
+    assert_eq!(tcgetattr(&slave).unwrap(), original_termios);
+    assert!(output
+        .windows(b"\x1b[?1049h".len())
+        .any(|window| window == b"\x1b[?1049h"));
+    assert!(output
+        .windows(b"\x1b[?1049l".len())
+        .any(|window| window == b"\x1b[?1049l"));
+    let mut source_after = BTreeMap::new();
+    observe_tree(&fixture, &mut Vec::new(), &mut source_after);
+    assert_eq!(
+        source_after, source_before,
+        "source fixture remains unchanged"
+    );
+    assert_eq!(
+        fs::read_dir(&destination_parent)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().as_bytes().to_vec())
+            .collect::<Vec<_>>(),
+        vec![destination_name.as_bytes().to_vec()],
+        "no sibling staging residue remains"
+    );
+    test_tree.cleanup_after_assertions();
 }
 
 // This acceptance covers one valid raw OS leaf, its reversible preview and
