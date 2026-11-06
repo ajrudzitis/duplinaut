@@ -70,14 +70,21 @@ fn descriptors_revalidate_completed_manifest_structure() {
 //= docs/parsing-requirements.md#parse-chain-001
 //= type=test
 //# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=test
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
 #[test]
 fn explicit_anchor_exact_target_and_borrowed_order() {
     let sets = [inc(20, 30), full(10), inc(10, 20), full(20), inc(30, 40)];
     let plan = ChainPlan::new(&sets, 1, Timestamp(30), ChainLimits::default()).unwrap();
     assert_eq!(plan.indices(), [1, 2, 0]);
     assert_eq!(plan.target(), Timestamp(30));
-    for (entry, index) in plan.sets().zip(plan.indices()) {
-        assert!(std::ptr::eq(entry, &sets[*index]));
+    let expected = vec![&sets[1], &sets[2], &sets[0]];
+    let selected: Vec<_> = plan.sets().collect();
+    assert_eq!(selected.len(), 3);
+    assert_eq!(selected, expected);
+    for (entry, expected_entry) in selected.iter().zip(expected.iter()) {
+        assert!(std::ptr::eq(*entry, *expected_entry));
     }
     let anchored = ChainPlan::new(&sets, 3, Timestamp(30), ChainLimits::default()).unwrap();
     assert_eq!(anchored.indices(), [3, 0]);
@@ -105,7 +112,38 @@ fn explicit_anchor_exact_target_and_borrowed_order() {
     );
 }
 
+//= docs/parsing-requirements.md#parse-chain-001
+//= type=test
+//# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=test
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
 #[test]
+fn full_only_plan_exposes_one_original_descriptor_reference() {
+    let sets = [full(10), inc(10, 20)];
+    let plan = ChainPlan::new(
+        &sets,
+        0,
+        Timestamp(10),
+        ChainLimits {
+            max_candidate_checks: 0,
+            ..ChainLimits::default()
+        },
+    )
+    .unwrap();
+
+    let expected = [&sets[0]];
+    let selected: Vec<_> = plan.sets().collect();
+    assert_eq!(plan.indices(), [0]);
+    assert_eq!(selected.len(), expected.len());
+    assert_eq!(selected, expected);
+    assert!(std::ptr::eq(selected[0], expected[0]));
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-chain-001
+//= type=test
+//# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
 //= docs/parsing-requirements.md#parse-chain-002
 //= type=test
 //# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
@@ -113,9 +151,11 @@ fn selected_plan_accessor_maps_each_position_to_its_stored_descriptor() {
     let sets = [inc(20, 30), full(10), inc(10, 20)];
     let plan = ChainPlan::new(&sets, 1, Timestamp(20), ChainLimits::default()).unwrap();
 
+    assert_eq!(plan.indices().len(), 2);
     assert_eq!(plan.selected_set_at(0), Some((1, sets[1])));
     assert_eq!(plan.selected_set_at(1), Some((2, sets[2])));
     assert_eq!(plan.selected_set_at(2), None);
+    assert_eq!(plan.selected_set_at(3), None);
     assert_eq!(plan.selected_set_at(usize::MAX), None);
 }
 

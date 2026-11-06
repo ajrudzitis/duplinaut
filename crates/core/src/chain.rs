@@ -235,6 +235,25 @@ impl<'a> ChainPlan<'a> {
     //= docs/parsing-requirements.md#parse-chain-001
     //= type=implementation
     //# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
+    pub open spec fn selected_set_at_model(
+        source_sets: Seq<SetDescriptor>,
+        selected_indices: Seq<usize>,
+        position: usize,
+    ) -> Option<(usize, SetDescriptor)> {
+        if position < selected_indices.len() {
+            let index = selected_indices[position as int];
+            if index < source_sets.len() {
+                Some((index, source_sets[index as int]))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+    //= docs/parsing-requirements.md#parse-chain-001
+    //= type=implementation
+    //# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
     //= docs/parsing-requirements.md#parse-chain-002
     //= type=implementation
     //# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
@@ -359,6 +378,9 @@ impl<'a> ChainPlan<'a> {
     {
         &self.indices
     }
+    //= docs/parsing-requirements.md#parse-chain-001
+    //= type=implementation
+    //# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
     //= docs/parsing-requirements.md#parse-chain-002
     //= type=implementation
     //# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
@@ -368,13 +390,16 @@ impl<'a> ChainPlan<'a> {
         position: usize,
     ) -> (result: Option<(usize, SetDescriptor)>)
         requires self.bounded_indices(),
-        ensures match result {
-            Some((index, descriptor)) => position < self.index_values().len()
-                && index == self.index_values()[position as int]
-                && index < self.original_sets().len()
-                && descriptor == self.original_sets()[index as int],
-            None => position >= self.index_values().len(),
-        },
+        ensures result == Self::selected_set_at_model(
+                self.original_sets(), self.index_values(), position,
+            )
+            && match result {
+                Some((index, descriptor)) => position < self.index_values().len()
+                    && index == self.index_values()[position as int]
+                    && index < self.original_sets().len()
+                    && descriptor == self.original_sets()[index as int],
+                None => position >= self.index_values().len(),
+            },
     {
         if position >= self.indices.len() {
             return None;
