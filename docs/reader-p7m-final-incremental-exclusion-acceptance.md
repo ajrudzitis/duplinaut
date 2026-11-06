@@ -1,7 +1,8 @@
 # Official Plain Reader PKCS#7 Final-Incremental Manifest Exclusion Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** The bounded fixture test, targeted Duvet checks, full core suite,
+formatting, strict Clippy, independent implementation review, and full local
+`cargo xtask ci` pass. Hosted Linux assurance/Pages remain pending.
 
 ## Goal and scope
 
@@ -106,13 +107,37 @@ adds no `PARSE-NAME-005` claim.
 
 - [x] Independent specification review accepts the scope, mutation, and
       public oracle.
-- [ ] The exact inventory relation and bytes/size/identity preservation pass;
+- [x] The exact inventory relation and bytes/size/identity preservation pass;
       the renamed object is visible as the specified unsupported incremental
       manifest.
-- [ ] The manifests iterator contains exactly the Full and first Incremental
+- [x] The manifests iterator contains exactly the Full and first Incremental
       descriptors independent of order; the iterator-derived Full index
       returns exact `Chain(Missing)` at `1700172800`.
-- [ ] Targeted Duvet queries/full trace, focused/full core tests, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Targeted `PARSE-NAME-001`/`PARSE-CHAIN-002` Duvet queries, full trace,
+      focused/full core tests, formatting, strict Clippy, and diff check pass.
+- [x] Independent implementation/test review passes.
+- [x] Full local `cargo xtask ci` passes (2,047/0, 3,183/0, and 1,329/0
+      verified; the source digest is recorded in generated
+      `target/assurance/ci.json`).
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
+
+## Current local evidence
+
+- `cargo test -p duplicity-core --test reader
+  official_pkcs7_final_incremental_manifest_is_visible_but_leaves_missing_transition`:
+  passed.
+- `cargo test -p duplicity-core`: passed.
+- `.tools/bin/duvet query --check implementation,test --section
+  docs/parsing-requirements.md#parse-name-001`: passed.
+- `.tools/bin/duvet query --check implementation,test --section
+  docs/parsing-requirements.md#parse-chain-002`: passed.
+- `DUVET="$PWD/.tools/bin/duvet" cargo xtask trace-update` and `cargo xtask
+  trace`: passed.
+- `cargo fmt --all -- --check`, `cargo clippy -p duplicity-core --all-targets
+  -- -D warnings`, and `git diff --check`: passed.
+- `nix-shell tools/shell.nix --run 'source tools/env.sh && cargo xtask ci'`:
+  passed with fresh Verus, Duvet, formatting, strict Clippy, and workspace
+  tests. The generated receipt records the source digest in
+  `target/assurance/ci.json`.
+- The original plain manifest bytes remain under a `.p7m` key; this test makes
+  no CMS, crypto, or PNAME-005 claim.
