@@ -1,6 +1,6 @@
 # PARSE-NAME-001 Short IncrementalManifest Reverse-Success Acceptance
 
-**Status:** Implementation and proof complete; independently reviewed. Full local `cargo xtask ci` passes. Hosted Linux/Pages acceptance remains pending.
+**Status:** Implementation/proof, independent reviews, local full `cargo xtask ci`, and hosted Linux assurance with Duvet Pages publication passed in [GitHub Actions run 42222073830](https://github.com/ajrudzitis/duplinaut/actions/runs/42222073830).
 
 ## Goal and scope
 
@@ -51,5 +51,5 @@ This acceptance does not prove malformed-input/error completeness, scanner/raw s
 - [x] Implementation, concrete antecedent witness, and strict Verus implication pass independent review.
 - [x] Existing exact-result regression tests, focused Duvet query/full trace, formatting, strict Clippy, and full core tests pass. Strict Verus reports 139 verified declarations and zero errors.
 - [x] Full local `cargo xtask ci` passes.
-- [ ] Hosted Linux assurance and Duvet publication pass.
+- [x] Hosted Linux assurance and Duvet publication pass in [run 42222073830](https://github.com/ajrudzitis/duplinaut/actions/runs/42222073830).
 - [x] Scoped acceptance is recorded without closing broader filename-parser/controller work.

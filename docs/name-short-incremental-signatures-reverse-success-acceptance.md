@@ -1,6 +1,6 @@
 # PARSE-NAME-001 Short IncrementalSignatures Reverse-Success Acceptance
 
-**Status:** Proposed; pending independent specification review. No implementation or proof has been accepted for this slice.
+**Status:** Implementation and proof complete; independently reviewed. Full local `cargo xtask ci` passes. Hosted Linux/Pages acceptance remains pending.
 
 ## Goal and scope
 
@@ -47,8 +47,9 @@ This acceptance does not prove malformed-input/error completeness, scanner/raw s
 
 ## Checklist
 
-- [ ] Independent specification review accepts the theorem scope and witness-alignment obligation.
-- [ ] Implementation, concrete antecedent witness, and strict Verus implication pass independent review.
-- [ ] Existing exact-result regression tests, Duvet trace, formatting, strict Clippy, and full core tests pass.
-- [ ] Local full assurance and hosted Linux assurance plus Duvet publication pass.
-- [ ] Scoped acceptance is recorded without closing broader filename-parser/controller work.
+- [x] Independent specification review accepts the theorem scope and witness-alignment obligation.
+- [x] Implementation, concrete antecedent witness, and strict Verus implication pass independent review.
+- [x] Existing exact-result regression tests, relevant edge tests, and full core tests pass; focused strict Verus reports 142 verified declarations and zero errors. Focused Duvet query/full trace, formatting, and strict Clippy pass.
+- [x] Full local `cargo xtask ci` passes.
+- [ ] Hosted Linux assurance and Duvet publication pass.
+- [x] Scoped acceptance is recorded without closing broader filename-parser/controller work.
