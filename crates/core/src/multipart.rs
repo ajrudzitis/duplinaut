@@ -12,6 +12,7 @@ use crate::tar::{
     ArchiveKind, EntryType, Operation, TarEntry, TarError, TarLimits, TarTime, TarVolume,
     Termination,
 };
+use crate::verified::multipart_empty_volume::{admit_empty_volume, EmptyVolumeStateView};
 use crate::verified::multipart_metadata::reserve_multipart_metadata;
 use crate::verified::openpgp_admission::{
     AuthenticatedPermit, OpenPgpAdmission, TarValidatedPermit,
@@ -437,6 +438,9 @@ impl<'a> MultipartAssembler<'a> {
         self.admission.commit_plain();
         Ok(())
     }
+    //= docs/parsing-requirements.md#parse-multi-004
+    //= type=implementation
+    //# Assembly MUST preserve pending logical-entry state across an empty volume while validating its supported empty-boundary marker shape.
     fn push_decoded_checked(
         &mut self,
         number: u64,
@@ -543,24 +547,27 @@ impl<'a> MultipartAssembler<'a> {
         } else {
             // Pinned producer's no-emission fallback uses root as start and
             // the previous emitted end as end; it does not finish pending parts.
-            let root = BackupPath::parse(
+            let root_path = BackupPath::parse(
                 b".",
                 false,
                 self.limits.tar.max_path_bytes,
                 self.limits.max_path_components,
             )
             .map_err(|error| AssemblyError::Tar(TarError::Path(error)))?;
-            let expected_end = self.previous_boundary.clone().unwrap_or(Boundary {
-                path: root.clone(),
+            let root_none = Boundary {
+                path: root_path,
                 block: None,
-            });
-            if record.start
-                != (Boundary {
-                    path: root,
-                    block: None,
-                })
-                || record.end != expected_end
-            {
+            };
+            let state = EmptyVolumeStateView {
+                previous: self.previous_boundary.as_ref(),
+                pending: self
+                    .pending
+                    .as_ref()
+                    .map(|pending| (&pending.entry.path, pending.next_part)),
+                completed_entries: self.entries.len(),
+                payload_bytes: self.payload_bytes,
+            };
+            if admit_empty_volume(&root_none, &record.start, &record.end, state).is_none() {
                 return Err(AssemblyError::Boundary);
             }
         }

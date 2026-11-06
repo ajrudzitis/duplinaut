@@ -100,14 +100,14 @@ fn multipart_metadata_budget_admits_exact_charge_and_rejects_before_normalizatio
 //= docs/parsing-requirements.md#parse-multi-001
 //= type=test
 //# Multipart assembly MUST concatenate payloads for one operation and path in consecutive part-number order starting at 1.
-//= docs/parsing-requirements.md#parse-multi-003
-//= type=test
-//# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
 //= docs/parsing-requirements.md#parse-multi-004
 //= type=test
 //# Assembly MUST preserve pending logical-entry state across an empty volume while validating its supported empty-boundary marker shape.
 #[test]
 fn continuation_markers_zero_final_and_empty_volumes() {
+    let initial_empty = assemble(&[Vec::new()], &[(".", ".")]).unwrap();
+    assert!(initial_empty.entries().is_empty());
+
     let full = member("multivol_snapshot/file/1", &vec![b'a'; 65536]);
     let final_part = member("multivol_snapshot/file/2", b"");
     let volumes = [full.clone(), final_part.clone()];
@@ -117,6 +117,7 @@ fn continuation_markers_zero_final_and_empty_volumes() {
     assert_eq!(archive.entries()[0].operation, LogicalOperation::Snapshot);
     assert_eq!(archive.entries()[0].mode, 0o644);
     assert_eq!(archive.entries()[0].mtime.seconds, 1);
+
     // Source-derived empty volumes preserve continuation, and their mandatory
     // hash/container checks do not get skipped merely because no entries exist.
     let volumes = [Vec::new(), full.clone(), Vec::new(), final_part, Vec::new()];
@@ -131,9 +132,52 @@ fn continuation_markers_zero_final_and_empty_volumes() {
         ],
     )
     .unwrap();
-    assert_eq!(archive.entries()[0].payload.len(), 65536);
+    assert_eq!(archive.entries().len(), 1);
+    assert_eq!(archive.entries()[0].operation, LogicalOperation::Snapshot);
+    assert_eq!(archive.entries()[0].payload, vec![b'a'; 65536]);
+    assert!(matches!(
+        assemble(&[Vec::new()], &[("a", "z")]),
+        Err(AssemblyError::Boundary)
+    ));
+    assert!(matches!(
+        assemble(&[Vec::new()], &[(".", "file 1")]),
+        Err(AssemblyError::Boundary)
+    ));
+    let previous_entry = member("snapshot/previous", b"x");
+    assert!(matches!(
+        assemble(
+            &[previous_entry, Vec::new()],
+            &[("previous", "previous"), (".", ".")],
+        ),
+        Err(AssemblyError::Boundary)
+    ));
     assert!(assemble(&[Vec::new()], &[("file", "file")]).is_err());
     assert!(assemble(&[full], &[("file 1", "file 1")]).is_err());
+}
+
+// This test supplies only the negative empty-volume case: the accepted empty
+// volume does not complete a full-size nonfinal part without its final short part.
+//= docs/parsing-requirements.md#parse-multi-003
+//= type=test
+//# The reader MUST establish multipart completion using the reviewed container and manifest boundary rules before reporting a reconstructed file as complete.
+#[test]
+fn empty_volume_after_nonfinal_part_does_not_complete_logical_entry() {
+    let volumes = [
+        member("multivol_snapshot/file/1", &vec![b'a'; 65536]),
+        Vec::new(),
+    ];
+    let manifest = make_manifest(&volumes, &[("file 1", "file 1"), (".", "file 1")]);
+    let mut assembler = MultipartAssembler::new(&manifest, AssemblyLimits::default()).unwrap();
+    assembler
+        .push_stored_volume(1, &volumes[0], Envelope::Plain)
+        .unwrap();
+    assembler
+        .push_stored_volume(2, &volumes[1], Envelope::Plain)
+        .unwrap();
+
+    // The empty volume preserves the pending part but cannot satisfy its
+    // missing final short part.
+    assert!(matches!(assembler.finish(), Err(AssemblyError::Incomplete)));
 }
 
 //= docs/parsing-requirements.md#parse-multi-002
