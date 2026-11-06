@@ -1,7 +1,11 @@
 # TUI invalid-parent restore diagnostic acceptance plan
 
-Status: proposed; specification only. This adds one real Linux PTY case for a
-typed backend rejection and complete escaped destination diagnostics.
+Status: accepted. The Linux-gated test
+`invalid_raw_parent_produces_scrolled_unpublished_diagnostic_over_pty` passed
+with full Linux assurance and Duvet Pages publication in
+[run 42165504386](https://github.com/ajrudzitis/duplinaut/actions/runs/42165504386).
+This acceptance covers one real PTY case for a typed backend rejection and
+complete escaped destination diagnostics.
 
 ## Goal and requirements
 
@@ -104,11 +108,11 @@ flow, and terminal harness. This case uses fixed PTY size and no resize.
   pre-staging failure and a definite typed `Unpublished` result. The frontend
   destination identity comes from the retained configured request because
   this result variant has no receipt.
-- Run the focused Linux test and full `cargo test -p duplicity-tui` on Linux,
-  targeted Duvet queries, `cargo xtask trace-update`, `cargo xtask trace`,
-  formatting, and strict TUI Clippy. Require hosted Linux assurance
-  (`cargo xtask ci`), Duvet Pages publication, and independent implementation
-  review. No AWS credentials or external service are needed.
+- Local portable TUI tests, formatting, strict Clippy, five targeted Duvet
+  queries, full Duvet trace, and diff checks passed. The Linux-gated PTY test
+  and Linux assurance (`cargo xtask ci`) passed, and Duvet Pages published, in
+  [run 42165504386](https://github.com/ajrudzitis/duplinaut/actions/runs/42165504386).
+  No AWS credentials or external service were needed.
 - Independent review MUST confirm the parent is a regular file before UI
   launch and its raw bytes are passed unchanged; the backend fails at the
   directory-only parent open before staging; the result remains typed
@@ -130,12 +134,13 @@ retain their separate scopes.
 
 ## Checklist
 
-- [ ] Drive the production Linux browser through an official whole-snapshot
+- [x] Drive the production Linux browser through an official whole-snapshot
       preview and exact acknowledgment into a deterministic `ENOTDIR` result.
-- [ ] Assert typed `Unpublished`/cleanup evidence and escaped full requested
+- [x] Assert typed `Unpublished`/cleanup evidence and escaped full requested
       parent/leaf in the scrollable result screen.
-- [ ] Assert no staging/publication, unchanged sentinel/source, and terminal
+- [x] Assert no staging/publication, unchanged sentinel/source, and terminal
       restoration.
-- [ ] Focused/full Linux TUI tests, Duvet trace, formatting, strict Clippy,
-      hosted assurance, and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped evidence.
+- [x] Local portable tests, Duvet trace, formatting, strict Clippy, and diff
+      checks pass; the Linux-gated PTY test, hosted assurance, and Duvet Pages
+      pass in [run 42165504386](https://github.com/ajrudzitis/duplinaut/actions/runs/42165504386).
+- [x] Independent implementation review accepts the scoped evidence.
