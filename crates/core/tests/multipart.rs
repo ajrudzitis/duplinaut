@@ -210,9 +210,8 @@ fn finish_poisoned_precedes_incomplete_when_pending_entry_remains() {
 //= docs/parsing-requirements.md#parse-multi-002
 //= type=test
 //# Multipart assembly MUST reject missing, duplicate, reversed, mixed-operation, or interleaved parts of the same logical entry.
-//= docs/parsing-requirements.md#parse-multi-005
-//= type=test
-//# Repeated ordinary operations for one path within a backup set MUST retain archive order for snapshot-state interpretation.
+// These assertions cover only mixed representations and repeated multipart
+// starts; they do not prove map-key identity or the full accept-entry machine.
 //= docs/parsing-requirements.md#parse-multi-006
 //= type=test
 //# Assembly MUST reject an ordinary/multipart representation mixture or a second multipart logical entry for one path within the initial supported backup-set profile.
@@ -249,6 +248,8 @@ fn malformed_parts_lengths_markers_and_interleaving_rejected() {
     ] {
         assert!(assemble(&[full.clone(), final_part.clone()], &boundaries).is_err());
     }
+    // The first short part completes the first multipart logical entry, so the
+    // next part-1 start is a distinct multipart logical entry for this path.
     let repeated = [
         member("multivol_snapshot/file/1", b"done"),
         member("multivol_snapshot/file/1", b"duplicate"),
@@ -273,18 +274,6 @@ fn malformed_parts_lengths_markers_and_interleaving_rejected() {
             Err(AssemblyError::DuplicateEntry)
         ));
     }
-    let ordinary = [
-        member("snapshot/file", b"first"),
-        member("snapshot/file", b"second"),
-    ]
-    .concat();
-    assert_eq!(
-        assemble(&[ordinary], &[("file", "file")])
-            .unwrap()
-            .entries()
-            .len(),
-        2
-    );
     let outside = [
         member("snapshot/a", b""),
         member("snapshot/zz", b""),
@@ -295,6 +284,25 @@ fn malformed_parts_lengths_markers_and_interleaving_rejected() {
         assemble(&[outside], &[("a", "z")]),
         Err(AssemblyError::Boundary)
     ));
+}
+
+//= docs/parsing-requirements.md#parse-multi-005
+//= type=test
+//# Repeated ordinary operations for one path within a backup set MUST retain archive order for snapshot-state interpretation.
+#[test]
+fn repeated_ordinary_operations_preserve_archive_order() {
+    let ordinary = [
+        member("snapshot/file", b"first"),
+        member("snapshot/file", b"second"),
+    ]
+    .concat();
+    let archive = assemble(&[ordinary], &[("file", "file")]).unwrap();
+
+    assert_eq!(archive.entries().len(), 2);
+    assert_eq!(archive.entries()[0].operation, LogicalOperation::Snapshot);
+    assert_eq!(archive.entries()[0].payload, b"first");
+    assert_eq!(archive.entries()[1].operation, LogicalOperation::Snapshot);
+    assert_eq!(archive.entries()[1].payload, b"second");
 }
 
 #[test]

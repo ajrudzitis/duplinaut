@@ -15,6 +15,7 @@ use crate::tar::{
 use crate::verified::multipart_empty_volume::{admit_empty_volume, EmptyVolumeStateView};
 use crate::verified::multipart_finish::{finish_gate, FinishGate};
 use crate::verified::multipart_metadata::reserve_multipart_metadata;
+use crate::verified::multipart_representation::admit_representation;
 use crate::verified::openpgp_admission::{
     AuthenticatedPermit, OpenPgpAdmission, TarValidatedPermit,
 };
@@ -728,7 +729,7 @@ impl<'a> MultipartAssembler<'a> {
                 if number != 1 {
                     return Err(AssemblyError::PartOrder);
                 }
-                if self.started_paths.contains_key(&path) {
+                if !admit_representation(self.started_paths.get(&path).copied(), true) {
                     return Err(AssemblyError::DuplicateEntry);
                 }
                 let owned = self.make_entry(entry, logical, path.clone())?;
@@ -749,7 +750,7 @@ impl<'a> MultipartAssembler<'a> {
             if self.pending.is_some() {
                 return Err(AssemblyError::Interleaved);
             }
-            if self.started_paths.get(&path) == Some(&true) {
+            if !admit_representation(self.started_paths.get(&path).copied(), false) {
                 return Err(AssemblyError::DuplicateEntry);
             }
             let mut owned = self.make_entry(entry, logical, path.clone())?;

@@ -21,6 +21,7 @@ pub(crate) mod local_read;
 pub(crate) mod multipart_empty_volume;
 pub(crate) mod multipart_finish;
 pub(crate) mod multipart_metadata;
+pub(crate) mod multipart_representation;
 pub(crate) mod openpgp_admission;
 pub(crate) mod policy_metadata;
 pub(crate) mod reader_accounting;
