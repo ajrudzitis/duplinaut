@@ -415,6 +415,9 @@ impl<'a> Catalog<'a> {
     //= docs/parsing-requirements.md#parse-source-001
     //= type=implementation
     //# The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
+    //= docs/parsing-requirements.md#parse-name-005
+    //= type=implementation
+    //# Objects marked partial MUST be excluded from completed restore sets.
     /// Discover one flat key-parent backup collection without reading objects.
     /// Completed names are metadata evidence, never validated restorability.
     pub fn discover(

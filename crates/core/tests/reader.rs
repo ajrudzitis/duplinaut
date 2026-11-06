@@ -514,6 +514,106 @@ fn official_partial_full_volume_is_visible_but_cannot_satisfy_required_volume() 
     ));
 }
 
+//= docs/parsing-requirements.md#parse-name-005
+//= type=test
+//# Objects marked partial MUST be excluded from completed restore sets.
+//= docs/parsing-requirements.md#parse-chain-001
+//= type=test
+//# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
+#[test]
+fn official_partial_full_manifest_remains_visible_but_is_not_a_chain_anchor() {
+    const ORIGINAL: &str = "backup/duplicity-full.20231114T221320Z.manifest";
+    const PARTIAL: &str = "backup/duplicity-full.20231114T221320Z.manifest.part";
+
+    let mut source = Source::official();
+    assert_eq!(source.objects.len(), 12);
+    let original_inventory = source.objects.clone();
+    let original_keys = {
+        let mut keys = original_inventory
+            .iter()
+            .map(|(object, _)| object.key.clone())
+            .collect::<Vec<_>>();
+        keys.sort();
+        keys
+    };
+    let (original_manifest, original_manifest_bytes) = source
+        .objects
+        .iter()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .map(|(object, bytes)| (object.clone(), bytes.clone()))
+        .expect("official fixture contains the full manifest");
+    let (renamed_manifest, renamed_manifest_bytes) = source
+        .objects
+        .iter_mut()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .expect("official fixture contains the full manifest");
+    renamed_manifest.key = PARTIAL.into();
+    assert_eq!(renamed_manifest_bytes, &original_manifest_bytes);
+    assert_eq!(renamed_manifest.size, original_manifest.size);
+    assert_eq!(renamed_manifest.identity, original_manifest.identity);
+
+    let mut expected_keys = original_keys;
+    let old_key = expected_keys
+        .iter_mut()
+        .find(|key| key.as_str() == ORIGINAL)
+        .expect("original inventory contains the full manifest");
+    *old_key = PARTIAL.into();
+    expected_keys.sort();
+    let mut actual_keys = source
+        .objects
+        .iter()
+        .map(|(object, _)| object.key.clone())
+        .collect::<Vec<_>>();
+    actual_keys.sort();
+    assert_eq!(actual_keys, expected_keys);
+    assert_eq!(source.objects.len(), 12);
+    for (original_object, original_bytes) in &original_inventory {
+        let expected_key = if original_object.key == ORIGINAL {
+            PARTIAL
+        } else {
+            original_object.key.as_str()
+        };
+        let (actual_object, actual_bytes) = source
+            .objects
+            .iter()
+            .find(|(object, _)| object.key == expected_key)
+            .expect("each original object remains under its expected key");
+        let mut expected_object = original_object.clone();
+        expected_object.key = expected_key.into();
+        assert_eq!(actual_object, &expected_object);
+        assert_eq!(actual_bytes, original_bytes);
+    }
+
+    let catalog = discover(&source);
+    let partial_entry = catalog
+        .objects()
+        .iter()
+        .find(|entry| entry.object().key == PARTIAL)
+        .expect("renamed partial manifest remains visible in discovery");
+    assert!(partial_entry.name().expect("partial key is parsed").partial);
+    assert_eq!(partial_entry.status(), DiscoveryStatus::Partial);
+
+    let descriptors = catalog.manifests().collect::<Vec<_>>();
+    assert_eq!(descriptors.len(), 2);
+    assert!(descriptors
+        .iter()
+        .all(|(_, _, descriptor)| descriptor.kind() == SetKind::Incremental));
+    let (first_incremental_index, _, first_descriptor) = descriptors
+        .first()
+        .expect("both incremental manifests remain in the catalog");
+    assert_eq!(first_descriptor.kind(), SetKind::Incremental);
+
+    assert!(matches!(
+        catalog.read_snapshot(
+            *first_incremental_index,
+            Timestamp(1700000000),
+            &Cancellation::default()
+        ),
+        Err(ReaderError::Chain(ChainError::InvalidAnchor))
+    ));
+    assert_eq!(source.opens.load(Ordering::SeqCst), 0);
+}
+
 #[test]
 fn discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation() {
     let mut source = Source::official();

@@ -1,7 +1,8 @@
 # Official Plain Reader Partial-Full-Manifest Exclusion Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-Duvet evidence, and CI remain pending.
+**Status:** The bounded fixture test and local scoped verification pass.
+Independent implementation review, full local `cargo xtask ci`, and hosted
+Linux assurance/Pages remain pending.
 
 ## Goal and scope
 
@@ -98,9 +99,32 @@ or a formal reader proof. It claims no `PARSE-CHAIN-002` result.
 ## Checklist
 
 - [x] Independent specification review accepts scope, mutation, and oracle.
-- [ ] Fixture inventory assertions, visible Partial status, two incremental
-      descriptors, and the public invalid-anchor result pass.
-- [ ] Duvet links, focused/full tests, formatting, strict Clippy, and local
-      `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Fixture inventory assertions, visible Partial status, exactly two
+      incremental descriptors, iterator-derived index, and exact public
+      invalid-anchor result pass.
+- [x] Targeted `PARSE-NAME-005` and `PARSE-CHAIN-001` Duvet queries, full
+      `cargo xtask trace`, focused test, full core suite, formatting, strict
+      Clippy, and diff check pass locally.
+- [x] Independent implementation/test review passes, including the zero
+      object-open check before `Chain(InvalidAnchor)`.
+- [x] Full local `cargo xtask ci` passes with 2,047, 3,183, and 1,329 verified
+      declarations and zero errors; Duvet, strict Clippy, formatting, and
+      workspace tests pass.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
+
+## Current local evidence
+
+- `cargo test -p duplicity-core --test reader
+  official_partial_full_manifest_remains_visible_but_is_not_a_chain_anchor`:
+  passed.
+- `cargo test -p duplicity-core`: passed.
+- `.tools/bin/duvet query --check implementation,test --section
+  docs/parsing-requirements.md#parse-name-005`: passed.
+- `.tools/bin/duvet query --check implementation,test --section
+  docs/parsing-requirements.md#parse-chain-001`: passed.
+- `DUVET="$PWD/.tools/bin/duvet" cargo xtask trace-update` and `cargo xtask
+  trace`: passed.
+- `cargo fmt --all -- --check`, `cargo clippy -p duplicity-core --all-targets
+  -- -D warnings`, and `git diff --check`: passed.
+- Full pinned CI wrote `target/assurance/ci.json` with source digest
+  `5f77df1719baa59be0a828410d602df98f42c2a93cd6a72064b6ddcb7443a63a`.
