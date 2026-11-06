@@ -1,6 +1,6 @@
 # PARSE-NAME-001 Short FullVolume Reverse-Success Acceptance
 
-**Status:** Implementation, strict proof, test evidence, and independent specification/implementation review are complete. Local full `cargo xtask ci` passed; its machine-readable source digest is recorded in generated `target/assurance/ci.json`. Hosted Linux assurance and Duvet Pages publication remain pending. The broader filename parser/controller remains open.
+**Status:** Implementation, strict proof, test evidence, independent specification/implementation review, local full `cargo xtask ci`, and hosted Linux assurance are complete. Duvet Pages publication passed in [GitHub Actions run 42206417102](https://github.com/ajrudzitis/duplinaut/actions/runs/42206417102). The broader filename parser/controller remains open.
 
 ## Goal and scope
 
@@ -50,5 +50,5 @@ This acceptance does not prove malformed-input or error completeness, correctnes
 - [x] Implementation, concrete antecedent witness, and strict Verus implication accepted by independent review.
 - [x] Existing exact-result regression tests, Duvet trace, formatting, strict Clippy, and full core tests pass. The `names` module passed strict verification with 131 verified declarations and zero errors.
 - [x] Local full assurance passed: `cargo xtask ci` under the pinned Nix shell produced generated `target/assurance/ci.json`, which records the source digest. The full run reported Verus crates at 2047, 3183, and 1291 verified declarations, each with zero errors; workspace tests, formatting, strict Clippy, and Duvet passed.
-- [ ] Hosted Linux assurance and Duvet Pages publication pass.
+- [x] Hosted Linux assurance and Duvet Pages publication pass in [run 42206417102](https://github.com/ajrudzitis/duplinaut/actions/runs/42206417102).
 - [x] Scoped implementation and local evidence are recorded without closing broader filename-parser/controller work.
