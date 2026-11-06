@@ -1432,7 +1432,7 @@ mod pty_acceptance {
             "typed ENOTDIR result",
             |screen| {
                 screen.contains("Restore result. Up/Down scroll; Esc returns; q exits.")
-                    && screen.contains("Unpublished: cause Syscall errno Some(20)")
+                    && screen.contains("Unpublished: cause Syscall errno 20")
                     && screen.contains("Cleanup attempted=0 failures=0 first_errno=None exhausted=false detail_truncated=false")
                     && !screen.contains("Publication indeterminate")
                     && !screen.contains("Published completed tree")
