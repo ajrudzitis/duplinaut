@@ -1,7 +1,7 @@
 # Empty-volume multipart state acceptance plan
 
-Status: implementation, formal proof, local tests, and independent review are
-complete; hosted Linux assurance and Duvet Pages are pending.
+Status: accepted. Local and hosted Linux assurance, Duvet Pages, and
+independent review are complete for this scoped empty-volume slice.
 
 ## Goal and implementation prerequisite
 
@@ -111,9 +111,10 @@ boundary equality.
   Verus, Duvet, formatting, strict Clippy, and independent verifier/implementation
   reviews passed at commit `a3ac918`, source SHA-256
   `767914182c1dbb51001ec7bb3f655b8fa02f9c729a06facd867fbdbeb0982e3e`.
-  Hosted Linux assurance and Duvet Pages remain pending in
-  [run 42187054602](https://github.com/ajrudzitis/duplinaut/actions/runs/42187054602);
-  do not mark overall acceptance complete until both hosted gates pass.
+  Hosted Linux assurance and Duvet Pages passed in
+  [run 42187054602](https://github.com/ajrudzitis/duplinaut/actions/runs/42187054602).
+  This completes this bounded acceptance only, not the broader multipart
+  controller or resource proof.
 - Independent verifier review MUST check the model against the project
   `Boundary`/`BackupPath` types, initial/previous-boundary cases, and the
   pending block relation. Independent implementation review MUST confirm the
@@ -144,7 +145,8 @@ profile.
       focused/full tests, full `cargo xtask ci`, and independent verifier and
       implementation reviews pass at commit `a3ac918` (source SHA-256
       `767914182c1dbb51001ec7bb3f655b8fa02f9c729a06facd867fbdbeb0982e3e`).
-- [ ] Hosted Linux assurance and Duvet Pages pass in run 42187054602.
+- [x] Hosted Linux assurance and Duvet Pages pass in
+      [run 42187054602](https://github.com/ajrudzitis/duplinaut/actions/runs/42187054602).
 - [x] Independent specification review accepts this scope before
       implementation.
 - [x] Independent verifier and implementation reviews accept the local
