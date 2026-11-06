@@ -1,5 +1,6 @@
 use duplicity_core::names::{
-    parse_long_timestamp, parse_name, Envelope, NameConfig, NameError, ObjectKind, Timestamp,
+    parse_long_timestamp, parse_name, Envelope, NameConfig, NameError, ObjectKind, ObjectName,
+    Timestamp,
 };
 
 struct ConfiguredPrefixCase {
@@ -168,6 +169,12 @@ const CONFIGURED_PREFIX_CASES: [ConfiguredPrefixCase; 12] = [
     },
 ];
 
+type PublicMalformedCase = (
+    &'static str,
+    &'static [u8],
+    Result<Option<ObjectName>, NameError>,
+);
+
 fn configured_prefix_config() -> NameConfig<'static> {
     NameConfig {
         global_prefix: b"root-",
@@ -235,6 +242,79 @@ fn public_parse_name_rejects_one_byte_global_and_kind_prefix_near_misses() {
         }
         assert_eq!(parse_name(&kind_near_miss, config), Ok(None));
     }
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+fn public_parse_name_malformed_routing_matrix() {
+    let config = NameConfig::default();
+    let cases: [PublicMalformedCase; 12] = [
+        ("FullVolume short", b"df.1.0.dt", Err(NameError::Malformed)),
+        (
+            "FullVolume long",
+            b"duplicity-full.19700101T000000Z.vol0.difftar",
+            Err(NameError::Malformed),
+        ),
+        (
+            "IncrementalVolume short",
+            b"di.1.1.1.dt",
+            Err(NameError::Malformed),
+        ),
+        (
+            "IncrementalVolume long",
+            b"duplicity-inc.19700101T000000Z.to.19700101T000000Z.vol1.difftar",
+            Err(NameError::Malformed),
+        ),
+        ("FullManifest short", b"df.1.bad", Err(NameError::Malformed)),
+        (
+            "FullManifest long",
+            b"duplicity-full.bad.manifest",
+            Err(NameError::Malformed),
+        ),
+        (
+            "IncrementalManifest short",
+            b"di.1.1.m",
+            Err(NameError::Malformed),
+        ),
+        (
+            "IncrementalManifest long",
+            b"duplicity-inc.19700101T000000Z.to.19700101T000000Z.manifest",
+            Err(NameError::Malformed),
+        ),
+        (
+            "FullSignatures short",
+            b"dfs.1.bad",
+            Err(NameError::Malformed),
+        ),
+        (
+            "FullSignatures long",
+            b"duplicity-full-signatures.bad.sigtar",
+            Err(NameError::Malformed),
+        ),
+        (
+            "IncrementalSignatures short",
+            b"dns.1.1.st",
+            Err(NameError::Malformed),
+        ),
+        (
+            "IncrementalSignatures long",
+            b"duplicity-new-signatures.19700101T000000Z.to.19700101T000000Z.sigtar",
+            Err(NameError::Malformed),
+        ),
+    ];
+
+    for (profile, input, expected) in cases {
+        assert!(input.len() < 4096, "{profile} exceeds the default limit");
+        assert!(
+            !input.iter().any(|byte| matches!(*byte, 0 | b'/')),
+            "{profile}"
+        );
+        assert_eq!(parse_name(input, config), expected, "{profile}: {input:?}");
+    }
+
+    assert_eq!(parse_name(b"not-a-duplicity-object", config), Ok(None));
 }
 
 //= docs/parsing-requirements.md#parse-name-004

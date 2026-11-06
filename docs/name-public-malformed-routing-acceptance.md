@@ -1,7 +1,9 @@
 # Public `parse_name` Malformed-Routing Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-Duvet evidence, and CI remain pending.
+**Status:** Specification and implementation/test independently reviewed. The
+12 malformed public results and unrelated control pass; Duvet trace links,
+formatting, strict Clippy, full workspace tests, and local full `cargo xtask
+ci` pass. Hosted Linux assurance and Duvet Pages publication remain pending.
 
 ## Goal and scope
 
@@ -90,9 +92,9 @@ no new Verus proof obligation and does not expand the normative scope of
 ## Checklist
 
 - [x] Independent specification review accepts scope, inputs, and trace links.
-- [ ] Twelve public malformed-routing expectations and the unrelated control
+- [x] Twelve public malformed-routing expectations and the unrelated control
       pass; Duvet links are reviewed.
-- [ ] Focused/full tests, Duvet queries/trace, formatting, strict Clippy, and
+- [x] Focused/full tests, Duvet queries/trace, formatting, strict Clippy, and
       local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
