@@ -1,6 +1,6 @@
 # Official Plain Reader PKCS#7 Incremental-Volume Exclusion Acceptance
 
-**Status:** Proposed; pending independent specification review. Implementation,
+**Status:** Specification accepted after independent review. Implementation,
 focused verification, and hosted assurance are pending.
 
 ## Goal and scope
