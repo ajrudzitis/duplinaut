@@ -175,6 +175,75 @@ type PublicMalformedCase = (
     Result<Option<ObjectName>, NameError>,
 );
 
+struct NonUtf8PrefixCase {
+    kind_prefix: u8,
+    kind_near_miss: u8,
+    basename: &'static [u8],
+    expected: ObjectName,
+}
+
+const NON_UTF8_PREFIX_CASES: [NonUtf8PrefixCase; 3] = [
+    NonUtf8PrefixCase {
+        kind_prefix: 0xFE,
+        kind_near_miss: 0xEE,
+        basename: b"df.1.1.dt",
+        expected: ObjectName {
+            kind: ObjectKind::FullVolume,
+            start: Timestamp(1),
+            end: Timestamp(1),
+            volume: Some(1),
+            envelope: Envelope::Plain,
+            partial: false,
+            short: true,
+        },
+    },
+    NonUtf8PrefixCase {
+        kind_prefix: 0xFD,
+        kind_near_miss: 0xED,
+        basename: b"df.1.m",
+        expected: ObjectName {
+            kind: ObjectKind::FullManifest,
+            start: Timestamp(1),
+            end: Timestamp(1),
+            volume: None,
+            envelope: Envelope::Plain,
+            partial: false,
+            short: true,
+        },
+    },
+    NonUtf8PrefixCase {
+        kind_prefix: 0xFC,
+        kind_near_miss: 0xEC,
+        basename: b"dfs.1.st",
+        expected: ObjectName {
+            kind: ObjectKind::FullSignatures,
+            start: Timestamp(1),
+            end: Timestamp(1),
+            volume: None,
+            envelope: Envelope::Plain,
+            partial: false,
+            short: true,
+        },
+    },
+];
+
+fn non_utf8_prefix_config() -> NameConfig<'static> {
+    NameConfig {
+        global_prefix: &[0xFF],
+        archive_prefix: &[0xFE],
+        manifest_prefix: &[0xFD],
+        signature_prefix: &[0xFC],
+        time_separator: b':',
+        max_name_bytes: 4096,
+    }
+}
+
+fn non_utf8_prefixed_input(kind_prefix: u8, basename: &[u8]) -> Vec<u8> {
+    let global = [0xFFu8];
+    let kind = [kind_prefix];
+    [&global[..], &kind[..], basename].concat()
+}
+
 fn configured_prefix_config() -> NameConfig<'static> {
     NameConfig {
         global_prefix: b"root-",
@@ -315,6 +384,52 @@ fn public_parse_name_malformed_routing_matrix() {
     }
 
     assert_eq!(parse_name(b"not-a-duplicity-object", config), Ok(None));
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-name-002
+//= type=test
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
+//= docs/parsing-requirements.md#parse-name-009
+//= type=test
+//# Before checking basename size or bytes, the reader MUST validate the parser configuration. The time separator MUST be in the valid set in PARSE-NAME-007. Configured global, archive, manifest, and signature prefixes MAY be empty and otherwise contain arbitrary bytes, but MUST NOT contain NUL or `/`. Invalid configuration MUST return the configuration error before basename limit or malformed-name errors; valid configuration MUST proceed to the checks in PARSE-NAME-008.
+fn public_parse_name_accepts_non_utf8_configured_prefixes() {
+    let config = non_utf8_prefix_config();
+    for case in NON_UTF8_PREFIX_CASES {
+        let input = non_utf8_prefixed_input(case.kind_prefix, case.basename);
+        assert_eq!(
+            parse_name(&input, config),
+            Ok(Some(case.expected)),
+            "input bytes {input:?}"
+        );
+    }
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-name-002
+//= type=test
+//# Configured global and kind-specific filename prefixes MUST be matched literally in that order before the object stem. Volume kinds MUST select the archive prefix, manifest kinds MUST select the manifest prefix, and signature kinds MUST select the signature prefix.
+fn public_parse_name_rejects_non_utf8_prefix_near_misses() {
+    let config = non_utf8_prefix_config();
+    for case in NON_UTF8_PREFIX_CASES {
+        let input = non_utf8_prefixed_input(case.kind_prefix, case.basename);
+        assert_eq!(input[0], 0xFF);
+        assert_eq!(input[1], case.kind_prefix);
+
+        let mut global_near_miss = input.clone();
+        global_near_miss[0] = 0xEF;
+        assert_eq!(global_near_miss[1..], input[1..]);
+        assert_eq!(parse_name(&global_near_miss, config), Ok(None));
+
+        let mut kind_near_miss = input.clone();
+        kind_near_miss[1] = case.kind_near_miss;
+        assert_eq!(kind_near_miss[0], input[0]);
+        assert_eq!(kind_near_miss[2..], input[2..]);
+        assert_eq!(parse_name(&kind_near_miss, config), Ok(None));
+    }
 }
 
 //= docs/parsing-requirements.md#parse-name-004

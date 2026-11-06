@@ -1,7 +1,9 @@
 # Public `parse_name` Non-UTF-8 Prefix Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-Duvet evidence, and CI remain pending.
+**Status:** Specification and implementation/test independently reviewed. The
+three public results, six byte-exact near-misses, Duvet links, formatting,
+strict Clippy, full workspace tests, and local full `cargo xtask ci` pass.
+Hosted Linux assurance and Duvet Pages publication remain pending.
 
 ## Goal and scope
 
@@ -92,9 +94,9 @@ refinement. Those broader questions remain open.
 
 - [x] Independent specification review accepts the byte cases, oracle, and
       trace links.
-- [ ] Three positive public-parser expectations and six near misses pass;
+- [x] Three positive public-parser expectations and six near misses pass;
       Duvet links are independently reviewed.
-- [ ] Focused/full tests, all three Duvet queries/full trace, formatting,
+- [x] Focused/full tests, all three Duvet queries/full trace, formatting,
       strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
