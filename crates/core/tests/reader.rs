@@ -396,6 +396,124 @@ fn missing_corrupt_and_ambiguous_objects_fail_explicitly() {
     ));
 }
 
+//= docs/parsing-requirements.md#parse-name-005
+//= type=test
+//# Objects marked partial MUST be excluded from completed restore sets.
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=test
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+#[test]
+fn official_partial_full_volume_is_visible_but_cannot_satisfy_required_volume() {
+    const ORIGINAL: &str = "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz";
+    const PARTIAL: &str = "backup/duplicity-full.20231114T221320Z.vol2.difftar.part.gz";
+    const VOLUME_THREE: &str = "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz";
+
+    let mut source = Source::official();
+    assert_eq!(source.objects.len(), 12);
+    let original_inventory = source.objects.clone();
+    let original_keys = {
+        let mut keys = original_inventory
+            .iter()
+            .map(|(object, _)| object.key.clone())
+            .collect::<Vec<_>>();
+        keys.sort();
+        keys
+    };
+    let (original_volume_two, original_volume_two_bytes) = source
+        .objects
+        .iter()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .map(|(object, bytes)| (object.clone(), bytes.clone()))
+        .expect("official fixture contains full volume 2");
+    let (original_volume_three, original_volume_three_bytes) = source
+        .objects
+        .iter()
+        .find(|(object, _)| object.key == VOLUME_THREE)
+        .map(|(object, bytes)| (object.clone(), bytes.clone()))
+        .expect("official fixture contains full volume 3");
+
+    let (renamed_volume_two, renamed_volume_two_bytes) = source
+        .objects
+        .iter_mut()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .expect("official fixture contains full volume 2");
+    renamed_volume_two.key = PARTIAL.into();
+    assert_eq!(renamed_volume_two_bytes, &original_volume_two_bytes);
+    assert_eq!(renamed_volume_two.size, original_volume_two.size);
+    assert_eq!(renamed_volume_two.identity, original_volume_two.identity);
+
+    let mut expected_keys = original_keys;
+    let old_key = expected_keys
+        .iter_mut()
+        .find(|key| key.as_str() == ORIGINAL)
+        .expect("original inventory contains full volume 2");
+    *old_key = PARTIAL.into();
+    expected_keys.sort();
+    let mut actual_keys = source
+        .objects
+        .iter()
+        .map(|(object, _)| object.key.clone())
+        .collect::<Vec<_>>();
+    actual_keys.sort();
+    assert_eq!(actual_keys, expected_keys);
+    assert_eq!(source.objects.len(), 12);
+    assert!(!actual_keys.iter().any(|key| key == ORIGINAL));
+    assert!(actual_keys.iter().any(|key| key == PARTIAL));
+
+    for (original_object, original_bytes) in &original_inventory {
+        let expected_key = if original_object.key == ORIGINAL {
+            PARTIAL
+        } else {
+            original_object.key.as_str()
+        };
+        let (actual_object, actual_bytes) = source
+            .objects
+            .iter()
+            .find(|(object, _)| object.key == expected_key)
+            .expect("each original inventory object remains under its expected key");
+        let mut expected_object = original_object.clone();
+        expected_object.key = expected_key.into();
+        assert_eq!(actual_object, &expected_object);
+        assert_eq!(actual_bytes, original_bytes);
+    }
+
+    let (retained_volume_three, retained_volume_three_bytes) = source
+        .objects
+        .iter()
+        .find(|(object, _)| object.key == VOLUME_THREE)
+        .expect("volume 3 remains in the inventory");
+    assert_eq!(retained_volume_three, &original_volume_three);
+    assert_eq!(retained_volume_three_bytes, &original_volume_three_bytes);
+
+    let catalog = discover(&source);
+    let partial_entry = catalog
+        .objects()
+        .iter()
+        .find(|entry| entry.object().key == PARTIAL)
+        .expect("renamed partial volume remains visible in discovery");
+    let partial_name = partial_entry.name().expect("partial key is parsed");
+    assert!(partial_name.partial);
+    assert_eq!(partial_entry.status(), DiscoveryStatus::Partial);
+
+    let completed_volume_three = catalog
+        .objects()
+        .iter()
+        .find(|entry| entry.object().key == VOLUME_THREE)
+        .expect("completed volume 3 remains visible in discovery");
+    assert!(!completed_volume_three.name().unwrap().partial);
+    assert_eq!(completed_volume_three.status(), DiscoveryStatus::Completed);
+
+    let result = catalog.read_snapshot(
+        anchor(&catalog),
+        Timestamp(1700000000),
+        &Cancellation::default(),
+    );
+    assert!(matches!(
+        result,
+        Err(ReaderError::MissingVolume { number: 2 })
+    ));
+}
+
 #[test]
 fn discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation() {
     let mut source = Source::official();

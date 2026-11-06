@@ -1076,7 +1076,7 @@ tests = [{ package = "duplicity-core", name = "restore_plan_preserves_component_
 [[milestone]]
 id = "reader-orchestration"
 gate = false
-requirements = ["PARSE-SOURCE-001", "PARSE-CHAIN-001", "PARSE-CHAIN-002", "PARSE-MULTI-003"]
+requirements = ["PARSE-SOURCE-001", "PARSE-NAME-005", "PARSE-CHAIN-001", "PARSE-CHAIN-002", "PARSE-MULTI-003"]
 specified = true
 implemented = true
 proved = false
@@ -1084,9 +1084,11 @@ tested = true
 reviewed = true
 proof_required = true
 # Independently reviewed native plain/gzip orchestration; no filesystem writes.
-implementations = [{ path = "crates/core/src/reader.rs", symbol = "discover" }, { path = "crates/core/src/reader.rs", symbol = "read_snapshot" }]
+# The partial-volume case is a fixture-backed integration observation, not a
+# formal proof of the complete reader/controller.
+implementations = [{ path = "crates/core/src/reader.rs", symbol = "discover" }, { path = "crates/core/src/reader.rs", symbol = "read_snapshot" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "required_volume_identity_matches" }]
 proofs = []
-tests = [{ package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" }, { package = "duplicity-core", name = "identity_cancellation_and_exact_body_failures_publish_no_snapshot" }, { package = "duplicity-core", name = "missing_corrupt_and_ambiguous_objects_fail_explicitly" }, { package = "duplicity-core", name = "discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation" }, { package = "duplicity-core", name = "reader_budget_edges_accept_exact_and_reject_one_less" }]
+tests = [{ package = "duplicity-core", name = "original_official_local_objects_reconstruct_all_three_dates_and_restore_plans" }, { package = "duplicity-core", name = "identity_cancellation_and_exact_body_failures_publish_no_snapshot" }, { package = "duplicity-core", name = "missing_corrupt_and_ambiguous_objects_fail_explicitly" }, { package = "duplicity-core", name = "official_partial_full_volume_is_visible_but_cannot_satisfy_required_volume" }, { package = "duplicity-core", name = "discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation" }, { package = "duplicity-core", name = "reader_budget_edges_accept_exact_and_reject_one_less" }]
 
 [[milestone]]
 id = "reader-volume-candidate-scan"

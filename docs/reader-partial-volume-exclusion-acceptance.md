@@ -1,7 +1,9 @@
 # Official Plain Reader Partial-Volume Exclusion Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-Duvet evidence, and CI remain pending.
+**Status:** Specification and implementation/test independently reviewed.
+Focused/full tests, Duvet, strict Clippy, formatting, and local full
+`cargo xtask ci` pass. Hosted Linux assurance and Duvet Pages publication
+remain pending.
 
 ## Goal and scope
 
@@ -92,9 +94,32 @@ and does not claim a formal proof of reader-level partial exclusion.
 ## Checklist
 
 - [x] Independent specification review accepts scope, mutation, and oracle.
-- [ ] Focused partial-volume reader test and Duvet links pass independent
-      review.
-- [ ] Focused/full tests, Duvet queries/trace, formatting, strict Clippy, and
-      local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused partial-volume reader test passes. It verifies the exact
+      twelve-key rename relation, unchanged object identities and bytes,
+      completed volume 3, catalog `Partial` status, and exact missing ordinal 2.
+- [x] Targeted `PARSE-NAME-005` and `PARSE-CHAIN-002` Duvet queries, full
+      `cargo xtask trace`, focused test, full core suite, formatting, strict
+      Clippy, and diff check pass locally.
+- [x] Independent implementation/test review passes.
+- [x] Full local `cargo xtask ci` passes with 2,047, 3,183, and 1,329 verified
+      declarations and zero errors; workspace tests, strict Clippy, formatting,
+      and Duvet pass.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
+
+## Current local evidence
+
+- `cargo test -p duplicity-core --test reader
+  official_partial_full_volume_is_visible_but_cannot_satisfy_required_volume`:
+  passed.
+- `cargo test -p duplicity-core`: passed.
+- `.tools/bin/duvet query --check implementation,test --section
+  docs/parsing-requirements.md#parse-name-005`: passed.
+- `.tools/bin/duvet query --check implementation,test --section
+  docs/parsing-requirements.md#parse-chain-002`: passed.
+- `DUVET="$PWD/.tools/bin/duvet" cargo xtask trace-update` and `cargo xtask
+  trace`: passed.
+- `cargo fmt --all -- --check`, `cargo clippy -p duplicity-core --all-targets
+  -- -D warnings`, and `git diff --check`: passed.
+- The full CI command ran in the pinned Nix shell and wrote
+  `target/assurance/ci.json` with source digest
+  `e17888dbb21ca22cf54f32599dfa3c8b0d232191c4acc56907d4019ea1bfcaa6`.
