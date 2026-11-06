@@ -11,11 +11,14 @@ volume. The production path is `MultipartAssembler::push_decoded_checked` in
 preserves any in-progress logical multipart entry, advances the remembered
 volume boundary, and emits no logical entry or payload.
 
-Implementation MUST NOT begin until the hosted Linux assurance and Duvet Pages
-gates both pass for (1) required-volume identity matching, run
-`42178899558`, and (2) the selected-chain-set adapter milestone. Those gates
-are prerequisites for this follow-up; this plan neither replaces nor extends
-their scopes.
+The implementation prerequisites are met: descendant run
+[42181068479](https://github.com/ajrudzitis/duplinaut/actions/runs/42181068479)
+passed hosted Linux assurance and Duvet Pages with both required-volume
+identity matching and the selected-chain-set adapter in its source history.
+Earlier identity-only run 42178899558 failed on a PTY transient-state race;
+that separate PTY follow-up was fixed in `b6cf3c6` and does not change or extend
+the core prerequisite scopes. Multipart-empty-volume implementation remains
+pending its own work and review.
 
 ## Requirements and transition model
 
@@ -124,6 +127,8 @@ profile.
 
 ## Checklist
 
+- [x] Hosted Linux assurance and Duvet Pages prerequisite gates for required-
+      volume identity and selected-set adapter pass in run 42181068479.
 - [ ] Verify the empty-volume boundary admission model and project-type
       refinement.
 - [ ] Test initial empty acceptance, pending-state preservation across an
