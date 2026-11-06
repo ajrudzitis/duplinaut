@@ -1023,7 +1023,7 @@ fn production_linux_tui_restores_two_marked_roots_with_exact_oracle_subset() {
         saw_mode_metadata |= screen.contains(
             "Preserves ordinary modes, supported exact modification times and raw symlink target bytes.",
         );
-        saw_scope_summary |= expected_roots_visible(screen);
+        saw_scope_summary |= expected_roots_visible(&screen);
         if saw_parent
             && saw_leaf
             && saw_no_replace
