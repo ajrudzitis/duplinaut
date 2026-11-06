@@ -1,7 +1,8 @@
 # Official Plain Reader PKCS#7 Incremental-Volume Exclusion Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** The bounded fixture test, targeted Duvet checks, and local core
+verification pass. Independent implementation review and full local
+`cargo xtask ci` pass; hosted Linux assurance/Pages remain pending.
 
 ## Goal and scope
 
@@ -108,13 +109,37 @@ proof. It adds no `PARSE-NAME-005` claim.
 
 - [x] Independent specification review accepts the scope, mutation, and
       public oracle.
-- [ ] Exact twelve-object mutation and byte/size/identity preservation pass;
+- [x] Exact twelve-object mutation and byte/size/identity preservation pass;
       the renamed volume 1 is visible as unsupported and completed volume 2
       remains visible.
-- [ ] All three expected descriptors are present independent of order; the
+- [x] All three expected descriptors are present independent of order; the
       iterator-derived Full index returns exact `MissingVolume { number: 1 }`
       at target `1700086400`.
-- [ ] Targeted Duvet queries/full trace, focused/full core tests, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Targeted `PARSE-NAME-001`/`PARSE-CHAIN-002` Duvet queries, full trace,
+      focused/full core tests, formatting, strict Clippy, and diff check pass.
+- [x] Independent implementation/test review passes.
+- [x] Full local `cargo xtask ci` passes (2,047/0, 3,183/0, and 1,329/0
+      verified; source digest is recorded in generated
+      `target/assurance/ci.json`).
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
+
+## Current local evidence
+
+- `cargo test -p duplicity-core --test reader
+  official_pkcs7_first_incremental_volume_is_visible_but_cannot_satisfy_volume_one`:
+  passed.
+- `cargo test -p duplicity-core`: passed.
+- `.tools/bin/duvet query --check implementation,test --section
+  docs/parsing-requirements.md#parse-name-001`: passed.
+- `.tools/bin/duvet query --check implementation,test --section
+  docs/parsing-requirements.md#parse-chain-002`: passed.
+- `DUVET="$PWD/.tools/bin/duvet" cargo xtask trace-update` and `cargo xtask
+  trace`: passed.
+- `cargo fmt --all -- --check`, `cargo clippy -p duplicity-core --all-targets
+  -- -D warnings`, and `git diff --check`: passed.
+- `nix-shell tools/shell.nix --run 'source tools/env.sh && cargo xtask ci'`:
+  passed with fresh Verus, Duvet, formatting, strict Clippy, and workspace
+  tests. The generated receipt records the source digest in
+  `target/assurance/ci.json`.
+- The original gzip volume bytes remain under a `.p7m` key; this test makes no
+  CMS, crypto, or PNAME-005 claim.
