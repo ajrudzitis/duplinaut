@@ -1,7 +1,11 @@
 # TUI selective multi-root restore acceptance plan
 
-Status: proposed; specification only. This adds a Linux production-PTY case
-for restoring multiple marked roots with distinct ancestor chains.
+Status: accepted. The Linux-gated test
+`production_linux_tui_restores_two_marked_roots_with_exact_oracle_subset`
+passed with full Linux assurance and Duvet Pages publication in
+[run 42170744533](https://github.com/ajrudzitis/duplinaut/actions/runs/42170744533).
+This acceptance covers one production-PTY restore of multiple marked roots
+with distinct ancestor chains.
 
 ## Goal and requirements
 
@@ -112,12 +116,12 @@ so no symlink timestamp exception applies.
   exact two-root selection, one acknowledged backend operation, known
   Published result, and filesystem subset oracle. Do not imply coverage of
   other outcome classes, all UI-008 behavior, or formal controller proof.
-- Run the focused Linux PTY test and full `cargo test -p duplicity-tui` on
-  Linux, targeted Duvet queries, `cargo xtask trace-update`, `cargo xtask
-  trace`, formatting, and strict TUI Clippy. Require hosted Linux assurance
-  (`cargo xtask ci`), Duvet Pages publication, and independent implementation
-  review. macOS portable tests do not count as Linux native publication
-  evidence.
+- The exact selective PTY test passed in the Linux assurance job's three-test
+  `restore_success_pty` binary suite. Full Linux assurance (`cargo xtask ci`)
+  and Duvet Pages publication passed in
+  [run 42170744533](https://github.com/ajrudzitis/duplinaut/actions/runs/42170744533).
+  This is Linux native publication evidence; macOS portable tests do not
+  substitute for it.
 - Independent review MUST verify the fixture paths/count/bytes/modes/times
   against `expected.json`; exactly two roots were marked; the preview and
   Published result were observed through the production PTY; the output tree
@@ -135,12 +139,13 @@ durability, ACL/xattr/ownership fidelity, or formal controller proofs.
 
 ## Checklist
 
-- [ ] Mark and preview exactly the two specified roots through the production
+- [x] Mark and preview exactly the two specified roots through the production
       Linux PTY; assert six entries, 28 payload bytes, and required ancestors.
-- [ ] Enter the exact acknowledgment once and observe the typed Published
+- [x] Enter the exact acknowledgment once and observe the typed Published
       result through the actual worker/backend path.
-- [ ] Compare the exact six-entry restored tree, file hashes, modes, mtimes,
+- [x] Compare the exact six-entry restored tree, file hashes, modes, mtimes,
       and absence of all unselected entries; verify source and terminal state.
-- [ ] Focused/full Linux TUI tests, Duvet trace, formatting, strict Clippy,
-      hosted assurance, and Duvet Pages pass.
-- [ ] Independent implementation review accepts the scoped evidence.
+- [x] Focused/full Linux TUI tests, Duvet trace, formatting, strict Clippy,
+      hosted assurance, and Duvet Pages pass in
+      [run 42170744533](https://github.com/ajrudzitis/duplinaut/actions/runs/42170744533).
+- [x] Independent implementation review accepts the scoped evidence.
