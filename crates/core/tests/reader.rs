@@ -1849,6 +1849,259 @@ fn official_pkcs7_full_signatures_archive_preserves_plain_snapshot_and_required_
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-chain-001
+//= type=test
+//# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
+//= docs/parsing-requirements.md#parse-path-001
+//= type=test
+//# The reader MUST preserve backup path components as bytes without lossy UTF-8 conversion.
+//= docs/parsing-requirements.md#assure-test-001
+//= type=test
+//# Compatibility tests MUST restore supported snapshots produced by official duplicity and compare contents and supported metadata with both their source tree and official restoration.
+#[test]
+fn official_partial_first_incremental_signature_archive_preserves_plain_snapshot_and_required_open_set(
+) {
+    const ORIGINAL: &str =
+        "backup/duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar.gz";
+    const UNSUPPORTED: &str =
+        "backup/duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar.part.gz";
+    const FULL_SIGNATURES: &str = "backup/duplicity-full-signatures.20231114T221320Z.sigtar.gz";
+    const SECOND_INCREMENTAL_SIGNATURES: &str =
+        "backup/duplicity-new-signatures.20231115T221320Z.to.20231116T221320Z.sigtar.gz";
+
+    let mut source = Source::official();
+    assert_eq!(source.objects.len(), 12);
+    let original_inventory = source.objects.clone();
+    let mut expected_keys = original_inventory
+        .iter()
+        .map(|(object, _)| object.key.clone())
+        .collect::<Vec<_>>();
+    expected_keys.sort();
+    let (original_archive, original_archive_bytes) = source
+        .objects
+        .iter()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .map(|(object, bytes)| (object.clone(), bytes.clone()))
+        .expect("official fixture contains the first-incremental signature archive");
+    let (renamed_archive, renamed_archive_bytes) = source
+        .objects
+        .iter_mut()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .expect("official fixture contains the first-incremental signature archive");
+    renamed_archive.key = UNSUPPORTED.into();
+    assert_eq!(renamed_archive_bytes, &original_archive_bytes);
+    assert_eq!(renamed_archive.size, original_archive.size);
+    assert_eq!(renamed_archive.identity, original_archive.identity);
+
+    let old_key = expected_keys
+        .iter_mut()
+        .find(|key| key.as_str() == ORIGINAL)
+        .expect("original inventory contains the first-incremental signature archive");
+    *old_key = UNSUPPORTED.into();
+    expected_keys.sort();
+    let mut actual_keys = source
+        .objects
+        .iter()
+        .map(|(object, _)| object.key.clone())
+        .collect::<Vec<_>>();
+    actual_keys.sort();
+    assert_eq!(actual_keys, expected_keys);
+    assert_eq!(source.objects.len(), 12);
+    for (original_object, original_bytes) in &original_inventory {
+        let expected_key = if original_object.key == ORIGINAL {
+            UNSUPPORTED
+        } else {
+            original_object.key.as_str()
+        };
+        let (actual_object, actual_bytes) = source
+            .objects
+            .iter()
+            .find(|(object, _)| object.key == expected_key)
+            .expect("each original object remains under its expected key");
+        let mut expected_object = original_object.clone();
+        expected_object.key = expected_key.into();
+        assert_eq!(actual_object, &expected_object);
+        assert_eq!(actual_bytes, original_bytes);
+    }
+
+    let catalog = discover(&source);
+    let unsupported_entry = catalog
+        .objects()
+        .iter()
+        .find(|entry| entry.object().key == UNSUPPORTED)
+        .expect("renamed partial first-incremental signature archive remains visible");
+    let unsupported_name = unsupported_entry.name().expect("archive name is parsed");
+    assert_eq!(
+        unsupported_name.kind,
+        duplicity_core::names::ObjectKind::IncrementalSignatures
+    );
+    assert_eq!(
+        (unsupported_name.start.0, unsupported_name.end.0),
+        (1700000000, 1700086400)
+    );
+    assert_eq!(unsupported_name.volume, None);
+    assert!(unsupported_name.partial);
+    assert_eq!(
+        unsupported_name.envelope,
+        duplicity_core::names::Envelope::Gzip
+    );
+    assert_eq!(unsupported_entry.status(), DiscoveryStatus::Partial);
+
+    let descriptors = catalog.manifests().collect::<Vec<_>>();
+    assert_eq!(descriptors.len(), 3);
+    let mut descriptor_keys = descriptors
+        .iter()
+        .map(|(_, _, descriptor)| {
+            (
+                match descriptor.kind() {
+                    SetKind::Full => 0,
+                    SetKind::Incremental => 1,
+                },
+                descriptor.start().0,
+                descriptor.end().0,
+            )
+        })
+        .collect::<Vec<_>>();
+    descriptor_keys.sort_unstable();
+    assert_eq!(
+        descriptor_keys,
+        vec![
+            (0, 1700000000, 1700000000),
+            (1, 1700000000, 1700086400),
+            (1, 1700086400, 1700172800),
+        ]
+    );
+    let (full_index, _, _) = descriptors
+        .iter()
+        .find(|(_, _, descriptor)| descriptor.kind() == SetKind::Full)
+        .expect("the completed full manifest remains a public anchor");
+    let snapshot = catalog
+        .read_snapshot(*full_index, Timestamp(1700172800), &Cancellation::default())
+        .expect(
+            "the unsupported first-incremental signature archive does not block plain restoration",
+        );
+
+    let oracle: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/duplicity-3.0.7/expected.json"
+    ))
+    .unwrap();
+    let expected_snapshot = oracle["snapshots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["mode"] == "plain" && item["index"] == 2)
+        .expect("the final plain snapshot oracle exists");
+    assert!(expected_snapshot["official_comparison_exclusions"]
+        .as_array()
+        .expect("official comparison exclusions are listed")
+        .iter()
+        .any(|excluded| excluded == "symlink_mtime_ns"));
+    let expected_entries = expected_snapshot["entries"]
+        .as_array()
+        .expect("official snapshot entries are listed");
+    assert_eq!(snapshot.state().len(), expected_entries.len());
+    let mut expected_by_components = std::collections::BTreeMap::new();
+    for expected_entry in expected_entries {
+        let components = expected_entry["components_hex"]
+            .as_array()
+            .expect("oracle raw path components")
+            .iter()
+            .map(|component| decode_oracle_hex(component.as_str().unwrap()))
+            .collect::<Vec<_>>();
+        assert!(
+            expected_by_components
+                .insert(components, expected_entry)
+                .is_none(),
+            "oracle contains each raw component path once"
+        );
+    }
+    let actual_entries = snapshot.state().entries().collect::<Vec<_>>();
+    let actual_paths = actual_entries
+        .iter()
+        .map(|(path, _)| path.components().clone())
+        .collect::<Vec<_>>();
+    let expected_sorted_paths = expected_by_components.keys().cloned().collect::<Vec<_>>();
+    assert_eq!(
+        actual_paths, expected_sorted_paths,
+        "final snapshot paths and iteration order match raw oracle components"
+    );
+    for (path, entry) in actual_entries {
+        let expected_entry = expected_by_components
+            .get(path.components())
+            .expect("every snapshot entry has an oracle record");
+        let expected_kind = match expected_entry["kind"].as_str().unwrap() {
+            "file" => duplicity_core::tar::EntryType::Regular,
+            "directory" => duplicity_core::tar::EntryType::Directory,
+            "symlink" => duplicity_core::tar::EntryType::Symlink,
+            other => panic!("unexpected oracle entry kind {other}"),
+        };
+        assert_eq!(entry.entry_type(), expected_kind);
+        assert_eq!(
+            entry.mode() & 0o777,
+            u32::try_from(expected_entry["mode"].as_u64().unwrap()).unwrap() & 0o777
+        );
+        if expected_kind != duplicity_core::tar::EntryType::Symlink {
+            let mtime_ns = expected_entry["mtime_ns"]
+                .as_i64()
+                .expect("oracle mtime_ns fits checked signed i64");
+            assert_eq!(
+                entry.mtime(),
+                duplicity_core::tar::TarTime {
+                    seconds: mtime_ns.div_euclid(1_000_000_000),
+                    nanoseconds: u32::try_from(mtime_ns.rem_euclid(1_000_000_000)).unwrap(),
+                }
+            );
+        }
+        match expected_kind {
+            duplicity_core::tar::EntryType::Regular => {
+                let content = entry
+                    .content()
+                    .expect("every oracle file has retained content");
+                assert_eq!(
+                    content.len() as u64,
+                    expected_entry["size"].as_u64().unwrap()
+                );
+                assert_eq!(
+                    format!("{:x}", sha2::Sha256::digest(content)),
+                    expected_entry["sha256"].as_str().unwrap()
+                );
+            }
+            duplicity_core::tar::EntryType::Symlink => assert_eq!(
+                entry.linkname(),
+                decode_oracle_hex(expected_entry["symlink_target_hex"].as_str().unwrap())
+            ),
+            duplicity_core::tar::EntryType::Directory => {}
+            other => panic!("unexpected snapshot entry type {other:?}"),
+        }
+    }
+
+    let mut expected_opened_keys = vec![
+        "backup/duplicity-full.20231114T221320Z.manifest",
+        "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+        "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz",
+        "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol2.difftar.gz",
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest",
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz",
+    ];
+    expected_opened_keys.sort_unstable();
+    let mut opened_keys = source.opened_keys.lock().unwrap().clone();
+    opened_keys.sort_unstable();
+    assert_eq!(opened_keys.len(), expected_opened_keys.len());
+    assert_eq!(opened_keys, expected_opened_keys);
+    assert!(!opened_keys.iter().any(|key| {
+        key == UNSUPPORTED
+            || key == ORIGINAL
+            || key == FULL_SIGNATURES
+            || key == SECOND_INCREMENTAL_SIGNATURES
+    }));
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 //= docs/parsing-requirements.md#parse-chain-002
 //= type=test
 //# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.

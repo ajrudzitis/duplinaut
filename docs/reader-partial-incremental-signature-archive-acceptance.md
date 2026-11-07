@@ -1,7 +1,6 @@
 # Official Plain Reader Partial Incremental-Signature Archive Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Specification accepted after independent review. The implementation and independent test review pass. Local focused/full core tests, Duvet trace, formatting, and strict Clippy pass. Local full `cargo xtask ci` passes. Hosted Linux assurance and Duvet Pages remain pending.
 
 ## Goal and scope
 
@@ -132,11 +131,12 @@ operations.
 
 - [x] Independent specification review accepts the scope, mutation, opened
       key set, and final snapshot oracle.
-- [ ] Exact twelve-object key relation and original bytes/size/identity pass;
+- [x] Exact twelve-object key relation and original bytes/size/identity pass;
       the renamed object is visible as partial IncrementalSignatures.
-- [ ] The exact three descriptors remain present; final state matches the
+- [x] The exact three descriptors remain present; final state matches the
       documented oracle and the read set contains only manifests/volumes.
-- [ ] Targeted Duvet queries/full trace, focused/full core tests, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Targeted Duvet queries/full trace, focused/full core tests, formatting,
+      strict Clippy, and diff checks pass.
+- [x] Local full `cargo xtask ci` passes.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
