@@ -1,7 +1,11 @@
 # Encrypted manifest signer rejection before volume access
 
-Status: proposed; pending independent specification review. No test or
-assurance-ledger changes are included in this proposal.
+Status: specification and implementation independently reviewed and accepted.
+The focused/full core tests, targeted Duvet queries, full trace, formatting,
+strict Clippy, and full local `cargo xtask ci` pass at exact-source receipt
+SHA-256 `bd449ed17c1dc507297cfb29c194d6b478ee643efabb0d7cde7f5e819653d1b8`
+(Verus 2,047/3,183/1,371, zero errors). The narrow native-attendance gate is
+enabled; hosted Linux/Pages checks remain pending.
 
 ## Goal and scope
 
@@ -97,18 +101,18 @@ primitive correctness, or reader-controller formal refinement.
 
 ## Acceptance evidence
 
-- [ ] Independent specification review accepts the exact fixture, credentials,
+- [x] Independent specification review accepts the exact fixture, credentials,
       and open-sequence oracle.
-- [ ] The focused positive control checks exact snapshot/oracle fields,
+- [x] The focused positive control checks exact snapshot/oracle fields,
       two authorized evidence records, and the exact two-key open sequence.
-- [ ] The negative path changes only the allowlist, returns the exact typed
+- [x] The negative path changes only the allowlist, returns the exact typed
       signer error, and records only the signed Full-manifest key in its open
       log; no snapshot or evidence receipt is returned.
-- [ ] The test is Duvet-linked to PARSE-ENV-018, PARSE-ENV-012, PARSE-ENV-014,
+- [x] The test is Duvet-linked to PARSE-ENV-018, PARSE-ENV-012, PARSE-ENV-014,
       and PARSE-ENV-021, and its source/test mapping is accepted in the
       assurance ledger without a crypto or controller proof claim.
-- [ ] Focused and full core tests, targeted Duvet queries/full trace,
+- [x] Focused and full core tests, targeted Duvet queries/full trace,
       formatting, strict Clippy, and full `cargo xtask ci` pass.
-- [ ] Independent implementation review accepts the positive control,
+- [x] Independent implementation review accepts the positive control,
       unchanged credentials, exact opened-key boundary, and typed failure.
 - [ ] Hosted Linux assurance and Duvet Pages pass.

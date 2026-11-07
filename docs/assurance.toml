@@ -1610,7 +1610,8 @@ tests = [
   { package = "duplicity-core", name = "crypto_decoded_and_each_receipt_bound_fail_through_catalog_reader" },
   { package = "duplicity-core", name = "multipart::openpgp_tests::authenticated_nonfinal_topoff_must_match_regenerated_ciphertext_prefix" },
   { package = "duplicity-core", name = "original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidence" },
-  { package = "duplicity-core", name = "public_rsa2048_pkesk_full_snapshot_matches_official_oracle" }
+  { package = "duplicity-core", name = "public_rsa2048_pkesk_full_snapshot_matches_official_oracle" },
+  { package = "duplicity-core", name = "public_signed_manifest_signer_rejection_precedes_volume_open" }
 ]
 
 [[milestone]]
@@ -1646,6 +1647,24 @@ implementations = [
 ]
 proofs = []
 tests = [{ package = "duplicity-core", name = "public_rsa2048_pkesk_full_snapshot_matches_official_oracle" }]
+
+[[milestone]]
+id = "openpgp-manifest-signer-before-volume"
+gate = true
+requirements = ["PARSE-ENV-018", "PARSE-ENV-012", "PARSE-ENV-014", "PARSE-ENV-021"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = false
+proof_rationale = "This narrow gate enforces native Duvet implementation/test attendance for one official signed Full-manifest source-open boundary. It makes no Verus claim about OpenPGP cryptography, manifest decoding, or complete reader control flow."
+implementations = [
+  { path = "crates/core/src/reader.rs", symbol = "read_snapshot_with_crypto" },
+  { path = "crates/core/src/openpgp.rs", symbol = "decode" }
+]
+proofs = []
+tests = [{ package = "duplicity-core", name = "public_signed_manifest_signer_rejection_precedes_volume_open" }]
 
 [[milestone]]
 id = "linux-restoration"

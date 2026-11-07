@@ -131,6 +131,43 @@ impl OrderedFixtureSource {
         }
     }
 
+    fn selected_one_volume(
+        directory: &str,
+        manifest_name: &str,
+        volume_name: &str,
+        version_id: &str,
+    ) -> Self {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/duplicity-3.0.7")
+            .join(directory);
+        let mut names = [manifest_name, volume_name];
+        names.sort_unstable();
+        assert_ne!(names[0], names[1], "manifest and volume keys are distinct");
+        let values = names
+            .into_iter()
+            .map(|name| {
+                let path = root.join(name);
+                assert!(path.is_file(), "expected fixture object {name}");
+                let bytes = std::fs::read(path).unwrap();
+                (
+                    StoredObject {
+                        key: format!("backup/{name}"),
+                        size: bytes.len() as u64,
+                        identity: ObjectIdentity {
+                            version_id: Some(version_id.to_owned()),
+                            etag: Some(format!("{:x}", Sha256::digest(&bytes))),
+                        },
+                    },
+                    bytes,
+                )
+            })
+            .collect::<Vec<_>>();
+        Self {
+            values,
+            opens: Mutex::new(Vec::new()),
+        }
+    }
+
     fn opened_keys(&self) -> Vec<String> {
         self.opens.lock().unwrap().clone()
     }
@@ -167,7 +204,6 @@ impl ObjectSource for OrderedFixtureSource {
         if cancel.is_cancelled() {
             return Err(SourceError::Cancelled);
         }
-        self.opens.lock().unwrap().push(object.key.clone());
         let (expected, bytes) = self
             .values
             .iter()
@@ -176,6 +212,7 @@ impl ObjectSource for OrderedFixtureSource {
         if expected != object {
             return Err(SourceError::Changed);
         }
+        self.opens.lock().unwrap().push(object.key.clone());
         Ok(Box::new(Cursor::new(bytes.clone())))
     }
 }
@@ -1495,6 +1532,149 @@ fn public_crypto_reader_rejects_valid_signature_from_disallowed_primary_signer()
     assert!(!error
         .to_string()
         .contains("duplicity-reader-public-test-fixture"));
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-018
+//= type=test
+//# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.
+//= docs/parsing-requirements.md#parse-env-012
+//= type=test
+//# Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
+//= docs/parsing-requirements.md#parse-env-014
+//= type=test
+//# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
+//= docs/parsing-requirements.md#parse-env-021
+//= type=test
+//# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+fn public_signed_manifest_signer_rejection_precedes_volume_open() {
+    const MANIFEST: &str = "duplicity-full.20231114T221320Z.manifest.gpg";
+    const VOLUME: &str = "duplicity-full.20231114T221320Z.vol1.difftar.gpg";
+    const MANIFEST_KEY: &str = "backup/duplicity-full.20231114T221320Z.manifest.gpg";
+    const VOLUME_KEY: &str = "backup/duplicity-full.20231114T221320Z.vol1.difftar.gpg";
+    const PRIMARY_FINGERPRINT: [u8; 20] = [
+        0xd0, 0x68, 0x47, 0xba, 0xc3, 0xb1, 0x17, 0xc4, 0x6b, 0xb6, 0x8b, 0xda, 0x6f, 0x23, 0x17,
+        0x3b, 0xad, 0x8a, 0x76, 0x56,
+    ];
+    const OPEN_KEYS: [&str; 2] = [MANIFEST_KEY, VOLUME_KEY];
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7");
+    let source =
+        OrderedFixtureSource::selected_one_volume("signed", MANIFEST, VOLUME, "signed-fixture-v1");
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .expect("official signed Full metadata is discoverable");
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .expect("official Full descriptor")
+        .0;
+    assert!(
+        source.opened_keys().is_empty(),
+        "discovery opens no objects"
+    );
+
+    let secret = std::fs::read(root.join("test-keys/secret.asc")).unwrap();
+    let signer = std::fs::read(root.join("test-keys/public.asc")).unwrap();
+    let passphrase = "duplicity-reader-public-test-fixture";
+    let password = OpenPgpPassword::from(passphrase);
+    let secret_exports = [SecretExport {
+        bytes: &secret,
+        password: Some(&password),
+    }];
+    let signer_exports = [signer.as_slice()];
+    let allowed_signers = [PRIMARY_FINGERPRINT];
+    let positive_context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &allowed_signers,
+            require_signature: true,
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+
+    let oracle: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(root.join("expected.json")).unwrap()).unwrap();
+    let expected_entries = &oracle["snapshots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["mode"] == "signed" && row["index"] == 0)
+        .expect("official signed first-date snapshot oracle")["entries"];
+    let positive_snapshot = catalog
+        .read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1_700_000_000),
+            &Cancellation::default(),
+            &positive_context,
+        )
+        .expect("the exact permitted primary fingerprint authorizes the signed Full set");
+    assert_snapshot_matches_one_volume_oracle(&positive_snapshot, expected_entries);
+    assert_eq!(source.opened_keys(), OPEN_KEYS);
+    let positive_records = positive_snapshot.authentication_evidence().objects();
+    assert_eq!(positive_records.len(), 2);
+    assert_eq!(
+        positive_records
+            .iter()
+            .map(|record| record.key.as_str())
+            .collect::<Vec<_>>(),
+        OPEN_KEYS
+    );
+    assert!(positive_records.iter().all(|record| {
+        record.kind == duplicity_core::reader::AuthenticationKind::OpenPgpAuthorized
+            && record
+                .authorized_signer
+                .as_ref()
+                .is_some_and(|signer| signer.primary_fingerprint == PRIMARY_FINGERPRINT)
+    }));
+    source.clear_open_log();
+
+    let mut suffix_collision = [0x55; 20];
+    suffix_collision[12..].copy_from_slice(&PRIMARY_FINGERPRINT[12..]);
+    assert_ne!(suffix_collision, PRIMARY_FINGERPRINT);
+    assert_eq!(
+        &suffix_collision[12..],
+        &PRIMARY_FINGERPRINT[12..],
+        "the unauthorized candidate collides only on the final eight bytes"
+    );
+    let disallowed_signers = [suffix_collision];
+    let negative_context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &disallowed_signers,
+            require_signature: true,
+            ..CryptoCredentials::default()
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    let error = match catalog.read_snapshot_with_crypto(
+        anchor,
+        Timestamp(1_700_000_000),
+        &Cancellation::default(),
+        &negative_context,
+    ) {
+        Ok(_) => panic!("reader accepted a valid signature from a suffix-collision signer"),
+        Err(ReaderError::Crypto(error)) => error,
+        Err(error) => panic!("disallowed signer returned an unexpected error: {error:?}"),
+    };
+    assert_eq!(
+        error,
+        duplicity_core::reader::OpenPgpError::SignerNotAllowed
+    );
+    assert_eq!(source.opened_keys(), [MANIFEST_KEY]);
+    let error_text = format!("{error:?} {error}");
+    assert!(!error_text.contains(passphrase));
+    assert!(!error_text.contains(std::str::from_utf8(&secret).unwrap()));
 }
 
 #[test]
