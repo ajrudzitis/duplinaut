@@ -1,7 +1,7 @@
 # PARSE-ENV-008 AES-128 symmetric payload acceptance
 
-Status: proposed; pending independent specification review. No fixture, test,
-assurance-gate, or implementation work is included in this specification yet.
+Status: implementation prepared; independent implementation review and gate
+activation remain pending. The accepted specification is unchanged.
 
 ## Goal and scope
 
@@ -28,12 +28,14 @@ wrappers, or the full OpenPGP capability matrix.
    producer argv, the cipher-selection option, public test password source,
    source recipe, output object names, sizes, and SHA-256 hashes.
 2. The fixture MUST contain a completed Full manifest and exactly one
-   required Full volume. Both MUST be symmetric OpenPGP objects using SKESKv4
-   and authenticated SEIPDv1. Independent fixture inspection MUST establish
-   the payload cipher for each object as AES-128, algorithm ID 7. Record the
-   exact GnuPG status evidence (expected `DECRYPTION_INFO` cipher field `7`)
-   and preserve the inspection command/output in provenance. Runtime tests
-   MUST NOT call GnuPG or infer the payload cipher from producer options alone.
+   required Full volume. Both MUST be symmetric OpenPGP objects using exactly
+   one SKESKv4 packet and zero PKESK packets, followed by authenticated
+   SEIPDv1. Independent fixture inspection MUST establish those exact wrapper
+   counts and the payload cipher for each object as AES-128, algorithm ID 7.
+   Record the exact GnuPG status evidence (expected `DECRYPTION_INFO` cipher
+   field `7`) and preserve the inspection command/output in provenance.
+   Runtime tests MUST NOT call GnuPG or infer the payload cipher from producer
+   options alone. Hybrid SKESK+PKESK objects are outside this case.
 3. Provenance MUST pin the public-reader source identity policy: fixed
    version ID `symmetric-aes128-fixture-v1` per stored object, ETag equal to
    lowercase hexadecimal SHA-256 of that exact object's stored bytes, and
@@ -108,21 +110,24 @@ remain trusted upstream boundaries.
 
 ## Verification and acceptance checklist
 
-- [ ] Independent specification review approves scope and the AES-128 fixture
+- [x] Independent specification review approves scope and the AES-128 fixture
       recipe.
-- [ ] Producer provenance pins versions, commands, exact object hashes and
-      identities; independent GnuPG inspection confirms SKESKv4,
-      SEIPDv1/MDC, and AES-128 algorithm ID 7 for both objects.
-- [ ] The public-reader test verifies the empty/nonempty credential profile,
+- [x] Producer provenance pins versions, commands, exact object hashes and
+      identities; independent GnuPG inspection confirms exactly one SKESKv4
+      and zero PKESK packets, SEIPDv1/MDC, and AES-128 algorithm ID 7 for both
+      objects.
+- [x] The public-reader test verifies the empty/nonempty credential profile,
       metadata-only discovery, exact ordered two-key open log, complete
       snapshot oracle, and exactly two integrity-only evidence records.
-- [ ] Duvet links cover PARSE-ENV-008, PARSE-ENV-009, PARSE-ENV-021,
+- [x] Duvet links cover PARSE-ENV-008, PARSE-ENV-009, PARSE-ENV-021,
       PARSE-ENV-023, and the scoped PARSE-STATE-003 order assertion; targeted
       queries and full trace pass.
-- [ ] The focused test is registered in the existing reader edge-test ledger
-      and the narrow native-only `proof_required = false` gate; independent
-      implementation review approves enabling the gate.
-- [ ] Focused/full core tests, formatting, strict Clippy, and full
+- [x] The focused test is registered in the existing reader edge-test ledger
+      and the narrow native-only `proof_required = false` gate. The gate stays
+      disabled until independent implementation review approves activation.
+- [x] The focused test, formatting, strict Clippy, targeted Duvet queries and
+      full trace pass.
+- [ ] Full core tests and full
       `cargo xtask ci` pass with an exact-source receipt.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
 
