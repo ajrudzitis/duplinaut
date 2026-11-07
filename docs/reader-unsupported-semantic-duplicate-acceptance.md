@@ -1,7 +1,8 @@
 # Official Plain Reader Unsupported Semantic-Duplicate Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Implementation and independent implementation review passed.
+Focused/full core tests, Duvet queries/full trace, formatting, strict Clippy,
+and full pinned local CI passed. Hosted Linux/Pages assurance is pending.
 
 ## Goal and scope
 
@@ -141,11 +142,24 @@ restoration, complete reader/controller refinement, or formal reader proof.
 
 - [x] Independent specification review accepts the same-semantic pair,
       diagnostic treatment, snapshot oracle, and open set.
-- [ ] Discovery preserves both objects with distinct envelope/status values
+- [x] Discovery preserves both objects with distinct envelope/status values
       and does not reject the catalog as a duplicate artifact.
-- [ ] The final snapshot matches all documented oracle fields and opens
+- [x] The final snapshot matches all documented oracle fields and opens
       exactly the three manifests plus six supported data volumes.
-- [ ] Focused/full core tests, targeted Duvet queries/full trace, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused/full core tests, targeted Duvet queries/full trace, formatting,
+      strict Clippy, and diff checks pass locally.
+- [x] Independent implementation/test review passes.
+- [x] Full pinned local `cargo xtask ci` passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
+
+## Current local evidence
+
+- Focused reader acceptance test passed (1/1).
+- `cargo test -p duplicity-core` passed.
+- Targeted Duvet queries for `PARSE-NAME-001`, `PARSE-CHAIN-001`,
+  `PARSE-PATH-001`, and `ASSURE-TEST-001`, `cargo xtask trace-update`, and
+  `cargo xtask trace` passed.
+- `cargo fmt --all -- --check`, strict core Clippy, and `git diff --check`
+  passed.
+- Independent implementation review and full pinned local `cargo xtask ci`
+  passed. Hosted Linux assurance/Pages remain pending.
