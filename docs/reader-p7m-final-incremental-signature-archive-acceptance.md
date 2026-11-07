@@ -1,7 +1,6 @@
 # Official Plain Reader PKCS#7 Final-Incremental Signature Archive Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Specification accepted after independent review. The implementation and independent test review pass. Local focused/full core tests, targeted Duvet queries/full trace, formatting, strict Clippy, and diff checks pass. Local full `cargo xtask ci` passes. Hosted Linux assurance and Duvet Pages remain pending.
 
 ## Goal and scope
 
@@ -141,12 +140,13 @@ reader/controller refinement, or formal reader proof.
 
 - [x] Independent specification review accepts the fixture mutation, public
       outcomes, open set, and oracle.
-- [ ] Discovery retains the renamed archive as
+- [x] Discovery retains the renamed archive as
       `IncrementalSignatures(1700086400,1700172800)`/
       `Pkcs7`/`UnsupportedEnvelope`, with exact inventory and payload identity.
-- [ ] The public final snapshot matches every documented oracle field and
+- [x] The public final snapshot matches every documented oracle field and
       opens exactly the three manifests plus six data volumes.
-- [ ] Focused/full core tests, targeted Duvet queries/full trace, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused/full core tests, targeted Duvet queries/full trace, formatting,
+      strict Clippy, and diff checks pass.
+- [x] Local full `cargo xtask ci` passes.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
