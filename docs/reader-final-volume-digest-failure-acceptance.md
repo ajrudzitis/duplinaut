@@ -114,7 +114,8 @@ boundary for native digest primitives explicit.
   obligations with zero errors; workspace formatting, strict Clippy, tests,
   and assurance-mapped test validation pass. Receipt: generated
   `target/assurance/ci.json`.
-- Hosted Linux assurance and Duvet Pages remain pending.
+- Hosted Linux assurance and Duvet Pages pass in [run
+  42384261165](https://github.com/ajrudzitis/duplinaut/actions/runs/42384261165).
 
 ## Checklist
 
@@ -128,4 +129,4 @@ boundary for native digest primitives explicit.
       strict Clippy pass.
 - [x] Full local `cargo xtask ci` passes.
 - [x] Independent implementation/test review passes.
-- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [x] Hosted Linux assurance and Duvet Pages pass in run 42384261165.
