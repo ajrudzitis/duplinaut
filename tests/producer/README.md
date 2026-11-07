@@ -72,6 +72,38 @@ GnuPG uses a private temporary home; its local agent socket must be available.
 The checked-in `provenance.json` records the exact tool store paths and command
 arguments for the produced fixture.
 
+### PARSE-ENV-008 Ed25519 signing-subkey fixture
+
+`generate_signing_subkey.py` creates a v4 Ed25519 certification-only primary,
+an Ed25519 signing subkey, and a cv25519 encryption subkey in an isolated
+GnuPG home. It uses the primary fingerprint as the reader authorization
+identity while explicitly selecting the signing-subkey fingerprint for the
+Duplicity signing option. GnuPG verifies the exported certificate binding and
+its embedded class-0x19 back-signature. Before packaging, the generator
+decrypts and verifies the exact Full manifest and volume 1 and requires each
+`VALIDSIG` status to report the expected signing-subkey and primary
+fingerprints. It also performs an official Duplicity restore against the
+independent source oracle. Provenance records tool versions, normalized argv,
+key-component identities, binding evidence, both document-signature status
+records, object hashes and lengths, and the oracle. Tests consume only the
+checked-in artifacts and never call Duplicity or GnuPG.
+
+Reproduce into a new output directory with the pinned producer tools:
+
+```sh
+nix-shell -p duplicity gnupg --run \
+  'python3 tests/producer/generate_signing_subkey.py \
+    --duplicity /path/to/official/duplicity-3.0.7/bin/duplicity \
+    --gpg /path/to/pinned/gnupg/bin/gpg \
+    --expected-version 3.0.7 \
+    --output /tmp/duplicity-reader-signing-subkey'
+```
+
+Use the recorded exact tool derivations from fixture provenance when
+reproducing the checked-in artifacts. The signing subkey is deliberately
+separate from the primary authorization fingerprint and encryption subkey;
+this fixture covers only this one Ed25519 signing profile.
+
 The checked-in 3.0.7 corpus was produced with:
 
 - Duplicity: `/nix/store/5j4mk0k17j37nh8a7s2pcr5z0vblx73r-duplicity-3.0.7/bin/duplicity`

@@ -1,7 +1,11 @@
 # PARSE-ENV-008 official signing-subkey compatibility acceptance
 
-Status: proposed; pending independent specification review. No fixture, test,
-assurance-gate, or implementation work is included in this specification yet.
+Status: implementation independently reviewed and accepted. Focused and full
+core/workspace tests, targeted Duvet queries/full trace, formatting, strict
+Clippy, and full local `cargo xtask ci` pass at exact-source receipt SHA-256
+`450797a2c83bc6a0a99533fa85e19785673f1f515c70a6c3a3a3787f104d6fb3`
+(Verus 2,047/3,183/1,371, zero errors). The narrow native-attendance gate is
+enabled. Hosted Linux/Pages checks remain pending.
 
 ## Goal and scope
 
@@ -113,24 +117,24 @@ filesystem publication, or complete reader/controller refinement.
 
 ## Verification and acceptance checklist
 
-- [ ] Independent specification review accepts the fixture-generation and
+- [x] Independent specification review accepts the fixture-generation and
       exact component-attribution criteria.
-- [ ] Checked-in producer provenance pins tool versions, exact command,
+- [x] Checked-in producer provenance pins tool versions, exact command,
       fixture object hashes, date, primary/subkey fingerprints, subkey
       binding/back-signature facts, and actual signature component for both
       required objects.
-- [ ] The public-reader test matches the independent snapshot oracle and
+- [x] The public-reader test matches the independent snapshot oracle and
       exact two-key open sequence using a nonempty primary allowlist and no
       message passwords.
-- [ ] Exactly two authorized evidence records preserve the expected primary
+- [x] Exactly two authorized evidence records preserve the expected primary
       and signing-subkey fingerprints for their respective source objects.
-- [ ] Duvet links cover PARSE-ENV-008, PARSE-ENV-012, PARSE-ENV-019,
+- [x] Duvet links cover PARSE-ENV-008, PARSE-ENV-012, PARSE-ENV-019,
       PARSE-ENV-021, and PARSE-ENV-023; targeted queries and full trace pass.
-- [ ] The exact test is in the existing reader edge-test ledger and the
+- [x] The exact test is in the existing reader edge-test ledger and the
       narrow `proof_required = false` gate; independent implementation review
       approves enabling that gate.
-- [ ] Focused and full core tests, formatting, strict Clippy, and full
-      `cargo xtask ci` pass with a recorded exact-source receipt.
+- [x] Focused and full core tests, formatting, strict Clippy, and full
+      `cargo xtask ci` pass with the exact-source receipt recorded above.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
 
 Acceptance applies only to this one official Ed25519 signing-subkey Full

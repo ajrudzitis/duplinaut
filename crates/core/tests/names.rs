@@ -2471,6 +2471,7 @@ fn every_official_archive_basename_is_classified() {
     let supplemental = [
         root.join("duplicity-3.0.7/unsigned-data-volume"),
         root.join("duplicity-3.0.7/rsa2048"),
+        root.join("duplicity-3.0.7/ed25519-signing-subkey"),
     ];
     let mut pending = vec![root];
     let mut count = 0;

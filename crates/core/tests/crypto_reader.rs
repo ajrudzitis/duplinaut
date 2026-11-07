@@ -864,6 +864,287 @@ fn public_rsa2048_pkesk_full_snapshot_matches_official_oracle() {
     assert!(policy.permitted_primary_fingerprints.is_empty());
 }
 
+#[test]
+//= docs/parsing-requirements.md#parse-env-008
+//= type=test
+//# The adapter MUST restrict decryption and verification algorithms to the enumerated initial capability profile.
+//= docs/parsing-requirements.md#parse-env-012
+//= type=test
+//# Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
+//= docs/parsing-requirements.md#parse-env-019
+//= type=test
+//# A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
+//= docs/parsing-requirements.md#parse-env-021
+//= type=test
+//# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+//= docs/parsing-requirements.md#parse-env-023
+//= type=test
+//# Snapshot authentication evidence MUST distinguish integrity-only objects from configured signer authorization and preserve available complete signer fingerprints and certificate creation/expiry/revocation observations without implying current validity or Web-of-Trust acceptance.
+fn public_ed25519_signing_subkey_full_snapshot_records_primary_and_component() {
+    const MANIFEST: &str = "duplicity-full.20231114T221320Z.manifest.gpg";
+    const VOLUME: &str = "duplicity-full.20231114T221320Z.vol1.difftar.gpg";
+    const MANIFEST_KEY: &str = "backup/duplicity-full.20231114T221320Z.manifest.gpg";
+    const VOLUME_KEY: &str = "backup/duplicity-full.20231114T221320Z.vol1.difftar.gpg";
+    const OPEN_KEYS: [&str; 2] = [MANIFEST_KEY, VOLUME_KEY];
+
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/ed25519-signing-subkey");
+    let expected: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(fixture.join("expected.json")).expect("official source oracle"),
+    )
+    .expect("valid source oracle");
+    let provenance: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(fixture.join("provenance.json")).expect("fixture provenance"),
+    )
+    .expect("valid fixture provenance");
+    assert_eq!(
+        provenance["source_recipe"],
+        "tests/producer/generate_signing_subkey.py"
+    );
+    let source_recipe = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/producer/generate_signing_subkey.py");
+    assert_eq!(
+        provenance["source_recipe_sha256"],
+        format!(
+            "{:x}",
+            Sha256::digest(std::fs::read(source_recipe).unwrap())
+        )
+    );
+    assert_eq!(provenance["producer"], "duplicity 3.0.7 December 31, 2025");
+    assert_eq!(provenance["gpg"], "gpg (GnuPG) 2.4.9");
+    assert_eq!(expected["target"], 1_700_000_000);
+    assert_eq!(provenance["source_interval"]["start"], 1_700_000_000);
+    assert_eq!(provenance["source_interval"]["end"], 1_700_000_000);
+    assert_eq!(
+        expected["official_comparison_exclusions"],
+        serde_json::json!(["symlink_mtime_ns"])
+    );
+
+    let signer = &provenance["signer"];
+    let primary_fingerprint: [u8; 20] =
+        decode_hex_bytes(signer["primary_fingerprint"].as_str().unwrap())
+            .try_into()
+            .expect("v4 primary fingerprint is 20 bytes");
+    let signing_subkey_fingerprint: [u8; 20] =
+        decode_hex_bytes(signer["signing_subkey"]["fingerprint"].as_str().unwrap())
+            .try_into()
+            .expect("v4 signing-subkey fingerprint is 20 bytes");
+    let encryption_subkey_fingerprint: [u8; 20] =
+        decode_hex_bytes(signer["encryption_subkey"]["fingerprint"].as_str().unwrap())
+            .try_into()
+            .expect("v4 encryption-subkey fingerprint is 20 bytes");
+    assert_ne!(primary_fingerprint, signing_subkey_fingerprint);
+    assert_ne!(primary_fingerprint, encryption_subkey_fingerprint);
+    assert_ne!(signing_subkey_fingerprint, encryption_subkey_fingerprint);
+    assert_eq!(signer["primary_component"]["algorithm_id"], 22);
+    assert!(signer["primary_component"]["capabilities"]
+        .as_str()
+        .unwrap()
+        .contains('c'));
+    assert!(!signer["primary_component"]["capabilities"]
+        .as_str()
+        .unwrap()
+        .contains('s'));
+    assert_eq!(signer["signing_subkey"]["algorithm_id"], 22);
+    assert_eq!(signer["signing_subkey"]["capabilities"], "s");
+    assert_eq!(signer["encryption_subkey"]["algorithm_id"], 18);
+    assert_eq!(signer["encryption_subkey"]["capabilities"], "e");
+    assert_eq!(signer["binding_evidence"]["binding_class"], "0x18");
+    assert_eq!(
+        signer["binding_evidence"]["embedded_back_signature_class"],
+        "0x19"
+    );
+    assert!(
+        signer["binding_evidence"]["embedded_back_signature_subpacket"]
+            .as_str()
+            .unwrap()
+            .contains("class 0x19")
+    );
+    assert_eq!(signer["binding_evidence"]["gpg_check_sigs_exit_status"], 0);
+    assert!(signer["check_sigs_stderr"]
+        .as_str()
+        .unwrap()
+        .contains("good signatures"));
+    let packet_listing = signer["public_certificate_packet_listing"]
+        .as_str()
+        .unwrap();
+    assert!(packet_listing.contains("sigclass 0x18"));
+    assert!(packet_listing.contains("class 0x19"));
+    assert!(packet_listing.contains(signer["signing_subkey"]["key_id"].as_str().unwrap()));
+
+    let expected_objects = [(MANIFEST, MANIFEST_KEY), (VOLUME, VOLUME_KEY)];
+    assert_eq!(provenance["objects"].as_array().unwrap().len(), 2);
+    for (filename, key) in expected_objects {
+        let record = provenance["objects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|record| record["key"] == key)
+            .expect("provenance pins exact stored object");
+        let bytes = std::fs::read(fixture.join(record["path"].as_str().unwrap())).unwrap();
+        assert_eq!(record["bytes"].as_u64(), Some(bytes.len() as u64));
+        assert_eq!(record["sha256"], format!("{:x}", Sha256::digest(&bytes)));
+        assert!(record["path"].as_str().unwrap().ends_with(filename));
+    }
+    for label in ["manifest", "volume"] {
+        let signature = &provenance["document_signatures"][label];
+        assert_eq!(
+            signature["signing_component_fingerprint"],
+            signer["signing_subkey"]["fingerprint"]
+        );
+        assert_eq!(
+            signature["primary_fingerprint"],
+            signer["primary_fingerprint"]
+        );
+        assert_eq!(signature["public_key_algorithm_id"], 22);
+        assert!(signature["status_line"]
+            .as_str()
+            .unwrap()
+            .starts_with("[GNUPG:] VALIDSIG "));
+    }
+    assert!(provenance["producer_extras_omitted_from_test_source"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|extra| extra
+            .as_str()
+            .is_some_and(|name| name.contains("signatures"))));
+
+    let keys = fixture.join("test-keys");
+    let secret =
+        std::fs::read(keys.join("secret.asc")).expect("checked-in protected secret export");
+    let public = std::fs::read(keys.join("public.asc")).expect("checked-in primary certificate");
+    assert_eq!(
+        provenance["secret_export"]["sha256"],
+        format!("{:x}", Sha256::digest(&secret))
+    );
+    assert_eq!(
+        provenance["public_export"]["sha256"],
+        format!("{:x}", Sha256::digest(&public))
+    );
+    assert!(provenance["secret_export"]["protected"].as_bool().unwrap());
+    assert_eq!(
+        provenance["secret_export"]["protection_profile"]["cipher_algorithm_id"],
+        7
+    );
+    assert_eq!(
+        provenance["secret_export"]["protection_profile"]["hash_algorithm_id"],
+        2
+    );
+    let credentials: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(keys.join("credentials.json")).unwrap())
+            .expect("valid public fixture credential record");
+    assert_eq!(credentials["fingerprint"], signer["primary_fingerprint"]);
+    assert_eq!(
+        credentials["purpose"],
+        "public signing-subkey test fixture only"
+    );
+    let passphrase = credentials["passphrase"].as_str().unwrap();
+    let password = OpenPgpPassword::from(passphrase);
+    let secret_exports = [SecretExport {
+        bytes: &secret,
+        password: Some(&password),
+    }];
+    let signer_exports = [public.as_slice()];
+    let permitted_signers = [primary_fingerprint];
+    let message_passwords: Vec<OpenPgpPassword> = Vec::new();
+    assert!(message_passwords.is_empty());
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords: &message_passwords,
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &permitted_signers,
+            require_signature: true,
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+
+    let source = OrderedFixtureSource::selected_one_volume(
+        "ed25519-signing-subkey/objects",
+        MANIFEST,
+        VOLUME,
+        "ed25519-signing-subkey-fixture-v1",
+    );
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .expect("official signed-subkey Full metadata is discoverable");
+    assert_eq!(catalog.objects().len(), 2);
+    assert!(
+        source.opened_keys().is_empty(),
+        "discovery opens no objects"
+    );
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .expect("one Full descriptor")
+        .0;
+    let snapshot = catalog
+        .read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1_700_000_000),
+            &Cancellation::default(),
+            &context,
+        )
+        .expect("primary allowlist authorizes the bound Ed25519 signing subkey");
+    assert_snapshot_matches_one_volume_oracle(&snapshot, &expected["entries"]);
+    assert_eq!(source.opened_keys(), OPEN_KEYS);
+
+    let evidence = snapshot.authentication_evidence();
+    let records = evidence.objects();
+    assert_eq!(records.len(), 2);
+    assert_eq!(
+        records
+            .iter()
+            .map(|record| record.key.as_str())
+            .collect::<Vec<_>>(),
+        OPEN_KEYS
+    );
+    for (record, key, manifest, ordinal) in [
+        (&records[0], MANIFEST_KEY, true, 0),
+        (&records[1], VOLUME_KEY, false, 1),
+    ] {
+        assert_eq!(record.key, key);
+        assert_eq!(
+            record.kind,
+            duplicity_core::reader::AuthenticationKind::OpenPgpAuthorized
+        );
+        assert_eq!(record.manifest, manifest);
+        assert_eq!(record.ordinal, ordinal);
+        assert_eq!(record.set_start, Timestamp(1_700_000_000));
+        assert_eq!(record.set_end, Timestamp(1_700_000_000));
+        let listed = catalog
+            .objects()
+            .iter()
+            .find(|object| object.object().key == key)
+            .expect("matching catalog object");
+        assert_eq!(record.identity, listed.object().identity);
+        let authorized = record
+            .authorized_signer
+            .as_ref()
+            .expect("authorized signer evidence");
+        assert_eq!(authorized.primary_fingerprint, primary_fingerprint);
+        assert_eq!(authorized.component_fingerprint, signing_subkey_fingerprint);
+        assert_ne!(
+            authorized.component_fingerprint,
+            authorized.primary_fingerprint
+        );
+    }
+    let policy = evidence.policy().expect("recorded per-read policy");
+    assert!(policy.authorization_configured);
+    assert!(policy.require_signature);
+    assert_eq!(policy.permitted_primary_fingerprints, [primary_fingerprint]);
+    let evidence_debug = format!("{evidence:?}");
+    assert!(!evidence_debug.contains(passphrase));
+    assert!(!evidence_debug.contains(std::str::from_utf8(&secret).unwrap()));
+}
+
 //= docs/parsing-requirements.md#parse-env-017
 //= type=test
 //# OpenPGP volume integration MUST validate every supported manifest digest against the exact original stored ciphertext before invoking decryption for that volume.
