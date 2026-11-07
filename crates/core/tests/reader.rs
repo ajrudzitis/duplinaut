@@ -1126,6 +1126,234 @@ fn official_partial_final_incremental_manifest_preserves_prior_snapshot_and_repo
     ));
 }
 
+//= docs/parsing-requirements.md#parse-name-005
+//= type=test
+//# Objects marked partial MUST be excluded from completed restore sets.
+//= docs/parsing-requirements.md#parse-chain-001
+//= type=test
+//# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=test
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+//= docs/parsing-requirements.md#parse-path-001
+//= type=test
+//# The reader MUST preserve backup path components as bytes without lossy UTF-8 conversion.
+//= docs/parsing-requirements.md#assure-test-001
+//= type=test
+//# Compatibility tests MUST restore supported snapshots produced by official duplicity and compare contents and supported metadata with both their source tree and official restoration.
+#[test]
+fn official_partial_final_incremental_volume_preserves_prior_snapshot_and_reports_missing_final() {
+    const ORIGINAL: &str =
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz";
+    const PARTIAL: &str =
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.part.gz";
+
+    let mut source = Source::official();
+    assert_eq!(source.objects.len(), 12);
+    let original_inventory = source.objects.clone();
+    let mut expected_keys = original_inventory
+        .iter()
+        .map(|(object, _)| object.key.clone())
+        .collect::<Vec<_>>();
+    expected_keys.sort();
+    let (original_volume, original_volume_bytes) = source
+        .objects
+        .iter()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .map(|(object, bytes)| (object.clone(), bytes.clone()))
+        .expect("official fixture contains final-incremental volume 1");
+    let (renamed_volume, renamed_volume_bytes) = source
+        .objects
+        .iter_mut()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .expect("official fixture contains final-incremental volume 1");
+    renamed_volume.key = PARTIAL.into();
+    assert_eq!(renamed_volume_bytes, &original_volume_bytes);
+    assert_eq!(renamed_volume.size, original_volume.size);
+    assert_eq!(renamed_volume.identity, original_volume.identity);
+
+    let old_key = expected_keys
+        .iter_mut()
+        .find(|key| key.as_str() == ORIGINAL)
+        .expect("original inventory contains final-incremental volume 1");
+    *old_key = PARTIAL.into();
+    expected_keys.sort();
+    let mut actual_keys = source
+        .objects
+        .iter()
+        .map(|(object, _)| object.key.clone())
+        .collect::<Vec<_>>();
+    actual_keys.sort();
+    assert_eq!(actual_keys, expected_keys);
+    assert_eq!(source.objects.len(), 12);
+    assert!(!actual_keys.iter().any(|key| key == ORIGINAL));
+    assert!(actual_keys.iter().any(|key| key == PARTIAL));
+    for (original_object, original_bytes) in &original_inventory {
+        let expected_key = if original_object.key == ORIGINAL {
+            PARTIAL
+        } else {
+            original_object.key.as_str()
+        };
+        let (actual_object, actual_bytes) = source
+            .objects
+            .iter()
+            .find(|(object, _)| object.key == expected_key)
+            .expect("each original object remains under its expected key");
+        let mut expected_object = original_object.clone();
+        expected_object.key = expected_key.into();
+        assert_eq!(actual_object, &expected_object);
+        assert_eq!(actual_bytes, original_bytes);
+    }
+
+    let catalog = discover(&source);
+    let partial_entry = catalog
+        .objects()
+        .iter()
+        .find(|entry| entry.object().key == PARTIAL)
+        .expect("renamed partial final volume remains visible in discovery");
+    let partial_name = partial_entry.name().expect("partial key is parsed");
+    assert_eq!(
+        partial_name.kind,
+        duplicity_core::names::ObjectKind::IncrementalVolume
+    );
+    assert_eq!(
+        (partial_name.start.0, partial_name.end.0),
+        (1700086400, 1700172800)
+    );
+    assert_eq!(partial_name.volume, Some(1));
+    assert!(partial_name.partial);
+    assert_eq!(partial_entry.status(), DiscoveryStatus::Partial);
+
+    let descriptors = catalog.manifests().collect::<Vec<_>>();
+    assert_eq!(descriptors.len(), 3);
+    let mut intervals = descriptors
+        .iter()
+        .map(|(_, _, descriptor)| {
+            (
+                match descriptor.kind() {
+                    SetKind::Full => 0,
+                    SetKind::Incremental => 1,
+                },
+                descriptor.start().0,
+                descriptor.end().0,
+            )
+        })
+        .collect::<Vec<_>>();
+    intervals.sort_unstable();
+    assert_eq!(
+        intervals,
+        vec![
+            (0, 1700000000, 1700000000),
+            (1, 1700000000, 1700086400),
+            (1, 1700086400, 1700172800),
+        ]
+    );
+    let (full_index, _, full_descriptor) = descriptors
+        .iter()
+        .find(|(_, _, descriptor)| descriptor.kind() == SetKind::Full)
+        .expect("completed full manifest remains a public anchor");
+    assert_eq!(
+        (full_descriptor.start().0, full_descriptor.end().0),
+        (1700000000, 1700000000)
+    );
+
+    let prior = catalog
+        .read_snapshot(*full_index, Timestamp(1700086400), &Cancellation::default())
+        .expect("the completed chain through the prior date remains restorable");
+    let oracle: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/duplicity-3.0.7/expected.json"
+    ))
+    .unwrap();
+    let expected_snapshot = oracle["snapshots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|snapshot| snapshot["mode"] == "plain" && snapshot["index"] == 1)
+        .expect("official oracle contains the prior plain snapshot");
+    assert!(expected_snapshot["official_comparison_exclusions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|exclusion| exclusion == "symlink_mtime_ns"));
+    let expected_entries = expected_snapshot["entries"].as_array().unwrap();
+    assert_eq!(prior.state().len(), expected_entries.len());
+    let mut expected_rows = expected_entries
+        .iter()
+        .map(|expected| {
+            (
+                expected["components_hex"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|component| decode_oracle_hex(component.as_str().unwrap()))
+                    .collect::<Vec<_>>(),
+                expected,
+            )
+        })
+        .collect::<Vec<_>>();
+    expected_rows.sort_by(|left, right| left.0.cmp(&right.0));
+    let actual_rows = prior.state().entries().collect::<Vec<_>>();
+    assert_eq!(actual_rows.len(), expected_rows.len());
+
+    for ((path, entry), (expected_components, expected)) in
+        actual_rows.into_iter().zip(expected_rows.iter())
+    {
+        assert_eq!(
+            path.components()
+                .iter()
+                .map(|component| component.as_slice())
+                .collect::<Vec<_>>(),
+            expected_components
+                .iter()
+                .map(Vec::as_slice)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            entry.mode() & 0o777,
+            expected["mode"].as_u64().unwrap() as u32
+        );
+        let kind = expected["kind"].as_str().unwrap();
+        if kind != "symlink" {
+            let mtime_ns = expected["mtime_ns"].as_i64().unwrap();
+            assert_eq!(entry.mtime().seconds, mtime_ns.div_euclid(1_000_000_000));
+            assert_eq!(
+                i64::from(entry.mtime().nanoseconds),
+                mtime_ns.rem_euclid(1_000_000_000)
+            );
+        }
+        match kind {
+            "file" => {
+                assert_eq!(entry.entry_type(), duplicity_core::tar::EntryType::Regular);
+                assert_eq!(
+                    entry.content().unwrap().len() as u64,
+                    expected["size"].as_u64().unwrap()
+                );
+                assert_eq!(
+                    format!("{:x}", sha2::Sha256::digest(entry.content().unwrap())),
+                    expected["sha256"].as_str().unwrap()
+                );
+            }
+            "directory" => assert_eq!(
+                entry.entry_type(),
+                duplicity_core::tar::EntryType::Directory
+            ),
+            "symlink" => {
+                assert_eq!(entry.entry_type(), duplicity_core::tar::EntryType::Symlink);
+                assert_eq!(
+                    entry.linkname(),
+                    decode_oracle_hex(expected["symlink_target_hex"].as_str().unwrap())
+                );
+            }
+            other => panic!("unexpected fixture kind {other}"),
+        }
+    }
+
+    assert!(matches!(
+        catalog.read_snapshot(*full_index, Timestamp(1700172800), &Cancellation::default()),
+        Err(ReaderError::MissingVolume { number: 1 })
+    ));
+}
+
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.

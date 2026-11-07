@@ -1,7 +1,7 @@
 # Official Plain Reader Partial Final-Incremental Volume Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Implementation and independent review passed. Full local
+`cargo xtask ci` passed. Hosted Linux assurance and Duvet Pages remain pending.
 
 ## Goal and scope
 
@@ -126,12 +126,13 @@ reader/controller refinement, or a formal reader proof.
 
 - [x] Independent specification review accepts the mutation and both target
       outcomes.
-- [ ] Exact twelve-object mutation and bytes/size/identity preservation pass;
+- [x] Exact twelve-object mutation and bytes/size/identity preservation pass;
       the renamed final volume remains visible as Partial and all three
       manifests remain available.
-- [ ] Prior target `1700086400` matches the official oracle; final target
+- [x] Prior target `1700086400` matches the official oracle; final target
       `1700172800` returns exact `MissingVolume { number: 1 }`.
-- [ ] Targeted Duvet queries/full trace, focused/full core tests, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Targeted Duvet queries/full trace, focused/full core tests, formatting,
+      strict Clippy, and diff checks pass.
+- [x] Independent implementation/test review passes.
+- [x] Full local `cargo xtask ci` passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
