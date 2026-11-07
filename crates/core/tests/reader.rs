@@ -5140,7 +5140,10 @@ fn official_incremental_volume_stored_digest_mismatch_returns_no_snapshot() {
         .expect("the official fixture includes first-incremental volume 1");
     assert!(!volume_bytes.is_empty());
     let original_len = volume_bytes.len();
+    let mut expected_mutated_bytes = volume_bytes.clone();
+    expected_mutated_bytes[0] ^= 1;
     volume_bytes[0] ^= 1;
+    assert_eq!(volume_bytes, &expected_mutated_bytes);
     assert_eq!(volume_bytes.len(), original_len);
     let mutated_etag = format!("{:x}", sha2::Sha256::digest(volume_bytes.as_slice()));
     volume_object.identity = ObjectIdentity {
@@ -5155,7 +5158,7 @@ fn official_incremental_volume_stored_digest_mismatch_returns_no_snapshot() {
             assert_eq!(object.key, original_object.key);
             assert_eq!(object.size, original_object.size);
             assert_eq!(bytes.len(), original_bytes.len());
-            assert_ne!(bytes, original_bytes);
+            assert_eq!(bytes, &expected_mutated_bytes);
             assert_eq!(
                 object.identity.version_id.as_deref(),
                 Some("mutated-volume-body-v1")

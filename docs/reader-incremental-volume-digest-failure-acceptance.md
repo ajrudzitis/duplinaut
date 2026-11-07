@@ -83,7 +83,8 @@ restoration, or complete reader/controller refinement.
 - [x] Independent specification review accepts the mutation, identity setup,
       typed digest error, and exact six-key open set.
 - [x] Focused test preserves the twelve-key inventory and changes only the
-      selected volume body plus test-local identity metadata.
+      selected volume body plus test-local identity metadata; the mutated body
+      equals a clone of the original with only byte 0 XORed by one.
 - [x] Discovery performs no source opens; final read processes the Full set,
       then fails on first-incremental volume 1 with no snapshot.
 - [x] The six-key opened set is exact, with no later incremental objects.
