@@ -173,12 +173,16 @@ fixture/account/inventory and live run are prerequisites for acceptance.
 The default-off integration target and synthetic local gate/inventory tests
 are implemented in `crates/s3/tests/live_s3.rs`. Focused and full S3 crate
 tests, strict Clippy, formatting, Duvet trace and the SOURCE-001, CHAIN-001,
-and STATE-001 coverage queries pass locally. The explicit region input,
-inventory-region validation, and `S3Config.region` assignment required by
-this plan remain an implementation follow-up. The ignored live case has not
-been run; hosted assurance for the implementation is pending. Bucket/account
-and region approval, the captured twelve-object inventory, and read-only
-credentials are still external prerequisites.
+and STATE-001 coverage queries pass locally. The harness requires an explicit
+region before inventory I/O, validates the inventory region against that
+setting, and sets `S3Config.region` before the first SDK connection. Offline
+tests cover absent, blank, malformed, and mismatched region cases and verify
+the configured region without constructing a client. Final pinned local CI
+passes with Verus partitions 2,047/3,183/1,329 and zero errors; the generated
+receipt is `target/assurance/ci.json`. The ignored live case has not been run;
+hosted assurance is pending. Bucket/account and region approval, the captured
+twelve-object inventory, and read-only credentials are still external
+prerequisites.
 
 ## Exclusions
 
@@ -197,13 +201,14 @@ cancellation; this one live case does not replace them.
 - [ ] Obtain approved read-only bucket/account/region, immutable prefix and
       captured twelve-object identity/metadata inventory containing the same
       approved region.
-- [ ] Add a default-off live integration test using `S3Source` and `Catalog`;
+- [x] Add a default-off live integration test using `S3Source` and `Catalog`;
       explicitly set `S3Config.region` from `DUPLINAUT_LIVE_S3_REGION` and
       validate opt-in, region match, and inventory handling offline without
       credentials.
 - [ ] Assert exact inventory/history and official object hashes, then compare
       the final complete snapshot with the checked-in source oracle.
-- [ ] Local mocked/offline tests, Duvet trace, formatting and strict Clippy
-      pass; hosted assurance and Duvet Pages pass.
+- [x] Local mocked/offline tests, Duvet trace, formatting, strict Clippy, and
+      final pinned `cargo xtask ci` pass.
+- [ ] Hosted assurance and Duvet Pages pass.
 - [ ] Authorized live S3 execution and independent review pass; record
       redacted evidence without secrets.

@@ -19,6 +19,7 @@ use std::{
 
 const OPT_IN: &str = "DUPLINAUT_LIVE_S3";
 const BUCKET: &str = "DUPLINAUT_LIVE_S3_BUCKET";
+const REGION: &str = "DUPLINAUT_LIVE_S3_REGION";
 const PREFIX: &str = "DUPLINAUT_LIVE_S3_PREFIX";
 const INVENTORY: &str = "DUPLINAUT_LIVE_S3_INVENTORY";
 const MAX_OBJECTS: usize = 12;
@@ -30,6 +31,7 @@ const FINAL_TIME: i64 = 1_700_172_800;
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LiveSettings {
     bucket: String,
+    region: String,
     prefix: String,
     inventory_path: PathBuf,
 }
@@ -55,9 +57,23 @@ struct InventoryObject {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Inventory {
     bucket: String,
+    region: String,
     prefix: String,
     versioning_enabled: bool,
     objects: Vec<InventoryObject>,
+}
+
+fn valid_region_name(region: &str) -> bool {
+    if region.is_empty() {
+        return false;
+    }
+    region
+        .bytes()
+        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        && region.contains('-')
+        && !region.starts_with('-')
+        && !region.ends_with('-')
+        && !region.contains("--")
 }
 
 /// Absence is the normal offline state. A present but malformed opt-in is an
@@ -79,8 +95,12 @@ fn live_settings_from(
             .ok_or("missing live S3 setting")
     };
     let bucket = required(BUCKET)?;
+    let region = required(REGION)?;
     let prefix = required(PREFIX)?;
     let inventory_path = PathBuf::from(required(INVENTORY)?);
+    if !valid_region_name(&region) {
+        return Err("invalid live S3 region");
+    }
     if prefix.starts_with('/')
         || !prefix.ends_with('/')
         || prefix.bytes().any(|byte| byte.is_ascii_control())
@@ -89,6 +109,7 @@ fn live_settings_from(
     }
     Ok(Some(LiveSettings {
         bucket,
+        region,
         prefix,
         inventory_path,
     }))
@@ -161,7 +182,11 @@ fn parse_inventory(text: &str) -> Result<Inventory, &'static str> {
     }
     let value: Value = serde_json::from_str(text).map_err(|_| "malformed live S3 inventory")?;
     let bucket = string_field(&value, "bucket")?.to_owned();
+    let region = string_field(&value, "region")?.to_owned();
     let prefix = string_field(&value, "prefix")?.to_owned();
+    if !valid_region_name(&region) {
+        return Err("malformed live S3 inventory");
+    }
     let captured_at = string_field(&value, "captured_at")?;
     if captured_at.trim().is_empty() {
         return Err("malformed live S3 inventory");
@@ -222,6 +247,7 @@ fn parse_inventory(text: &str) -> Result<Inventory, &'static str> {
     }
     Ok(Inventory {
         bucket,
+        region,
         prefix,
         versioning_enabled,
         objects,
@@ -233,7 +259,10 @@ fn validate_inventory(
     inventory: &Inventory,
     expected: &[ExpectedObject],
 ) -> Result<(), &'static str> {
-    if inventory.bucket != settings.bucket || inventory.prefix != settings.prefix {
+    if inventory.bucket != settings.bucket
+        || inventory.region != settings.region
+        || inventory.prefix != settings.prefix
+    {
         return Err("live S3 inventory does not match selected source");
     }
     if inventory.objects.len() != expected.len() {
@@ -417,6 +446,15 @@ fn read_inventory_file(path: &PathBuf) -> Result<String, &'static str> {
     String::from_utf8(bytes).map_err(|_| "live S3 inventory is not UTF-8")
 }
 
+fn s3_config(settings: &LiveSettings) -> S3Config {
+    let mut config = S3Config::new(settings.bucket.clone());
+    config.region = Some(settings.region.clone());
+    config.prefix = settings.prefix.clone();
+    config.request_timeout = std::time::Duration::from_secs(45);
+    config.stream_idle_timeout = std::time::Duration::from_secs(20);
+    config
+}
+
 #[test]
 fn live_s3_gate_is_default_off_and_requires_exact_opt_in_before_inventory_io() {
     let empty = HashMap::new();
@@ -441,7 +479,13 @@ fn live_s3_gate_is_default_off_and_requires_exact_opt_in_before_inventory_io() {
         "invalid opt-in must fail before inventory I/O"
     );
 
-    values.insert(OPT_IN.to_owned(), "1".to_owned());
+    values = HashMap::from([
+        (OPT_IN.to_owned(), "1".to_owned()),
+        (BUCKET.to_owned(), "approved-bucket".to_owned()),
+        (PREFIX.to_owned(), "duplinaut/fixture/".to_owned()),
+        (INVENTORY.to_owned(), "synthetic-inventory.json".to_owned()),
+    ]);
+    inventory_read = false;
     assert!(load_live_inputs(&values, |_| {
         inventory_read = true;
         Ok::<_, &'static str>(())
@@ -449,14 +493,43 @@ fn live_s3_gate_is_default_off_and_requires_exact_opt_in_before_inventory_io() {
     .is_err());
     assert!(
         !inventory_read,
-        "missing settings must fail before inventory I/O"
+        "missing region must fail before inventory I/O"
     );
+
+    for region in ["", " \t", "us--east-1", "US-east-1", "us/east-1"] {
+        values.insert(REGION.to_owned(), region.to_owned());
+        inventory_read = false;
+        assert!(load_live_inputs(&values, |_| {
+            inventory_read = true;
+            Ok::<_, &'static str>(())
+        })
+        .is_err());
+        assert!(
+            !inventory_read,
+            "invalid region {region:?} must fail before inventory I/O"
+        );
+    }
+
+    values.insert(REGION.to_owned(), "us-east-1".to_owned());
+    let mut loaded = false;
+    let input = load_live_inputs(&values, |_| {
+        loaded = true;
+        Ok::<_, &'static str>("inventory")
+    })
+    .unwrap()
+    .unwrap();
+    assert!(loaded);
+    assert_eq!(input.0.region, "us-east-1");
+    assert!(valid_region_name("us-gov-west-1"));
+    assert!(valid_region_name("eu-central-2"));
+    assert!(valid_region_name("eusc-de-east-1"));
 }
 
 #[test]
 fn synthetic_inventory_parser_and_oracle_gate_reject_mismatch_without_sdk() {
     let settings = LiveSettings {
         bucket: "approved-bucket".into(),
+        region: "us-east-1".into(),
         prefix: "duplinaut/fixture/".into(),
         inventory_path: PathBuf::from("synthetic-inventory.json"),
     };
@@ -473,8 +546,8 @@ fn synthetic_inventory_parser_and_oracle_gate_reject_mismatch_without_sdk() {
         .collect::<Vec<_>>()
         .join(",");
     let text = format!(
-        "{{\"bucket\":\"{}\",\"prefix\":\"{}\",\"captured_at\":\"2026-01-01T00:00:00Z\",\"versioning_enabled\":false,\"objects\":[{}]}}",
-        settings.bucket, settings.prefix, objects
+        "{{\"bucket\":\"{}\",\"region\":\"{}\",\"prefix\":\"{}\",\"captured_at\":\"2026-01-01T00:00:00Z\",\"versioning_enabled\":false,\"objects\":[{}]}}",
+        settings.bucket, settings.region, settings.prefix, objects
     );
     let inventory = parse_inventory(&text).unwrap();
     assert!(!inventory.versioning_enabled);
@@ -482,6 +555,7 @@ fn synthetic_inventory_parser_and_oracle_gate_reject_mismatch_without_sdk() {
 
     assert!(parse_inventory("{}").is_err());
     assert!(parse_inventory(&" ".repeat(MAX_INVENTORY_BYTES + 1)).is_err());
+    assert!(parse_inventory(&text.replace("\"region\":\"us-east-1\",", "")).is_err());
     assert!(
         parse_inventory(&text.replace(",\"last_modified\":\"2026-01-01T00:00:00Z\"", "")).is_err()
     );
@@ -496,9 +570,28 @@ fn synthetic_inventory_parser_and_oracle_gate_reject_mismatch_without_sdk() {
     assert!(parse_inventory(&extra_object).is_err());
     let wrong_source = LiveSettings {
         bucket: "other-bucket".into(),
-        ..settings
+        ..settings.clone()
     };
     assert!(validate_inventory(&wrong_source, &inventory, &expected).is_err());
+    let wrong_region = LiveSettings {
+        region: "us-west-2".into(),
+        ..settings.clone()
+    };
+    assert!(validate_inventory(&wrong_region, &inventory, &expected).is_err());
+    assert!(
+        parse_inventory(&text.replace("\"region\":\"us-east-1\"", "\"region\":\"us-east-\""))
+            .is_err()
+    );
+
+    let config = s3_config(&settings);
+    assert_eq!(config.bucket, settings.bucket);
+    assert_eq!(config.prefix, settings.prefix);
+    assert_eq!(config.region.as_deref(), Some("us-east-1"));
+    assert_eq!(config.request_timeout, std::time::Duration::from_secs(45));
+    assert_eq!(
+        config.stream_idle_timeout,
+        std::time::Duration::from_secs(20)
+    );
 }
 
 //= docs/parsing-requirements.md#parse-source-001
@@ -513,7 +606,7 @@ fn synthetic_inventory_parser_and_oracle_gate_reject_mismatch_without_sdk() {
 #[test]
 #[ignore = "requires an operator-approved read-only S3 fixture and explicit environment opt-in"]
 fn live_s3_official_plain_fixture_read_only_acceptance() {
-    let values = [OPT_IN, BUCKET, PREFIX, INVENTORY]
+    let values = [OPT_IN, BUCKET, REGION, PREFIX, INVENTORY]
         .into_iter()
         .filter_map(|name| env::var(name).ok().map(|value| (name.to_owned(), value)))
         .collect::<HashMap<_, _>>();
@@ -531,10 +624,7 @@ fn live_s3_official_plain_fixture_read_only_acceptance() {
 
     // This is the first SDK client construction, after every opt-in, setting,
     // inventory, fixture path, size and digest check has succeeded.
-    let mut config = S3Config::new(settings.bucket.clone());
-    config.prefix = settings.prefix.clone();
-    config.request_timeout = std::time::Duration::from_secs(45);
-    config.stream_idle_timeout = std::time::Duration::from_secs(20);
+    let config = s3_config(&settings);
     let cancel = Cancellation::default();
     let source = safe(S3Source::connect(config, &cancel), "SDK connection");
     let source_limits = SourceLimits {
