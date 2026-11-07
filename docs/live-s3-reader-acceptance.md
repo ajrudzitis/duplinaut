@@ -1,8 +1,10 @@
 # Live S3 reader acceptance plan
 
-Status: proposed; live execution pending an approved fixture bucket/account and
-captured object inventory. No bucket access or provisioning is part of this
-specification task.
+Status: Offline harness and hosted Linux assurance/Duvet Pages passed in
+[run 42366805281](https://github.com/ajrudzitis/duplinaut/actions/runs/42366805281);
+live execution remains pending an approved fixture bucket/account and captured
+object inventory. No bucket access or provisioning is part of this specification
+task.
 
 ## Goal and scope
 
@@ -178,10 +180,12 @@ region before inventory I/O, validates the inventory region against that
 setting, and sets `S3Config.region` before the first SDK connection. Offline
 tests cover absent, blank, malformed, and mismatched region cases and verify
 the configured region without constructing a client. Final pinned local CI
-passes with Verus partitions 2,047/3,183/1,329 and zero errors; the generated
-receipt is `target/assurance/ci.json`. The ignored live case has not been run;
-hosted assurance is pending. Bucket/account and region approval, the captured
-twelve-object inventory, and read-only credentials are still external
+passed with Verus partitions 2,047/3,183/1,329 and zero errors. Its receipt
+predates this hosted-status documentation update, so its source digest does not
+bind the current tracked docs tree. Hosted Linux assurance and Duvet Pages
+passed in [run 42366805281](https://github.com/ajrudzitis/duplinaut/actions/runs/42366805281).
+The ignored live case has not been run. Bucket/account and region approval, the
+captured twelve-object inventory, and read-only credentials remain external
 prerequisites.
 
 ## Exclusions
@@ -209,6 +213,7 @@ cancellation; this one live case does not replace them.
       the final complete snapshot with the checked-in source oracle.
 - [x] Local mocked/offline tests, Duvet trace, formatting, strict Clippy, and
       final pinned `cargo xtask ci` pass.
-- [ ] Hosted assurance and Duvet Pages pass.
+- [x] Hosted assurance and Duvet Pages pass in [run
+      42366805281](https://github.com/ajrudzitis/duplinaut/actions/runs/42366805281).
 - [ ] Authorized live S3 execution and independent review pass; record
       redacted evidence without secrets.
