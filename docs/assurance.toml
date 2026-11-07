@@ -5430,7 +5430,8 @@ proofs = [
 ]
 tests = [
   { package = "duplicity-core", name = "snapshot_entries_use_bytewise_component_lexicographic_order" },
-  { package = "duplicity-core", name = "official_incremental_supported_digest_ignores_unknown_sibling" }
+  { package = "duplicity-core", name = "official_incremental_supported_digest_ignores_unknown_sibling" },
+  { package = "duplicity-core", name = "official_unknown_and_malformed_siblings_preserve_plain_snapshot_and_required_open_set" }
 ]
 
 [[trusted]]

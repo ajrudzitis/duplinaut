@@ -4479,11 +4479,16 @@ fn official_pkcs7_first_incremental_signature_archive_preserves_plain_snapshot_a
 //= docs/parsing-requirements.md#parse-path-001
 //= type=test
 //# The reader MUST preserve backup path components as bytes without lossy UTF-8 conversion.
+//= docs/parsing-requirements.md#parse-state-003
+//= type=test
+//# `SnapshotState::entries()` MUST enumerate retained entries in bytewise lexicographic order of their backup-relative path components.
 //= docs/parsing-requirements.md#assure-test-001
 //= type=test
 //# Compatibility tests MUST restore supported snapshots produced by official duplicity and compare contents and supported metadata with both their source tree and official restoration.
 #[test]
 fn official_unknown_and_malformed_siblings_preserve_plain_snapshot_and_required_open_set() {
+    // The ordering assertion below is limited to this observed fixture
+    // snapshot; it does not prove standard-library map internals.
     const UNKNOWN: &str = "backup/notes.txt";
     const MALFORMED: &str = "backup/duplicity-full.invalid.manifest";
 

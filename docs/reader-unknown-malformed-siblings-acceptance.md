@@ -1,10 +1,11 @@
 # Official Plain Reader Unknown and Malformed Sibling Objects Acceptance
 
-**Status:** The existing implementation and review passed. The added
-`PARSE-STATE-003` traceability scope is pending independent review and Duvet
-rerun. Focused/full core tests, current Duvet queries/full trace, formatting,
-and strict Clippy passed locally. Full pinned CI and hosted Linux/Pages
-assurance are pending.
+**Status:** The implementation and independent review pass. The raw-component
+order assertion is linked to `PARSE-STATE-003` and registered in the
+snapshot-entry-order assurance milestone; the targeted query and full Duvet
+trace pass. Focused/full core tests, formatting, strict Clippy, and full local
+`cargo xtask ci` pass (Verus 2,047/3,183/1,329, zero errors; the generated
+receipt is `target/assurance/ci.json`). Hosted Linux/Pages remain pending.
 
 ## Goal and scope
 
@@ -148,7 +149,9 @@ reader proof.
 - [x] Focused/full core tests, targeted Duvet queries/full trace, formatting,
       strict Clippy, and diff checks pass locally.
 - [x] Independent implementation/test review passes.
-- [ ] Full pinned local `cargo xtask ci` passes.
+- [x] Full pinned local `cargo xtask ci` passes with fresh verification,
+      formatting, strict workspace Clippy, workspace tests, and named-gate
+      validation.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
 
 ## Current local evidence
@@ -160,6 +163,9 @@ reader proof.
   `cargo xtask trace` passed.
 - `cargo fmt --all -- --check`, strict core Clippy, and `git diff --check`
   passed.
-- Independent implementation review passed. Full pinned CI and hosted Linux
-  assurance/Pages remain pending.
-- The `PARSE-STATE-003` test link, targeted query, and full trace remain pending.
+- Independent implementation review and full pinned local CI passed. Hosted
+  Linux assurance/Pages remain pending.
+- `PARSE-STATE-003` is linked to the raw-component order assertion in this
+  test and registered under `snapshot-entry-order`; its evidence is limited to
+  the observed order of this fixture snapshot and does not prove
+  standard-library map internals.
