@@ -1,4 +1,5 @@
 use duplicity_core::chain::{ChainError, SetKind};
+use duplicity_core::envelope::EnvelopeError;
 use duplicity_core::names::{NameConfig, Timestamp};
 use duplicity_core::path::BackupPath;
 use duplicity_core::reader::{Catalog, DiscoveryStatus, ReaderError, ReaderLimits};
@@ -136,6 +137,37 @@ fn discover(source: &Source) -> Catalog<'_> {
         &Cancellation::default(),
     )
     .unwrap()
+}
+
+fn budget_catalog(source: &Source, limits: ReaderLimits) -> Catalog<'_> {
+    clear_source_open_log(source);
+    let catalog = Catalog::discover(
+        source,
+        "backup/",
+        NameConfig::default(),
+        limits,
+        &Cancellation::default(),
+    )
+    .unwrap();
+    assert_eq!(source.opens.load(Ordering::SeqCst), 0);
+    assert!(source.opened_keys.lock().unwrap().is_empty());
+    catalog
+}
+
+fn clear_source_open_log(source: &Source) {
+    source.opens.store(0, Ordering::SeqCst);
+    source.opened_keys.lock().unwrap().clear();
+}
+
+fn assert_source_open_log(source: &Source, expected: &[&str]) {
+    assert_eq!(source.opens.load(Ordering::SeqCst), expected.len());
+    assert_eq!(
+        source.opened_keys.lock().unwrap().as_slice(),
+        expected
+            .iter()
+            .map(|key| (*key).to_owned())
+            .collect::<Vec<_>>()
+    );
 }
 fn anchor(catalog: &Catalog<'_>) -> usize {
     catalog
@@ -4490,90 +4522,152 @@ fn discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation() {
 //= type=test
 //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
 fn reader_budget_edges_accept_exact_and_reject_one_less() {
+    const FULL_MANIFEST: &str = "backup/duplicity-full.20231114T221320Z.manifest";
+    const FULL_VOLUME_KEYS: [&str; 3] = [
+        "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+        "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz",
+        "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz",
+    ];
+    const FULL_OPEN_KEYS: [&str; 4] = [
+        FULL_MANIFEST,
+        FULL_VOLUME_KEYS[0],
+        FULL_VOLUME_KEYS[1],
+        FULL_VOLUME_KEYS[2],
+    ];
+
     let source = Source::official();
+    assert_eq!(source.objects.len(), 12);
     let full_manifest = source
         .objects
         .iter()
-        .find(|(object, _)| {
-            object
-                .key
-                .ends_with("duplicity-full.20231114T221320Z.manifest")
-        })
-        .unwrap();
-    let full_volumes = source
+        .find(|(object, _)| object.key == FULL_MANIFEST)
+        .expect("the official source has its Full manifest");
+    let source_full_volume_keys = source
         .objects
         .iter()
         .filter(|(object, _)| {
             object.key.contains("duplicity-full.") && object.key.ends_with(".difftar.gz")
         })
-        .count();
-    assert_eq!(full_volumes, 3); // original producer inventory, not parsed hints
-    let comparisons = source.objects.len() * full_volumes;
+        .map(|(object, _)| object.key.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(source_full_volume_keys.len(), 3);
+    assert!(FULL_VOLUME_KEYS
+        .iter()
+        .all(|expected| source_full_volume_keys.contains(expected)));
+
+    let exact_work = 12 * 3;
+    assert_eq!(exact_work, 36);
+    let one_less_work = 35;
+    let exact_work_catalog = budget_catalog(
+        &source,
+        ReaderLimits {
+            max_object_checks: exact_work,
+            ..Default::default()
+        },
+    );
+    assert_eq!(exact_work_catalog.objects().len(), 12);
+    clear_source_open_log(&source);
+    exact_work_catalog
+        .read_snapshot(
+            anchor(&exact_work_catalog),
+            Timestamp(1700000000),
+            &Cancellation::default(),
+        )
+        .expect("the exact 36-object-check budget accepts the Full read");
+    assert_source_open_log(&source, &FULL_OPEN_KEYS);
+
+    clear_source_open_log(&source);
+    let one_less_work_catalog = budget_catalog(
+        &source,
+        ReaderLimits {
+            max_object_checks: one_less_work,
+            ..Default::default()
+        },
+    );
+    assert_eq!(one_less_work_catalog.objects().len(), 12);
+    clear_source_open_log(&source);
+    assert!(matches!(
+        one_less_work_catalog.read_snapshot(
+            anchor(&one_less_work_catalog),
+            Timestamp(1700000000),
+            &Cancellation::default(),
+        ),
+        Err(ReaderError::Limit)
+    ));
+    assert_source_open_log(&source, &[FULL_MANIFEST]);
+
+    let exact_decoded_catalog = budget_catalog(
+        &source,
+        ReaderLimits {
+            decoded_manifest_bytes: full_manifest.1.len(),
+            ..Default::default()
+        },
+    );
+    clear_source_open_log(&source);
+    exact_decoded_catalog
+        .read_snapshot(
+            anchor(&exact_decoded_catalog),
+            Timestamp(1700000000),
+            &Cancellation::default(),
+        )
+        .expect("the exact decoded-manifest budget accepts the Full read");
+    assert_source_open_log(&source, &FULL_OPEN_KEYS);
+
+    clear_source_open_log(&source);
+    let short_decoded_catalog = budget_catalog(
+        &source,
+        ReaderLimits {
+            decoded_manifest_bytes: full_manifest.1.len() - 1,
+            ..Default::default()
+        },
+    );
+    clear_source_open_log(&source);
+    assert!(matches!(
+        short_decoded_catalog.read_snapshot(
+            anchor(&short_decoded_catalog),
+            Timestamp(1700000000),
+            &Cancellation::default(),
+        ),
+        Err(ReaderError::Envelope(EnvelopeError::DecodedLimit))
+    ));
+    assert_source_open_log(&source, &[FULL_MANIFEST]);
+
     let normalization = 4 * 2 * std::mem::size_of::<usize>();
-    for (exact, smaller) in [
-        (
-            ReaderLimits {
-                max_object_checks: comparisons,
-                ..Default::default()
-            },
-            ReaderLimits {
-                max_object_checks: comparisons - 1,
-                ..Default::default()
-            },
-        ),
-        (
-            ReaderLimits {
-                decoded_manifest_bytes: full_manifest.1.len(),
-                ..Default::default()
-            },
-            ReaderLimits {
-                decoded_manifest_bytes: full_manifest.1.len() - 1,
-                ..Default::default()
-            },
-        ),
-        (
-            ReaderLimits {
-                normalization_metadata_bytes: normalization,
-                ..Default::default()
-            },
-            ReaderLimits {
-                normalization_metadata_bytes: normalization - 1,
-                ..Default::default()
-            },
-        ),
-    ] {
-        let exact = Catalog::discover(
-            &source,
-            "backup/",
-            NameConfig::default(),
-            exact,
+    let exact_normalization_catalog = budget_catalog(
+        &source,
+        ReaderLimits {
+            normalization_metadata_bytes: normalization,
+            ..Default::default()
+        },
+    );
+    clear_source_open_log(&source);
+    exact_normalization_catalog
+        .read_snapshot(
+            anchor(&exact_normalization_catalog),
+            Timestamp(1700000000),
             &Cancellation::default(),
         )
-        .unwrap();
-        assert!(exact
-            .read_snapshot(
-                anchor(&exact),
-                Timestamp(1700000000),
-                &Cancellation::default()
-            )
-            .is_ok());
-        let smaller = Catalog::discover(
-            &source,
-            "backup/",
-            NameConfig::default(),
-            smaller,
+        .expect("the exact normalization-metadata budget accepts the Full read");
+    assert_source_open_log(&source, &FULL_OPEN_KEYS);
+
+    clear_source_open_log(&source);
+    let short_normalization_catalog = budget_catalog(
+        &source,
+        ReaderLimits {
+            normalization_metadata_bytes: normalization - 1,
+            ..Default::default()
+        },
+    );
+    clear_source_open_log(&source);
+    assert!(matches!(
+        short_normalization_catalog.read_snapshot(
+            anchor(&short_normalization_catalog),
+            Timestamp(1700000000),
             &Cancellation::default(),
-        )
-        .unwrap();
-        assert!(matches!(
-            smaller.read_snapshot(
-                anchor(&smaller),
-                Timestamp(1700000000),
-                &Cancellation::default()
-            ),
-            Err(ReaderError::Limit | ReaderError::Envelope(_))
-        ));
-    }
+        ),
+        Err(ReaderError::Limit)
+    ));
+    assert_source_open_log(&source, &[FULL_MANIFEST]);
 }
 
 #[test]

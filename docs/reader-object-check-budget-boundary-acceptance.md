@@ -1,7 +1,8 @@
 # Public object-check budget boundary acceptance
 
-Status: specification accepted after independent review. Implementation,
-tests, trace, and hosted verification remain pending.
+Status: implementation, focused/full core tests, trace, formatting, strict
+Clippy, independent implementation review, and full local `cargo xtask ci`
+pass. Hosted verification is pending.
 
 ## Goal and scope
 
@@ -95,14 +96,28 @@ refinement.
 ## Acceptance evidence
 
 - [x] Independent specification review accepts the 36/35 oracle and scope.
-- [ ] The focused reader test asserts exact `Limit` at 35 and the one-key open
+- [x] The focused reader test asserts exact `Limit` at 35 and the one-key open
       prefix; exact 36 succeeds with the ordered four-key Full open log.
-- [ ] Separate decoded-manifest and normalization exact/one-less cases remain
+- [x] Separate decoded-manifest and normalization exact/one-less cases remain
       present and assert their distinct typed failures.
-- [ ] Targeted Duvet `PARSE-GEN-005` implementation/test queries, trace update,
+- [x] Targeted Duvet `PARSE-GEN-005` implementation/test queries, trace update,
       and full trace pass.
-- [ ] Formatting, strict Clippy, focused/full core tests, and full
-      `cargo xtask ci` pass.
-- [ ] Independent implementation review confirms the preflight happens after
+- [x] Formatting, strict Clippy, and focused/full core tests pass.
+- [x] Full `cargo xtask ci` passes on `aarch64-macos`; isolated Verus partitions
+      verify 2,047, 3,183, and 1,362 obligations with zero errors. The receipt
+      records source SHA-256
+      `33c28ba90b8ec9ea2b0ea25d557f2c36a39761fcff26f2982833b1e79d92e470`.
+- [x] Independent implementation review confirms the exact 36/35 boundary,
+      typed preflight error, and open prefixes; the `Limit` at 35 occurs after
       the Full manifest is read but before any volume is opened.
-- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [ ] Hosted Linux assurance and Duvet Pages pass for the implementation
+      commit.
+
+## Local implementation evidence
+
+- `cargo test -p duplicity-core --test reader reader_budget_edges_accept_exact_and_reject_one_less` passed 1/1.
+- `cargo test -p duplicity-core` passed the full core suite, including 201 library tests, 18 crypto-reader tests, and 39 reader integration tests.
+- `.tools/bin/duvet query --check implementation,test --section docs/parsing-requirements.md#parse-gen-005` passed; `cargo xtask trace-update` and `cargo xtask trace` passed.
+- `cargo fmt --all -- --check`, `cargo clippy -p duplicity-core --tests -- -D warnings`, and `git diff --check` passed.
+- Independent implementation review passed. The 12-object fixture and exact Full-volume keys are pinned; 36 succeeds with four opens, while 35 returns `ReaderError::Limit` with only the Full manifest open. The separate decoded-manifest and normalization cases assert `DecodedLimit` and `Limit`, respectively.
+- Full `nix-shell tools/shell.nix --run 'source tools/env.sh && cargo xtask ci'` passed with fresh isolated Verus verification and all workspace tests. The generated local receipt is `target/assurance/ci.json` (source SHA-256 above; `aarch64-macos`).
