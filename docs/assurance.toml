@@ -1136,7 +1136,8 @@ proofs = [
 ]
 tests = [
   { package = "duplicity-core", name = "verified::reader_volume_scan::tests::volume_scan_charges_before_matching_and_rejects_a_second_candidate" },
-  { package = "duplicity-core", name = "missing_corrupt_and_ambiguous_objects_fail_explicitly" }
+  { package = "duplicity-core", name = "missing_corrupt_and_ambiguous_objects_fail_explicitly" },
+  { package = "duplicity-core", name = "official_reversed_object_order_preserves_manifest_descriptor_projection" }
 ]
 
 [[milestone]]

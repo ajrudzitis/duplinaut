@@ -156,6 +156,9 @@ fn decode_oracle_hex(hex: &str) -> Vec<u8> {
 //= docs/parsing-requirements.md#parse-chain-001
 //= type=test
 //# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=test
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
 #[test]
 fn official_reversed_object_order_preserves_manifest_descriptor_projection() {
     const FULL: &str = "backup/duplicity-full.20231114T221320Z.manifest";
@@ -253,6 +256,36 @@ fn official_reversed_object_order_preserves_manifest_descriptor_projection() {
         vec![FULL, FIRST_INCREMENTAL],
         vec![FULL, FIRST_INCREMENTAL, SECOND_INCREMENTAL],
     ];
+    let mut full_set_opens = vec![FULL.to_owned()];
+    for number in 1..=3 {
+        full_set_opens.push(format!(
+            "backup/duplicity-full.20231114T221320Z.vol{number}.difftar.gz"
+        ));
+    }
+    let mut first_incremental_set_opens = vec![FIRST_INCREMENTAL.to_owned()];
+    for number in 1..=2 {
+        first_incremental_set_opens.push(format!(
+            "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol{number}.difftar.gz"
+        ));
+    }
+    let mut second_incremental_set_opens = vec![SECOND_INCREMENTAL.to_owned()];
+    for number in 1..=1 {
+        second_incremental_set_opens.push(format!(
+            "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol{number}.difftar.gz"
+        ));
+    }
+    let mut first_target_opens = full_set_opens.clone();
+    first_target_opens.extend(first_incremental_set_opens.clone());
+    let mut final_target_opens = first_target_opens.clone();
+    final_target_opens.extend(second_incremental_set_opens);
+    let expected_object_opens = [full_set_opens, first_target_opens, final_target_opens];
+    assert_eq!(
+        expected_object_opens
+            .iter()
+            .map(Vec::len)
+            .collect::<Vec<_>>(),
+        [4, 7, 9]
+    );
 
     for (snapshot_index, target) in targets.into_iter().enumerate() {
         source.opens.store(0, Ordering::SeqCst);
@@ -270,10 +303,14 @@ fn official_reversed_object_order_preserves_manifest_descriptor_projection() {
             .unwrap();
         assert_eq!(snapshot.state().len(), expected_entries.len());
 
-        let observed_manifest_opens = source
-            .opened_keys
-            .lock()
-            .unwrap()
+        let opened_keys = source.opened_keys.lock().unwrap().clone();
+        assert_eq!(
+            opened_keys.len(),
+            [4, 7, 9][snapshot_index],
+            "snapshot_index={snapshot_index}, opened_keys={opened_keys:?}"
+        );
+        assert_eq!(opened_keys, expected_object_opens[snapshot_index]);
+        let observed_manifest_opens = opened_keys
             .iter()
             .filter(|key| key.ends_with(".manifest"))
             .cloned()

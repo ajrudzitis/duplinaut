@@ -1,7 +1,8 @@
 # Reversed-Listing Volume Scan Acceptance
 
-**Status:** Proposed; independent specification review and implementation
-pending.
+**Status:** Specification and independent implementation review, implementation,
+scoped local checks, and full local CI passed. Hosted Linux assurance and Duvet
+Pages remain pending.
 
 ## Goal and scope
 
@@ -59,28 +60,28 @@ reader refinement.
    ```
 
 4. For target `1700086400`, require the complete source open log to equal the
-   preceding four keys followed by:
+   preceding four keys followed by exactly:
 
    ```text
    backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest
    backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz
    backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol2.difftar.gz
-   backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol3.difftar.gz
    ```
 
-5. For target `1700172800`, require the preceding eight keys followed by:
+5. For target `1700172800`, require the preceding seven keys followed by exactly:
 
    ```text
    backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest
    backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz
-   backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol2.difftar.gz
-   backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol3.difftar.gz
    ```
 
-   The exact sequence lengths MUST be 4, 8, and 12. The sequence MUST contain
-   no signature archive, unselected later-set object, or duplicate open. This
-   proves only the selected keys and observed order for this fixture and
-   descending listing.
+   The exact sequence lengths MUST be 4, 7, and 9. No source open may target
+   either unselected later-set objects or any of the three official signature
+   archives: `backup/duplicity-full-signatures.20231114T221320Z.sigtar.gz`,
+   `backup/duplicity-new-signatures.20231114T221320Z.to.20231115T221320Z.sigtar.gz`,
+   and `backup/duplicity-new-signatures.20231115T221320Z.to.20231116T221320Z.sigtar.gz`.
+   No duplicate open is permitted. This proves only the selected keys and
+   observed order for this fixture and descending listing.
 6. Add the exact open-log assertion to the existing test's Duvet links for
    `PARSE-CHAIN-002`, and register the test under
    `reader-volume-candidate-scan` in `docs/assurance.toml`. Keep the separate
@@ -103,12 +104,24 @@ reader refinement.
 
 ## Checklist
 
-- [ ] Independent specification review accepts the exact 4/8/12 open oracle.
-- [ ] Strengthen the existing reversed-listing official test without adding a
+- [x] Independent specification review accepts the exact 4/7/9 open oracle.
+- [x] Strengthen the existing reversed-listing official test without adding a
       new fixture mutation.
-- [ ] Link the test to `PARSE-CHAIN-002` and the existing
+- [x] Link the test to `PARSE-CHAIN-002` and the existing
       `reader-volume-candidate-scan` assurance milestone.
-- [ ] Focused/full core tests, targeted Duvet/full trace, formatting, strict
-      Clippy, and full local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused/full core tests, targeted Duvet/full trace, formatting, and
+      strict Clippy pass.
+- [x] Full local `cargo xtask ci` passed for the implementation tree recorded
+      below.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
+
+## Current evidence
+
+- `cargo test -p duplicity-core --test reader official_reversed_object_order_preserves_manifest_descriptor_projection -- --exact`: passed with exact complete open logs of 4, 7, and 9 fixture keys for the three dates.
+- `cargo test -p duplicity-core`: passed.
+- `.tools/bin/duvet query --check implementation,test --section docs/parsing-requirements.md#parse-chain-002`: passed.
+- `cargo xtask trace-update` and `cargo xtask trace`: passed.
+- `cargo clippy -p duplicity-core --tests -- -D warnings`, `cargo fmt --all -- --check`, and `git diff --check`: passed.
+- Full local `cargo xtask ci` passed at source SHA-256 `4e687f5c4a75818d6ef7f924c846eae95b9d1f93f74a4047ba7d906062357cc3`; Verus partitions 2,047/3,183/1,332, zero errors.
+- Independent implementation review passed. Hosted Linux assurance/Duvet Pages remain pending.
