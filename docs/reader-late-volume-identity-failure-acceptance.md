@@ -1,7 +1,7 @@
 # Late Data-Volume Source-Identity Failure Acceptance
 
-**Status:** Independently reviewed and accepted as a specification;
-implementation, tests, and verification pending.
+**Status:** Specification and implementation independently reviewed;
+implementation and full local CI pass; hosted gates pending.
 
 ## Goal and scope
 
@@ -87,16 +87,39 @@ refinement.
   cover other objects or failure positions, validate crypto, perform
   filesystem publication, or prove complete reader-controller refinement.
 
+## Current evidence
+
+- The focused `official_reader_late_final_incremental_volume_change_returns_no_snapshot`
+  test and full `cargo test -p duplicity-core` pass.
+- The targeted `PARSE-SOURCE-001` implementation/test query, `cargo xtask
+  trace-update`, and full `cargo xtask trace` pass.
+- `cargo clippy -p duplicity-core --tests -- -D warnings`, `cargo fmt --all
+  -- --check`, and `git diff --check` pass. Clippy reports pre-existing
+  warnings in vendored `vest_lib`; the core test target is clean.
+- Independent implementation review passed: mode 9 matches exactly the final
+  Incremental vol1 key, asserts `Source(Changed)`, a clear cancellation token,
+  and the ordered nine-key prefix. The existing final-manifest mode-5 and
+  cancellation mode-6 checks remain intact. No production or fixture changes.
+- Full `nix-shell tools/shell.nix --run 'source tools/env.sh && cargo xtask ci'`
+  passes for source SHA-256
+  `dfb0dee0c617756eb897d4fd52fe90476f99d4a2a96b159f2c360dd7fed4defa` on
+  `aarch64-macos`. Verus partitions report 2,047, 3,183, and 1,332 verified
+  obligations with zero errors; workspace formatting, strict Clippy, tests,
+  and assurance-mapped test validation pass. Receipt: generated
+  `target/assurance/ci.json`.
+- Hosted Linux assurance and Duvet Pages remain pending.
+
 ## Checklist
 
 - [x] Independent specification review accepts the trigger and nine-key log.
-- [ ] Add the official-fixture source-change test with an exact trigger and no
+- [x] Add the official-fixture source-change test with an exact trigger and no
       production changes.
-- [ ] Map the test to `PARSE-SOURCE-001` and `reader-orchestration`; extend
+- [x] Map the test to `PARSE-SOURCE-001` and `reader-orchestration`; extend
       the assurance rationale for both separate final-manifest and
       final-volume-open observations without claiming backend identity proof
       or complete reader refinement.
-- [ ] Focused/full core tests, targeted Duvet/full trace, formatting, strict
-      Clippy, and full local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused/full core tests, targeted Duvet/full trace, formatting, and
+      strict Clippy pass.
+- [x] Full local `cargo xtask ci` passes.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages pass.

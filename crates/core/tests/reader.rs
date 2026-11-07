@@ -89,6 +89,12 @@ impl ObjectSource for Source {
         {
             return Err(SourceError::Changed);
         }
+        if self.mode == 9
+            && object.key
+                == "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz"
+        {
+            return Err(SourceError::Changed);
+        }
         if self.mode == 6 && object.key.contains(".to.20231116T221320Z.") {
             cancel.cancel();
         }
@@ -556,6 +562,42 @@ fn identity_cancellation_and_exact_body_failures_publish_no_snapshot() {
         catalog.read_snapshot(anchor(&catalog), Timestamp(1700000000), &cancel),
         Err(ReaderError::Source(SourceError::Cancelled))
     ));
+}
+
+//= docs/parsing-requirements.md#parse-source-001
+//= type=test
+//# The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
+#[test]
+fn official_reader_late_final_incremental_volume_change_returns_no_snapshot() {
+    const EXPECTED_OPENS: [&str; 9] = [
+        "backup/duplicity-full.20231114T221320Z.manifest",
+        "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+        "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz",
+        "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol2.difftar.gz",
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest",
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz",
+    ];
+    let expected_opens = EXPECTED_OPENS.map(str::to_owned);
+    let mut source = Source::official();
+    source.mode = 9;
+    let catalog = discover(&source);
+    let cancel = Cancellation::default();
+
+    let result = catalog.read_snapshot(anchor(&catalog), Timestamp(1700172800), &cancel);
+
+    assert!(matches!(
+        result,
+        Err(ReaderError::Source(SourceError::Changed))
+    ));
+    assert!(!cancel.is_cancelled());
+    assert_eq!(
+        source.opened_keys.lock().unwrap().as_slice(),
+        expected_opens.as_slice()
+    );
+    assert_eq!(source.opens.load(Ordering::SeqCst), 9);
 }
 
 //= docs/parsing-requirements.md#parse-env-024
