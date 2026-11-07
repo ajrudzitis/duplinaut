@@ -98,8 +98,9 @@ This adds native integration evidence only; no formal proof is claimed.
 - Full local `cargo xtask ci` passed at source SHA-256
   `0fd2ce171190ed490639326d8ccfb9613a501dc7cd0659048e482324eed53017`; Verus
   partitions 2,047/3,183/1,332, zero errors.
-- Independent implementation review passed. Hosted Linux assurance/Duvet
-  Pages remain pending.
+- Independent implementation review passed. Hosted Linux assurance and Duvet
+  Pages pass in [run
+  42382568637](https://github.com/ajrudzitis/duplinaut/actions/runs/42382568637).
 
 ## Checklist
 
@@ -115,4 +116,4 @@ This adds native integration evidence only; no formal proof is claimed.
 - [x] Full local `cargo xtask ci` passed for the implementation tree recorded
       below.
 - [x] Independent implementation/test review passes.
-- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [x] Hosted Linux assurance and Duvet Pages pass in run 42382568637.
