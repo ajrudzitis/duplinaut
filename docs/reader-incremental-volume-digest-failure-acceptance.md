@@ -1,7 +1,7 @@
 # Official Plain Reader Incremental-Volume Digest-Failure Acceptance
 
-**Status:** Specification accepted after independent review. No implementation
-or verification evidence is claimed.
+**Status:** Implementation, local tests, Duvet trace, independent review, and
+full local CI pass. Hosted assurance remains pending.
 
 ## Goal and scope
 
@@ -82,12 +82,14 @@ restoration, or complete reader/controller refinement.
 
 - [x] Independent specification review accepts the mutation, identity setup,
       typed digest error, and exact six-key open set.
-- [ ] Focused test preserves the twelve-key inventory and changes only the
+- [x] Focused test preserves the twelve-key inventory and changes only the
       selected volume body plus test-local identity metadata.
-- [ ] Discovery performs no source opens; final read processes the Full set,
+- [x] Discovery performs no source opens; final read processes the Full set,
       then fails on first-incremental volume 1 with no snapshot.
-- [ ] The six-key opened set is exact, with no later incremental objects.
-- [ ] Duvet `PARSE-ENV-005`, focused/full core tests, formatting, strict Clippy,
-      and local `cargo xtask ci` pass.
-- [ ] Independent implementation review and hosted Linux assurance plus Duvet
-      Pages publication pass.
+- [x] The six-key opened set is exact, with no later incremental objects.
+- [x] Duvet `PARSE-ENV-005` implementation/test query and full trace,
+      focused/full core tests, formatting, strict Clippy, and diff checks pass.
+- [x] Independent implementation review passes.
+- [x] Full local `cargo xtask ci` passes on the final tracked tree (receipt in
+      generated `target/assurance/ci.json`).
+- [ ] Hosted Linux assurance and Duvet Pages publication pass.
