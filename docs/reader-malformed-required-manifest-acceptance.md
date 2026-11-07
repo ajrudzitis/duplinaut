@@ -1,7 +1,8 @@
 # Official Plain Reader Malformed Required-Manifest Acceptance
 
-**Status:** Implementation, independent review, and local full CI pass. Hosted
-Linux assurance and Duvet Pages publication remain pending.
+**Status:** Implementation and independent review pass. A fresh full local CI
+run is pending after the shared `Manifest::parse` traceability annotation;
+hosted Linux assurance and Duvet Pages publication remain pending.
 
 ## Goal and scope
 
@@ -103,9 +104,9 @@ reader-controller refinement.
       `ReaderError::Manifest(ManifestError::Malformed)`, no snapshot, and
       opens only the selected Full manifest.
 - [x] Focused test and `cargo test -p duplicity-core` pass; Duvet
-      `PARSE-GEN-001` query and full `cargo xtask trace` pass; formatting,
-      strict core Clippy, and diff checks pass.
+      `PARSE-GEN-001` implementation/test query and full `cargo xtask trace`
+      pass; formatting, strict core Clippy, and diff checks pass.
 - [x] Independent implementation/test review passes.
-- [x] Full local `cargo xtask ci` passes (fresh final-tree receipt recorded in
-      generated `target/assurance/ci.json`).
+- [ ] Full local `cargo xtask ci` passes on the final tracked tree after the
+      shared parser annotation.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.

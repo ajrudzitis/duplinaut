@@ -1,7 +1,7 @@
 # Official Plain Reader Malformed Incremental-Manifest Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Implementation, focused/full core verification, and independent
+implementation review pass. Full local CI and hosted assurance remain pending.
 
 ## Goal and scope
 
@@ -85,14 +85,15 @@ refinement.
 
 - [x] Independent specification review accepts the mutation, public typed
       error, descriptor observations, and exact five-object open set.
-- [ ] Focused integration test preserves the twelve-key inventory and changes
+- [x] Focused integration test preserves the twelve-key inventory and changes
       only the in-memory body, size, and synthetic identity for this manifest.
-- [ ] Discovery opens no objects and exposes the name-derived incremental
+- [x] Discovery opens no objects and exposes the name-derived incremental
       descriptor; the final-target read returns the exact typed error and no
       snapshot.
-- [ ] The failed read opens exactly the Full manifest, three Full volumes, and
+- [x] The failed read opens exactly the Full manifest, three Full volumes, and
       first-incremental manifest, with no later object reads.
-- [ ] Duvet `PARSE-GEN-001`, focused/full tests, formatting, strict Clippy, and
-      local `cargo xtask ci` pass.
-- [ ] Independent implementation review and hosted Linux assurance plus Duvet
-      Pages publication pass.
+- [x] The `PARSE-GEN-001` implementation/test query and full Duvet trace,
+      focused/full core tests, formatting, strict Clippy, and diff checks pass.
+- [x] Independent implementation/test review passes.
+- [ ] Full local `cargo xtask ci` passes on the final tracked tree.
+- [ ] Hosted Linux assurance and Duvet Pages publication pass.

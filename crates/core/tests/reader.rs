@@ -4994,3 +4994,124 @@ fn official_empty_required_full_manifest_returns_structured_malformed_error() {
     assert_eq!(opened_keys, vec![FULL_MANIFEST]);
     assert_eq!(source.opens.load(Ordering::SeqCst), 1);
 }
+
+//= docs/parsing-requirements.md#parse-gen-001
+//= type=test
+//# A parser MUST return a structured error for malformed or truncated required input.
+#[test]
+fn official_empty_required_first_incremental_manifest_returns_structured_malformed_error() {
+    const FIRST_INCREMENTAL: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest";
+    const FULL_MANIFEST: &str = "backup/duplicity-full.20231114T221320Z.manifest";
+    const FULL_VOL1: &str = "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz";
+    const FULL_VOL2: &str = "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz";
+    const FULL_VOL3: &str = "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz";
+
+    let mut source = Source::official();
+    assert_eq!(source.objects.len(), 12);
+    let original_inventory = source.objects.clone();
+    let (manifest_object, manifest_bytes) = source
+        .objects
+        .iter_mut()
+        .find(|(object, _)| object.key == FIRST_INCREMENTAL)
+        .expect("the official fixture includes its first incremental manifest");
+    manifest_bytes.clear();
+    manifest_object.size = 0;
+    let empty_body_etag = format!("{:x}", sha2::Sha256::digest([]));
+    manifest_object.identity = ObjectIdentity {
+        version_id: Some("empty-malformed-body-v1".into()),
+        etag: Some(empty_body_etag.clone()),
+    };
+
+    assert_eq!(source.objects.len(), original_inventory.len());
+    for (index, (original_object, original_bytes)) in original_inventory.iter().enumerate() {
+        let (object, bytes) = &source.objects[index];
+        if original_object.key == FIRST_INCREMENTAL {
+            assert_eq!(object.key, original_object.key);
+            assert_eq!(object.size, 0);
+            assert_eq!(
+                object.identity.version_id.as_deref(),
+                Some("empty-malformed-body-v1")
+            );
+            assert_eq!(
+                object.identity.etag.as_deref(),
+                Some(empty_body_etag.as_str())
+            );
+            assert!(bytes.is_empty());
+        } else {
+            assert_eq!(object, original_object);
+            assert_eq!(bytes, original_bytes);
+        }
+    }
+
+    let catalog = discover(&source);
+    assert_eq!(source.opens.load(Ordering::SeqCst), 0);
+    let discovered_incremental = catalog
+        .objects()
+        .iter()
+        .find(|entry| entry.object().key == FIRST_INCREMENTAL)
+        .expect("the valid object name remains visible in metadata-only discovery");
+    let incremental_name = discovered_incremental
+        .name()
+        .expect("the incremental key has a valid name");
+    assert_eq!(
+        incremental_name.kind,
+        duplicity_core::names::ObjectKind::IncrementalManifest
+    );
+    assert_eq!(
+        (incremental_name.start.0, incremental_name.end.0),
+        (1700000000, 1700086400)
+    );
+    assert_eq!(discovered_incremental.status(), DiscoveryStatus::Completed);
+
+    let descriptors = catalog.manifests().collect::<Vec<_>>();
+    assert_eq!(descriptors.len(), 3);
+    let mut descriptor_keys = descriptors
+        .iter()
+        .map(|(_, _, descriptor)| {
+            (
+                match descriptor.kind() {
+                    SetKind::Full => 0,
+                    SetKind::Incremental => 1,
+                },
+                descriptor.start().0,
+                descriptor.end().0,
+            )
+        })
+        .collect::<Vec<_>>();
+    descriptor_keys.sort_unstable();
+    assert_eq!(
+        descriptor_keys,
+        vec![
+            (0, 1700000000, 1700000000),
+            (1, 1700000000, 1700086400),
+            (1, 1700086400, 1700172800),
+        ]
+    );
+    let full_index = descriptors
+        .iter()
+        .find(|(_, _, descriptor)| descriptor.kind() == SetKind::Full)
+        .expect("the name-derived Full descriptor is available")
+        .0;
+
+    source.opened_keys.lock().unwrap().clear();
+    assert!(matches!(
+        catalog.read_snapshot(full_index, Timestamp(1700172800), &Cancellation::default()),
+        Err(ReaderError::Manifest(
+            duplicity_core::manifest::ManifestError::Malformed
+        ))
+    ));
+    let mut expected_opened_keys = vec![
+        FULL_MANIFEST,
+        FULL_VOL1,
+        FULL_VOL2,
+        FULL_VOL3,
+        FIRST_INCREMENTAL,
+    ];
+    expected_opened_keys.sort_unstable();
+    let mut opened_keys = source.opened_keys.lock().unwrap().clone();
+    opened_keys.sort_unstable();
+    assert_eq!(opened_keys.len(), 5);
+    assert_eq!(opened_keys, expected_opened_keys);
+    assert_eq!(source.opens.load(Ordering::SeqCst), 5);
+}

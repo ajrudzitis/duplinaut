@@ -1320,6 +1320,9 @@ fn parse_line(raw: &[u8], line: &[u8], limits: ManifestLimits, state: ParseState
 }
 
 impl Manifest {
+    //= docs/parsing-requirements.md#parse-gen-001
+    //= type=implementation
+    //# A parser MUST return a structured error for malformed or truncated required input.
     //= docs/parsing-requirements.md#parse-man-001
     //# The manifest parser MUST recover ordered volume records containing volume number, starting path, ending path, optional block boundaries, and declared hashes.
     //= docs/parsing-requirements.md#parse-man-006

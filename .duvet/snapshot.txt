@@ -1,6 +1,6 @@
 SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements.md)
   SECTION: [PARSE-GEN-001](#parse-gen-001)
-    TEXT[!MUST,test]: A parser MUST return a structured error for malformed or truncated required input.
+    TEXT[!MUST,implementation,test]: A parser MUST return a structured error for malformed or truncated required input.
 
   SECTION: [PARSE-GEN-002](#parse-gen-002)
     TEXT[!MUST,implementation,test]: A successful parser MUST report a consumed input range wholly contained within the supplied input.
