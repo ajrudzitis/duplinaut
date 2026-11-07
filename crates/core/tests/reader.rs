@@ -4683,11 +4683,16 @@ fn official_unknown_and_malformed_siblings_preserve_plain_snapshot_and_required_
 //= docs/parsing-requirements.md#parse-path-001
 //= type=test
 //# The reader MUST preserve backup path components as bytes without lossy UTF-8 conversion.
+//= docs/parsing-requirements.md#parse-state-003
+//= type=test
+//# `SnapshotState::entries()` MUST enumerate retained entries in bytewise lexicographic order of their backup-relative path components.
 //= docs/parsing-requirements.md#assure-test-001
 //= type=test
 //# Compatibility tests MUST restore supported snapshots produced by official duplicity and compare contents and supported metadata with both their source tree and official restoration.
 #[test]
 fn official_unsupported_semantic_duplicate_preserves_plain_snapshot_and_required_open_set() {
+    // The order assertion below covers this observed fixture snapshot only;
+    // it does not prove standard-library map internals.
     const SUPPORTED: &str = "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz";
     const UNSUPPORTED: &str = "backup/duplicity-full.20231114T221320Z.vol1.difftar.p7m";
 

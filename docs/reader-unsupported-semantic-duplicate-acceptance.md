@@ -1,8 +1,11 @@
 # Official Plain Reader Unsupported Semantic-Duplicate Acceptance
 
-**Status:** Implementation and independent implementation review passed.
-Focused/full core tests, Duvet queries/full trace, formatting, strict Clippy,
-and full pinned local CI passed. Hosted Linux/Pages assurance is pending.
+**Status:** Implementation and independent implementation review passed,
+including the fixture-scoped `PARSE-STATE-003` mapping. Focused/full core
+tests, Duvet queries/full trace, formatting, and strict Clippy pass. The
+final-tree full pinned local CI passes with Verus partitions 2,047/3,183/1,329
+and zero errors; its receipt is generated at `target/assurance/ci.json`.
+Hosted Linux/Pages assurance is pending.
 
 ## Goal and scope
 
@@ -105,13 +108,19 @@ snapshot:
    participate as a completed required volume. Link this restored-chain
    behavior to `PARSE-CHAIN-001`.
 3. MUST compare the complete snapshot with the documented `expected.json`
-   fields, including raw component paths/order, kind/mode, supported
-   timestamps, file size/hash, and symlink target; omit symlink mtime as
-   documented. Link these checks to `PARSE-PATH-001` and `ASSURE-TEST-001`.
-4. MUST assert the exact nine-key open set above; the unsupported `.p7m`
+   fields, including raw component paths, kind/mode, supported timestamps,
+   file size/hash, and symlink target; omit symlink mtime as documented. Link
+   these checks to `PARSE-PATH-001` and `ASSURE-TEST-001`.
+4. MUST require `SnapshotState::entries()` iteration order to equal the
+   oracle's paths sorted lexicographically by raw component-byte sequences.
+   Compare each component as unsigned bytes, preserve component boundaries,
+   and order a proper component-sequence prefix before its extension. This
+   assertion covers the observed fixture snapshot and links to
+   `PARSE-STATE-003`; it does not claim proof of standard-library map internals.
+5. MUST assert the exact nine-key open set above; the unsupported `.p7m`
    sibling MUST NOT be opened. This result is limited to the named fixture
    pair and plain chain.
-5. MUST NOT make a universal claim about collision handling for other
+6. MUST NOT make a universal claim about collision handling for other
    unsupported variants, CMS decoding, cryptography, S3 identity, or
    filesystem restoration.
 
@@ -121,8 +130,10 @@ snapshot:
   all twelve official objects and add only the zero-byte `.p7m` sibling.
 - Add Duvet links for unsupported/supported same-semantic name diagnostics to
   `PARSE-NAME-001`, restored-chain success to `PARSE-CHAIN-001`, raw byte paths
-  to `PARSE-PATH-001`, and the official snapshot oracle to `ASSURE-TEST-001`.
-  Do not add `PARSE-NAME-005` or crypto-authentication links.
+  to `PARSE-PATH-001`, the raw-component iteration-order assertion to
+  `PARSE-STATE-003`, and the official snapshot oracle to `ASSURE-TEST-001`.
+  Run targeted Duvet queries for all five linked requirements and the full
+  trace. Do not add `PARSE-NAME-005` or crypto-authentication links.
 - Run focused/full core tests, targeted Duvet queries and full trace,
   formatting, strict Clippy, and `cargo xtask ci`. Require hosted Linux
   assurance and Duvet Pages publication before acceptance is complete.
@@ -142,14 +153,19 @@ restoration, complete reader/controller refinement, or formal reader proof.
 
 - [x] Independent specification review accepts the same-semantic pair,
       diagnostic treatment, snapshot oracle, and open set.
+- [x] Independent review accepts the added `PARSE-STATE-003` ordering scope.
 - [x] Discovery preserves both objects with distinct envelope/status values
       and does not reject the catalog as a duplicate artifact.
 - [x] The final snapshot matches all documented oracle fields and opens
       exactly the three manifests plus six supported data volumes.
-- [x] Focused/full core tests, targeted Duvet queries/full trace, formatting,
-      strict Clippy, and diff checks pass locally.
+- [x] Focused/full core tests, formatting, strict Clippy, and diff checks pass
+      locally.
+- [x] Targeted Duvet queries for `PARSE-NAME-001`, `PARSE-CHAIN-001`,
+      `PARSE-PATH-001`, `PARSE-STATE-003`, and `ASSURE-TEST-001`, plus the full
+      trace, pass after adding the `PARSE-STATE-003` test link.
 - [x] Independent implementation/test review passes.
-- [x] Full pinned local `cargo xtask ci` passes.
+- [x] Final-tree full pinned local `cargo xtask ci` passes after the added
+      `PARSE-STATE-003` mapping and documentation update.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
 
 ## Current local evidence
@@ -157,9 +173,12 @@ restoration, complete reader/controller refinement, or formal reader proof.
 - Focused reader acceptance test passed (1/1).
 - `cargo test -p duplicity-core` passed.
 - Targeted Duvet queries for `PARSE-NAME-001`, `PARSE-CHAIN-001`,
-  `PARSE-PATH-001`, and `ASSURE-TEST-001`, `cargo xtask trace-update`, and
-  `cargo xtask trace` passed.
+  `PARSE-PATH-001`, `PARSE-STATE-003`, and `ASSURE-TEST-001`, followed by
+  `cargo xtask trace-update` and `cargo xtask trace`, passed after the
+  `PARSE-STATE-003` test annotation and assurance registration were added.
 - `cargo fmt --all -- --check`, strict core Clippy, and `git diff --check`
   passed.
-- Independent implementation review and full pinned local `cargo xtask ci`
-  passed. Hosted Linux assurance/Pages remain pending.
+- Independent implementation review accepts the added STATE-003 scope.
+- Final-tree full pinned local `cargo xtask ci` passed with Verus partitions
+  2,047/3,183/1,329 and zero errors. The generated receipt is
+  `target/assurance/ci.json`. Hosted Linux assurance/Pages remain pending.
