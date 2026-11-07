@@ -1,7 +1,6 @@
 # Official Plain Reader Partial Full-Signature Archive Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Specification accepted after independent review. The implementation and independent test review pass. Local focused/full core tests, targeted Duvet queries/full trace, formatting, strict Clippy, and diff checks pass. Local full `cargo xtask ci` passes. Hosted Linux assurance and Duvet Pages remain pending.
 
 ## Goal and scope
 
@@ -125,11 +124,12 @@ or a formal reader proof.
 
 - [x] Independent specification review accepts the scope, fixture mutation,
       opened-key set, and snapshot oracle.
-- [ ] The renamed archive remains visible as partial `FullSignatures`, with
+- [x] The renamed archive remains visible as partial `FullSignatures`, with
       exact inventory and byte/size/identity preservation.
-- [ ] Final state matches all documented oracle fields and the opened-key set
+- [x] Final state matches all documented oracle fields and the opened-key set
       contains only the three manifests plus six data volumes.
-- [ ] Targeted Duvet queries/full trace, focused/full core tests, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Targeted Duvet queries/full trace, focused/full core tests, formatting,
+      strict Clippy, and diff checks pass.
+- [x] Local full `cargo xtask ci` passes.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
