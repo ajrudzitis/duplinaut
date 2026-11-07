@@ -25,8 +25,8 @@ locate the Volume 1 `Hash SHA1 <hex>` declaration. Insert immediately after it
 one `Hash SHA2 <hex>` declaration using the same 40 hexadecimal digits as the
 SHA1 declaration. Preserve the original SHA1 declaration and all other
 manifest content. The inserted unsupported declaration is syntactically
-valid but ignored for integrity calculation; the unchanged SHA1 declaration
-and stored bytes are retained from the official positive fixture case for
+valid but ignored for integrity calculation. Preserve the baseline fixture's
+known-supported SHA1 declaration and associated stored bytes for
 
 ```text
 backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz
@@ -95,7 +95,7 @@ volumes, filesystem restoration, or complete reader/controller refinement.
 ## Checklist
 
 - [x] Independent specification review accepts the inserted declaration,
-      supported-digest oracle, final snapshot comparison, and nine-key open set.
+      supported-digest precondition, final snapshot comparison, and nine-key open set.
 - [ ] Focused test proves the original SHA1 token/hex and all data payloads are
       unchanged, and inserts exactly one valid same-digest SHA2 line.
 - [ ] Discovery opens no objects; final public read succeeds and matches the
