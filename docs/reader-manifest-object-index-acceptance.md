@@ -88,7 +88,8 @@ preconditions for all possible inputs.
 - Focused/full core tests, the focused Verus proof, targeted `PARSE-CHAIN-001`
   Duvet query and full trace, formatting, strict Clippy, and full local
   `cargo xtask ci` passed. Independent verifier and implementation reviews
-  passed. Hosted Linux assurance and Duvet Pages publication remain required.
+  passed. Hosted Linux assurance and Duvet Pages passed in [run
+  42382568637](https://github.com/ajrudzitis/duplinaut/actions/runs/42382568637).
 - The proof covers only an in-range index/descriptor projection from supplied,
   length-aligned tables whose object indices are in bounds. It does not
   dereference the object table. Native fixture tests cover discovery's
@@ -110,7 +111,7 @@ preconditions for all possible inputs.
 - [x] Focused/full tests, Verus, targeted Duvet/full trace, formatting, strict
       Clippy, and local full CI pass.
 - [x] Independent verifier and implementation reviews pass.
-- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [x] Hosted Linux assurance and Duvet Pages pass in run 42382568637.
 
 ## Local evidence
 
@@ -120,4 +121,5 @@ The focused projection proof and native tests pass. The full local
 Verus partitions 2,047 vstd, 3,183 Vest, and 1,332 core obligations with zero
 errors. Duvet `PARSE-CHAIN-001` query/full trace, formatting, strict Clippy,
 and independent verifier/implementation reviews pass. Hosted Linux assurance
-and Duvet Pages remain pending.
+and Duvet Pages pass in [run
+42382568637](https://github.com/ajrudzitis/duplinaut/actions/runs/42382568637).
