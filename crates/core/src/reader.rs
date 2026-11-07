@@ -37,9 +37,8 @@ use crate::verified::reader_completion::{
 };
 use crate::verified::reader_manifest_index::{manifest_position, manifest_tables_well_formed};
 use crate::verified::reader_volume_scan::{
-    advance_volume_scan_cursor, charge_volume_object, record_volume_candidate,
-    required_volume_identity_matches, reserve_volume_scan, start_volume_scan_cursor,
-    volume_scan_cursor_complete, VolumeScan, VolumeScanError,
+    reserve_volume_scan, scan_required_volume_object, start_volume_scan_cursor,
+    volume_scan_cursor_complete, VolumeScan, VolumeScanError, VolumeScanState,
 };
 pub use pgp::types::Password as OpenPgpPassword;
 use std::io::Read;
@@ -839,35 +838,33 @@ impl<'a> Catalog<'a> {
                 if cancel.is_cancelled() {
                     return Err(ReaderError::Source(SourceError::Cancelled));
                 }
-                let mut scan = VolumeScan {
-                    checked_objects: checks,
-                    candidate_index: None,
+                let mut scan_state = VolumeScanState {
+                    cursor,
+                    scan: VolumeScan {
+                        checked_objects: checks,
+                        candidate_index: None,
+                    },
                 };
                 for (object_index, object) in self.objects.iter().enumerate() {
                     if cancel.is_cancelled() {
                         return Err(ReaderError::Source(SourceError::Cancelled));
                     }
-                    cursor = advance_volume_scan_cursor(cursor, volume_index, object_index)
-                        .ok_or(ReaderError::Limit)?;
-                    let charged = charge_volume_object(
-                        scan,
-                        reservation.final_checks,
+                    scan_state = scan_required_volume_object(
+                        scan_state,
+                        volume_index,
                         object_index,
-                        self.objects.len(),
+                        reservation.final_checks,
+                        object.name,
+                        descriptor,
+                        record.number,
                     )
                     .map_err(|error| match error {
                         VolumeScanError::Limit => ReaderError::Limit,
                         VolumeScanError::Duplicate => ReaderError::DuplicateArtifact,
                     })?;
-                    let matches = object.name.is_some_and(|volume| {
-                        required_volume_identity_matches(volume, descriptor, record.number)
-                    });
-                    scan =
-                        record_volume_candidate(charged, matches).map_err(|error| match error {
-                            VolumeScanError::Limit => ReaderError::Limit,
-                            VolumeScanError::Duplicate => ReaderError::DuplicateArtifact,
-                        })?;
                 }
+                cursor = scan_state.cursor;
+                let scan = scan_state.scan;
                 checks = scan.checked_objects;
                 let object = match scan.candidate_index {
                     Some(index) => self.objects.get(index).ok_or(ReaderError::Limit)?,

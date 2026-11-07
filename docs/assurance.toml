@@ -1137,23 +1137,28 @@ tests = [{ package = "duplicity-core", name = "official_final_incremental_volume
 
 [[milestone]]
 id = "reader-volume-candidate-scan"
-gate = false
+gate = true
 requirements = ["PARSE-GEN-005", "PARSE-CHAIN-002"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
 # Scoped transitions independently accepted; object enumeration, identity
 # predicate, cancellation/controller and global resource-accounting refinement remain open.
-implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "charge_volume_object" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "record_volume_candidate" }]
+implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "charge_volume_object" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "record_volume_candidate" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "scan_required_volume_object" }]
 proofs = [
   { id = "reader-volume-scan-charge", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "charge_volume_object", kind = "contract" },
-  { id = "reader-volume-unique-candidate", requirement = "PARSE-CHAIN-002", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "record_volume_candidate", kind = "contract" }
+  { id = "reader-volume-unique-candidate", requirement = "PARSE-CHAIN-002", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "record_volume_candidate", kind = "contract" },
+  { id = "reader-volume-scan-composition-gen", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "scan_required_volume_object", kind = "contract" },
+  { id = "reader-volume-scan-composition-chain", requirement = "PARSE-CHAIN-002", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "scan_required_volume_object", kind = "contract" },
+  { id = "reader-volume-scan-composition-fold-gen", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "volume_scan_ordered_fold_refines_candidate_summary", kind = "lemma" },
+  { id = "reader-volume-scan-composition-fold-chain", requirement = "PARSE-CHAIN-002", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "volume_scan_ordered_fold_refines_candidate_summary", kind = "lemma" }
 ]
 tests = [
   { package = "duplicity-core", name = "verified::reader_volume_scan::tests::volume_scan_charges_before_matching_and_rejects_a_second_candidate" },
+  { package = "duplicity-core", name = "verified::reader_volume_scan::tests::composed_volume_scan_step_covers_order_charge_and_candidate_outcomes" },
   { package = "duplicity-core", name = "missing_corrupt_and_ambiguous_objects_fail_explicitly" },
   { package = "duplicity-core", name = "official_reversed_object_order_preserves_manifest_descriptor_projection" }
 ]

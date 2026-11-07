@@ -1,7 +1,10 @@
 # Required-volume candidate scan composition acceptance
 
-Status: proposed; implementation, composition proof, focused tests, and hosted
-verification remain pending.
+Status: implementation, strict focused composition proof, focused reader tests,
+Duvet trace, formatting, strict Clippy, and independent implementation review
+pass. The candidate-scan milestone is now enforced by the assurance gate;
+full `cargo xtask ci` passes on `aarch64-macos` (Verus 2,047/3,183/1,371,
+zero errors). Hosted verification remains pending.
 
 ## Goal and scope
 
@@ -132,20 +135,35 @@ their existing separate proofs.
 
 - [x] Independent specification review accepts the one-scan composition
       boundary and its trust limits.
-- [ ] Production calls the shared transition in cursor, charge, identity,
+- [x] Production calls the shared transition in cursor, charge, identity,
       candidate-record order.
-- [ ] Strict Verus proves the composed per-step contract and ordered-fold
+- [x] Strict Verus proves the composed per-step contract and ordered-fold
       candidate/check-count property.
-- [ ] Focused tests cover no match, one match at each position, duplicate,
+- [x] Focused tests cover no match, one match at each position, duplicate,
       invalid cursor, charge exhaustion, and exact state advancement.
-- [ ] Existing public missing-volume, discovery-time duplicate-artifact, and
+- [x] Existing public missing-volume, discovery-time duplicate-artifact, and
       reversed-order reader tests pass; the helper-level test exercises a
       second matching candidate. Duvet links the helper/tests to
       PARSE-GEN-005 and PARSE-CHAIN-002 only.
-- [ ] Assurance mapping extends `reader-volume-candidate-scan`; the
+- [x] Assurance mapping extends `reader-volume-candidate-scan`; the
       row-major cursor and work-reservation mappings remain unchanged.
-- [ ] Targeted Duvet queries, trace update/full trace, formatting, strict
-      Clippy, focused/full core tests, and `cargo xtask ci` pass.
-- [ ] Independent implementation/proof review accepts the helper-to-callsite
+- [x] Targeted Duvet queries, trace update/full trace, formatting, strict
+      Clippy, focused helper tests, and public reader tests pass.
+- [x] Full `cargo xtask ci` passes on `aarch64-macos`, including all enabled
+      Duvet, Verus, workspace-test, and assurance-mapped-test gates. The
+      receipt records source SHA-256
+      `22bc1734a7a6ce0c875945d498bf24ca702e9a026f4bb7032cdc8eeed73e6986`.
+- [x] Independent implementation/proof review accepts the helper-to-callsite
       composition and scoped native evidence.
+- [x] The `reader-volume-candidate-scan` milestone is enabled as a scoped
+      assurance gate with the reviewed proof and test mappings.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
+
+## Local implementation evidence
+
+- Strict pinned Verus module verification passed: `cargo verus focus -p duplicity-core --target-dir target/verify/reader-volume-composition-final -- --no-cheating --verify-module verified::reader_volume_scan` (51 verified, 0 errors).
+- `cargo test -p duplicity-core --lib verified::reader_volume_scan::tests::composed_volume_scan_step_covers_order_charge_and_candidate_outcomes` passed 1/1.
+- `cargo test -p duplicity-core --test reader` passed all 39 reader integration tests, including the discovery-time duplicate, missing-volume, and reversed-order cases.
+- Targeted `PARSE-GEN-005` and `PARSE-CHAIN-002` implementation/test queries passed; `cargo xtask trace-update` and `cargo xtask trace` passed.
+- `cargo clippy -p duplicity-core --tests -- -D warnings`, `cargo fmt --all -- --check`, and `git diff --check` passed.
+- Full `nix-shell tools/shell.nix --run 'source tools/env.sh && cargo xtask ci'` passed with fresh isolated Verus verification (2,047/3,183/1,371, zero errors), workspace tests, and gated assurance-test replay. Receipt: `target/assurance/ci.json` (source SHA-256 above; `aarch64-macos`).

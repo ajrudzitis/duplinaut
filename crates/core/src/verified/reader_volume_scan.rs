@@ -27,6 +27,12 @@ pub struct ChargedVolumeObject {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VolumeScanState {
+    pub cursor: VolumeScanCursor,
+    pub scan: VolumeScan,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VolumeScanReservation {
     pub initial_checks: usize,
     pub planned_checks: usize,
@@ -832,14 +838,342 @@ pub fn record_volume_candidate(
     })
 }
 
+pub open spec fn volume_scan_match_step_model(
+    state: VolumeScanState,
+    volume_index: usize,
+    object_index: usize,
+    limit: usize,
+    matches: bool,
+) -> Result<VolumeScanState, VolumeScanError> {
+    match advance_volume_scan_cursor_model(state.cursor, volume_index, object_index) {
+        None => Err(VolumeScanError::Limit),
+        Some(cursor) => match charge_volume_object_model(
+            state.scan,
+            limit,
+            object_index,
+            state.cursor.object_count,
+        ) {
+            Err(error) => Err(error),
+            Ok(charged) => match record_volume_candidate_model(charged, matches) {
+                Err(error) => Err(error),
+                Ok(scan) => Ok(VolumeScanState { cursor, scan }),
+            },
+        },
+    }
+}
+
+pub open spec fn volume_scan_step_model(
+    state: VolumeScanState,
+    volume_index: usize,
+    object_index: usize,
+    limit: usize,
+    name: Option<ObjectName>,
+    descriptor: SetDescriptor,
+    required_volume: u64,
+) -> Result<VolumeScanState, VolumeScanError> {
+    let matches = match name {
+        Some(parsed) => required_volume_identity_model(parsed, descriptor, required_volume),
+        None => false,
+    };
+    volume_scan_match_step_model(state, volume_index, object_index, limit, matches)
+}
+
+/// Fold already-computed identity outcomes in one ordered volume row. The
+/// Boolean sequence is the result of the separately verified fieldwise name
+/// predicate for each visited catalog entry.
+pub open spec fn volume_scan_ordered_fold_model(
+    state: VolumeScanState,
+    volume_index: usize,
+    first_object_index: usize,
+    limit: usize,
+    matches: Seq<bool>,
+) -> Result<VolumeScanState, VolumeScanError>
+    decreases matches.len(),
+{
+    if matches.len() == 0 {
+        Ok(state)
+    } else {
+        match volume_scan_match_step_model(
+            state,
+            volume_index,
+            first_object_index,
+            limit,
+            matches[0],
+        ) {
+            Err(error) => Err(error),
+            Ok(next) => volume_scan_ordered_fold_model(
+                next,
+                volume_index,
+                (first_object_index as int + 1) as usize,
+                limit,
+                matches.drop_first(),
+            ),
+        }
+    }
+}
+
+pub open spec fn volume_scan_candidate_fold_model(
+    initial_candidate: Option<usize>,
+    first_object_index: usize,
+    matches: Seq<bool>,
+) -> Result<Option<usize>, VolumeScanError>
+    decreases matches.len(),
+{
+    if matches.len() == 0 {
+        Ok(initial_candidate)
+    } else if matches[0] && initial_candidate.is_some() {
+        Err(VolumeScanError::Duplicate)
+    } else {
+        let next_candidate = if matches[0] {
+            Some(first_object_index)
+        } else {
+            initial_candidate
+        };
+        volume_scan_candidate_fold_model(
+            next_candidate,
+            (first_object_index as int + 1) as usize,
+            matches.drop_first(),
+        )
+    }
+}
+
+pub proof fn volume_scan_match_step_has_expected_result(
+    state: VolumeScanState,
+    volume_index: usize,
+    object_index: usize,
+    limit: usize,
+    matches: bool,
+)
+    requires
+        volume_index < state.cursor.volume_count,
+        object_index < state.cursor.object_count,
+        state.cursor.planned_positions as int
+            == state.cursor.volume_count as int * state.cursor.object_count as int,
+        state.cursor.next_position as int
+            == volume_index as int * state.cursor.object_count as int + object_index as int,
+        state.scan.checked_objects < limit,
+        !matches || state.scan.candidate_index.is_none(),
+    ensures
+        volume_scan_match_step_model(state, volume_index, object_index, limit, matches)
+            == Ok(VolumeScanState {
+                cursor: VolumeScanCursor {
+                    next_position: (state.cursor.next_position as int + 1) as usize,
+                    ..state.cursor
+                },
+                scan: VolumeScan {
+                    checked_objects: (state.scan.checked_objects as int + 1) as usize,
+                    candidate_index: if matches {
+                        Some(object_index)
+                    } else {
+                        state.scan.candidate_index
+                    },
+                },
+            }),
+{
+    reveal(volume_scan_match_step_model);
+    reveal(advance_volume_scan_cursor_model);
+    reveal(charge_volume_object_model);
+    reveal(record_volume_candidate_model);
+    assert((volume_index as int * state.cursor.object_count as int + object_index as int)
+        < (state.cursor.planned_positions as int)) by (nonlinear_arith)
+        requires
+            0 <= volume_index as int,
+            (volume_index as int) < (state.cursor.volume_count as int),
+            0 <= object_index as int,
+            (object_index as int) < (state.cursor.object_count as int),
+            0 <= state.cursor.object_count as int,
+            state.cursor.planned_positions as int
+                == state.cursor.volume_count as int * state.cursor.object_count as int;
+}
+
+pub proof fn volume_scan_match_step_rejects_second_match(
+    state: VolumeScanState,
+    volume_index: usize,
+    object_index: usize,
+    limit: usize,
+)
+    requires
+        volume_index < state.cursor.volume_count,
+        object_index < state.cursor.object_count,
+        state.cursor.planned_positions as int
+            == state.cursor.volume_count as int * state.cursor.object_count as int,
+        state.cursor.next_position as int
+            == volume_index as int * state.cursor.object_count as int + object_index as int,
+        state.scan.checked_objects < limit,
+        state.scan.candidate_index.is_some(),
+    ensures
+        volume_scan_match_step_model(state, volume_index, object_index, limit, true)
+            == Err(VolumeScanError::Duplicate),
+{
+    reveal(volume_scan_match_step_model);
+    reveal(advance_volume_scan_cursor_model);
+    reveal(charge_volume_object_model);
+    reveal(record_volume_candidate_model);
+    assert((volume_index as int * state.cursor.object_count as int + object_index as int)
+        < (state.cursor.planned_positions as int)) by (nonlinear_arith)
+        requires
+            0 <= volume_index as int,
+            (volume_index as int) < (state.cursor.volume_count as int),
+            0 <= object_index as int,
+            (object_index as int) < (state.cursor.object_count as int),
+            0 <= state.cursor.object_count as int,
+            state.cursor.planned_positions as int
+                == state.cursor.volume_count as int * state.cursor.object_count as int;
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=implementation
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+pub proof fn volume_scan_ordered_fold_refines_candidate_summary(
+    state: VolumeScanState,
+    volume_index: usize,
+    first_object_index: usize,
+    limit: usize,
+    matches: Seq<bool>,
+)
+    requires
+        volume_index < state.cursor.volume_count,
+        state.cursor.object_count as int
+            == first_object_index as int + matches.len(),
+        state.cursor.planned_positions as int
+            == state.cursor.volume_count as int * state.cursor.object_count as int,
+        state.cursor.next_position as int
+            == volume_index as int * state.cursor.object_count as int
+                + first_object_index as int,
+        state.scan.checked_objects as int + matches.len() <= limit as int,
+        matches.len() <= usize::MAX as int,
+    ensures
+        match volume_scan_candidate_fold_model(
+            state.scan.candidate_index,
+            first_object_index,
+            matches,
+        ) {
+            Err(error) => volume_scan_ordered_fold_model(
+                state,
+                volume_index,
+                first_object_index,
+                limit,
+                matches,
+            ) == Err(error),
+            Ok(candidate) => volume_scan_ordered_fold_model(
+                state,
+                volume_index,
+                first_object_index,
+                limit,
+                matches,
+            ) == Ok(VolumeScanState {
+                cursor: VolumeScanCursor {
+                    next_position: (state.cursor.next_position as int + matches.len()) as usize,
+                    ..state.cursor
+                },
+                scan: VolumeScan {
+                    checked_objects: (state.scan.checked_objects as int + matches.len()) as usize,
+                    candidate_index: candidate,
+                },
+            }),
+        },
+    decreases matches.len(),
+{
+    if matches.len() == 0 {
+        reveal(volume_scan_candidate_fold_model);
+        reveal(volume_scan_ordered_fold_model);
+    } else if matches[0] && state.scan.candidate_index.is_some() {
+        volume_scan_match_step_rejects_second_match(state, volume_index, first_object_index, limit);
+        reveal(volume_scan_candidate_fold_model);
+        reveal(volume_scan_ordered_fold_model);
+    } else {
+        let object_index = first_object_index;
+        let next_matches = matches.drop_first();
+        let next_state = VolumeScanState {
+            cursor: VolumeScanCursor {
+                next_position: (state.cursor.next_position as int + 1) as usize,
+                ..state.cursor
+            },
+            scan: VolumeScan {
+                checked_objects: (state.scan.checked_objects as int + 1) as usize,
+                candidate_index: if matches[0] {
+                    Some(object_index)
+                } else {
+                    state.scan.candidate_index
+                },
+            },
+        };
+        volume_scan_match_step_has_expected_result(
+            state,
+            volume_index,
+            object_index,
+            limit,
+            matches[0],
+        );
+        reveal(volume_scan_candidate_fold_model);
+        reveal(volume_scan_ordered_fold_model);
+        volume_scan_ordered_fold_refines_candidate_summary(
+            next_state,
+            volume_index,
+            (object_index as int + 1) as usize,
+            limit,
+            next_matches,
+        );
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=implementation
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+/// Perform one required-volume scan step in cursor, charge, identity, and
+/// unique-candidate order. Parsing and source enumeration happen elsewhere.
+pub fn scan_required_volume_object(
+    state: VolumeScanState,
+    volume_index: usize,
+    object_index: usize,
+    limit: usize,
+    name: Option<ObjectName>,
+    descriptor: SetDescriptor,
+    required_volume: u64,
+) -> (result: Result<VolumeScanState, VolumeScanError>)
+    ensures result == volume_scan_step_model(
+        state,
+        volume_index,
+        object_index,
+        limit,
+        name,
+        descriptor,
+        required_volume,
+    ),
+{
+    let cursor = match advance_volume_scan_cursor(state.cursor, volume_index, object_index) {
+        Some(cursor) => cursor,
+        None => return Err(VolumeScanError::Limit),
+    };
+    let charged = charge_volume_object(
+        state.scan,
+        limit,
+        object_index,
+        state.cursor.object_count,
+    )?;
+    let matches = match name {
+        Some(parsed) => required_volume_identity_matches(parsed, descriptor, required_volume),
+        None => false,
+    };
+    let scan = record_volume_candidate(charged, matches)?;
+    Ok(VolumeScanState { cursor, scan })
+}
+
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
         advance_volume_scan_cursor, charge_volume_object, record_volume_candidate,
-        required_volume_identity_matches, reserve_volume_scan, start_volume_scan_cursor,
-        volume_scan_cursor_complete, VolumeScan, VolumeScanError, VolumeScanReservation,
+        required_volume_identity_matches, reserve_volume_scan, scan_required_volume_object,
+        start_volume_scan_cursor, volume_scan_cursor_complete, VolumeScan, VolumeScanError,
+        VolumeScanReservation, VolumeScanState,
     };
     use crate::chain::{SetDescriptor, SetKind};
     use crate::names::{Envelope, ObjectKind, ObjectName, Timestamp};
@@ -1185,6 +1519,112 @@ mod tests {
         );
         assert_eq!(
             charge_volume_object(scan, 2, 2, 3),
+            Err(VolumeScanError::Limit)
+        );
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=test
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    //= docs/parsing-requirements.md#parse-chain-002
+    //= type=test
+    //# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+    fn composed_volume_scan_step_covers_order_charge_and_candidate_outcomes() {
+        let set = descriptor(SetKind::Full, 100, 100);
+        let matching_name = Some(volume_name(
+            ObjectKind::FullVolume,
+            100,
+            100,
+            2,
+            Envelope::Plain,
+            false,
+        ));
+        let initial = VolumeScanState {
+            cursor: start_volume_scan_cursor(
+                VolumeScanReservation {
+                    initial_checks: 0,
+                    planned_checks: 3,
+                    final_checks: 3,
+                },
+                1,
+                3,
+            )
+            .unwrap(),
+            scan: VolumeScan {
+                checked_objects: 0,
+                candidate_index: None,
+            },
+        };
+
+        // A no-match advances and charges once while preserving no candidate.
+        let no_match = scan_required_volume_object(initial, 0, 0, 3, None, set, 2).unwrap();
+        assert_eq!(no_match.cursor.next_position, 1);
+        assert_eq!(no_match.scan.checked_objects, 1);
+        assert_eq!(no_match.scan.candidate_index, None);
+
+        // A no-match also preserves an already recorded candidate.
+        let existing_candidate = VolumeScanState {
+            cursor: no_match.cursor,
+            scan: VolumeScan {
+                checked_objects: no_match.scan.checked_objects,
+                candidate_index: Some(0),
+            },
+        };
+        let preserved =
+            scan_required_volume_object(existing_candidate, 0, 1, 3, None, set, 2).unwrap();
+        assert_eq!(preserved.cursor.next_position, 2);
+        assert_eq!(preserved.scan.checked_objects, 2);
+        assert_eq!(preserved.scan.candidate_index, Some(0));
+
+        // The first matching position is retained at the first, middle, and
+        // last object index. Expected states are asserted fieldwise.
+        for target in [0, 1, 2] {
+            let mut state = initial;
+            for object_index in 0..target {
+                state =
+                    scan_required_volume_object(state, 0, object_index, 3, None, set, 2).unwrap();
+                assert_eq!(state.cursor.next_position, object_index + 1);
+                assert_eq!(state.scan.checked_objects, object_index + 1);
+                assert_eq!(state.scan.candidate_index, None);
+            }
+            state =
+                scan_required_volume_object(state, 0, target, 3, matching_name, set, 2).unwrap();
+            assert_eq!(state.cursor.next_position, target + 1);
+            assert_eq!(state.scan.checked_objects, target + 1);
+            assert_eq!(state.scan.candidate_index, Some(target));
+        }
+
+        // A second matching object is rejected without returning a next state.
+        let first_match =
+            scan_required_volume_object(initial, 0, 0, 3, matching_name, set, 2).unwrap();
+        let after_unmatched =
+            scan_required_volume_object(first_match, 0, 1, 3, None, set, 2).unwrap();
+        assert_eq!(
+            scan_required_volume_object(after_unmatched, 0, 2, 3, matching_name, set, 2,),
+            Err(VolumeScanError::Duplicate)
+        );
+
+        // Skipped and repeated coordinates fail closed as Limit.
+        assert_eq!(
+            scan_required_volume_object(initial, 0, 1, 3, matching_name, set, 2),
+            Err(VolumeScanError::Limit)
+        );
+        assert_eq!(
+            scan_required_volume_object(no_match, 0, 0, 3, None, set, 2),
+            Err(VolumeScanError::Limit)
+        );
+
+        // Exhausted charge returns Limit even for a parsed matching identity.
+        let exhausted = VolumeScanState {
+            cursor: initial.cursor,
+            scan: VolumeScan {
+                checked_objects: 3,
+                candidate_index: None,
+            },
+        };
+        assert_eq!(
+            scan_required_volume_object(exhausted, 0, 0, 3, matching_name, set, 2),
             Err(VolumeScanError::Limit)
         );
     }
