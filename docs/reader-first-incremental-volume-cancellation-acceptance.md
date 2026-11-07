@@ -2,7 +2,8 @@
 
 **Status:** Specification and independent implementation review,
 implementation, focused/full core tests, scoped Duvet/format/Clippy checks, and
-full local CI passed. Hosted Linux assurance and Duvet Pages remain pending.
+full local CI passed. Hosted Linux assurance and Duvet Pages passed in
+[run 42376292497](https://github.com/ajrudzitis/duplinaut/actions/runs/42376292497).
 
 ## Goal and scope
 
@@ -108,9 +109,10 @@ bytes. No test-only reader or production cancellation hook is permitted.
       proof.
 - [x] Focused/full core tests, targeted Duvet/full trace, formatting, and
       strict Clippy pass.
-- [x] Full local `cargo xtask ci` passes on the final tracked tree.
+- [x] Full local `cargo xtask ci` passed for the implementation tree recorded
+      below.
 - [x] Independent implementation/test review passes.
-- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [x] Hosted Linux assurance and Duvet Pages pass in [run 42376292497](https://github.com/ajrudzitis/duplinaut/actions/runs/42376292497).
 
 ## Current evidence
 
@@ -120,4 +122,4 @@ bytes. No test-only reader or production cancellation hook is permitted.
 - `cargo xtask trace-update` and `cargo xtask trace`: passed.
 - `cargo clippy -p duplicity-core --tests -- -D warnings`, `cargo fmt --all -- --check`, and `git diff --check`: passed.
 - Full local `cargo xtask ci`: passed at source SHA-256 `e96efe562da72a8b7de132a3d9a51038ae92f0441227101454b222ed2d83ecb6`; Verus partitions 2,047/3,183/1,332, zero errors.
-- Independent implementation/test review passed. Hosted Linux assurance/Duvet Pages remain pending.
+- Independent implementation/test review passed. Hosted Linux assurance and Duvet Pages passed in [run 42376292497](https://github.com/ajrudzitis/duplinaut/actions/runs/42376292497).
