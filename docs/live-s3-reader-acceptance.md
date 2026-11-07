@@ -40,24 +40,29 @@ all of the following:
    `tests/fixtures/duplicity-3.0.7/plain/`; provisioning/upload is an external
    setup action, never performed by the test. No other objects or folder-marker
    keys may occur under the test prefix.
-2. A non-secret inventory file captured from the provisioned objects. For each
+2. The approved AWS region for the bucket. The operator MUST supply this
+   region explicitly to the opt-in test; SDK region-chain fallback MUST NOT
+   silently select a different region for this acceptance.
+3. A non-secret inventory file captured from the provisioned objects. It MUST
+   record the approved region along with the other source identifiers. For each
    full S3 key it MUST record the corresponding checked-in relative fixture
    path, byte size, SHA-256 from
    `tests/fixtures/duplicity-3.0.7/provenance.json`, exact quoted ETag, version
    ID when versioning supplies one, and observed `LastModified` plus
    `ContentType`/user metadata where present. It MUST also record bucket,
-   prefix, capture time, and whether bucket versioning is enabled. Inventory
+   prefix, region, capture time, and whether bucket versioning is enabled. The
+   region MUST equal the explicitly supplied approved region. Inventory
    metadata is fixture provenance; ETag is an identity/conditional token and
    MUST NOT be described as a content digest. Runtime assertions are limited
    to identity fields exposed through ListObjectsV2 and `S3Source::head`; the
    additional LastModified/content/user-metadata values are captured fixture
    provenance, not fields interpreted by the current reader API.
-3. A read-only IAM role/profile authorized only to list the approved prefix
+4. A read-only IAM role/profile authorized only to list the approved prefix
    and read/head its fixture objects. The live test MUST NOT have Put, Delete,
    Copy, tagging-write, ACL-write, or bucket-configuration permissions. Use the
    normal AWS SDK credential provider or an approved profile; never put
    credentials in the inventory or test arguments.
-4. A protected opt-in runner/environment with network access and the approved
+5. A protected opt-in runner/environment with network access and the approved
    bucket/account settings. The ordinary workspace CI and `cargo xtask ci`
    MUST NOT contact S3 or require AWS credentials. The live command is run
    explicitly by an authorized operator or protected manual workflow.
@@ -74,14 +79,19 @@ fixture/account/inventory and live run are prerequisites for acceptance.
 
 1. The test MUST be ignored or otherwise disabled by default and MUST require
    `DUPLINAUT_LIVE_S3=1`, `DUPLINAUT_LIVE_S3_BUCKET`,
-   `DUPLINAUT_LIVE_S3_PREFIX`, and `DUPLINAUT_LIVE_S3_INVENTORY` before
-   constructing an SDK client. AWS region/profile and credentials come from
-   the standard SDK configuration chain. If opt-in is absent, ordinary tests
-   MUST finish without DNS/network access or credential-provider calls.
+   `DUPLINAUT_LIVE_S3_REGION`, `DUPLINAUT_LIVE_S3_PREFIX`, and
+   `DUPLINAUT_LIVE_S3_INVENTORY` before constructing an SDK client. The region
+   MUST be nonempty and MUST exactly match the inventory's approved region.
+   Set `S3Config.region` from this value; do not rely on SDK region-chain
+   fallback to choose the test target. Credentials and optional profile
+   selection may come from the standard SDK configuration chain. If opt-in is
+   absent, ordinary tests MUST finish without DNS/network access or
+   credential-provider calls.
    Missing/malformed inventory or absent required settings MUST fail before
    S3 connection; it MUST NOT silently skip an explicitly requested live run.
-2. Configure `S3Config` with exactly the approved bucket, prefix, region, and
-   optional approved profile/endpoint settings. Use finite limits: at most 12
+2. Configure `S3Config` with exactly the approved bucket, explicitly supplied
+   region, prefix, and optional approved profile/endpoint settings. Use finite
+   limits: at most 12
    listed objects, at most 64 KiB retained source metadata, and at most 2 MiB
    per stored object. Require each expected object to fit those bounds. Keep
    catalog/reader limits finite and no larger than their reviewed defaults.
@@ -139,7 +149,8 @@ fixture/account/inventory and live run are prerequisites for acceptance.
 
 ## Verification and evidence boundaries
 
-- Without external credentials, validate inventory parsing against a
+- Without external credentials, validate inventory parsing (including the
+  explicit region field and mismatch rejection) against a
   non-secret local fixture, prove the opt-in gate exits before client creation,
   run the SDK-mocked suite, targeted Duvet queries, `cargo xtask trace-update`,
   `cargo xtask trace`, formatting, strict S3/core Clippy, and full offline
@@ -162,10 +173,12 @@ fixture/account/inventory and live run are prerequisites for acceptance.
 The default-off integration target and synthetic local gate/inventory tests
 are implemented in `crates/s3/tests/live_s3.rs`. Focused and full S3 crate
 tests, strict Clippy, formatting, Duvet trace and the SOURCE-001, CHAIN-001,
-and STATE-001 coverage queries pass locally. The ignored live case has not
-been run; hosted assurance for this implementation is pending. Bucket/account
-approval, the captured twelve-object inventory, and read-only credentials are
-still external prerequisites.
+and STATE-001 coverage queries pass locally. The explicit region input,
+inventory-region validation, and `S3Config.region` assignment required by
+this plan remain an implementation follow-up. The ignored live case has not
+been run; hosted assurance for the implementation is pending. Bucket/account
+and region approval, the captured twelve-object inventory, and read-only
+credentials are still external prerequisites.
 
 ## Exclusions
 
@@ -181,10 +194,13 @@ cancellation; this one live case does not replace them.
 
 ## Checklist
 
-- [ ] Obtain approved read-only bucket/account, immutable prefix and captured
-      twelve-object identity/metadata inventory.
+- [ ] Obtain approved read-only bucket/account/region, immutable prefix and
+      captured twelve-object identity/metadata inventory containing the same
+      approved region.
 - [ ] Add a default-off live integration test using `S3Source` and `Catalog`;
-      validate opt-in and inventory handling offline without credentials.
+      explicitly set `S3Config.region` from `DUPLINAUT_LIVE_S3_REGION` and
+      validate opt-in, region match, and inventory handling offline without
+      credentials.
 - [ ] Assert exact inventory/history and official object hashes, then compare
       the final complete snapshot with the checked-in source oracle.
 - [ ] Local mocked/offline tests, Duvet trace, formatting and strict Clippy
