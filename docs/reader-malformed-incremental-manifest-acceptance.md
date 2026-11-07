@@ -1,7 +1,11 @@
 # Official Plain Reader Malformed Incremental-Manifest Acceptance
 
-**Status:** Implementation, focused/full core verification, and independent
-implementation review pass. Full local CI and hosted assurance remain pending.
+**Status:** Implementation, focused/full core verification, independent
+implementation review, and full local `cargo xtask ci` pass. The CI receipt
+records source SHA-256
+`c6d7ee0920b580e725b435e2def19aa5f6574466ac50b31f511f84be176e5529`; Verus
+partitions 2,047/3,183/1,329 have zero errors. Hosted Linux assurance and Duvet
+Pages publication remain pending.
 
 ## Goal and scope
 
@@ -95,5 +99,5 @@ refinement.
 - [x] The `PARSE-GEN-001` implementation/test query and full Duvet trace,
       focused/full core tests, formatting, strict Clippy, and diff checks pass.
 - [x] Independent implementation/test review passes.
-- [ ] Full local `cargo xtask ci` passes on the final tracked tree.
+- [x] Full local `cargo xtask ci` passes on the final tracked tree.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.

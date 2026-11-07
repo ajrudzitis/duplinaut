@@ -1,7 +1,7 @@
 # Official Plain Reader Malformed Required-Manifest Acceptance
 
 **Status:** Implementation and independent review pass. Full local
-`cargo xtask ci` passes on receipt source SHA-256
+`cargo xtask ci` passes; its receipt records source SHA-256
 `6fb3322ba4e415b301432ff4f4c454cc0b24e25fb7bebf9430af98acdbe66d83`;
 Verus partitions 2,047/3,183/1,329 have zero errors. Hosted Linux assurance
 and Duvet Pages publication remain pending.
