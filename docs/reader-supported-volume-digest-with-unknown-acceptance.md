@@ -1,7 +1,8 @@
 # Official Plain Reader Supported Digest with Unknown Sibling Acceptance
 
-**Status:** Specification accepted after independent review. No implementation
-or verification evidence is claimed.
+**Status:** Specification and implementation independently reviewed. Focused
+and full core tests, Duvet query/full trace, formatting, and strict Clippy pass.
+Full local CI and hosted Linux/Pages assurance remain pending.
 
 ## Goal and scope
 
@@ -96,13 +97,13 @@ volumes, filesystem restoration, or complete reader/controller refinement.
 
 - [x] Independent specification review accepts the inserted declaration,
       supported-digest precondition, final snapshot comparison, and nine-key open set.
-- [ ] Focused test proves the original SHA1 token/hex and all data payloads are
+- [x] Focused test proves the original SHA1 token/hex and all data payloads are
       unchanged, and inserts exactly one valid same-digest SHA2 line.
-- [ ] Discovery opens no objects; final public read succeeds and matches the
+- [x] Discovery opens no objects; final public read succeeds and matches the
       plain oracle at `1700172800`.
-- [ ] The nine required chain objects open once each; no signatures or
+- [x] The nine required chain objects open once each; no signatures or
       unrelated objects open.
-- [ ] Duvet `PARSE-ENV-006`, focused/full core tests, formatting, strict Clippy,
-      and local `cargo xtask ci` pass.
-- [ ] Independent implementation review and hosted Linux assurance plus Duvet
-      Pages publication pass.
+- [x] Duvet `PARSE-ENV-006` query/full trace, focused/full core tests,
+      formatting, strict Clippy, and independent implementation review pass.
+- [ ] Full local `cargo xtask ci` passes.
+- [ ] Hosted Linux assurance and Duvet Pages publication pass.

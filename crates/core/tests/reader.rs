@@ -5372,3 +5372,274 @@ fn official_incremental_unsupported_digest_fails_before_volume_open() {
     assert_eq!(opened_keys, expected_opened_keys);
     assert_eq!(source.opens.load(Ordering::SeqCst), 5);
 }
+
+//= docs/parsing-requirements.md#parse-env-006
+//= type=test
+//# An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
+#[test]
+fn official_incremental_supported_digest_ignores_unknown_sibling() {
+    const FIRST_INCREMENTAL_MANIFEST: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest";
+    const FULL_MANIFEST: &str = "backup/duplicity-full.20231114T221320Z.manifest";
+    const FULL_VOL1: &str = "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz";
+    const FULL_VOL2: &str = "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz";
+    const FULL_VOL3: &str = "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz";
+    const FIRST_INCREMENTAL_VOL1: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz";
+    const FIRST_INCREMENTAL_VOL2: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol2.difftar.gz";
+    const FINAL_INCREMENTAL_MANIFEST: &str =
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest";
+    const FINAL_INCREMENTAL_VOL1: &str =
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz";
+
+    let mut source = Source::official();
+    assert_eq!(source.objects.len(), 12);
+    let original_inventory = source.objects.clone();
+    let (manifest_object, manifest_bytes) = source
+        .objects
+        .iter_mut()
+        .find(|(object, _)| object.key == FIRST_INCREMENTAL_MANIFEST)
+        .expect("the official fixture includes its first incremental manifest");
+    let volume_one_header = manifest_bytes
+        .windows(b"Volume 1:".len())
+        .position(|window| window == b"Volume 1:")
+        .expect("the manifest starts its Volume 1 section");
+    let declaration_relative = manifest_bytes[volume_one_header + b"Volume 1:".len()..]
+        .windows(b"Hash SHA1 ".len())
+        .position(|window| window == b"Hash SHA1 ")
+        .expect("Volume 1 declares a supported SHA1 digest")
+        + volume_one_header
+        + b"Volume 1:".len();
+    let digest_start = declaration_relative + b"Hash SHA1 ".len();
+    let digest_end = digest_start + 40;
+    assert!(manifest_bytes[digest_start..digest_end]
+        .iter()
+        .all(u8::is_ascii_hexdigit));
+    let declaration_end = manifest_bytes[digest_end..]
+        .iter()
+        .position(|byte| *byte == b'\n')
+        .map(|offset| digest_end + offset + 1)
+        .expect("the supported digest declaration ends with LF");
+    let line_start = manifest_bytes[..declaration_relative]
+        .iter()
+        .rposition(|byte| *byte == b'\n')
+        .map_or(0, |offset| offset + 1);
+    let indentation = &manifest_bytes[line_start..declaration_relative];
+    let mut inserted_line = Vec::with_capacity(indentation.len() + 10 + 40 + 1);
+    inserted_line.extend_from_slice(indentation);
+    inserted_line.extend_from_slice(b"Hash SHA2 ");
+    inserted_line.extend_from_slice(&manifest_bytes[digest_start..digest_end]);
+    inserted_line.push(b'\n');
+    assert_eq!(inserted_line.len(), indentation.len() + 51);
+    assert!(inserted_line.ends_with(b"\n"));
+
+    let original_size = manifest_object.size;
+    let original_sha1 = manifest_bytes[declaration_relative..declaration_end].to_vec();
+    let original_digest = manifest_bytes[digest_start..digest_end].to_vec();
+    let mut expected_mutated_body = manifest_bytes.clone();
+    expected_mutated_body.splice(declaration_end..declaration_end, inserted_line.clone());
+    manifest_bytes.splice(declaration_end..declaration_end, inserted_line.clone());
+    assert_eq!(*manifest_bytes, expected_mutated_body);
+    assert_eq!(
+        manifest_bytes[declaration_relative..declaration_end],
+        original_sha1
+    );
+    assert_eq!(
+        &manifest_bytes[declaration_end..declaration_end + inserted_line.len()],
+        inserted_line.as_slice()
+    );
+    assert_eq!(
+        &inserted_line[inserted_line.len() - original_digest.len() - 1..inserted_line.len() - 1],
+        original_digest.as_slice()
+    );
+    manifest_object.size =
+        u64::try_from(manifest_bytes.len()).expect("mutated manifest size fits u64");
+    assert_eq!(
+        manifest_object.size,
+        original_size + inserted_line.len() as u64
+    );
+    let updated_etag = format!("{:x}", sha2::Sha256::digest(manifest_bytes.as_slice()));
+    manifest_object.identity = ObjectIdentity {
+        version_id: Some("supported-volume-digest-unknown-sibling-v1".into()),
+        etag: Some(updated_etag.clone()),
+    };
+
+    assert_eq!(source.objects.len(), original_inventory.len());
+    for (index, (original_object, original_bytes)) in original_inventory.iter().enumerate() {
+        let (object, bytes) = &source.objects[index];
+        if original_object.key == FIRST_INCREMENTAL_MANIFEST {
+            assert_eq!(object.key, original_object.key);
+            assert_eq!(bytes, &expected_mutated_body);
+            assert_eq!(object.size, bytes.len() as u64);
+            assert_eq!(
+                object.identity.version_id.as_deref(),
+                Some("supported-volume-digest-unknown-sibling-v1")
+            );
+            assert_eq!(object.identity.etag.as_deref(), Some(updated_etag.as_str()));
+        } else {
+            assert_eq!(object, original_object);
+            assert_eq!(bytes, original_bytes);
+        }
+    }
+    let supported_volume = source
+        .objects
+        .iter()
+        .find(|(object, _)| {
+            object.key
+                == "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz"
+        })
+        .expect("the supported first-incremental volume remains present");
+    let original_supported_volume = original_inventory
+        .iter()
+        .find(|(object, _)| object.key == supported_volume.0.key)
+        .expect("the original inventory includes the supported volume");
+    assert_eq!(supported_volume, original_supported_volume);
+
+    let catalog = discover(&source);
+    assert_eq!(source.opens.load(Ordering::SeqCst), 0);
+    let descriptors = catalog.manifests().collect::<Vec<_>>();
+    assert_eq!(descriptors.len(), 3);
+    let mut descriptor_keys = descriptors
+        .iter()
+        .map(|(_, _, descriptor)| {
+            (
+                match descriptor.kind() {
+                    SetKind::Full => 0,
+                    SetKind::Incremental => 1,
+                },
+                descriptor.start().0,
+                descriptor.end().0,
+            )
+        })
+        .collect::<Vec<_>>();
+    descriptor_keys.sort_unstable();
+    assert_eq!(
+        descriptor_keys,
+        vec![
+            (0, 1700000000, 1700000000),
+            (1, 1700000000, 1700086400),
+            (1, 1700086400, 1700172800),
+        ]
+    );
+    let full_index = descriptors
+        .iter()
+        .find(|(_, _, descriptor)| descriptor.kind() == SetKind::Full)
+        .expect("the Full descriptor is the selected history anchor")
+        .0;
+    let snapshot = catalog
+        .read_snapshot(full_index, Timestamp(1700172800), &Cancellation::default())
+        .expect("a supported SHA1 declaration validates despite its SHA2 sibling");
+
+    let oracle: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/duplicity-3.0.7/expected.json"
+    ))
+    .unwrap();
+    let expected_snapshot = oracle["snapshots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["mode"] == "plain" && item["index"] == 2)
+        .expect("the final plain snapshot oracle exists");
+    assert!(expected_snapshot["official_comparison_exclusions"]
+        .as_array()
+        .expect("official comparison exclusions are listed")
+        .iter()
+        .any(|excluded| excluded == "symlink_mtime_ns"));
+    let expected_entries = expected_snapshot["entries"]
+        .as_array()
+        .expect("official snapshot entries are listed");
+    assert_eq!(snapshot.state().len(), expected_entries.len());
+    let mut expected_by_components = std::collections::BTreeMap::new();
+    for expected_entry in expected_entries {
+        let components = expected_entry["components_hex"]
+            .as_array()
+            .expect("oracle raw path components")
+            .iter()
+            .map(|component| decode_oracle_hex(component.as_str().unwrap()))
+            .collect::<Vec<_>>();
+        assert!(
+            expected_by_components
+                .insert(components, expected_entry)
+                .is_none(),
+            "oracle contains each raw component path once"
+        );
+    }
+    let actual_entries = snapshot.state().entries().collect::<Vec<_>>();
+    let actual_paths = actual_entries
+        .iter()
+        .map(|(path, _)| path.components().clone())
+        .collect::<Vec<_>>();
+    let expected_sorted_paths = expected_by_components.keys().cloned().collect::<Vec<_>>();
+    assert_eq!(
+        actual_paths, expected_sorted_paths,
+        "final snapshot paths and iteration order match raw oracle components"
+    );
+    for (path, entry) in actual_entries {
+        let expected_entry = expected_by_components
+            .get(path.components())
+            .expect("every snapshot entry has an oracle record");
+        let expected_kind = match expected_entry["kind"].as_str().unwrap() {
+            "file" => duplicity_core::tar::EntryType::Regular,
+            "directory" => duplicity_core::tar::EntryType::Directory,
+            "symlink" => duplicity_core::tar::EntryType::Symlink,
+            other => panic!("unexpected oracle entry kind {other}"),
+        };
+        assert_eq!(entry.entry_type(), expected_kind);
+        assert_eq!(
+            entry.mode() & 0o777,
+            u32::try_from(expected_entry["mode"].as_u64().unwrap()).unwrap() & 0o777
+        );
+        if expected_kind != duplicity_core::tar::EntryType::Symlink {
+            let mtime_ns = expected_entry["mtime_ns"]
+                .as_i64()
+                .expect("oracle mtime_ns fits checked signed i64");
+            assert_eq!(
+                entry.mtime(),
+                duplicity_core::tar::TarTime {
+                    seconds: mtime_ns.div_euclid(1_000_000_000),
+                    nanoseconds: u32::try_from(mtime_ns.rem_euclid(1_000_000_000)).unwrap(),
+                }
+            );
+        }
+        match expected_kind {
+            duplicity_core::tar::EntryType::Regular => {
+                let content = entry
+                    .content()
+                    .expect("every oracle file has retained content");
+                assert_eq!(
+                    content.len() as u64,
+                    expected_entry["size"].as_u64().unwrap()
+                );
+                assert_eq!(
+                    format!("{:x}", sha2::Sha256::digest(content)),
+                    expected_entry["sha256"].as_str().unwrap()
+                );
+            }
+            duplicity_core::tar::EntryType::Symlink => assert_eq!(
+                entry.linkname(),
+                decode_oracle_hex(expected_entry["symlink_target_hex"].as_str().unwrap())
+            ),
+            duplicity_core::tar::EntryType::Directory => {}
+            other => panic!("unexpected snapshot entry type {other:?}"),
+        }
+    }
+
+    let mut expected_opened_keys = vec![
+        FULL_MANIFEST,
+        FULL_VOL1,
+        FULL_VOL2,
+        FULL_VOL3,
+        FIRST_INCREMENTAL_MANIFEST,
+        FIRST_INCREMENTAL_VOL1,
+        FIRST_INCREMENTAL_VOL2,
+        FINAL_INCREMENTAL_MANIFEST,
+        FINAL_INCREMENTAL_VOL1,
+    ];
+    expected_opened_keys.sort_unstable();
+    let mut opened_keys = source.opened_keys.lock().unwrap().clone();
+    opened_keys.sort_unstable();
+    assert_eq!(opened_keys.len(), 9);
+    assert_eq!(opened_keys, expected_opened_keys);
+    assert!(!opened_keys.iter().any(|key| key.ends_with(".sigtar.gz")));
+}
