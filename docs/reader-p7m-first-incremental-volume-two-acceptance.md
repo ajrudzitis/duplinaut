@@ -1,7 +1,9 @@
 # Official Plain Reader PKCS#7 First-Incremental Volume 2 Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Implementation and independent review passed. Focused/full core
+tests, targeted Duvet queries/full trace, formatting, and strict Clippy passed.
+Local pinned `cargo xtask ci` passed. Hosted Linux assurance and Duvet Pages
+are pending.
 
 ## Goal and scope
 
@@ -117,13 +119,14 @@ refinement, or formal reader proof.
 
 - [x] Independent specification review accepts the mutation, public outcomes,
       six-key open set, and scope.
-- [ ] Discovery retains the renamed object as
+- [x] Discovery retains the renamed object as
       `IncrementalVolume(1700000000,1700086400,2)`/`Pkcs7`/
       `UnsupportedEnvelope`, and volume 1 remains completed.
-- [ ] The first-incremental read returns exactly
+- [x] The first-incremental read returns exactly
       `MissingVolume { number: 2 }`, no snapshot, and opens exactly the six
       listed objects.
-- [ ] Focused/full core tests, targeted Duvet queries/full trace, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused/full core tests, targeted Duvet queries/full trace, formatting,
+      and strict Clippy pass.
+- [x] Local pinned `cargo xtask ci` passes.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
