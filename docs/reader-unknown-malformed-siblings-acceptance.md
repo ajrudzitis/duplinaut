@@ -1,8 +1,10 @@
 # Official Plain Reader Unknown and Malformed Sibling Objects Acceptance
 
-**Status:** Implementation and independent implementation review passed.
-Focused/full core tests, Duvet queries/full trace, formatting, and strict Clippy
-passed locally. Full pinned CI and hosted Linux/Pages assurance are pending.
+**Status:** The existing implementation and review passed. The added
+`PARSE-STATE-003` traceability scope is pending independent review and Duvet
+rerun. Focused/full core tests, current Duvet queries/full trace, formatting,
+and strict Clippy passed locally. Full pinned CI and hosted Linux/Pages
+assurance are pending.
 
 ## Goal and scope
 
@@ -95,10 +97,16 @@ snapshot:
    the final target through the uniquely contiguous Full-plus-Incremental
    chain. Link the chain behavior to `PARSE-CHAIN-001`.
 3. MUST compare the complete final snapshot with the recorded `expected.json`
-   fields, including raw component paths/order, kind/mode, supported
+   fields, including raw component paths, kind/mode, supported
    timestamps, regular-file size/hash, and symlink target; omit symlink mtime
    as documented. Link these checks to `PARSE-PATH-001` and `ASSURE-TEST-001`.
-4. MUST assert the exact nine-key open set above. Neither diagnostic sibling
+4. MUST enumerate `SnapshotState::entries()` in bytewise lexicographic order
+   of raw backup-relative path components. Compare components as unsigned
+   byte sequences, keep component boundaries significant, and order a proper
+   component-sequence prefix before its extension. The test MUST compare
+   actual iteration order with the oracle's sorted component sequences and
+   link this assertion to `PARSE-STATE-003`.
+5. MUST assert the exact nine-key open set above. Neither diagnostic sibling
    may be opened during this read. This is a bounded fixture result, not a
    universal claim for arbitrary extra objects.
 
@@ -109,7 +117,8 @@ snapshot:
 - Add Duvet test links for unknown/malformed classification and ignored
   siblings to `PARSE-NAME-001`, successful chain restoration to
   `PARSE-CHAIN-001`, byte paths to `PARSE-PATH-001`, and the official fixture
-  oracle to `ASSURE-TEST-001`.
+  oracle to `ASSURE-TEST-001`. The existing iteration-order assertion MUST
+  also link to `PARSE-STATE-003`.
 - Run the focused test, targeted Duvet queries/full trace, focused/full core
   tests, formatting, strict Clippy, and `cargo xtask ci`. Require hosted Linux
   assurance and Duvet Pages publication before acceptance is complete.
@@ -130,6 +139,8 @@ reader proof.
 
 - [x] Independent specification review accepts the exact added keys,
       diagnostics, descriptor set, and open set.
+- [x] Independent specification review accepts the added `PARSE-STATE-003`
+      iteration-order requirement and traceability scope.
 - [x] Both sibling objects remain visible as `Unknown` and `Malformed`,
       without changing the official descriptor membership.
 - [x] The final snapshot matches all documented oracle fields and source opens
@@ -151,3 +162,4 @@ reader proof.
   passed.
 - Independent implementation review passed. Full pinned CI and hosted Linux
   assurance/Pages remain pending.
+- The `PARSE-STATE-003` test link, targeted query, and full trace remain pending.
