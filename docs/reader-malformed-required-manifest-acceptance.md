@@ -1,7 +1,7 @@
 # Official Plain Reader Malformed Required-Manifest Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Implementation, independent review, and local full CI pass. Hosted
+Linux assurance and Duvet Pages publication remain pending.
 
 ## Goal and scope
 
@@ -97,12 +97,15 @@ reader-controller refinement.
 
 - [x] Independent specification review accepts the body mutation, public
       error, metadata-only discovery, and one-key open set.
-- [ ] Discovery opens no source objects and retains the three name-derived
+- [x] Discovery opens no source objects and retains the three name-derived
       descriptors.
-- [ ] The final-target read returns exact
+- [x] The final-target read returns exact
       `ReaderError::Manifest(ManifestError::Malformed)`, no snapshot, and
       opens only the selected Full manifest.
-- [ ] Focused/full core tests, targeted Duvet query/full trace, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused test and `cargo test -p duplicity-core` pass; Duvet
+      `PARSE-GEN-001` query and full `cargo xtask trace` pass; formatting,
+      strict core Clippy, and diff checks pass.
+- [x] Independent implementation/test review passes.
+- [x] Full local `cargo xtask ci` passes (fresh final-tree receipt recorded in
+      generated `target/assurance/ci.json`).
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
