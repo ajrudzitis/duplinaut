@@ -1,8 +1,8 @@
 # Reversed-Listing Volume Scan Acceptance
 
 **Status:** Specification and independent implementation review, implementation,
-scoped local checks, and full local CI passed. Hosted Linux assurance and Duvet
-Pages remain pending.
+scoped local checks, full local CI, hosted Linux assurance, and Duvet Pages
+passed.
 
 ## Goal and scope
 
@@ -114,7 +114,7 @@ reader refinement.
 - [x] Full local `cargo xtask ci` passed for the implementation tree recorded
       below.
 - [x] Independent implementation/test review passes.
-- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [x] Hosted Linux assurance and Duvet Pages pass in [run 42378422333](https://github.com/ajrudzitis/duplinaut/actions/runs/42378422333).
 
 ## Current evidence
 
@@ -124,4 +124,4 @@ reader refinement.
 - `cargo xtask trace-update` and `cargo xtask trace`: passed.
 - `cargo clippy -p duplicity-core --tests -- -D warnings`, `cargo fmt --all -- --check`, and `git diff --check`: passed.
 - Full local `cargo xtask ci` passed at source SHA-256 `4e687f5c4a75818d6ef7f924c846eae95b9d1f93f74a4047ba7d906062357cc3`; Verus partitions 2,047/3,183/1,332, zero errors.
-- Independent implementation review passed. Hosted Linux assurance/Duvet Pages remain pending.
+- Independent implementation review passed. Hosted Linux assurance and Duvet Pages passed in [run 42378422333](https://github.com/ajrudzitis/duplinaut/actions/runs/42378422333).
