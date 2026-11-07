@@ -2473,6 +2473,7 @@ fn every_official_archive_basename_is_classified() {
         root.join("duplicity-3.0.7/rsa2048"),
         root.join("duplicity-3.0.7/ed25519-signing-subkey"),
         root.join("duplicity-3.0.7/expired-signer"),
+        root.join("duplicity-3.0.7/aes128-symmetric"),
     ];
     let mut pending = vec![root];
     let mut count = 0;

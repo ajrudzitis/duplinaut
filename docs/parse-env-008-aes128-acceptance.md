@@ -1,7 +1,11 @@
 # PARSE-ENV-008 AES-128 symmetric payload acceptance
 
-Status: implementation prepared; independent implementation review and gate
-activation remain pending. The accepted specification is unchanged.
+Status: implementation independently reviewed and accepted. Full core/workspace
+tests, targeted Duvet queries/full trace, formatting, strict Clippy, and full
+local `cargo xtask ci` pass at exact-source receipt SHA-256
+`314798423dee202e877f291ce39b954858e9528b5d35edce19107b8f16567ea4`
+(Verus 2,047/3,183/1,371, zero errors). The native-attendance gate is enabled.
+Hosted Linux/Pages checks remain pending.
 
 ## Goal and scope
 
@@ -123,12 +127,11 @@ remain trusted upstream boundaries.
       PARSE-ENV-023, and the scoped PARSE-STATE-003 order assertion; targeted
       queries and full trace pass.
 - [x] The focused test is registered in the existing reader edge-test ledger
-      and the narrow native-only `proof_required = false` gate. The gate stays
-      disabled until independent implementation review approves activation.
-- [x] The focused test, formatting, strict Clippy, targeted Duvet queries and
-      full trace pass.
-- [ ] Full core tests and full
-      `cargo xtask ci` pass with an exact-source receipt.
+      and the narrow native-only `proof_required = false` gate, enabled after
+      independent implementation review.
+- [x] The focused test, formatting, strict Clippy, targeted Duvet queries,
+      full trace, full core tests, and full `cargo xtask ci` pass with the
+      exact-source receipt recorded above.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
 
 Acceptance establishes only the single AES-128 symmetric Full-volume profile

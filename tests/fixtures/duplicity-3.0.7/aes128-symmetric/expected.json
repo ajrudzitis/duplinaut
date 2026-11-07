@@ -1,0 +1,74 @@
+{
+  "producer": "duplicity 3.0.7 December 31, 2025",
+  "source_interval": {
+    "start": 1700000000,
+    "end": 1700000000
+  },
+  "target": 1700000000,
+  "entries": [
+    {
+      "path_hex": "",
+      "components_hex": [],
+      "kind": "directory",
+      "mode": 493,
+      "mtime_ns": 1700000000000000000
+    },
+    {
+      "path_hex": "636166c3a92e747874",
+      "components_hex": [
+        "636166c3a92e747874"
+      ],
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1700000000000000000,
+      "size": 13,
+      "sha256": "6d599d7293e0dd1b021978a8329a6079707eae9efdbf88919097eefe8c3daca3"
+    },
+    {
+      "path_hex": "6c696e6b",
+      "components_hex": [
+        "6c696e6b"
+      ],
+      "kind": "symlink",
+      "mode": 493,
+      "mtime_ns": 1700000000000000000,
+      "symlink_target_hex": "706c61696e2e747874"
+    },
+    {
+      "path_hex": "6e6573746564",
+      "components_hex": [
+        "6e6573746564"
+      ],
+      "kind": "directory",
+      "mode": 493,
+      "mtime_ns": 1700000000000000000
+    },
+    {
+      "path_hex": "6e65737465642f6d657461646174612e747874",
+      "components_hex": [
+        "6e6573746564",
+        "6d657461646174612e747874"
+      ],
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1700000000000000000,
+      "size": 26,
+      "sha256": "fc1930cf5ef7534180bd210cf0b8ebadb4f5c08a4540b92de23463e3e4d6d2b7"
+    },
+    {
+      "path_hex": "706c61696e2e747874",
+      "components_hex": [
+        "706c61696e2e747874"
+      ],
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1700000000000000000,
+      "size": 9,
+      "sha256": "25718360e05d3c2d0963d1381e9dd4dae5fca789244ee4b9f861adcc0cc96218"
+    }
+  ],
+  "official_restore_verified": true,
+  "official_comparison_exclusions": [
+    "symlink_mtime_ns"
+  ]
+}

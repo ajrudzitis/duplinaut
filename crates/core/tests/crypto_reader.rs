@@ -866,6 +866,251 @@ fn public_rsa2048_pkesk_full_snapshot_matches_official_oracle() {
 }
 
 #[test]
+//= docs/parsing-requirements.md#parse-env-008
+//= type=test
+//# The adapter MUST restrict decryption and verification algorithms to the enumerated initial capability profile.
+//= docs/parsing-requirements.md#parse-env-009
+//= type=test
+//# The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
+//= docs/parsing-requirements.md#parse-env-021
+//= type=test
+//# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+//= docs/parsing-requirements.md#parse-env-023
+//= type=test
+//# Snapshot authentication evidence MUST distinguish integrity-only objects from configured signer authorization and preserve available complete signer fingerprints and certificate creation/expiry/revocation observations without implying current validity or Web-of-Trust acceptance.
+//= docs/parsing-requirements.md#parse-state-003
+//= type=test
+//# `SnapshotState::entries()` MUST enumerate retained entries in bytewise lexicographic order of their backup-relative path components. Each component MUST be compared as an unsigned byte sequence using lexicographic byte order, with a proper prefix ordered before the longer sequence. Paths MUST be compared as sequences of components using the same lexicographic rule, with a proper component-sequence prefix ordered before the longer path. Component boundaries MUST remain significant; the ordering MUST NOT be derived by comparing slash-joined or rendered path strings.
+fn public_aes128_symmetric_full_snapshot_matches_official_oracle() {
+    const MANIFEST: &str = "duplicity-full.20231114T221320Z.manifest.gpg";
+    const VOLUME: &str = "duplicity-full.20231114T221320Z.vol1.difftar.gpg";
+    const MANIFEST_KEY: &str = "backup/duplicity-full.20231114T221320Z.manifest.gpg";
+    const VOLUME_KEY: &str = "backup/duplicity-full.20231114T221320Z.vol1.difftar.gpg";
+    const VERSION_ID: &str = "symmetric-aes128-fixture-v1";
+    const PASSWORD: &str = "duplicity-reader-public-test-fixture";
+
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/aes128-symmetric");
+    let expected: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(fixture.join("expected.json")).expect("official source oracle"),
+    )
+    .expect("valid source oracle");
+    let provenance: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(fixture.join("provenance.json")).expect("fixture provenance"),
+    )
+    .expect("valid fixture provenance");
+    assert_eq!(provenance["producer"], "duplicity 3.0.7 December 31, 2025");
+    assert_eq!(provenance["gpg"], "gpg (GnuPG) 2.4.9");
+    assert_eq!(provenance["cipher_selection"]["gnupg_name"], "AES128");
+    assert_eq!(
+        provenance["cipher_selection"]["openpgp_symmetric_algorithm_id"],
+        7
+    );
+    assert_eq!(
+        provenance["cipher_selection"]["duplicity_gpg_option"],
+        "--gpg-options=--cipher-algo=AES128"
+    );
+    assert_eq!(
+        provenance["source_identity_policy"]["version_id"],
+        VERSION_ID
+    );
+    assert_eq!(
+        provenance["source_identity_policy"]["etag"],
+        "lowercase SHA-256 hex of each exact stored object body"
+    );
+    assert_eq!(
+        provenance["source_identity_policy"]["scope"],
+        "OrderedFixtureSource test adapter only; not a provider ETag claim"
+    );
+    assert_eq!(provenance["source_interval"]["start"], 1_700_000_000);
+    assert_eq!(provenance["source_interval"]["end"], 1_700_000_000);
+    assert_eq!(expected["target"], 1_700_000_000);
+    assert_eq!(expected["official_restore_verified"], true);
+    assert_eq!(
+        expected["official_comparison_exclusions"],
+        serde_json::json!(["symlink_mtime_ns"]),
+        "the official source oracle records its symlink-mtime exclusion"
+    );
+    assert_eq!(
+        provenance["snapshot_oracle"]["official_comparison_exclusions"],
+        expected["official_comparison_exclusions"]
+    );
+    assert_eq!(provenance["objects"].as_array().unwrap().len(), 2);
+    for (key, filename, inspected_key) in [
+        (MANIFEST_KEY, MANIFEST, "manifest"),
+        (VOLUME_KEY, VOLUME, "volume"),
+    ] {
+        let record = provenance["objects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|record| record["key"] == key)
+            .expect("provenance pins exact stored object");
+        let bytes = std::fs::read(fixture.join(record["path"].as_str().unwrap())).unwrap();
+        assert_eq!(record["bytes"].as_u64(), Some(bytes.len() as u64));
+        assert_eq!(record["sha256"], format!("{:x}", Sha256::digest(&bytes)));
+        assert!(record["path"].as_str().unwrap().ends_with(filename));
+        let inspected = &provenance["symmetric_fixture"]["objects"][inspected_key];
+        assert_eq!(inspected["packet_counts"]["pkesk"], 0);
+        assert_eq!(inspected["packet_counts"]["skesk"], 1);
+        assert_eq!(inspected["skesk"]["version"], 4);
+        assert_eq!(inspected["skesk"]["cipher_algorithm_id"], 7);
+        assert_eq!(inspected["seipd"]["packet"], "SEIPDv1");
+        assert_eq!(inspected["seipd"]["version"], 1);
+        assert_eq!(inspected["seipd"]["mdc_method"], 2);
+        assert_eq!(inspected["seipd"]["authenticated_mdc_status"], "GOODMDC");
+        assert_eq!(inspected["payload_cipher"]["name"], "AES-128");
+        assert_eq!(inspected["payload_cipher"]["algorithm_id"], 7);
+        assert!(inspected["payload_cipher"]["decryption_info_status"]
+            .as_str()
+            .unwrap()
+            .starts_with("[GNUPG:] DECRYPTION_INFO 2 7 "));
+        assert_eq!(inspected["decryption_ok_status"], "DECRYPTION_OKAY");
+    }
+    let credentials: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(fixture.join("test-keys/credentials.json"))
+            .expect("public synthetic message password"),
+    )
+    .expect("valid credential record");
+    assert_eq!(
+        credentials["purpose"],
+        "public AES-128 symmetric test fixture only"
+    );
+    assert_eq!(credentials["passphrase"], PASSWORD);
+    let message_passwords = [OpenPgpPassword::from(
+        credentials["passphrase"].as_str().unwrap(),
+    )];
+    let secret_exports: Vec<SecretExport<'_>> = Vec::new();
+    let signer_exports: Vec<&[u8]> = Vec::new();
+    let permitted_signers: Vec<[u8; 20]> = Vec::new();
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords: &message_passwords,
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &permitted_signers,
+            require_signature: false,
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+
+    let source = OrderedFixtureSource::selected_one_volume(
+        "aes128-symmetric/objects",
+        MANIFEST,
+        VOLUME,
+        VERSION_ID,
+    );
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .expect("AES-128 symmetric Full metadata is discoverable");
+    assert_eq!(catalog.objects().len(), 2);
+    assert_eq!(
+        catalog
+            .objects()
+            .iter()
+            .map(|object| object.object().key.as_str())
+            .collect::<Vec<_>>(),
+        [MANIFEST_KEY, VOLUME_KEY]
+    );
+    for (catalog_object, key, kind, volume) in [
+        (
+            &catalog.objects()[0],
+            MANIFEST_KEY,
+            duplicity_core::names::ObjectKind::FullManifest,
+            None,
+        ),
+        (
+            &catalog.objects()[1],
+            VOLUME_KEY,
+            duplicity_core::names::ObjectKind::FullVolume,
+            Some(1),
+        ),
+    ] {
+        let object = catalog_object.object();
+        let name = catalog_object.name().expect("fixture name parsed");
+        let provenance_object = provenance["objects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|record| record["key"] == key)
+            .expect("provenance object exists");
+        assert_eq!(object.key, key);
+        assert_eq!(object.size, provenance_object["bytes"].as_u64().unwrap());
+        assert_eq!(object.identity.version_id.as_deref(), Some(VERSION_ID));
+        assert_eq!(
+            object.identity.etag.as_deref(),
+            provenance_object["sha256"].as_str()
+        );
+        assert_eq!(name.kind, kind);
+        assert_eq!(name.start, Timestamp(1_700_000_000));
+        assert_eq!(name.end, Timestamp(1_700_000_000));
+        assert_eq!(name.volume, volume);
+        assert_eq!(name.envelope, duplicity_core::names::Envelope::OpenPgp);
+        assert!(!name.partial);
+        assert!(!name.short);
+        assert_eq!(catalog_object.status(), DiscoveryStatus::Completed);
+    }
+    assert!(
+        source.opened_keys().is_empty(),
+        "discovery opens no object bodies"
+    );
+    let descriptors = catalog.manifests().collect::<Vec<_>>();
+    assert_eq!(descriptors.len(), 1);
+    let (anchor, _, descriptor) = descriptors[0];
+    assert_eq!(descriptor.kind(), duplicity_core::chain::SetKind::Full);
+    assert_eq!(descriptor.start(), Timestamp(1_700_000_000));
+    assert_eq!(descriptor.end(), Timestamp(1_700_000_000));
+
+    let snapshot = catalog
+        .read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1_700_000_000),
+            &Cancellation::default(),
+            &context,
+        )
+        .expect("AES-128 symmetric credentials recover the official Full snapshot");
+    assert_snapshot_matches_one_volume_oracle(&snapshot, &expected["entries"]);
+    assert_eq!(source.opened_keys(), [MANIFEST_KEY, VOLUME_KEY]);
+
+    let evidence = snapshot.authentication_evidence();
+    let records = evidence.objects();
+    assert_eq!(records.len(), 2);
+    assert_eq!(
+        records
+            .iter()
+            .map(|record| record.key.as_str())
+            .collect::<Vec<_>>(),
+        [MANIFEST_KEY, VOLUME_KEY]
+    );
+    for (record, manifest) in records.iter().zip([true, false]) {
+        assert_eq!(
+            record.kind,
+            duplicity_core::reader::AuthenticationKind::OpenPgpIntegrity
+        );
+        assert!(record.authorized_signer.is_none());
+        assert_eq!(record.manifest, manifest);
+        assert_eq!(record.ordinal, if manifest { 0 } else { 1 });
+        assert_eq!(record.set_start, Timestamp(1_700_000_000));
+        assert_eq!(record.set_end, Timestamp(1_700_000_000));
+    }
+    let policy = evidence.policy().expect("recorded credential policy");
+    assert!(!policy.authorization_configured);
+    assert!(!policy.require_signature);
+    assert!(policy.permitted_primary_fingerprints.is_empty());
+    assert!(message_passwords.len() == 1);
+    assert!(secret_exports.is_empty());
+    assert!(signer_exports.is_empty());
+    assert!(permitted_signers.is_empty());
+    assert!(!format!("{evidence:?}").contains(PASSWORD));
+}
+
+#[test]
 //= docs/parsing-requirements.md#parse-env-012
 //= type=test
 //# Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
