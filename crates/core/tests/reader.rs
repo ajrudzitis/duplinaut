@@ -140,6 +140,191 @@ fn decode_oracle_hex(hex: &str) -> Vec<u8> {
         .collect()
 }
 
+//= docs/parsing-requirements.md#parse-chain-001
+//= type=test
+//# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
+#[test]
+fn official_reversed_object_order_preserves_manifest_descriptor_projection() {
+    const FULL: &str = "backup/duplicity-full.20231114T221320Z.manifest";
+    const FIRST_INCREMENTAL: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest";
+    const SECOND_INCREMENTAL: &str =
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest";
+
+    let mut source = Source::official();
+    source
+        .objects
+        .sort_by(|(left, _), (right, _)| left.key.as_bytes().cmp(right.key.as_bytes()));
+    source.objects.reverse();
+    let supplied_keys = source
+        .objects
+        .iter()
+        .map(|(object, _)| object.key.as_str())
+        .collect::<Vec<_>>();
+    assert!(supplied_keys.windows(2).all(|pair| pair[0] > pair[1]));
+
+    let catalog = discover(&source);
+    assert_eq!(source.opens.load(Ordering::SeqCst), 0);
+    assert!(source.opened_keys.lock().unwrap().is_empty());
+    assert_eq!(
+        catalog
+            .objects()
+            .iter()
+            .map(|entry| entry.object().key.as_str())
+            .collect::<Vec<_>>(),
+        supplied_keys
+    );
+
+    let mut manifest_rows = catalog
+        .manifests()
+        .map(|(index, object, descriptor)| {
+            (
+                object.key.as_str(),
+                index,
+                descriptor.kind(),
+                descriptor.start().0,
+                descriptor.end().0,
+                object as *const StoredObject,
+            )
+        })
+        .collect::<Vec<_>>();
+    manifest_rows.sort_by(|left, right| left.0.cmp(right.0));
+    assert_eq!(manifest_rows.len(), 3);
+    assert_eq!(
+        manifest_rows
+            .iter()
+            .map(|(key, index, kind, start, end, _)| { (*key, *index, *kind, *start, *end) })
+            .collect::<Vec<_>>(),
+        vec![
+            (FULL, 2, SetKind::Full, 1700000000, 1700000000),
+            (
+                FIRST_INCREMENTAL,
+                1,
+                SetKind::Incremental,
+                1700000000,
+                1700086400
+            ),
+            (
+                SECOND_INCREMENTAL,
+                0,
+                SetKind::Incremental,
+                1700086400,
+                1700172800
+            ),
+        ]
+    );
+    for (key, _, _, _, _, returned_object) in &manifest_rows {
+        let catalog_object = catalog
+            .objects()
+            .iter()
+            .find(|entry| entry.object().key == *key)
+            .expect("each manifest object remains in the catalog object table");
+        assert!(std::ptr::eq(
+            *returned_object,
+            catalog_object.object() as *const StoredObject
+        ));
+    }
+
+    let full_anchor = manifest_rows
+        .iter()
+        .find(|row| row.0 == FULL)
+        .expect("the full descriptor is exposed through manifests")
+        .1;
+    let oracle: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/duplicity-3.0.7/expected.json"
+    ))
+    .unwrap();
+    let targets = [1700000000_i128, 1700086400, 1700172800];
+    let expected_manifest_opens = [
+        vec![FULL],
+        vec![FULL, FIRST_INCREMENTAL],
+        vec![FULL, FIRST_INCREMENTAL, SECOND_INCREMENTAL],
+    ];
+
+    for (snapshot_index, target) in targets.into_iter().enumerate() {
+        source.opens.store(0, Ordering::SeqCst);
+        source.opened_keys.lock().unwrap().clear();
+        let snapshot = catalog
+            .read_snapshot(full_anchor, Timestamp(target), &Cancellation::default())
+            .unwrap();
+        let expected_entries = oracle["snapshots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["mode"] == "plain" && entry["index"] == snapshot_index as u64)
+            .expect("the official oracle contains all three plain dates")["entries"]
+            .as_array()
+            .unwrap();
+        assert_eq!(snapshot.state().len(), expected_entries.len());
+
+        let observed_manifest_opens = source
+            .opened_keys
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|key| key.ends_with(".manifest"))
+            .cloned()
+            .collect::<Vec<_>>();
+        assert_eq!(
+            observed_manifest_opens,
+            expected_manifest_opens[snapshot_index]
+                .iter()
+                .map(|key| (*key).to_owned())
+                .collect::<Vec<_>>()
+        );
+
+        if snapshot_index == 2 {
+            for (path, entry) in snapshot.state().entries() {
+                let bytes = path
+                    .components()
+                    .iter()
+                    .map(|part| part.as_slice())
+                    .collect::<Vec<_>>()
+                    .join(&b'/');
+                let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+                let expected = expected_entries
+                    .iter()
+                    .find(|expected| expected["path_hex"] == hex)
+                    .expect("each final snapshot path is represented in the official oracle");
+                assert_eq!(
+                    entry.mode() & 0o777,
+                    expected["mode"].as_u64().unwrap() as u32
+                );
+                if expected["kind"] != "symlink" {
+                    assert_eq!(
+                        entry.mtime().seconds as i128 * 1_000_000_000
+                            + i128::from(entry.mtime().nanoseconds),
+                        expected["mtime_ns"].as_i64().unwrap() as i128
+                    );
+                }
+                match expected["kind"].as_str().unwrap() {
+                    "file" => {
+                        assert_eq!(entry.entry_type(), duplicity_core::tar::EntryType::Regular);
+                        assert_eq!(
+                            format!("{:x}", sha2::Sha256::digest(entry.content().unwrap())),
+                            expected["sha256"].as_str().unwrap()
+                        );
+                    }
+                    "symlink" => {
+                        assert_eq!(entry.entry_type(), duplicity_core::tar::EntryType::Symlink);
+                        let target: String = entry
+                            .linkname()
+                            .iter()
+                            .map(|byte| format!("{byte:02x}"))
+                            .collect();
+                        assert_eq!(target, expected["symlink_target_hex"].as_str().unwrap());
+                    }
+                    "directory" => assert_eq!(
+                        entry.entry_type(),
+                        duplicity_core::tar::EntryType::Directory
+                    ),
+                    kind => panic!("unexpected oracle entry kind {kind}"),
+                }
+            }
+        }
+    }
+}
+
 //= docs/parsing-requirements.md#assure-test-001
 //= type=test
 //# Compatibility tests MUST restore supported snapshots produced by official duplicity and compare contents and supported metadata with both their source tree and official restoration.

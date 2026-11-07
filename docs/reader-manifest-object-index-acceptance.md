@@ -1,6 +1,7 @@
 # Reader Manifest-Object Index Projection Acceptance
 
-**Status:** Proposed; implementation and independent review pending.
+**Status:** Local implementation, tests, Verus proof, Duvet trace, and
+independent reviews passed. Hosted Linux assurance and Duvet Pages are pending.
 
 ## Goal and scope
 
@@ -26,11 +27,14 @@ that use them.
 
 For catalog object sequence `O`, manifest-object index sequence `M`, and
 descriptor sequence `D`, define the adapter result at manifest position `i`
-as `(i, O[M[i]], D[i])`. The model MUST require equal lengths for `M` and
-`D`, and every `M[i]` in bounds for `O`. A verified position helper MUST
-return the exact pair for an in-range index and no pair out of range. This
-proves the index projection under those explicit preconditions; it does not
-prove that `Catalog::discover` establishes them for all possible inputs.
+as `(i, M[i], D[i])`. The model MUST require equal lengths for `M` and `D`,
+and every `M[i]` in bounds for `O`. A verified position helper MUST return
+the exact descriptor-table position, mapped object-table index, and descriptor
+for an in-range index, and no row out of range. The helper does not dereference
+`O[M[i]]`; the exact `StoredObject` reference reached by that dereference is
+native-test evidence. This proves index/descriptor projection under the stated
+preconditions; it does not prove that `Catalog::discover` establishes those
+preconditions for all possible inputs.
 
 ## Acceptance requirements
 
@@ -63,8 +67,11 @@ prove that `Catalog::discover` establishes them for all possible inputs.
    later manifest may be opened for an earlier target. The final read MUST
    preserve the existing full snapshot oracle check.
 4. The formal position helper MUST have a project-owned model independent of
-   the native `Iterator` adapter. Prove exact in-range index/object/descriptor
-   projection and the out-of-range result. State explicitly that Rust's
+   the native `Iterator` adapter. Prove exact in-range position, mapped object
+   index, and descriptor projection plus the out-of-range result. It MUST NOT
+   claim that the proof dereferences the object table or proves pointer
+   identity. The native fixture test MUST verify the dereference and pointer
+   identity against `Catalog::objects()`. State explicitly that Rust's
    `Iterator`, `Enumerate`, `Map`, and slice implementation internals are not
    formally verified; the public iterator is covered by the native test.
 5. Add a Duvet link to `PARSE-CHAIN-001` only for the manifest associations
@@ -74,31 +81,43 @@ prove that `Catalog::discover` establishes them for all possible inputs.
 
 ## Verification and boundaries
 
-- Add focused native tests for the model helper's boundaries and the public
+- Focused native tests cover the model helper's boundaries and the public
   explicitly reversed-listing catalog fixture. The test MUST assert zero
   opens during discovery, all three public associations with indices 2/1/0,
   and the per-target manifest-only projections from the full open logs.
-- Run focused/full core tests, the focused Verus proof, targeted
-  `PARSE-CHAIN-001` Duvet query and full trace, formatting, strict Clippy, and
-  full `cargo xtask ci`. Require independent verifier and implementation
-  reviews, then hosted Linux assurance and Duvet Pages publication.
-- The proof covers only an in-range projection from supplied, length-aligned
-  index/descriptor tables. Native fixture tests cover the discovery-to-table
-  construction and standard iterator boundary for this official input. This
-  does not establish universal construction invariants or complete
-  `read_snapshot_inner` correctness.
+- Focused/full core tests, the focused Verus proof, targeted `PARSE-CHAIN-001`
+  Duvet query and full trace, formatting, strict Clippy, and full local
+  `cargo xtask ci` passed. Independent verifier and implementation reviews
+  passed. Hosted Linux assurance and Duvet Pages publication remain required.
+- The proof covers only an in-range index/descriptor projection from supplied,
+  length-aligned tables whose object indices are in bounds. It does not
+  dereference the object table. Native fixture tests cover discovery's
+  parallel table construction, object dereference/pointer identity, and the
+  standard iterator boundary for this official input. This does not establish
+  universal construction invariants or complete `read_snapshot_inner`
+  correctness.
 
 ## Checklist
 
-- [ ] Independent specification review accepts the model, fixture oracle,
+- [x] Independent specification review accepts the model, fixture oracle,
       and exclusions.
-- [ ] Implement the verified projection helper and use it in the public
+- [x] Implement the verified projection helper and use it in the public
       manifest adapter.
-- [ ] Reverse-listing fixture test checks exact key/index/descriptor and
+- [x] Reverse-listing fixture test checks exact key/index/descriptor and
       original object reference associations.
-- [ ] Three selected reads match the official date entry-count oracle and
+- [x] Three selected reads match the official date entry-count oracle and
       open only manifests selected through the descriptor mapping.
-- [ ] Focused/full tests, Verus, targeted Duvet/full trace, formatting, strict
+- [x] Focused/full tests, Verus, targeted Duvet/full trace, formatting, strict
       Clippy, and local full CI pass.
-- [ ] Independent verifier and implementation reviews pass.
+- [x] Independent verifier and implementation reviews pass.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
+
+## Local evidence
+
+The focused projection proof and native tests pass. The full local
+`cargo xtask ci` receipt records source SHA-256
+`1b4f09883ef980a3a6a8300763e78a6f05f8bf28bb33170e1323357ab74c9c71` and
+Verus partitions 2,047 vstd, 3,183 Vest, and 1,332 core obligations with zero
+errors. Duvet `PARSE-CHAIN-001` query/full trace, formatting, strict Clippy,
+and independent verifier/implementation reviews pass. Hosted Linux assurance
+and Duvet Pages remain pending.

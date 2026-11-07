@@ -1059,6 +1059,33 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-manifest-object-index"
+gate = true
+requirements = ["PARSE-CHAIN-001"]
+specified = true
+implemented = true
+proved = true
+tested = true
+reviewed = true
+proof_required = true
+# Proves descriptor position, mapped object index, and descriptor projection
+# for supplied length-aligned, in-bounds tables. Native fixture coverage checks
+# object dereference/pointer identity. Discovery construction for arbitrary
+# sources, standard iterator internals, and whole-reader refinement remain out.
+implementations = [
+  { path = "crates/core/src/verified/reader_manifest_index.rs", symbol = "manifest_position" },
+  { path = "crates/core/src/reader.rs", symbol = "manifests" },
+  { path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" }
+]
+proofs = [
+  { id = "reader-manifest-object-index", requirement = "PARSE-CHAIN-001", path = "crates/core/src/verified/reader_manifest_index.rs", symbol = "manifest_position", kind = "contract" }
+]
+tests = [
+  { package = "duplicity-core", name = "verified::reader_manifest_index::tests::manifest_position_checks_table_shape_bounds_and_position_edges" },
+  { package = "duplicity-core", name = "official_reversed_object_order_preserves_manifest_descriptor_projection" }
+]
+
+[[milestone]]
 id = "restore-selection"
 gate = false
 requirements = ["RESTORE-001", "RESTORE-005"]

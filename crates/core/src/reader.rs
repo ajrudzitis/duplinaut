@@ -35,6 +35,7 @@ use crate::verified::reader_completion::{
     commit_set_completion, set_completion_complete, snapshot_publication_readiness,
     start_set_completion,
 };
+use crate::verified::reader_manifest_index::{manifest_position, manifest_tables_well_formed};
 use crate::verified::reader_volume_scan::{
     advance_volume_scan_cursor, charge_volume_object, record_volume_candidate,
     required_volume_identity_matches, reserve_volume_scan, start_volume_scan_cursor,
@@ -570,15 +571,26 @@ impl<'a> Catalog<'a> {
     }
     /// Indices identify the immutable descriptor sequence used by read_snapshot.
     pub fn manifests(&self) -> impl Iterator<Item = (usize, &StoredObject, &SetDescriptor)> {
+        let tables_well_formed = manifest_tables_well_formed(
+            self.objects.len(),
+            &self.manifest_objects,
+            &self.descriptors,
+        );
         self.manifest_objects
             .iter()
             .enumerate()
-            .map(|(index, object)| {
-                (
-                    index,
-                    &self.objects[*object].object,
-                    &self.descriptors[index],
-                )
+            .filter_map(move |(position, _)| {
+                let (descriptor_position, object_index, projected_descriptor) = manifest_position(
+                    self.objects.len(),
+                    &self.manifest_objects,
+                    &self.descriptors,
+                    position,
+                    tables_well_formed,
+                )?;
+                let object = self.objects.get(object_index)?;
+                let descriptor = self.descriptors.get(descriptor_position)?;
+                debug_assert_eq!(*descriptor, projected_descriptor);
+                Some((descriptor_position, &object.object, descriptor))
             })
     }
     fn read_stored(

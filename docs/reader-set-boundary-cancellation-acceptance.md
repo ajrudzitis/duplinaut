@@ -1,6 +1,8 @@
 # Reader Selected-Set Boundary Cancellation Acceptance
 
-**Status:** Implementation, independent review, and full local CI pass; hosted Linux assurance and Duvet Pages pending.
+**Status:** Accepted. Implementation, independent review, full local CI,
+hosted Linux assurance, and Duvet Pages pass in
+[run 42370397916](https://github.com/ajrudzitis/duplinaut/actions/runs/42370397916).
 
 ## Goal and scope
 
@@ -75,8 +77,8 @@ or cancellation-specific production hook.
   and `cargo xtask trace`; check formatting, strict core Clippy, and full
   `cargo xtask ci`.
 - Require independent implementation/test review of the exact trigger key,
-  observed token, no-snapshot error, and five-key open set. Require hosted
-  Linux assurance and Duvet Pages before accepting the milestone.
+  observed token, no-snapshot error, and five-key open set. Hosted Linux
+  assurance and Duvet Pages must pass before accepting the milestone.
 - This case does not establish cancellation before discovery, at every
   manifest/volume boundary, during native crypto, during blocking source
   reads, or in a concurrent race. It does not prove iterator semantics,
@@ -92,7 +94,8 @@ or cancellation-specific production hook.
       strict Clippy, and diff checks pass.
 - [x] Full local `cargo xtask ci` passes on the final tracked tree; receipt is recorded in generated `target/assurance/ci.json`.
 - [x] Independent implementation/test review passes.
-- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [x] Hosted Linux assurance and Duvet Pages pass in
+      [run 42370397916](https://github.com/ajrudzitis/duplinaut/actions/runs/42370397916).
 
 ## Current evidence
 
@@ -101,4 +104,7 @@ or cancellation-specific production hook.
 - `.tools/bin/duvet query --check test --section docs/parsing-requirements.md#parse-env-024`: passed.
 - `cargo xtask trace-update` and `cargo xtask trace`: passed.
 - `cargo fmt --all --check`, strict core Clippy, and `git diff --check`: passed.
-- Independent implementation review and full local `cargo xtask ci` passed; the generated receipt is in `target/assurance/ci.json`. Hosted Linux assurance and Duvet Pages remain pending.
+- Independent implementation review and full local `cargo xtask ci` passed;
+  the generated receipt is in `target/assurance/ci.json`. Hosted Linux
+  assurance and Duvet Pages passed in
+  [run 42370397916](https://github.com/ajrudzitis/duplinaut/actions/runs/42370397916).
