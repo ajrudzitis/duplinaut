@@ -1,7 +1,8 @@
 # Final Incremental Volume Digest Failure Acceptance
 
 **Status:** Independently reviewed and accepted as a specification;
-implementation and verification pending.
+implementation and scoped local checks pass; independent implementation
+review, full local CI, and hosted gates pending.
 
 ## Goal and scope
 
@@ -91,15 +92,40 @@ boundary for native digest primitives explicit.
   correctness, signature/authenticity, failure behavior at other volumes,
   cancellation races, filesystem publication, or whole-reader refinement.
 
+## Current evidence
+
+- The focused `official_final_incremental_volume_digest_mismatch_returns_no_snapshot`
+  test and full `cargo test -p duplicity-core` pass.
+- The targeted `PARSE-ENV-005` implementation/test query, `cargo xtask
+  trace-update`, and full `cargo xtask trace` pass.
+- `cargo clippy -p duplicity-core --tests -- -D warnings`, `cargo fmt --all
+  -- --check`, and `git diff --check` pass. Clippy reports pre-existing
+  warnings in vendored `vest_lib`; the core test target is clean.
+- Independent implementation review passed. The reviewer confirmed the
+  mutation is limited to final Incremental vol1's byte zero and test-local
+  identity, the manifest digest remains unchanged, discovery performs zero
+  opens, the exact typed mismatch and clear token are asserted, and the
+  ordered nine-key read log ends at the mutated volume. The scoped
+  PARSE-ENV-005 mapping and native-digest trust boundary are appropriate.
+- Full `nix-shell tools/shell.nix --run 'source tools/env.sh && cargo xtask ci'`
+  passes at source SHA-256
+  `a2cadb1dba44d7423fdcb410d99d9c851ef7ae4b90970fc0fe6195bc84e8177c` on
+  `aarch64-macos`. Verus partitions report 2,047, 3,183, and 1,332 verified
+  obligations with zero errors; workspace formatting, strict Clippy, tests,
+  and assurance-mapped test validation pass. Receipt: generated
+  `target/assurance/ci.json`.
+- Hosted Linux assurance and Duvet Pages remain pending.
+
 ## Checklist
 
 - [x] Independent specification review accepts the mutation and nine-key
       failure oracle.
-- [ ] Add a native test that mutates only final Incremental volume 1 and
+- [x] Add a native test that mutates only final Incremental volume 1 and
       updates only its test-local identity.
-- [ ] Map the test to `PARSE-ENV-005` and a separate scoped assurance
+- [x] Map the test to `PARSE-ENV-005` and a separate scoped assurance
       milestone; retain the trusted native-digest boundary.
-- [ ] Focused/full core tests, targeted Duvet/full trace, formatting, strict
-      Clippy, and full local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused/full core tests, targeted Duvet/full trace, formatting, and
+      strict Clippy pass.
+- [x] Full local `cargo xtask ci` passes.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages pass.

@@ -5617,6 +5617,127 @@ fn official_incremental_volume_stored_digest_mismatch_returns_no_snapshot() {
     assert_eq!(source.opens.load(Ordering::SeqCst), 6);
 }
 
+//= docs/parsing-requirements.md#parse-env-005
+//= type=test
+//# Manifest volume digests MUST be checked against the original stored object bytes before a restoration using those volumes is published.
+#[test]
+fn official_final_incremental_volume_digest_mismatch_returns_no_snapshot() {
+    const MUTATED_VOLUME: &str =
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.vol1.difftar.gz";
+    const FULL_MANIFEST: &str = "backup/duplicity-full.20231114T221320Z.manifest";
+    const FULL_VOL1: &str = "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz";
+    const FULL_VOL2: &str = "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz";
+    const FULL_VOL3: &str = "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz";
+    const FIRST_INCREMENTAL_MANIFEST: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest";
+    const FIRST_INCREMENTAL_VOL1: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz";
+    const FIRST_INCREMENTAL_VOL2: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol2.difftar.gz";
+    const FINAL_INCREMENTAL_MANIFEST: &str =
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest";
+
+    let mut source = Source::official();
+    assert_eq!(source.objects.len(), 12);
+    let original_inventory = source.objects.clone();
+    let (volume_object, volume_bytes) = source
+        .objects
+        .iter_mut()
+        .find(|(object, _)| object.key == MUTATED_VOLUME)
+        .expect("the official fixture includes final-incremental volume 1");
+    assert!(!volume_bytes.is_empty());
+    let original_len = volume_bytes.len();
+    let mut expected_mutated_bytes = volume_bytes.clone();
+    expected_mutated_bytes[0] ^= 1;
+    volume_bytes[0] ^= 1;
+    assert_eq!(volume_bytes, &expected_mutated_bytes);
+    assert_eq!(volume_bytes.len(), original_len);
+    let mutated_etag = format!("{:x}", sha2::Sha256::digest(volume_bytes.as_slice()));
+    volume_object.identity = ObjectIdentity {
+        version_id: Some("mutated-final-volume-body-v1".into()),
+        etag: Some(mutated_etag.clone()),
+    };
+
+    assert_eq!(source.objects.len(), original_inventory.len());
+    for (index, (original_object, original_bytes)) in original_inventory.iter().enumerate() {
+        let (object, bytes) = &source.objects[index];
+        if original_object.key == MUTATED_VOLUME {
+            assert_eq!(object.key, original_object.key);
+            assert_eq!(object.size, original_object.size);
+            assert_eq!(bytes.len(), original_bytes.len());
+            assert_eq!(bytes, &expected_mutated_bytes);
+            assert_eq!(
+                object.identity.version_id.as_deref(),
+                Some("mutated-final-volume-body-v1")
+            );
+            assert_eq!(object.identity.etag.as_deref(), Some(mutated_etag.as_str()));
+        } else {
+            assert_eq!(object, original_object);
+            assert_eq!(bytes, original_bytes);
+        }
+    }
+
+    let catalog = discover(&source);
+    assert_eq!(source.opens.load(Ordering::SeqCst), 0);
+    let descriptors = catalog.manifests().collect::<Vec<_>>();
+    assert_eq!(descriptors.len(), 3);
+    let mut descriptor_keys = descriptors
+        .iter()
+        .map(|(_, _, descriptor)| {
+            (
+                match descriptor.kind() {
+                    SetKind::Full => 0,
+                    SetKind::Incremental => 1,
+                },
+                descriptor.start().0,
+                descriptor.end().0,
+            )
+        })
+        .collect::<Vec<_>>();
+    descriptor_keys.sort_unstable();
+    assert_eq!(
+        descriptor_keys,
+        vec![
+            (0, 1700000000, 1700000000),
+            (1, 1700000000, 1700086400),
+            (1, 1700086400, 1700172800),
+        ]
+    );
+    let full_index = descriptors
+        .iter()
+        .find(|(_, _, descriptor)| descriptor.kind() == SetKind::Full)
+        .expect("the Full descriptor is the selected history anchor")
+        .0;
+    let cancel = Cancellation::default();
+
+    assert!(matches!(
+        catalog.read_snapshot(full_index, Timestamp(1700172800), &cancel),
+        Err(ReaderError::Assembly(
+            duplicity_core::multipart::AssemblyError::Envelope(
+                duplicity_core::envelope::EnvelopeError::DigestMismatch
+            )
+        ))
+    ));
+    assert!(!cancel.is_cancelled());
+    assert_eq!(
+        source.opened_keys.lock().unwrap().as_slice(),
+        [
+            FULL_MANIFEST,
+            FULL_VOL1,
+            FULL_VOL2,
+            FULL_VOL3,
+            FIRST_INCREMENTAL_MANIFEST,
+            FIRST_INCREMENTAL_VOL1,
+            FIRST_INCREMENTAL_VOL2,
+            FINAL_INCREMENTAL_MANIFEST,
+            MUTATED_VOLUME,
+        ]
+        .map(str::to_owned)
+        .as_slice()
+    );
+    assert_eq!(source.opens.load(Ordering::SeqCst), 9);
+}
+
 //= docs/parsing-requirements.md#parse-env-006
 //= type=test
 //# An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
