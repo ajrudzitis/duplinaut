@@ -1274,10 +1274,13 @@ proved = false
 tested = true
 reviewed = true
 proof_required = false
-proof_rationale = "This fixture test observes a synchronous cancellation at one required-object handoff in the public reader. It does not prove cancellation timing, interruption of blocking work, race behavior, or whole-reader refinement."
+proof_rationale = "These fixture tests observe two distinct synchronous required-object handoffs in the public reader: the first Incremental manifest open and its first data-volume open after manifest processing. They do not prove cancellation timing, interruption of blocking work, race behavior, or whole-reader refinement."
 implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot" }]
 proofs = []
-tests = [{ package = "duplicity-core", name = "official_reader_cancellation_at_first_incremental_manifest_open_returns_no_snapshot" }]
+tests = [
+  { package = "duplicity-core", name = "official_reader_cancellation_at_first_incremental_manifest_open_returns_no_snapshot" },
+  { package = "duplicity-core", name = "official_reader_cancellation_at_first_incremental_volume_open_returns_no_snapshot" }
+]
 
 [[milestone]]
 id = "reader-evidence-metadata-reservation"

@@ -15,6 +15,7 @@ struct Source {
     mode: usize,
     opens: AtomicUsize,
     opened_keys: Mutex<Vec<String>>,
+    triggered_cancel_key: Mutex<Option<String>>,
 }
 impl Source {
     fn official() -> Self {
@@ -25,6 +26,7 @@ impl Source {
             mode: 0,
             opens: AtomicUsize::new(0),
             opened_keys: Mutex::new(Vec::new()),
+            triggered_cancel_key: Mutex::new(None),
         };
         for file in std::fs::read_dir(directory).unwrap() {
             let file = file.unwrap();
@@ -93,6 +95,17 @@ impl ObjectSource for Source {
         if self.mode == 7
             && object.key == "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest"
         {
+            cancel.cancel();
+        }
+        if self.mode == 8
+            && object.key
+                == "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz"
+        {
+            assert!(
+                !cancel.is_cancelled(),
+                "the exact snapshot token is clear at the trigger"
+            );
+            *self.triggered_cancel_key.lock().unwrap() = Some(object.key.clone());
             cancel.cancel();
         }
         if self.mode == 2 {
@@ -536,6 +549,44 @@ fn official_reader_cancellation_at_first_incremental_manifest_open_returns_no_sn
     ];
     expected.sort();
     assert_eq!(sorted_opened, expected);
+}
+
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+#[test]
+fn official_reader_cancellation_at_first_incremental_volume_open_returns_no_snapshot() {
+    const TRIGGER: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz";
+    let expected_opened = vec![
+        "backup/duplicity-full.20231114T221320Z.manifest".to_owned(),
+        "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz".to_owned(),
+        "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz".to_owned(),
+        "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz".to_owned(),
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest".to_owned(),
+        TRIGGER.to_owned(),
+    ];
+
+    let mut source = Source::official();
+    source.mode = 8;
+    let catalog = discover(&source);
+    assert_eq!(source.opens.load(Ordering::SeqCst), 0);
+    assert!(source.opened_keys.lock().unwrap().is_empty());
+    let cancel = Cancellation::default();
+
+    let result = catalog.read_snapshot(anchor(&catalog), Timestamp(1700172800), &cancel);
+    assert!(matches!(
+        result,
+        Err(ReaderError::Source(SourceError::Cancelled))
+    ));
+    assert!(cancel.is_cancelled());
+    assert_eq!(
+        *source.triggered_cancel_key.lock().unwrap(),
+        Some(TRIGGER.to_owned())
+    );
+    let opened = source.opened_keys.lock().unwrap().clone();
+    assert_eq!(opened, expected_opened);
+    assert_eq!(source.opens.load(Ordering::SeqCst), expected_opened.len());
 }
 
 #[test]

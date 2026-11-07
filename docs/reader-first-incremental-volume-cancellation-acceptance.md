@@ -1,7 +1,8 @@
 # Reader First Incremental Volume Cancellation Acceptance
 
-**Status:** Proposed; independent specification review and implementation
-pending.
+**Status:** Specification and independent implementation review,
+implementation, focused/full core tests, scoped Duvet/format/Clippy checks, and
+full local CI passed. Hosted Linux assurance and Duvet Pages remain pending.
 
 ## Goal and scope
 
@@ -99,13 +100,24 @@ bytes. No test-only reader or production cancellation hook is permitted.
 
 ## Checklist
 
-- [ ] Independent specification review accepts the trigger and six-key order.
-- [ ] Add the deterministic official-fixture test without a production hook.
-- [ ] Extend the existing assurance milestone rationale and test mapping to
+- [x] Independent specification review accepts the trigger and six-key order.
+- [x] Add the deterministic official-fixture test without a production hook.
+- [x] Extend the existing assurance milestone rationale and test mapping to
       cover the separate manifest-open and first-incremental volume 1
       handoffs; map both to `PARSE-ENV-024` without claiming broader controller
       proof.
-- [ ] Focused/full core tests, targeted Duvet/full trace, formatting, strict
-      Clippy, and full local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused/full core tests, targeted Duvet/full trace, formatting, and
+      strict Clippy pass.
+- [x] Full local `cargo xtask ci` passes on the final tracked tree.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
+
+## Current evidence
+
+- `cargo test -p duplicity-core --test reader official_reader_cancellation_at_first_incremental_volume_open_returns_no_snapshot -- --exact`: passed; exact trigger, typed cancellation, and ordered six-key open log asserted.
+- `cargo test -p duplicity-core`: passed.
+- `.tools/bin/duvet query --check implementation,test --section docs/parsing-requirements.md#parse-env-024`: passed.
+- `cargo xtask trace-update` and `cargo xtask trace`: passed.
+- `cargo clippy -p duplicity-core --tests -- -D warnings`, `cargo fmt --all -- --check`, and `git diff --check`: passed.
+- Full local `cargo xtask ci`: passed at source SHA-256 `e96efe562da72a8b7de132a3d9a51038ae92f0441227101454b222ed2d83ecb6`; Verus partitions 2,047/3,183/1,332, zero errors.
+- Independent implementation/test review passed. Hosted Linux assurance/Duvet Pages remain pending.
