@@ -16,6 +16,35 @@ Output must not exist. Source trees, caches, private test-agent state, official 
 
 `cargo xtask producer` runs this same recipe. Set `PRODUCER_PYTHON`, `PRODUCER_DUPLICITY`, `PRODUCER_GPG` and `PRODUCER_OUTPUT` explicitly. `PRODUCER_VERSION` defaults to `3.0.7`; `PRODUCER_PROFILE` accepts `full` (default), `plain`, or `small-plain`. The wrapper preserves argument boundaries and never overwrites an existing output. Use the direct Python invocation above for historical producer options.
 
+### PARSE-ENV-019 unsigned data-volume fixture
+
+`tests/producer/compose_env019_unsigned_volume.py` builds the supplemental
+`tests/fixtures/duplicity-3.0.7/unsigned-data-volume` test source from the
+checked-in signed and symmetric Full outputs. It copies the official
+symmetric volume unchanged, verifies that its decrypted tar bytes match the
+official signed volume, changes the signed manifest's one stored-volume SHA1,
+and re-encrypts and re-signs that manifest with the checked-in synthetic test
+key. The resulting signed-manifest/symmetric-volume pair is adversarial test
+composition; it was not emitted by one ordinary Duplicity invocation. The
+sidecar `provenance.json` records the input and output object hashes, payload
+digest comparison, transformation argv, generator hash, and test-key source.
+Reader tests load only these checked-in bytes and do not invoke GPG or
+Duplicity.
+
+Reproduce the composition with the pinned GnuPG binary recorded in
+`tests/fixtures/duplicity-3.0.7/provenance.json`:
+
+```sh
+python3 tests/producer/compose_env019_unsigned_volume.py \
+  --fixture-root tests/fixtures/duplicity-3.0.7 \
+  --gpg /path/from/provenance/bin/gpg \
+  --output /tmp/duplicity-reader-env019-unsigned-volume
+```
+
+The output directory must not exist. GnuPG uses a private temporary home under
+`/tmp`; the credential is the public synthetic test passphrase from
+`test-keys/credentials.json`.
+
 The checked-in 3.0.7 corpus was produced with:
 
 - Duplicity: `/nix/store/5j4mk0k17j37nh8a7s2pcr5z0vblx73r-duplicity-3.0.7/bin/duplicity`

@@ -11,8 +11,130 @@ use sha2::{Digest, Sha256};
 use std::{
     io::{Cursor, Read},
     path::Path,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Mutex,
+    },
 };
+
+struct OrderedFixtureSource {
+    values: Vec<(StoredObject, Vec<u8>)>,
+    opens: Mutex<Vec<String>>,
+}
+
+impl OrderedFixtureSource {
+    fn one_volume(directory: &str) -> Self {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/duplicity-3.0.7")
+            .join(directory);
+        if directory == "unsigned-data-volume" {
+            let mut names = std::fs::read_dir(&root)
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+                .collect::<Vec<_>>();
+            names.sort();
+            assert_eq!(
+                names,
+                [
+                    "duplicity-full.20231114T221320Z.manifest.gpg",
+                    "duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+                    "provenance.json",
+                ],
+                "the adversarial fixture folder contains only two stored objects and its sidecar"
+            );
+        }
+        let mut values = std::fs::read_dir(root)
+            .unwrap()
+            .filter_map(|entry| {
+                let entry = entry.unwrap();
+                let name = entry.file_name();
+                (name == "duplicity-full.20231114T221320Z.manifest.gpg"
+                    || name == "duplicity-full.20231114T221320Z.vol1.difftar.gpg")
+                    .then_some(entry)
+            })
+            .map(|entry| {
+                let name = entry.file_name().into_string().unwrap();
+                let bytes = std::fs::read(entry.path()).unwrap();
+                (
+                    StoredObject {
+                        key: format!("backup/{name}"),
+                        size: bytes.len() as u64,
+                        identity: ObjectIdentity {
+                            version_id: Some("env019-fixture-v1".into()),
+                            etag: Some(format!("{:x}", Sha256::digest(&bytes))),
+                        },
+                    },
+                    bytes,
+                )
+            })
+            .collect::<Vec<_>>();
+        values.sort_by(|left, right| left.0.key.cmp(&right.0.key));
+        let expected_keys = [
+            "backup/duplicity-full.20231114T221320Z.manifest.gpg",
+            "backup/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+        ];
+        assert_eq!(
+            values
+                .iter()
+                .map(|(object, _)| object.key.as_str())
+                .collect::<Vec<_>>(),
+            expected_keys,
+            "the fixture source contains only its Full manifest and one required volume"
+        );
+        Self {
+            values,
+            opens: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn opened_keys(&self) -> Vec<String> {
+        self.opens.lock().unwrap().clone()
+    }
+
+    fn clear_open_log(&self) {
+        self.opens.lock().unwrap().clear();
+    }
+}
+
+impl ObjectSource for OrderedFixtureSource {
+    fn list(
+        &self,
+        prefix: &str,
+        _: SourceLimits,
+        cancel: &Cancellation,
+    ) -> Result<Vec<StoredObject>, SourceError> {
+        if cancel.is_cancelled() {
+            return Err(SourceError::Cancelled);
+        }
+        Ok(self
+            .values
+            .iter()
+            .filter(|(object, _)| object.key.starts_with(prefix))
+            .map(|(object, _)| object.clone())
+            .collect())
+    }
+
+    fn open(
+        &self,
+        object: &StoredObject,
+        _: SourceLimits,
+        cancel: &Cancellation,
+    ) -> Result<Box<dyn Read + Send>, SourceError> {
+        if cancel.is_cancelled() {
+            return Err(SourceError::Cancelled);
+        }
+        self.opens.lock().unwrap().push(object.key.clone());
+        let (expected, bytes) = self
+            .values
+            .iter()
+            .find(|(expected, _)| expected.key == object.key)
+            .ok_or(SourceError::Missing)?;
+        if expected != object {
+            return Err(SourceError::Changed);
+        }
+        Ok(Box::new(Cursor::new(bytes.clone())))
+    }
+}
 
 struct FixtureSource {
     values: Vec<(StoredObject, Vec<u8>)>,
@@ -304,6 +426,85 @@ fn decode_hex_bytes(hex: &str) -> Vec<u8> {
         })
         .collect()
 }
+
+fn assert_snapshot_matches_one_volume_oracle(
+    snapshot: &duplicity_core::reader::ValidatedSnapshot,
+    expected: &serde_json::Value,
+) {
+    let expected = expected.as_array().expect("oracle entry array");
+    assert_eq!(snapshot.state().len(), expected.len());
+    let mut expected_by_path = std::collections::BTreeMap::new();
+    for expected_entry in expected {
+        let components = expected_entry["components_hex"]
+            .as_array()
+            .expect("oracle path components")
+            .iter()
+            .map(|component| decode_hex_bytes(component.as_str().unwrap()))
+            .collect::<Vec<_>>();
+        assert!(
+            expected_by_path
+                .insert(components, expected_entry)
+                .is_none(),
+            "one-volume oracle contains each path once"
+        );
+    }
+    let actual_entries = snapshot.state().entries().collect::<Vec<_>>();
+    assert_eq!(
+        actual_entries
+            .iter()
+            .map(|(path, _)| path.components().clone())
+            .collect::<Vec<_>>(),
+        expected_by_path.keys().cloned().collect::<Vec<_>>(),
+        "the reconstructed raw paths exactly match the oracle"
+    );
+    for (path, entry) in actual_entries {
+        let expected_entry = expected_by_path
+            .get(path.components())
+            .expect("every snapshot entry has an oracle record");
+        let expected_type = match expected_entry["kind"].as_str().unwrap() {
+            "file" => duplicity_core::tar::EntryType::Regular,
+            "directory" => duplicity_core::tar::EntryType::Directory,
+            "symlink" => duplicity_core::tar::EntryType::Symlink,
+            other => panic!("unexpected oracle type {other}"),
+        };
+        assert_eq!(entry.entry_type(), expected_type, "entry kind");
+        assert_eq!(
+            entry.mode(),
+            u32::try_from(expected_entry["mode"].as_u64().unwrap()).unwrap(),
+            "entry mode"
+        );
+        if expected_type != duplicity_core::tar::EntryType::Symlink {
+            let mtime_ns = expected_entry["mtime_ns"].as_i64().unwrap();
+            assert_eq!(
+                entry.mtime(),
+                duplicity_core::tar::TarTime {
+                    seconds: mtime_ns.div_euclid(1_000_000_000),
+                    nanoseconds: u32::try_from(mtime_ns.rem_euclid(1_000_000_000)).unwrap(),
+                }
+            );
+        }
+        match expected_type {
+            duplicity_core::tar::EntryType::Regular => {
+                let content = entry.content().expect("oracle file content");
+                assert_eq!(
+                    content.len() as u64,
+                    expected_entry["size"].as_u64().unwrap()
+                );
+                assert_eq!(
+                    format!("{:x}", Sha256::digest(content)),
+                    expected_entry["sha256"].as_str().unwrap()
+                );
+            }
+            duplicity_core::tar::EntryType::Symlink => assert_eq!(
+                entry.linkname(),
+                decode_hex_bytes(expected_entry["symlink_target_hex"].as_str().unwrap())
+            ),
+            duplicity_core::tar::EntryType::Directory => {}
+            other => panic!("unsupported oracle entry type {other:?}"),
+        }
+    }
+}
+
 #[test]
 //= docs/parsing-requirements.md#parse-env-017
 //= type=test
@@ -1628,7 +1829,7 @@ fn crypto_reader_rejects_source_identity_change_and_inexact_manifest_bodies() {
         );
         match expected_kind {
             None => assert!(matches!(
-                result,
+                &result,
                 Err(ReaderError::Source(SourceError::Changed))
             )),
             Some(kind) => match result {
@@ -1639,6 +1840,286 @@ fn crypto_reader_rejects_source_identity_change_and_inexact_manifest_bodies() {
             },
         }
         assert_eq!(source.opens.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-019
+//= type=test
+//# A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
+fn signer_policy_rejects_integrity_valid_unsigned_symmetric_full_volume() {
+    let fixture_root =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7");
+    let provenance: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(fixture_root.join("unsigned-data-volume/provenance.json")).unwrap(),
+    )
+    .unwrap();
+    assert!(provenance["purpose"]
+        .as_str()
+        .unwrap()
+        .contains("not a single ordinary Duplicity output"));
+    let generator_hash = format!(
+        "{:x}",
+        Sha256::digest(
+            std::fs::read(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../tests/producer/compose_env019_unsigned_volume.py"),
+            )
+            .unwrap(),
+        )
+    );
+    assert_eq!(provenance["generator_sha256"], generator_hash);
+    assert_eq!(
+        provenance["logical_volume_tar_payload_sha256"]["authorized_signed_control"],
+        provenance["logical_volume_tar_payload_sha256"]["unsigned_symmetric_volume"]
+    );
+    assert_eq!(
+        provenance["logical_volume_tar_payload_sha256"]["authorized_signed_control"],
+        "0d749bef1ccd8a54a6dffa7a059a32b0a03ad55c6f5c44836dc6b9fbf6874bc9"
+    );
+
+    let oracle: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(fixture_root.join("expected.json")).unwrap())
+            .unwrap();
+    let expected_signed = &oracle["snapshots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["mode"] == "signed" && row["index"] == 0)
+        .expect("official signed one-volume source oracle")["entries"];
+    let expected_symmetric = &oracle["snapshots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["mode"] == "symmetric" && row["index"] == 0)
+        .expect("official symmetric one-volume source oracle")["entries"];
+    assert_eq!(expected_signed, expected_symmetric);
+    assert!(oracle["snapshots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["mode"] == "signed" && row["index"] == 0)
+        .unwrap()["official_comparison_exclusions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|value| value == "symlink_mtime_ns"));
+
+    let final_object_records = provenance["objects"].as_array().unwrap();
+    let input_object_records = provenance["input_objects"].as_array().unwrap();
+    let official_symmetric_volume = std::fs::read(
+        fixture_root
+            .join("symmetric")
+            .join("duplicity-full.20231114T221320Z.vol1.difftar.gpg"),
+    )
+    .unwrap();
+    let unsigned_volume = std::fs::read(
+        fixture_root
+            .join("unsigned-data-volume")
+            .join("duplicity-full.20231114T221320Z.vol1.difftar.gpg"),
+    )
+    .unwrap();
+    assert_eq!(
+        unsigned_volume, official_symmetric_volume,
+        "the negative volume is copied byte-for-byte from the official symmetric producer output"
+    );
+    let symmetric_input = input_object_records
+        .iter()
+        .find(|record| {
+            record["path"] == "symmetric/duplicity-full.20231114T221320Z.vol1.difftar.gpg"
+        })
+        .expect("symmetric producer input is recorded");
+    assert_eq!(
+        symmetric_input["sha256"].as_str().unwrap(),
+        format!("{:x}", Sha256::digest(&official_symmetric_volume))
+    );
+    for directory in ["signed", "unsigned-data-volume"] {
+        let source_dir = fixture_root.join(directory);
+        for object in std::fs::read_dir(source_dir).unwrap() {
+            let object = object.unwrap();
+            let filename = object.file_name().into_string().unwrap();
+            if filename == "provenance.json" {
+                continue;
+            }
+            let key = format!("backup/{filename}");
+            if directory == "signed" && !filename.starts_with("duplicity-full.20231114T221320Z.") {
+                continue;
+            }
+            let bytes = std::fs::read(object.path()).unwrap();
+            let (records, field, recorded_name) = if directory == "signed" {
+                (input_object_records, "path", format!("signed/{filename}"))
+            } else {
+                (final_object_records, "key", key)
+            };
+            let recorded = records
+                .iter()
+                .find(|record| record[field] == recorded_name)
+                .expect("every source object has checked-in final provenance");
+            assert_eq!(recorded["bytes"].as_u64().unwrap(), bytes.len() as u64);
+            assert_eq!(
+                recorded["sha256"].as_str().unwrap(),
+                format!("{:x}", Sha256::digest(&bytes)),
+                "final object provenance for {directory}/{filename}"
+            );
+        }
+    }
+
+    let keys_dir = fixture_root.join("test-keys");
+    let secret = std::fs::read(keys_dir.join("secret.asc")).unwrap();
+    let public = std::fs::read(keys_dir.join("public.asc")).unwrap();
+    let test_credentials: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(keys_dir.join("credentials.json")).unwrap()).unwrap();
+    assert_eq!(
+        test_credentials["purpose"], "public test fixtures only",
+        "only the checked-in synthetic test credentials are used"
+    );
+    let password = OpenPgpPassword::from(test_credentials["passphrase"].as_str().unwrap());
+    let message_passwords = std::slice::from_ref(&password);
+    let secret_exports = [SecretExport {
+        bytes: &secret,
+        password: Some(&password),
+    }];
+    let signer_exports = [public.as_slice()];
+    let fingerprint: [u8; 20] = decode_hex_bytes(test_credentials["fingerprint"].as_str().unwrap())
+        .try_into()
+        .expect("test credential fingerprint has 20 bytes");
+    let permitted_signers = [fingerprint];
+    let strict_context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords,
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &permitted_signers,
+            require_signature: true,
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    let integrity_context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords,
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &[],
+            require_signature: false,
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+    let manifest_key = "backup/duplicity-full.20231114T221320Z.manifest.gpg";
+    let volume_key = "backup/duplicity-full.20231114T221320Z.vol1.difftar.gpg";
+    let exact_open_log = vec![manifest_key.to_owned(), volume_key.to_owned()];
+
+    for (directory, signer_authorized) in [("signed", true), ("unsigned-data-volume", false)] {
+        let source = OrderedFixtureSource::one_volume(directory);
+        let catalog = Catalog::discover(
+            &source,
+            "backup/",
+            NameConfig::default(),
+            ReaderLimits::default(),
+            &Cancellation::default(),
+        )
+        .expect("one-volume metadata is discoverable");
+        assert_eq!(catalog.objects().len(), 2);
+        assert!(catalog
+            .objects()
+            .iter()
+            .all(|object| object.status() == DiscoveryStatus::Completed));
+        assert!(
+            source.opened_keys().is_empty(),
+            "discovery opens no objects"
+        );
+        let descriptors = catalog.manifests().collect::<Vec<_>>();
+        assert_eq!(descriptors.len(), 1);
+        let (anchor, _, descriptor) = descriptors[0];
+        assert_eq!(descriptor.kind(), duplicity_core::chain::SetKind::Full);
+        assert_eq!(descriptor.start(), Timestamp(1700000000));
+        assert_eq!(descriptor.end(), Timestamp(1700000000));
+
+        // Fixture-control read: the bytes reconstruct the same official source
+        // oracle with signer authorization disabled. This is not a policy pass.
+        let integrity_snapshot = catalog
+            .read_snapshot_with_crypto(
+                anchor,
+                Timestamp(1700000000),
+                &Cancellation::default(),
+                &integrity_context,
+            )
+            .unwrap_or_else(|error| panic!("{directory} integrity-only control: {error:?}"));
+        assert_snapshot_matches_one_volume_oracle(&integrity_snapshot, expected_signed);
+        assert!(integrity_snapshot
+            .authentication_evidence()
+            .objects()
+            .iter()
+            .all(|record| record.kind
+                == duplicity_core::reader::AuthenticationKind::OpenPgpIntegrity));
+        assert_eq!(source.opened_keys(), exact_open_log);
+        source.clear_open_log();
+
+        if signer_authorized {
+            let snapshot = catalog
+                .read_snapshot_with_crypto(
+                    anchor,
+                    Timestamp(1700000000),
+                    &Cancellation::default(),
+                    &strict_context,
+                )
+                .expect("official signed manifest and signed volume are authorized");
+            assert_snapshot_matches_one_volume_oracle(&snapshot, expected_signed);
+            let evidence = snapshot.authentication_evidence();
+            let records = evidence.objects();
+            assert_eq!(records.len(), 2);
+            assert_eq!(
+                records.iter().map(|r| r.key.as_str()).collect::<Vec<_>>(),
+                exact_open_log
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+            );
+            for (record, manifest) in records.iter().zip([true, false]) {
+                assert_eq!(
+                    record.kind,
+                    duplicity_core::reader::AuthenticationKind::OpenPgpAuthorized
+                );
+                assert_eq!(record.manifest, manifest);
+                assert_eq!(record.set_start, Timestamp(1700000000));
+                assert_eq!(record.set_end, Timestamp(1700000000));
+                assert_eq!(record.ordinal, if manifest { 0 } else { 1 });
+                assert_eq!(
+                    record
+                        .authorized_signer
+                        .as_ref()
+                        .unwrap()
+                        .primary_fingerprint,
+                    permitted_signers[0]
+                );
+            }
+            let policy = evidence.policy().expect("read policy evidence");
+            assert!(policy.authorization_configured);
+            assert!(policy.require_signature);
+            assert_eq!(policy.permitted_primary_fingerprints, permitted_signers);
+            assert_eq!(source.opened_keys(), exact_open_log);
+        } else {
+            let result = catalog.read_snapshot_with_crypto(
+                anchor,
+                Timestamp(1700000000),
+                &Cancellation::default(),
+                &strict_context,
+            );
+            assert!(
+                matches!(
+                    &result,
+                    Err(ReaderError::Assembly(
+                        duplicity_core::multipart::AssemblyError::Crypto(
+                            duplicity_core::reader::OpenPgpError::Unsigned
+                        )
+                    ))
+                ),
+                "unsigned data-volume read returned {:?}",
+                result.as_ref().err()
+            );
+            assert_eq!(source.opened_keys(), exact_open_log);
+        }
     }
 }
 

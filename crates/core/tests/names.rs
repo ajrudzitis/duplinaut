@@ -2468,12 +2468,18 @@ fn long_trailer_suffixes_classify_every_kind_and_reject_extra_fields() {
 #[test]
 fn every_official_archive_basename_is_classified() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+    let supplemental = root.join("duplicity-3.0.7/unsigned-data-volume");
     let mut pending = vec![root];
     let mut count = 0;
     while let Some(directory) = pending.pop() {
         for entry in std::fs::read_dir(directory).unwrap() {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_dir() {
+                // Supplemental adversarial fixtures are derived test inputs,
+                // not additional official producer artifact inventories.
+                if entry.path() == supplemental {
+                    continue;
+                }
                 pending.push(entry.path());
                 continue;
             }

@@ -1,0 +1,145 @@
+{
+  "purpose": "PARSE-ENV-019 adversarial reader fixture; not a single ordinary Duplicity output",
+  "official_producer": "Duplicity 3.0.7",
+  "official_producer_provenance": "../provenance.json",
+  "test_credentials_source": "../test-keys/credentials.json",
+  "generator": "tests/producer/compose_env019_unsigned_volume.py",
+  "generator_sha256": "b350aaeebe17ea6c0cba1e20758eaf85ec005c9e555961fb35f3f8890cdc3ad1",
+  "reference_command": [
+    "python3",
+    "tests/producer/compose_env019_unsigned_volume.py",
+    "--fixture-root",
+    "tests/fixtures/duplicity-3.0.7",
+    "--gpg",
+    "${PINNED_GPG}",
+    "--output",
+    "tests/fixtures/duplicity-3.0.7/unsigned-data-volume"
+  ],
+  "transformations": [
+    {
+      "input": "signed/duplicity-full.20231114T221320Z.manifest.gpg",
+      "operation": "decrypt and verify with checked-in fixture key; replace the single SHA1 volume digest; re-encrypt and re-sign to the same checked-in recipient/signer",
+      "original_manifest_plaintext_sha256": "0704ce735e58c96b96dc7dbbe0b1ae0deeaa4dabecbc5af726f0c4a83e100941",
+      "changed_manifest_plaintext_sha256": "4d41702c8644e71044313f88f2d29e5efd96cf6b8029b869bb525df5b60c6b33",
+      "changed_digest_field": {
+        "algorithm": "SHA1",
+        "from": "cba418c10054e984a6c19e0a8c9d495fcdcdf003",
+        "to": "e06a1e379c39bef071e435145c86b0b257ae893d"
+      }
+    },
+    {
+      "input": "symmetric/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "operation": "copy the official symmetric-encrypted volume unchanged; its decrypted logical tar is byte-identical to the signed control volume"
+    }
+  ],
+  "logical_volume_tar_payload_sha256": {
+    "authorized_signed_control": "0d749bef1ccd8a54a6dffa7a059a32b0a03ad55c6f5c44836dc6b9fbf6874bc9",
+    "unsigned_symmetric_volume": "0d749bef1ccd8a54a6dffa7a059a32b0a03ad55c6f5c44836dc6b9fbf6874bc9"
+  },
+  "objects": [
+    {
+      "key": "backup/duplicity-full.20231114T221320Z.manifest.gpg",
+      "bytes": 647,
+      "sha256": "3e757fbaa169ef3d4398eb1adb7ad473a4e343096b395635b481a7f76becaf20"
+    },
+    {
+      "key": "backup/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "bytes": 884,
+      "sha256": "357988a3f64ebc05cb724faa951347aa2610796b1dd3c70af508e92a6e0adf69"
+    }
+  ],
+  "input_objects": [
+    {
+      "path": "signed/duplicity-full.20231114T221320Z.manifest.gpg",
+      "bytes": 636,
+      "sha256": "e84520667dfa0864e48db0076f51ce9798e1f09eea9106fcea4350452c81da77"
+    },
+    {
+      "path": "signed/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "bytes": 1146,
+      "sha256": "4555cb02555ca3f5b6b15d27fd7345a01d639913926c704b68c71852ef274a2a"
+    },
+    {
+      "path": "symmetric/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "bytes": 884,
+      "sha256": "357988a3f64ebc05cb724faa951347aa2610796b1dd3c70af508e92a6e0adf69"
+    }
+  ],
+  "commands": [
+    [
+      "${GPG}",
+      "--batch",
+      "--import",
+      "${FIXTURE_ROOT}/test-keys/secret.asc"
+    ],
+    [
+      "${GPG}",
+      "--batch",
+      "--import",
+      "${FIXTURE_ROOT}/test-keys/public.asc"
+    ],
+    [
+      "${GPG}",
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "duplicity-reader-public-test-fixture",
+      "--output",
+      "${WORK}/signed-manifest.txt",
+      "--decrypt",
+      "${FIXTURE_ROOT}/signed/duplicity-full.20231114T221320Z.manifest.gpg"
+    ],
+    [
+      "${GPG}",
+      "--batch",
+      "--yes",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "duplicity-reader-public-test-fixture",
+      "--trust-model",
+      "always",
+      "--local-user",
+      "D06847BAC3B117C46BB68BDA6F23173BAD8A7656",
+      "--recipient",
+      "D06847BAC3B117C46BB68BDA6F23173BAD8A7656",
+      "--sign",
+      "--encrypt",
+      "--output",
+      "${OUTPUT}/duplicity-full.20231114T221320Z.manifest.gpg",
+      "${WORK}/mixed-manifest.txt"
+    ],
+    [
+      "${GPG}",
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "duplicity-reader-public-test-fixture",
+      "--output",
+      "${WORK}/signed-volume.tar",
+      "--decrypt",
+      "${FIXTURE_ROOT}/signed/duplicity-full.20231114T221320Z.vol1.difftar.gpg"
+    ],
+    [
+      "${GPG}",
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "duplicity-reader-public-test-fixture",
+      "--output",
+      "${WORK}/symmetric-volume.tar",
+      "--decrypt",
+      "${FIXTURE_ROOT}/symmetric/duplicity-full.20231114T221320Z.vol1.difftar.gpg"
+    ],
+    [
+      "${GPGCONF}",
+      "--homedir",
+      "${WORK}/gnupg",
+      "--kill",
+      "gpg-agent"
+    ]
+  ]
+}

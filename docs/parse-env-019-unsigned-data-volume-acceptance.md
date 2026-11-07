@@ -1,7 +1,9 @@
 # PARSE-ENV-019 unsigned encrypted data-volume acceptance
 
-Status: specification independently reviewed and accepted; fixture
-provenance, implementation, tests, and hosted verification remain pending.
+Status: implementation, fixture provenance, focused local checks, and
+independent implementation review pass. Full core tests and full local
+`cargo xtask ci` pass on `aarch64-macos` (Verus 2,047/3,183/1,371, zero
+errors). Hosted verification remains pending.
 
 ## Goal and scope
 
@@ -95,10 +97,11 @@ exactly the manifest followed by volume 1.
 
 With the unsigned-volume source and the same context, discovery MUST remain
 metadata-only. Reading the same Full anchor and target MUST return exactly
-`ReaderError::Crypto(CryptoError::Unsigned)` after the authorized manifest
-and unsigned required volume have been opened. The ordered open log MUST
-contain exactly those two keys, in manifest-then-volume order. The call MUST
-return no snapshot and no authentication-evidence receipt.
+`ReaderError::Assembly(AssemblyError::Crypto(CryptoError::Unsigned))` after
+the authorized manifest and unsigned required volume have been opened. The
+ordered open log MUST contain exactly those two keys, in manifest-then-volume
+order. The call MUST return no snapshot and no authentication-evidence
+receipt.
 
 The unsigned result MUST be reached only after source identity, exact stored
 size/EOF, the manifest-declared stored digest, SEIPDv1 integrity, and
@@ -122,6 +125,17 @@ manifest-to-volume composition, or whole-reader control flow is claimed. The
 existing `openpgp-reader-edge-tests` milestone remains a scoped test ledger,
 not proof completion of reader orchestration.
 
+The test MUST also be registered in a separate narrow gated assurance
+milestone named `openpgp-unsigned-volume-signer-policy` (or an independently
+reviewed equivalent) with `PARSE-ENV-019`, this exact test, and
+`crates/core/src/reader.rs::read_snapshot_inner` as its implementation. This
+milestone MUST set `proof_required = false` and MUST state that it enforces
+native Duvet/test attendance only; it makes no Verus claim about cryptographic
+primitives or whole-reader control flow. Keep the test's existing registration
+under `openpgp-reader-edge-tests` as well. After independent implementation
+review accepts the exact test and mapping, enable the narrow milestone gate so
+xtask enforces this Duvet/test coverage.
+
 ## Exclusions
 
 This acceptance does not prove cryptographic primitives or side-channel
@@ -135,23 +149,32 @@ Duplicity-produced profile.
 
 ## Acceptance evidence
 
-- [ ] Independent review accepts the fixture's signed-manifest/unsigned-volume
+- [x] Independent review accepts the fixture's signed-manifest/unsigned-volume
       provenance, and confirms the negative fixture's stored digest and MDC
       are valid before the intended signer failure.
-- [ ] Fixture provenance records equal decrypted logical-volume tar SHA-256
+- [x] Fixture provenance records equal decrypted logical-volume tar SHA-256
       values; integrity-only public-reader reads reconstruct both exact
       expected one-volume snapshots before the strict signer-policy tests.
-- [ ] The authorized positive control succeeds with exact two-record,
+- [x] The authorized positive control succeeds with exact two-record,
       per-record signer evidence and exact two-key open log.
-- [ ] Under the identical policy/context, the unsigned volume returns exact
-      `CryptoError::Unsigned`, with exact two-key open log, no snapshot, and
-      no returned evidence.
-- [ ] The focused test links only to PARSE-ENV-019 and is registered under
+- [x] Under the identical policy/context, the unsigned volume returns exact
+      `ReaderError::Assembly(AssemblyError::Crypto(CryptoError::Unsigned))`,
+      with exact two-key open log, no snapshot, and no returned evidence.
+- [x] The focused test links only to PARSE-ENV-019 and is registered under
       `openpgp-reader-edge-tests`.
-- [ ] Targeted Duvet PARSE-ENV-019 implementation/test queries, trace update,
+- [x] A gated narrow `PARSE-ENV-019` assurance entry also names
+      `read_snapshot_inner` and this exact test, sets `proof_required = false`,
+      and is enabled after independent implementation review.
+- [x] Targeted Duvet PARSE-ENV-019 implementation/test queries, trace update,
       and full trace pass.
-- [ ] Focused/full core tests, formatting, strict Clippy, and full
-      `cargo xtask ci` pass.
-- [ ] Independent implementation review accepts the source ordering, same
+- [x] Focused reader test, formatting, and strict Clippy pass.
+- [x] Full core tests and full `cargo xtask ci` pass. The isolated receipt
+      records source SHA-256
+      `0d556df683d74b312de34983ad479773181084fc530e2ac7ef57e755f8ab7cd7`.
+- [x] Independent implementation review accepts the source ordering, same
       policy inputs, typed outcome, and scope limits.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
+
+## Local implementation evidence
+
+- Full `nix-shell tools/shell.nix --run 'source tools/env.sh && cargo xtask ci'` passes with fresh isolated Verus (2,047/3,183/1,371, zero errors), full workspace tests, Duvet trace/gate queries, and gated test replay. Receipt: `target/assurance/ci.json` (source SHA-256 above; `aarch64-macos`).
