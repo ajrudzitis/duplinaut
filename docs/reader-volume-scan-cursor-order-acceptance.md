@@ -124,7 +124,7 @@ tested.
 - [x] Full core/workspace tests and `cargo xtask ci` pass.
 - [x] Independent implementation/proof review accepts the model-to-transition
       linkage and native adapter claims.
-- [ ] Hosted Linux assurance and Duvet Pages pass.
+- [x] Hosted Linux assurance and Duvet Pages pass in [run 42389031856](https://github.com/ajrudzitis/duplinaut/actions/runs/42389031856).
 
 ## Local implementation evidence
 
