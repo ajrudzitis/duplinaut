@@ -114,9 +114,12 @@ accepts the fixture provenance, reader result, and requirement mapping.
 
 This acceptance does not test revoked certificates, current-expiry rejection
 policy, online status or key retrieval, Web-of-Trust, multiple certificates,
-signing-subkey behavior or expiry, RSA, alternative hashes/ciphers, arbitrary
+signing-subkey behavior or expiry, alternative hashes/ciphers, arbitrary
 historical profiles, crypto primitives, side-channel behavior, filesystem
-publication, live S3, or complete reader/controller refinement.
+publication, live S3, or complete reader/controller refinement. The fixture
+uses the already-supported v4 RSA-2048 profile only for this expired-key
+observation; this acceptance makes no broader RSA compatibility or
+cryptographic claim.
 
 ## Verification and acceptance checklist
 
