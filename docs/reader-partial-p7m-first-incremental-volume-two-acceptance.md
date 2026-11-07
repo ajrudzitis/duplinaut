@@ -1,7 +1,8 @@
 # Official Plain Reader Partial PKCS#7 First-Incremental Volume 2 Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Implementation and independent implementation review passed.
+Focused/full core tests, Duvet queries/full trace, formatting, and strict Clippy
+passed locally. Full pinned CI and hosted Linux/Pages assurance are pending.
 
 ## Goal and scope
 
@@ -118,11 +119,23 @@ reader/controller refinement, or formal reader proof.
 
 - [x] Independent specification review accepts the combined profile, public
       status precedence, required-volume result, and open set.
-- [ ] Discovery retains the renamed object with both parsed facts and status
+- [x] Discovery retains the renamed object with both parsed facts and status
       `Partial`, while volume 1 remains completed.
-- [ ] The first-incremental read returns exact `MissingVolume { number: 2 }`,
+- [x] The first-incremental read returns exact `MissingVolume { number: 2 }`,
       no snapshot, and opens only the six listed objects.
-- [ ] Focused/full core tests, targeted Duvet queries/full trace, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused/full core tests, targeted Duvet queries/full trace, formatting,
+      strict Clippy, and diff checks pass locally.
+- [x] Independent implementation/test review passes.
+- [ ] Full pinned local `cargo xtask ci` passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
+
+## Current local evidence
+
+- Focused reader acceptance test passed (1/1).
+- `cargo test -p duplicity-core` passed.
+- Targeted Duvet queries for `PARSE-NAME-001`, `PARSE-NAME-005`, and
+  `PARSE-CHAIN-002`, `cargo xtask trace-update`, and `cargo xtask trace` passed.
+- `cargo fmt --all -- --check`, strict core Clippy, and `git diff --check`
+  passed.
+- Independent implementation review passed. Full pinned CI and hosted Linux
+  assurance/Pages remain pending.
