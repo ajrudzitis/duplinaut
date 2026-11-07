@@ -1,7 +1,11 @@
 # PARSE-ENV-013 expired historical signer acceptance
 
-Status: proposed; pending independent specification review. No fixture, test,
-assurance-gate, or implementation work is included in this specification yet.
+Status: implementation independently reviewed and accepted. Focused/full
+core/workspace tests, targeted Duvet queries/full trace, formatting, strict
+Clippy, and full local `cargo xtask ci` pass at exact-source receipt SHA-256
+`f97939d0ca0c7c95aeb415f19934018c5c4c7c9fa2859eca5351b856ba9c0d26`
+(Verus 2,047/3,183/1,371, zero errors). The narrow native-attendance gate is
+enabled. Hosted Linux/Pages checks remain pending.
 
 ## Goal and scope
 
@@ -123,24 +127,25 @@ cryptographic claim.
 
 ## Verification and acceptance checklist
 
-- [ ] Independent specification review accepts the clock/expiry oracle and
+- [x] Independent specification review accepts the clock/expiry oracle and
       fixture recipe.
-- [ ] Fixture provenance pins official tool versions, producer command,
+- [x] Fixture provenance pins official tool versions, producer command,
       source oracle, certificate creation time, expiry duration, absolute
       expiry, both signature times, and object hashes.
-- [ ] The test proves its execution time is after the fixture's key expiry,
+- [x] The test proves its execution time is after the fixture's key expiry,
       then reads both required signed objects successfully under one unchanged
       caller policy and matches the source oracle.
-- [ ] Exactly two authorized evidence records preserve the configured primary
+- [x] Exactly two authorized evidence records preserve the configured primary
       fingerprint; certificate metadata retains the exact expiry duration and
       creation observation without a validity/revocation decision.
-- [ ] Duvet links cover PARSE-ENV-012, PARSE-ENV-013, PARSE-ENV-019,
+- [x] Duvet links cover PARSE-ENV-012, PARSE-ENV-013, PARSE-ENV-019,
       PARSE-ENV-021, and PARSE-ENV-023; targeted queries and full trace pass.
-- [ ] The test is registered in the edge-test ledger and a narrow
-      `proof_required = false` gate; independent implementation review accepts
-      enabling the gate.
-- [ ] Focused/full core tests, formatting, strict Clippy, and full
-      `cargo xtask ci` pass with an exact-source receipt.
+- [x] The test is registered in the edge-test ledger and a narrow
+      `proof_required = false` milestone. Its gate currently remains disabled
+      pending independent implementation review.
+- [x] Independent implementation review accepts enabling the narrow gate.
+- [x] Focused/full core tests, formatting, strict Clippy, and full
+      `cargo xtask ci` pass with the exact-source receipt recorded above.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
 
 Acceptance covers this one historically signed Full snapshot only. It does

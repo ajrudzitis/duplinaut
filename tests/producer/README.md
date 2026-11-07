@@ -104,6 +104,38 @@ reproducing the checked-in artifacts. The signing subkey is deliberately
 separate from the primary authorization fingerprint and encryption subkey;
 this fixture covers only this one Ed25519 signing profile.
 
+### PARSE-ENV-013 expired historical signer fixture
+
+`generate_expired_signer.py` creates a v4 RSA-2048 primary signer with a finite
+one-year expiry and a separate RSA-2048 encryption subkey. A checked-in
+`gpg_fixed_clock.py` wrapper gives Duplicity's GnuPG calls the fixed November
+14, 2023 signing/restore time; the generator hashes the wrapper and records
+both object `VALIDSIG` records. It parses the public certificate packets to
+associate the key-expiry subpacket with a primary-issued primary self-signature,
+cross-checks the primary creation and absolute expiry, and fails unless the
+manifest and volume are signed by the primary before expiry. Official restore
+under that same historical clock must match the independent source oracle.
+The test checks that its own clock is later than the recorded expiry, but does
+not pass that time to the reader or infer current validity/revocation. The
+producer uses GnuPG's `trust-model=always` only to encrypt to its freshly made
+test recipient; the reader's authorization remains the exact caller-supplied
+primary fingerprint.
+
+Reproduce into a new output directory with the pinned producer tools:
+
+```sh
+nix-shell tools/shell.nix --run \
+  'python3 tests/producer/generate_expired_signer.py \
+    --duplicity /path/to/official/duplicity-3.0.7/bin/duplicity \
+    --gpg /path/to/pinned/gnupg/bin/gpg \
+    --expected-version 3.0.7 \
+    --output /tmp/duplicity-reader-expired-signer'
+```
+
+The output directory must not exist. The generated protected test secret is
+for this public fixture only. Runtime tests consume the checked-in artifacts
+and never invoke Duplicity, GnuPG, or key lookup.
+
 The checked-in 3.0.7 corpus was produced with:
 
 - Duplicity: `/nix/store/5j4mk0k17j37nh8a7s2pcr5z0vblx73r-duplicity-3.0.7/bin/duplicity`

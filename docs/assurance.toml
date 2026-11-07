@@ -1611,6 +1611,7 @@ tests = [
   { package = "duplicity-core", name = "multipart::openpgp_tests::authenticated_nonfinal_topoff_must_match_regenerated_ciphertext_prefix" },
   { package = "duplicity-core", name = "original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidence" },
   { package = "duplicity-core", name = "public_rsa2048_pkesk_full_snapshot_matches_official_oracle" },
+  { package = "duplicity-core", name = "public_expired_primary_signature_remains_authorized_offline" },
   { package = "duplicity-core", name = "public_signed_manifest_signer_rejection_precedes_volume_open" },
   { package = "duplicity-core", name = "public_ed25519_signing_subkey_full_snapshot_records_primary_and_component" }
 ]
@@ -1684,6 +1685,24 @@ implementations = [
 ]
 proofs = []
 tests = [{ package = "duplicity-core", name = "public_ed25519_signing_subkey_full_snapshot_records_primary_and_component" }]
+
+[[milestone]]
+id = "openpgp-expired-historical-signer"
+gate = true
+requirements = ["PARSE-ENV-012", "PARSE-ENV-013", "PARSE-ENV-019", "PARSE-ENV-021", "PARSE-ENV-023"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = false
+proof_rationale = "This narrow native milestone enforces Duvet/test attendance for one official expired-primary signed Full fixture and observed authorization metadata only. It makes no Verus claim about OpenPGP cryptography, current certificate validity, revocation policy, or complete reader control flow."
+implementations = [
+  { path = "crates/core/src/openpgp.rs", symbol = "decode" },
+  { path = "crates/core/src/reader.rs", symbol = "read_snapshot_with_crypto" }
+]
+proofs = []
+tests = [{ package = "duplicity-core", name = "public_expired_primary_signature_remains_authorized_offline" }]
 
 [[milestone]]
 id = "linux-restoration"

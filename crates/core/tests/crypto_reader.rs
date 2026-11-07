@@ -15,6 +15,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Mutex,
     },
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 struct OrderedFixtureSource {
@@ -862,6 +863,269 @@ fn public_rsa2048_pkesk_full_snapshot_matches_official_oracle() {
     assert!(!policy.authorization_configured);
     assert!(!policy.require_signature);
     assert!(policy.permitted_primary_fingerprints.is_empty());
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-012
+//= type=test
+//# Signer authorization MUST compare complete primary-certificate fingerprints supplied by the caller rather than short key IDs or unverified packet issuer hints.
+//= docs/parsing-requirements.md#parse-env-013
+//= type=test
+//# Historical signer verification MUST report its explicit offline fingerprint-authorization scope without claiming current certificate validity or Web-of-Trust validation.
+//= docs/parsing-requirements.md#parse-env-019
+//= type=test
+//# A snapshot read with signer authorization configured MUST require that authorization for every required manifest and data volume throughout the selected full/incremental chain, rejecting unsigned or plain/gzip required objects without policy downgrade.
+//= docs/parsing-requirements.md#parse-env-021
+//= type=test
+//# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+//= docs/parsing-requirements.md#parse-env-023
+//= type=test
+//# Snapshot authentication evidence MUST distinguish integrity-only objects from configured signer authorization and preserve available complete signer fingerprints and certificate creation/expiry/revocation observations without implying current validity or Web-of-Trust acceptance.
+fn public_expired_primary_signature_remains_authorized_offline() {
+    const MANIFEST: &str = "duplicity-full.20231114T221320Z.manifest.gpg";
+    const VOLUME: &str = "duplicity-full.20231114T221320Z.vol1.difftar.gpg";
+    const MANIFEST_KEY: &str = "backup/duplicity-full.20231114T221320Z.manifest.gpg";
+    const VOLUME_KEY: &str = "backup/duplicity-full.20231114T221320Z.vol1.difftar.gpg";
+    const OPEN_KEYS: [&str; 2] = [MANIFEST_KEY, VOLUME_KEY];
+
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/expired-signer");
+    let expected: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(fixture.join("expected.json")).expect("official source oracle"),
+    )
+    .expect("valid source oracle");
+    let provenance: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(fixture.join("provenance.json")).expect("fixture provenance"),
+    )
+    .expect("valid fixture provenance");
+    assert_eq!(provenance["producer"], "duplicity 3.0.7 December 31, 2025");
+    assert_eq!(provenance["gpg"], "gpg (GnuPG) 2.4.9");
+    assert_eq!(expected["target"], 1_700_000_000);
+    assert_eq!(expected["official_restore_verified"], true);
+    assert_eq!(
+        expected["official_comparison_exclusions"],
+        serde_json::json!(["symlink_mtime_ns"])
+    );
+    let recipe = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/producer/generate_expired_signer.py");
+    let clock_wrapper =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/producer/gpg_fixed_clock.py");
+    assert_eq!(
+        provenance["source_recipe_sha256"],
+        format!("{:x}", Sha256::digest(std::fs::read(recipe).unwrap()))
+    );
+    assert_eq!(
+        provenance["gpg_clock_wrapper_sha256"],
+        format!(
+            "{:x}",
+            Sha256::digest(std::fs::read(clock_wrapper).unwrap())
+        )
+    );
+
+    let signer = &provenance["primary_signer"];
+    let primary_fingerprint: [u8; 20] = decode_hex_bytes(signer["fingerprint"].as_str().unwrap())
+        .try_into()
+        .expect("v4 RSA primary fingerprint is 20 bytes");
+    assert_eq!(signer["algorithm_id"], 1);
+    assert_eq!(signer["bits"], 2048);
+    assert!(signer["capabilities"].as_str().unwrap().contains('s'));
+    assert_eq!(signer["signing_subkey"], false);
+    assert_eq!(signer["revocation_present"], false);
+    let created = signer["created_seconds"].as_u64().unwrap();
+    let expiry_duration = signer["key_expiry_duration_seconds"].as_u64().unwrap();
+    let expiry = signer["expires_at_seconds"].as_u64().unwrap();
+    assert!(expiry_duration > 0);
+    assert_eq!(expiry, created + expiry_duration);
+    let created_metadata = u32::try_from(created).expect("certificate time fits metadata");
+    let expiry_duration_metadata =
+        u32::try_from(expiry_duration).expect("expiry duration fits metadata");
+    assert_eq!(
+        signer["expiry_derivation"],
+        "primary key creation timestamp plus key-expiration subpacket from primary-issued primary self-signature"
+    );
+    let self_signature = &signer["self_signature_expiry_evidence"];
+    assert_eq!(self_signature["issuer_key_id"], signer["key_id"]);
+    assert_eq!(self_signature["issuer_fingerprint"], signer["fingerprint"]);
+    assert_eq!(self_signature["key_expiry_seconds"], expiry_duration);
+    assert_eq!(self_signature["signature_created_seconds"], created);
+    assert!(matches!(
+        self_signature["signature_class"].as_str(),
+        Some("0x10" | "0x11" | "0x12" | "0x13" | "0x1f")
+    ));
+    assert!(self_signature["packet_excerpt"]
+        .as_str()
+        .unwrap()
+        .contains("hashed subpkt 9 len 4"));
+    assert_eq!(
+        self_signature["revocation_signature_classes"],
+        serde_json::json!([])
+    );
+    assert_eq!(signer["check_sigs_exit_status"], 0);
+    assert!(signer["check_sigs_output"]
+        .as_str()
+        .unwrap()
+        .contains("sig!"));
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("test system clock is after Unix epoch")
+        .as_secs();
+    assert!(
+        now > expiry,
+        "expired-signer fixture precondition failed: test time {now} must be later than recorded primary-key expiry {expiry}"
+    );
+    let document_signatures = &provenance["document_signatures"];
+    for label in ["manifest", "volume"] {
+        let signature = &document_signatures[label];
+        assert_eq!(
+            signature["signing_component_fingerprint"],
+            signer["fingerprint"]
+        );
+        assert_eq!(signature["primary_fingerprint"], signer["fingerprint"]);
+        assert_eq!(signature["public_key_algorithm_id"], 1);
+        assert!(signature["signature_created_seconds"].as_u64().unwrap() < expiry);
+        assert_eq!(
+            signature["signature_created_seconds"],
+            provenance["gpg_clock"]["fixed_signature_time_seconds"]
+        );
+        assert!(signature["status_line"]
+            .as_str()
+            .unwrap()
+            .starts_with("[GNUPG:] VALIDSIG "));
+    }
+
+    let expected_objects = [(MANIFEST, MANIFEST_KEY), (VOLUME, VOLUME_KEY)];
+    assert_eq!(provenance["objects"].as_array().unwrap().len(), 2);
+    for (filename, key) in expected_objects {
+        let record = provenance["objects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|record| record["key"] == key)
+            .expect("provenance identifies exact stored object");
+        let bytes = std::fs::read(fixture.join(record["path"].as_str().unwrap())).unwrap();
+        assert_eq!(record["bytes"].as_u64(), Some(bytes.len() as u64));
+        assert_eq!(record["sha256"], format!("{:x}", Sha256::digest(&bytes)));
+        assert!(record["path"].as_str().unwrap().ends_with(filename));
+    }
+
+    let keys = fixture.join("test-keys");
+    let secret = std::fs::read(keys.join("secret.asc")).expect("protected test secret export");
+    let public = std::fs::read(keys.join("public.asc")).expect("test certificate export");
+    assert_eq!(
+        provenance["secret_export"]["sha256"],
+        format!("{:x}", Sha256::digest(&secret))
+    );
+    let credentials: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(keys.join("credentials.json")).unwrap())
+            .expect("public fixture credential record");
+    assert_eq!(credentials["fingerprint"], signer["fingerprint"]);
+    let passphrase = credentials["passphrase"].as_str().unwrap();
+    let password = OpenPgpPassword::from(passphrase);
+    let secret_exports = [SecretExport {
+        bytes: &secret,
+        password: Some(&password),
+    }];
+    let signer_exports = [public.as_slice()];
+    let permitted_signers = [primary_fingerprint];
+    let message_passwords: Vec<OpenPgpPassword> = Vec::new();
+    assert!(message_passwords.is_empty());
+    let context = CryptoReadContext {
+        credentials: CryptoCredentials {
+            message_passwords: &message_passwords,
+            secret_exports: &secret_exports,
+            signer_exports: &signer_exports,
+            permitted_signers: &permitted_signers,
+            require_signature: true,
+        },
+        crypto_limits: OpenPgpLimits::default(),
+        evidence_limits: EvidenceLimits::default(),
+    };
+
+    let source = OrderedFixtureSource::selected_one_volume(
+        "expired-signer/objects",
+        MANIFEST,
+        VOLUME,
+        "expired-signer-fixture-v1",
+    );
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .expect("historical signed Full metadata is discoverable");
+    assert_eq!(catalog.objects().len(), 2);
+    assert!(
+        source.opened_keys().is_empty(),
+        "discovery opens no objects"
+    );
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .expect("one Full descriptor")
+        .0;
+    let snapshot = catalog
+        .read_snapshot_with_crypto(
+            anchor,
+            Timestamp(1_700_000_000),
+            &Cancellation::default(),
+            &context,
+        )
+        .expect("offline authorized historical signatures remain readable after expiry");
+    assert_snapshot_matches_one_volume_oracle(&snapshot, &expected["entries"]);
+    assert_eq!(source.opened_keys(), OPEN_KEYS);
+
+    let evidence = snapshot.authentication_evidence();
+    let records = evidence.objects();
+    assert_eq!(records.len(), 2);
+    assert_eq!(
+        records
+            .iter()
+            .map(|record| record.key.as_str())
+            .collect::<Vec<_>>(),
+        OPEN_KEYS
+    );
+    for (record, key, manifest, ordinal) in [
+        (&records[0], MANIFEST_KEY, true, 0),
+        (&records[1], VOLUME_KEY, false, 1),
+    ] {
+        assert_eq!(record.key, key);
+        assert_eq!(
+            record.kind,
+            duplicity_core::reader::AuthenticationKind::OpenPgpAuthorized
+        );
+        assert_eq!(record.manifest, manifest);
+        assert_eq!(record.ordinal, ordinal);
+        let authorized = record
+            .authorized_signer
+            .as_ref()
+            .expect("authorized signer record");
+        assert_eq!(authorized.primary_fingerprint, primary_fingerprint);
+        assert_eq!(authorized.component_fingerprint, primary_fingerprint);
+    }
+    assert_eq!(evidence.certificates().len(), 1);
+    let certificate = &evidence.certificates()[0];
+    assert_eq!(certificate.primary_fingerprint, primary_fingerprint);
+    assert_eq!(certificate.created_seconds, created_metadata);
+    assert!(
+        certificate
+            .signatures
+            .iter()
+            .any(|signature| { signature.key_expiry_seconds == Some(expiry_duration_metadata) }),
+        "certificate evidence retains the observed primary-key expiry duration"
+    );
+    assert!(certificate
+        .signatures
+        .iter()
+        .all(|signature| !signature.revocation));
+    let evidence_debug = format!("{evidence:?}");
+    let snapshot_debug = format!("{:?}", snapshot.state());
+    assert!(!evidence_debug.contains(passphrase));
+    assert!(!snapshot_debug.contains(passphrase));
+    assert!(!evidence_debug.contains(std::str::from_utf8(&secret).unwrap()));
+    assert!(!snapshot_debug.contains(std::str::from_utf8(&secret).unwrap()));
 }
 
 #[test]
