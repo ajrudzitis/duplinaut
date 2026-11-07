@@ -1,0 +1,74 @@
+{
+  "producer": "duplicity 3.0.7 December 31, 2025",
+  "source_interval": {
+    "start": 1700000000,
+    "end": 1700000000
+  },
+  "target": 1700000000,
+  "entries": [
+    {
+      "path_hex": "",
+      "components_hex": [],
+      "kind": "directory",
+      "mode": 493,
+      "mtime_ns": 1699999900000000000
+    },
+    {
+      "path_hex": "656d7074792e747874",
+      "components_hex": [
+        "656d7074792e747874"
+      ],
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1699999900000000000,
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path_hex": "6c696e6b",
+      "components_hex": [
+        "6c696e6b"
+      ],
+      "kind": "symlink",
+      "mode": 493,
+      "mtime_ns": 1699999900000000000,
+      "symlink_target_hex": "706c61696e2e747874"
+    },
+    {
+      "path_hex": "6e6573746564",
+      "components_hex": [
+        "6e6573746564"
+      ],
+      "kind": "directory",
+      "mode": 493,
+      "mtime_ns": 1699999900000000000
+    },
+    {
+      "path_hex": "6e65737465642f7061796c6f61642e62696e",
+      "components_hex": [
+        "6e6573746564",
+        "7061796c6f61642e62696e"
+      ],
+      "kind": "file",
+      "mode": 416,
+      "mtime_ns": 1699999900000000000,
+      "size": 1024,
+      "sha256": "785b0751fc2c53dc14a4ce3d800e69ef9ce1009eb327ccf458afe09c242c26c9"
+    },
+    {
+      "path_hex": "706c61696e2e747874",
+      "components_hex": [
+        "706c61696e2e747874"
+      ],
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1699999900000000000,
+      "size": 19,
+      "sha256": "efbf0f2c7b90f554783b493540a665b9d3de7273a77fbb696b88af2d2510a812"
+    }
+  ],
+  "official_restore_verified": true,
+  "official_comparison_exclusions": [
+    "symlink_mtime_ns"
+  ]
+}

@@ -1,0 +1,274 @@
+{
+  "producer": "duplicity 3.0.7 December 31, 2025",
+  "gpg": "gpg (GnuPG) 2.4.9",
+  "source_recipe": "tests/producer/generate_rsa2048.py",
+  "source_recipe_sha256": "0ef8ab03a07b46addd9a6422ec2feeae030605ed9cfd3808a0749e78b1dd8fd9",
+  "oracle_helper": "tests/producer/generate.py",
+  "oracle_helper_sha256": "675b72926639c13abb6eb0c3a4a4733975cae49ce0d7e37990b32729ba606d5b",
+  "reference_command": [
+    "python3",
+    "tests/producer/generate_rsa2048.py",
+    "--duplicity",
+    "${DUPLICITY_3_0_7}",
+    "--gpg",
+    "${PINNED_GPG}",
+    "--expected-version",
+    "3.0.7",
+    "--output",
+    "tests/fixtures/duplicity-3.0.7/rsa2048"
+  ],
+  "commands": [
+    [
+      "/nix/store/jbfy8i1wsc8nyx8wvydvr3n177x03ky8-duplicity-3.0.7/bin/duplicity",
+      "--version"
+    ],
+    [
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--version"
+    ],
+    [
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "duplicity-reader-rsa2048-test-fixture",
+      "--faked-system-time",
+      "1699999000!",
+      "--quick-generate-key",
+      "Duplicity RSA2048 Reader Fixture <rsa2048@example.invalid>",
+      "rsa2048",
+      "sign",
+      "0"
+    ],
+    [
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--batch",
+      "--with-colons",
+      "--list-keys"
+    ],
+    [
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "duplicity-reader-rsa2048-test-fixture",
+      "--faked-system-time",
+      "1699999100!",
+      "--quick-add-key",
+      "D08555BD6566E18ADD1FB0AF9CB9955B820EB9C1",
+      "rsa2048",
+      "encrypt",
+      "0"
+    ],
+    [
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--batch",
+      "--with-colons",
+      "--list-keys",
+      "D08555BD6566E18ADD1FB0AF9CB9955B820EB9C1"
+    ],
+    [
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--armor",
+      "--export",
+      "D08555BD6566E18ADD1FB0AF9CB9955B820EB9C1"
+    ],
+    [
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "duplicity-reader-rsa2048-test-fixture",
+      "--armor",
+      "--export-secret-keys",
+      "D08555BD6566E18ADD1FB0AF9CB9955B820EB9C1"
+    ],
+    [
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--list-packets",
+      "${WORK}/test-keys/public.asc"
+    ],
+    [
+      "/nix/store/jbfy8i1wsc8nyx8wvydvr3n177x03ky8-duplicity-3.0.7/bin/duplicity",
+      "full",
+      "--archive-dir",
+      "${WORK}/producer-cache",
+      "--name",
+      "reader-fixture-rsa2048",
+      "--volsize",
+      "1",
+      "--gpg-binary",
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--gpg-options=--pinentry-mode=loopback",
+      "--encrypt-key",
+      "D08555BD6566E18ADD1FB0AF9CB9955B820EB9C1",
+      "--current-time",
+      "1700000000",
+      "${WORK}/rsa2048-source",
+      "file://${WORK}/producer-objects"
+    ],
+    [
+      "/nix/store/jbfy8i1wsc8nyx8wvydvr3n177x03ky8-duplicity-3.0.7/bin/duplicity",
+      "restore",
+      "--archive-dir",
+      "${WORK}/producer-cache",
+      "--gpg-binary",
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--gpg-options=--pinentry-mode=loopback",
+      "--time",
+      "1700000000",
+      "file://${WORK}/producer-objects",
+      "${WORK}/rsa2048-restore"
+    ],
+    [
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--homedir",
+      "${WORK}/gnupg",
+      "--list-packets",
+      "${WORK}/producer-objects/duplicity-full.20231114T221320Z.vol1.difftar.gpg"
+    ],
+    [
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "duplicity-reader-rsa2048-test-fixture",
+      "--status-fd=2",
+      "--output",
+      "${WORK}/decoded-volume.tar",
+      "--decrypt",
+      "${WORK}/producer-objects/duplicity-full.20231114T221320Z.vol1.difftar.gpg"
+    ],
+    [
+      "/nix/store/cgh6iwzz5jgx9z5whka4vgj210i6npc6-gnupg-2.4.9/bin/gpg",
+      "--list-packets",
+      "${WORK}/test-keys/secret.asc"
+    ]
+  ],
+  "timestamp": 1700000000,
+  "source_interval": {
+    "start": 1700000000,
+    "end": 1700000000
+  },
+  "recipient": {
+    "fingerprint": "D08555BD6566E18ADD1FB0AF9CB9955B820EB9C1",
+    "public_key_packet_components": [
+      {
+        "version": 4,
+        "algorithm_id": 1,
+        "bits": 2048
+      },
+      {
+        "version": 4,
+        "algorithm_id": 1,
+        "bits": 2048
+      }
+    ],
+    "primary_component": {
+      "component": "primary",
+      "bits": 2048,
+      "algorithm_id": 1,
+      "key_id": "9CB9955B820EB9C1",
+      "capabilities": "scESC",
+      "fingerprint": "D08555BD6566E18ADD1FB0AF9CB9955B820EB9C1"
+    },
+    "components": [
+      {
+        "component": "primary",
+        "bits": 2048,
+        "algorithm_id": 1,
+        "key_id": "9CB9955B820EB9C1",
+        "capabilities": "scESC",
+        "fingerprint": "D08555BD6566E18ADD1FB0AF9CB9955B820EB9C1"
+      },
+      {
+        "component": "subkey",
+        "bits": 2048,
+        "algorithm_id": 1,
+        "key_id": "AB8C2E1915EFE9DF",
+        "capabilities": "e",
+        "fingerprint": "ECDB0475B2E1097C3B843259AB8C2E1915EFE9DF"
+      }
+    ],
+    "pkesk": {
+      "version": 3,
+      "algorithm_id": 1,
+      "recipient_key_id": "AB8C2E1915EFE9DF",
+      "recipient_component": {
+        "component": "subkey",
+        "bits": 2048,
+        "algorithm_id": 1,
+        "key_id": "AB8C2E1915EFE9DF",
+        "capabilities": "e",
+        "fingerprint": "ECDB0475B2E1097C3B843259AB8C2E1915EFE9DF"
+      }
+    }
+  },
+  "payload_cipher": {
+    "name": "AES-256",
+    "algorithm_id": 9,
+    "gpg_decryption_status": "[GNUPG:] DECRYPTION_INFO 2 9 0"
+  },
+  "source_identity_policy": {
+    "version_id": "rsa2048-fixture-v1",
+    "etag": "lowercase SHA-256 hex of each exact stored object body",
+    "scope": "OrderedFixtureSource test adapter only; not a provider ETag claim"
+  },
+  "secret_export": {
+    "path": "test-keys/secret.asc",
+    "bytes": 3669,
+    "sha256": "e7f00d0e9da88018745c4dab1ea47157f0df2c61c322448a753274c6e82b570d",
+    "protected": true,
+    "protection_usage": 254,
+    "protection_profile": {
+      "s2k": "iterated-and-salted",
+      "s2k_type": 3,
+      "cipher": "AES-128",
+      "cipher_algorithm_id": 7,
+      "integrity": "SHA1",
+      "hash_algorithm_id": 2
+    },
+    "protection_packet_lines": [
+      ":secret key packet:",
+      "iter+salt S2K, algo: 7, SHA1 protection, hash: 2, salt: 28E4459122718553",
+      "protect count: 65011712 (255)",
+      "protect IV:  88 fd 35 ba e4 09 5f af 5d bd 65 5b 01 c0 39 43",
+      "skey[2]: [v4 protected]",
+      ":secret sub key packet:",
+      "iter+salt S2K, algo: 7, SHA1 protection, hash: 2, salt: 1962E518AF29C8FE",
+      "protect count: 65011712 (255)",
+      "protect IV:  76 5e a7 42 97 5c cf f1 75 bb b5 37 68 f5 f9 bb",
+      "skey[2]: [v4 protected]"
+    ],
+    "credentials_path": "test-keys/credentials.json",
+    "s2k_profile_supported_by_parse_env_009": true
+  },
+  "objects": [
+    {
+      "key": "backup/duplicity-full.20231114T221320Z.manifest.gpg",
+      "path": "objects/duplicity-full.20231114T221320Z.manifest.gpg",
+      "bytes": 535,
+      "sha256": "9b809b3b14b891a840ce4ef6519fb9817995480088da3435ac83a426af6719bb"
+    },
+    {
+      "key": "backup/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "path": "objects/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "bytes": 906,
+      "sha256": "fa5d05cf6a53b573272549f3f37a9e795bebdbcbefdd386b860c05f717c16967"
+    }
+  ],
+  "snapshot_oracle": {
+    "path": "expected.json",
+    "entries": 6,
+    "official_comparison_exclusions": [
+      "symlink_mtime_ns"
+    ]
+  },
+  "producer_extras_omitted_from_test_source": [
+    "duplicity-full-signatures.20231114T221320Z.sigtar.gpg"
+  ]
+}

@@ -690,6 +690,9 @@ impl<'a> Catalog<'a> {
     }
     /// Reconstruct a full selected chain using borrowed OpenPGP credentials and
     /// return bounded per-object authentication observations with the snapshot.
+    //= docs/parsing-requirements.md#parse-env-008
+    //= type=implementation
+    //# The adapter MUST restrict decryption and verification algorithms to the enumerated initial capability profile.
     pub fn read_snapshot_with_crypto(
         &self,
         full_anchor: usize,

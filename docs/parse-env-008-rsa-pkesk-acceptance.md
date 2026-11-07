@@ -1,7 +1,13 @@
 # PARSE-ENV-008 RSA recipient compatibility acceptance
 
-Status: specification independently reviewed and accepted; fixture, test,
-assurance-gate, and implementation work remain pending.
+Status: specification independently reviewed and accepted; the pinned fixture,
+public-reader test, and Duvet links are implemented and independently reviewed.
+The narrow native-attendance gate is enabled. The focused test, targeted
+queries, full Duvet trace, formatting, and strict Clippy pass. Full local CI
+pass locally at exact-source receipt SHA-256
+`69b862b4775eb420880da2ec6a8d332b51936f809f550d84d715e08c7a77008e`
+(Verus 2,047/3,183/1,371, zero errors). Hosted Linux/Pages checks remain
+pending.
 
 ## Goal and scope
 
@@ -35,13 +41,19 @@ cryptographic primitives, or complete reader control flow.
    behavior.
 2. The producer MUST emit a single Full backup with exactly one required data
    volume. The package MUST contain the Full manifest and that volume only;
-   each object's parsed identity, envelope, stored digest, and source identity
-   MUST match the producer inventory. The test MUST assert the exact ordered
-   two-key source-open log: Full manifest followed by Full volume 1.
+   provenance MUST define the synthetic `ObjectSource` identity policy
+   explicitly: each object has version ID `rsa2048-fixture-v1` and an ETag
+   equal to the lowercase hexadecimal SHA-256 of its exact stored bytes. The
+   test MUST assert exact catalog object keys, parsed kind/interval/ordinal,
+   envelope, stored size, version ID, and ETag-to-SHA-256 correspondence for
+   both objects. The read MUST use those same catalog identities. The test MUST
+   assert the exact ordered two-key source-open log: Full manifest followed by
+   Full volume 1.
 3. Independent fixture inspection MUST establish that the recipient is a v4
    RSA key with a 2048-bit modulus, the selected wrapper is PKESKv3 using RSA,
-   and the payload uses one cipher named in PARSE-ENV-008 (record the actual
-   cipher in provenance). The PKESK recipient key ID MUST be recorded and
+   and the payload uses AES-256 (OpenPGP symmetric algorithm ID 9). Record that
+   exact algorithm ID in provenance; this acceptance covers only this one
+   cipher from PARSE-ENV-008. The PKESK recipient key ID MUST be recorded and
    resolved to the matching fingerprint of the exported RSA-2048
    encryption-capable primary key or subkey; provenance MUST identify which
    component it is and record its OpenPGP public-key algorithm ID. This
@@ -126,20 +138,21 @@ formal proof.
 ## Verification and acceptance checklist
 
 - [x] Independent specification review approves scope and the fixture recipe.
-- [ ] Official producer provenance and independent RSA/Payload-cipher
+- [x] Official producer provenance and independent RSA/payload-cipher
       inspection are checked in; fixture bytes and exact two-object inventory
       are pinned by hashes.
-- [ ] The focused public-reader test passes the exact discovery, open-log,
+- [x] The focused public-reader test passes the exact discovery, open-log,
       snapshot-oracle, authentication-evidence, and credential-isolation
       assertions above.
-- [ ] Duvet links cover PARSE-ENV-008 and the scoped PARSE-STATE-003 order
+- [x] Duvet links cover PARSE-ENV-008 and the scoped PARSE-STATE-003 order
       assertion; targeted requirement queries and full trace pass.
-- [ ] The test is registered in the existing edge ledger and the narrow
-      `proof_required = false` assurance milestone; the gate is enabled only
-      after independent implementation review.
-- [ ] Formatting, strict Clippy, focused core test, full core/workspace tests,
-      and full `cargo xtask ci` pass locally with the recorded source digest.
-- [ ] Independent implementation review accepts the fixture provenance,
+- [x] The test is registered in the existing edge ledger and the narrow
+      `proof_required = false` assurance milestone; its gate is enabled after
+      independent implementation review.
+- [x] Formatting, strict Clippy, and the focused core test pass.
+- [x] Full core/workspace tests and full `cargo xtask ci` pass locally at the
+      exact-source receipt recorded above.
+- [x] Independent implementation review accepts the fixture provenance,
       oracle, exact public API path, credentials, evidence, and scope limits.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
 

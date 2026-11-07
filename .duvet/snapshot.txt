@@ -81,7 +81,7 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST]: The native reader MUST accept only SEIPDv1 authenticated encrypted-data containers within its initial OpenPGP profile.
 
   SECTION: [PARSE-ENV-008](#parse-env-008)
-    TEXT[!MUST]: The adapter MUST restrict decryption and verification algorithms to the enumerated initial capability profile.
+    TEXT[!MUST,implementation,test]: The adapter MUST restrict decryption and verification algorithms to the enumerated initial capability profile.
 
   SECTION: [PARSE-ENV-009](#parse-env-009)
     TEXT[!MUST,implementation,test]: The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.

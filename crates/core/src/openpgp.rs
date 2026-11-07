@@ -891,6 +891,9 @@ fn content(bytes: &[u8], depth: usize, work: &mut Work) -> Result<Content, Crypt
 //= docs/parsing-requirements.md#parse-env-009
 //= type=implementation
 //# The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
+//= docs/parsing-requirements.md#parse-env-008
+//= type=implementation
+//# The adapter MUST restrict decryption and verification algorithms to the enumerated initial capability profile.
 //= docs/parsing-requirements.md#parse-env-016
 //= type=implementation
 //# The adapter MUST enforce configured key, session-key packet, signature, nesting, and S2K-work limits before the corresponding unbounded work or allocation.

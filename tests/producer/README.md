@@ -45,6 +45,33 @@ The output directory must not exist. GnuPG uses a private temporary home under
 `/tmp`; the credential is the public synthetic test passphrase from
 `test-keys/credentials.json`.
 
+### PARSE-ENV-008 RSA-2048 PKESK fixture
+
+`generate_rsa2048.py` creates a fresh isolated GnuPG home, makes a v4
+RSA-2048 primary key and encryption-capable RSA-2048 subkey, and runs official
+Duplicity 3.0.7 for one encrypted Full backup. It verifies the official restore
+against a deterministic source oracle before packaging exactly the Full
+manifest and volume 1. The fixture also contains the protected synthetic
+secret-key export and its explicitly public test passphrase. Provenance records
+the RSA component fingerprints/key IDs, PKESKv3 recipient, payload cipher,
+usage-254 AES-128/SHA1 S2K profile, exact object hashes, source oracle and
+normalized commands. The fixture test does not invoke either producer or GPG.
+
+Reproduce with the pinned producer tools and a new output directory:
+
+```sh
+nix-shell tools/shell.nix --run \
+  'python3 tests/producer/generate_rsa2048.py \
+    --duplicity /path/to/official/duplicity-3.0.7/bin/duplicity \
+    --gpg /path/to/pinned/gnupg/bin/gpg \
+    --expected-version 3.0.7 \
+    --output /tmp/duplicity-reader-rsa2048'
+```
+
+GnuPG uses a private temporary home; its local agent socket must be available.
+The checked-in `provenance.json` records the exact tool store paths and command
+arguments for the produced fixture.
+
 The checked-in 3.0.7 corpus was produced with:
 
 - Duplicity: `/nix/store/5j4mk0k17j37nh8a7s2pcr5z0vblx73r-duplicity-3.0.7/bin/duplicity`

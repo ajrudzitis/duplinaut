@@ -1609,7 +1609,8 @@ tests = [
   { package = "duplicity-core", name = "signer_policy_rejects_integrity_valid_unsigned_symmetric_full_volume" },
   { package = "duplicity-core", name = "crypto_decoded_and_each_receipt_bound_fail_through_catalog_reader" },
   { package = "duplicity-core", name = "multipart::openpgp_tests::authenticated_nonfinal_topoff_must_match_regenerated_ciphertext_prefix" },
-  { package = "duplicity-core", name = "original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidence" }
+  { package = "duplicity-core", name = "original_encrypted_chains_reconstruct_each_official_date_with_bounded_evidence" },
+  { package = "duplicity-core", name = "public_rsa2048_pkesk_full_snapshot_matches_official_oracle" }
 ]
 
 [[milestone]]
@@ -1626,6 +1627,25 @@ proof_rationale = "This gated milestone enforces native Duvet implementation/tes
 implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" }]
 proofs = []
 tests = [{ package = "duplicity-core", name = "signer_policy_rejects_integrity_valid_unsigned_symmetric_full_volume" }]
+
+[[milestone]]
+id = "openpgp-rsa-pkesk-compatibility"
+gate = true
+requirements = ["PARSE-ENV-008", "PARSE-STATE-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = false
+proof_rationale = "This milestone enforces native Duvet implementation/test attendance for one official RSA-2048 Full-volume fixture and observed snapshot order only. It makes no Verus claim about RSA, cryptographic primitives, or complete reader control flow."
+implementations = [
+  { path = "crates/core/src/openpgp.rs", symbol = "decode" },
+  { path = "crates/core/src/reader.rs", symbol = "read_snapshot_with_crypto" },
+  { path = "crates/core/src/path.rs", symbol = "cmp" }
+]
+proofs = []
+tests = [{ package = "duplicity-core", name = "public_rsa2048_pkesk_full_snapshot_matches_official_oracle" }]
 
 [[milestone]]
 id = "linux-restoration"
