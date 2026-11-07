@@ -1,8 +1,8 @@
 # Public object-check budget boundary acceptance
 
 Status: implementation, focused/full core tests, trace, formatting, strict
-Clippy, independent implementation review, and full local `cargo xtask ci`
-pass. Hosted verification is pending.
+Clippy, independent implementation review, full local `cargo xtask ci`, and
+hosted Linux assurance/Duvet Pages pass in [run 42391489596](https://github.com/ajrudzitis/duplinaut/actions/runs/42391489596).
 
 ## Goal and scope
 
@@ -110,8 +110,7 @@ refinement.
 - [x] Independent implementation review confirms the exact 36/35 boundary,
       typed preflight error, and open prefixes; the `Limit` at 35 occurs after
       the Full manifest is read but before any volume is opened.
-- [ ] Hosted Linux assurance and Duvet Pages pass for the implementation
-      commit.
+- [x] Hosted Linux assurance and Duvet Pages pass in [run 42391489596](https://github.com/ajrudzitis/duplinaut/actions/runs/42391489596).
 
 ## Local implementation evidence
 
