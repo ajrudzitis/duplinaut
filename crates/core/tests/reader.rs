@@ -1357,6 +1357,177 @@ fn official_partial_final_incremental_volume_preserves_prior_snapshot_and_report
 //= docs/parsing-requirements.md#parse-name-001
 //= type=test
 //# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
+//= docs/parsing-requirements.md#parse-name-005
+//= type=test
+//# Objects marked partial MUST be excluded from completed restore sets.
+//= docs/parsing-requirements.md#parse-chain-002
+//= type=test
+//# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
+#[test]
+fn official_partial_first_incremental_volume_two_is_visible_but_cannot_satisfy_volume_two() {
+    const ORIGINAL: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol2.difftar.gz";
+    const PARTIAL: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol2.difftar.part.gz";
+    const VOLUME_ONE: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz";
+
+    let mut source = Source::official();
+    assert_eq!(source.objects.len(), 12);
+    let original_inventory = source.objects.clone();
+    let mut expected_keys = original_inventory
+        .iter()
+        .map(|(object, _)| object.key.clone())
+        .collect::<Vec<_>>();
+    expected_keys.sort();
+    let (original_volume_two, original_volume_two_bytes) = source
+        .objects
+        .iter()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .map(|(object, bytes)| (object.clone(), bytes.clone()))
+        .expect("official fixture contains first-incremental volume 2");
+    let (renamed_volume_two, renamed_volume_two_bytes) = source
+        .objects
+        .iter_mut()
+        .find(|(object, _)| object.key == ORIGINAL)
+        .expect("official fixture contains first-incremental volume 2");
+    renamed_volume_two.key = PARTIAL.into();
+    assert_eq!(renamed_volume_two_bytes, &original_volume_two_bytes);
+    assert_eq!(renamed_volume_two.size, original_volume_two.size);
+    assert_eq!(renamed_volume_two.identity, original_volume_two.identity);
+
+    let old_key = expected_keys
+        .iter_mut()
+        .find(|key| key.as_str() == ORIGINAL)
+        .expect("original inventory contains first-incremental volume 2");
+    *old_key = PARTIAL.into();
+    expected_keys.sort();
+    let mut actual_keys = source
+        .objects
+        .iter()
+        .map(|(object, _)| object.key.clone())
+        .collect::<Vec<_>>();
+    actual_keys.sort();
+    assert_eq!(actual_keys, expected_keys);
+    assert_eq!(source.objects.len(), 12);
+    for (original_object, original_bytes) in &original_inventory {
+        let expected_key = if original_object.key == ORIGINAL {
+            PARTIAL
+        } else {
+            original_object.key.as_str()
+        };
+        let (actual_object, actual_bytes) = source
+            .objects
+            .iter()
+            .find(|(object, _)| object.key == expected_key)
+            .expect("each original object remains under its expected key");
+        let mut expected_object = original_object.clone();
+        expected_object.key = expected_key.into();
+        assert_eq!(actual_object, &expected_object);
+        assert_eq!(actual_bytes, original_bytes);
+    }
+
+    let catalog = discover(&source);
+    let partial_entry = catalog
+        .objects()
+        .iter()
+        .find(|entry| entry.object().key == PARTIAL)
+        .expect("renamed partial volume remains visible in discovery");
+    let partial_name = partial_entry.name().expect("partial key is parsed");
+    assert_eq!(
+        partial_name.kind,
+        duplicity_core::names::ObjectKind::IncrementalVolume
+    );
+    assert_eq!(
+        (partial_name.start.0, partial_name.end.0),
+        (1700000000, 1700086400)
+    );
+    assert_eq!(partial_name.volume, Some(2));
+    assert_eq!(partial_name.envelope, duplicity_core::names::Envelope::Gzip);
+    assert!(partial_name.partial);
+    assert_eq!(partial_entry.status(), DiscoveryStatus::Partial);
+
+    let completed_volume_one = catalog
+        .objects()
+        .iter()
+        .find(|entry| entry.object().key == VOLUME_ONE)
+        .expect("completed first-incremental volume 1 remains visible");
+    let volume_one_name = completed_volume_one.name().expect("volume 1 key is parsed");
+    assert_eq!(
+        volume_one_name.kind,
+        duplicity_core::names::ObjectKind::IncrementalVolume
+    );
+    assert_eq!(
+        (volume_one_name.start.0, volume_one_name.end.0),
+        (1700000000, 1700086400)
+    );
+    assert_eq!(volume_one_name.volume, Some(1));
+    assert_eq!(
+        volume_one_name.envelope,
+        duplicity_core::names::Envelope::Gzip
+    );
+    assert!(!volume_one_name.partial);
+    assert_eq!(completed_volume_one.status(), DiscoveryStatus::Completed);
+
+    let descriptors = catalog.manifests().collect::<Vec<_>>();
+    assert_eq!(descriptors.len(), 3);
+    let mut descriptor_keys = descriptors
+        .iter()
+        .map(|(_, _, descriptor)| {
+            (
+                match descriptor.kind() {
+                    SetKind::Full => 0,
+                    SetKind::Incremental => 1,
+                },
+                descriptor.start().0,
+                descriptor.end().0,
+            )
+        })
+        .collect::<Vec<_>>();
+    descriptor_keys.sort_unstable();
+    assert_eq!(
+        descriptor_keys,
+        vec![
+            (0, 1700000000, 1700000000),
+            (1, 1700000000, 1700086400),
+            (1, 1700086400, 1700172800),
+        ]
+    );
+    let (full_index, _, descriptor) = descriptors
+        .iter()
+        .find(|(_, _, descriptor)| descriptor.kind() == SetKind::Full)
+        .expect("completed full manifest remains a public anchor");
+    assert_eq!(
+        (descriptor.start().0, descriptor.end().0),
+        (1700000000, 1700000000)
+    );
+
+    source.opened_keys.lock().unwrap().clear();
+    assert!(matches!(
+        catalog.read_snapshot(*full_index, Timestamp(1700086400), &Cancellation::default()),
+        Err(ReaderError::MissingVolume { number: 2 })
+    ));
+    let mut expected_opened_keys = vec![
+        "backup/duplicity-full.20231114T221320Z.manifest",
+        "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+        "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz",
+        "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz",
+    ];
+    expected_opened_keys.sort_unstable();
+    let mut opened_keys = source.opened_keys.lock().unwrap().clone();
+    opened_keys.sort_unstable();
+    assert_eq!(opened_keys.len(), 6);
+    assert_eq!(opened_keys, expected_opened_keys);
+    assert!(!opened_keys
+        .iter()
+        .any(|key| key == ORIGINAL || key == PARTIAL));
+}
+
+//= docs/parsing-requirements.md#parse-name-001
+//= type=test
+//# The reader MUST classify supported names into the six object kinds in the object-name grammar with their backup dates, volume number where applicable, envelope, and partial status.
 //= docs/parsing-requirements.md#parse-chain-002
 //= type=test
 //# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.
