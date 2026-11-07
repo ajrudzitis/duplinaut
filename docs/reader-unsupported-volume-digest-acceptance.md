@@ -1,7 +1,9 @@
 # Official Plain Reader Unsupported-Volume-Digest Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Specification and implementation independently reviewed. Focused
+verification, full core tests, Duvet trace, formatting, and strict Clippy pass.
+Full local `cargo xtask ci` passes. Hosted Linux assurance and Duvet Pages
+publication remain pending.
 
 ## Goal and scope
 
@@ -92,13 +94,13 @@ restoration, or complete reader/controller refinement.
 - [x] Independent specification review accepts the exact same-length manifest
       mutation, unsupported-digest preconditions, typed error, and five-key open
       set.
-- [ ] Focused test proves only the first Volume 1 algorithm token changes to
+- [x] Focused test proves only the first Volume 1 algorithm token changes to
       `SHA2`; payload bytes and all other fixture objects remain unchanged.
-- [ ] Discovery opens no source objects; final read fails on the first
+- [x] Discovery opens no source objects; final read fails on the first
       incremental manifest with exact `Manifest(UnsupportedIntegrity)` and no
       snapshot or volume reads from that set.
-- [ ] The five-key source-open set is exact; no later incremental objects open.
-- [ ] Duvet `PARSE-ENV-006`, focused/full core tests, formatting, strict Clippy,
-      and local `cargo xtask ci` pass.
-- [ ] Independent implementation review and hosted Linux assurance plus Duvet
-      Pages publication pass.
+- [x] The five-key source-open set is exact; no later incremental objects open.
+- [x] Duvet `PARSE-ENV-006` query and full trace, focused/full core tests,
+      formatting, strict Clippy, and independent implementation review pass.
+- [x] Full local `cargo xtask ci` passes.
+- [ ] Hosted Linux assurance and Duvet Pages publication pass.

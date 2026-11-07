@@ -5223,3 +5223,152 @@ fn official_incremental_volume_stored_digest_mismatch_returns_no_snapshot() {
     assert_eq!(opened_keys, expected_opened_keys);
     assert_eq!(source.opens.load(Ordering::SeqCst), 6);
 }
+
+//= docs/parsing-requirements.md#parse-env-006
+//= type=test
+//# An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
+#[test]
+fn official_incremental_unsupported_digest_fails_before_volume_open() {
+    const FIRST_INCREMENTAL_MANIFEST: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest";
+    const FULL_MANIFEST: &str = "backup/duplicity-full.20231114T221320Z.manifest";
+    const FULL_VOL1: &str = "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz";
+    const FULL_VOL2: &str = "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz";
+    const FULL_VOL3: &str = "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz";
+
+    let mut source = Source::official();
+    assert_eq!(source.objects.len(), 12);
+    let original_inventory = source.objects.clone();
+    let (manifest_object, manifest_bytes) = source
+        .objects
+        .iter_mut()
+        .find(|(object, _)| object.key == FIRST_INCREMENTAL_MANIFEST)
+        .expect("the official fixture includes its first incremental manifest");
+    let original_size = manifest_object.size;
+    let volume_one_header = manifest_bytes
+        .windows(b"Volume 1:".len())
+        .position(|window| window == b"Volume 1:")
+        .expect("the official manifest starts its Volume 1 section");
+    let algorithm_relative = manifest_bytes[volume_one_header + b"Volume 1:".len()..]
+        .windows(b"Hash SHA1 ".len())
+        .position(|window| window == b"Hash SHA1 ")
+        .expect("Volume 1 declares its SHA1 digest")
+        + volume_one_header
+        + b"Volume 1:".len();
+    let algorithm_start = algorithm_relative + b"Hash ".len();
+    assert_eq!(
+        &manifest_bytes[algorithm_start..algorithm_start + 4],
+        b"SHA1"
+    );
+    manifest_bytes[algorithm_start..algorithm_start + 4].copy_from_slice(b"SHA2");
+    assert_eq!(manifest_object.size, original_size);
+    let updated_etag = format!("{:x}", sha2::Sha256::digest(manifest_bytes.as_slice()));
+    manifest_object.identity = ObjectIdentity {
+        version_id: Some("unsupported-volume-digest-v1".into()),
+        etag: Some(updated_etag.clone()),
+    };
+
+    assert_eq!(source.objects.len(), original_inventory.len());
+    for (index, (original_object, original_bytes)) in original_inventory.iter().enumerate() {
+        let (object, bytes) = &source.objects[index];
+        if original_object.key == FIRST_INCREMENTAL_MANIFEST {
+            assert_eq!(object.key, original_object.key);
+            assert_eq!(object.size, original_object.size);
+            assert_eq!(bytes.len(), original_bytes.len());
+            assert_eq!(&bytes[algorithm_start..algorithm_start + 4], b"SHA2");
+            assert_eq!(
+                object.identity.version_id.as_deref(),
+                Some("unsupported-volume-digest-v1")
+            );
+            assert_eq!(object.identity.etag.as_deref(), Some(updated_etag.as_str()));
+            let changed = bytes
+                .iter()
+                .zip(original_bytes)
+                .enumerate()
+                .filter(|(_, (new, old))| new != old)
+                .map(|(offset, _)| offset)
+                .collect::<Vec<_>>();
+            let expected_changed = (algorithm_start..algorithm_start + 4)
+                .filter(|offset| b"SHA2"[offset - algorithm_start] != original_bytes[*offset])
+                .collect::<Vec<_>>();
+            assert_eq!(
+                changed, expected_changed,
+                "only byte differences within the digest algorithm token are allowed"
+            );
+        } else {
+            assert_eq!(object, original_object);
+            assert_eq!(bytes, original_bytes);
+        }
+    }
+
+    let catalog = discover(&source);
+    assert_eq!(source.opens.load(Ordering::SeqCst), 0);
+    let discovered_manifest = catalog
+        .objects()
+        .iter()
+        .find(|entry| entry.object().key == FIRST_INCREMENTAL_MANIFEST)
+        .expect("the first incremental manifest remains visible during discovery");
+    let parsed_name = discovered_manifest
+        .name()
+        .expect("the incremental manifest key has a valid name");
+    assert_eq!(
+        parsed_name.kind,
+        duplicity_core::names::ObjectKind::IncrementalManifest
+    );
+    assert_eq!(
+        (parsed_name.start.0, parsed_name.end.0),
+        (1700000000, 1700086400)
+    );
+    assert_eq!(discovered_manifest.status(), DiscoveryStatus::Completed);
+
+    let descriptors = catalog.manifests().collect::<Vec<_>>();
+    assert_eq!(descriptors.len(), 3);
+    let mut descriptor_keys = descriptors
+        .iter()
+        .map(|(_, _, descriptor)| {
+            (
+                match descriptor.kind() {
+                    SetKind::Full => 0,
+                    SetKind::Incremental => 1,
+                },
+                descriptor.start().0,
+                descriptor.end().0,
+            )
+        })
+        .collect::<Vec<_>>();
+    descriptor_keys.sort_unstable();
+    assert_eq!(
+        descriptor_keys,
+        vec![
+            (0, 1700000000, 1700000000),
+            (1, 1700000000, 1700086400),
+            (1, 1700086400, 1700172800),
+        ]
+    );
+    let full_index = descriptors
+        .iter()
+        .find(|(_, _, descriptor)| descriptor.kind() == SetKind::Full)
+        .expect("the Full descriptor is the selected history anchor")
+        .0;
+
+    source.opened_keys.lock().unwrap().clear();
+    assert!(matches!(
+        catalog.read_snapshot(full_index, Timestamp(1700172800), &Cancellation::default()),
+        Err(ReaderError::Manifest(
+            duplicity_core::manifest::ManifestError::UnsupportedIntegrity
+        ))
+    ));
+    let mut expected_opened_keys = vec![
+        FULL_MANIFEST,
+        FULL_VOL1,
+        FULL_VOL2,
+        FULL_VOL3,
+        FIRST_INCREMENTAL_MANIFEST,
+    ];
+    expected_opened_keys.sort_unstable();
+    let mut opened_keys = source.opened_keys.lock().unwrap().clone();
+    opened_keys.sort_unstable();
+    assert_eq!(opened_keys.len(), 5);
+    assert_eq!(opened_keys, expected_opened_keys);
+    assert_eq!(source.opens.load(Ordering::SeqCst), 5);
+}
