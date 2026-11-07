@@ -1238,6 +1238,21 @@ tests = [
 ]
 
 [[milestone]]
+id = "reader-set-boundary-cancellation-observation"
+gate = true
+requirements = ["PARSE-ENV-024"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = false
+proof_rationale = "This fixture test observes a synchronous cancellation at one required-object handoff in the public reader. It does not prove cancellation timing, interruption of blocking work, race behavior, or whole-reader refinement."
+implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot" }]
+proofs = []
+tests = [{ package = "duplicity-core", name = "official_reader_cancellation_at_first_incremental_manifest_open_returns_no_snapshot" }]
+
+[[milestone]]
 id = "reader-evidence-metadata-reservation"
 gate = false
 requirements = ["PARSE-GEN-005", "PARSE-ENV-022"]

@@ -1,6 +1,6 @@
 # Reader Selected-Set Boundary Cancellation Acceptance
 
-**Status:** Proposed; implementation and independent review pending.
+**Status:** Implementation, independent review, and full local CI pass; hosted Linux assurance and Duvet Pages pending.
 
 ## Goal and scope
 
@@ -85,10 +85,20 @@ or cancellation-specific production hook.
 
 ## Checklist
 
-- [ ] Independent specification review accepts the selected-set boundary
+- [x] Independent specification review accepts the selected-set boundary
       trigger and exact open-set oracle.
-- [ ] Add the deterministic official-fixture test without production hooks.
-- [ ] Focused/full core tests, targeted Duvet query/full trace, formatting,
-      strict Clippy, and full local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Add the deterministic official-fixture test without production hooks.
+- [x] Focused/full core tests, targeted Duvet query/full trace, formatting,
+      strict Clippy, and diff checks pass.
+- [x] Full local `cargo xtask ci` passes on the final tracked tree; receipt is recorded in generated `target/assurance/ci.json`.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
+
+## Current evidence
+
+- `cargo test -p duplicity-core --test reader official_reader_cancellation_at_first_incremental_manifest_open_returns_no_snapshot -- --exact`: passed.
+- `cargo test -p duplicity-core`: passed.
+- `.tools/bin/duvet query --check test --section docs/parsing-requirements.md#parse-env-024`: passed.
+- `cargo xtask trace-update` and `cargo xtask trace`: passed.
+- `cargo fmt --all --check`, strict core Clippy, and `git diff --check`: passed.
+- Independent implementation review and full local `cargo xtask ci` passed; the generated receipt is in `target/assurance/ci.json`. Hosted Linux assurance and Duvet Pages remain pending.

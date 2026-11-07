@@ -90,6 +90,11 @@ impl ObjectSource for Source {
                 cancel.cancel();
             }
         }
+        if self.mode == 7
+            && object.key == "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest"
+        {
+            cancel.cancel();
+        }
         if self.mode == 2 {
             cancel.cancel();
         }
@@ -301,6 +306,51 @@ fn identity_cancellation_and_exact_body_failures_publish_no_snapshot() {
         catalog.read_snapshot(anchor(&catalog), Timestamp(1700000000), &cancel),
         Err(ReaderError::Source(SourceError::Cancelled))
     ));
+}
+
+//= docs/parsing-requirements.md#parse-env-024
+//= type=test
+//# The reader MUST return a completed immutable snapshot and its authentication evidence only after every required manifest, normalized data volume, container, multipart completion and state transition succeeds under one unchanged policy and final cancellation check.
+#[test]
+fn official_reader_cancellation_at_first_incremental_manifest_open_returns_no_snapshot() {
+    const FULL_MANIFEST: &str = "backup/duplicity-full.20231114T221320Z.manifest";
+    const FIRST_INCREMENTAL_MANIFEST: &str =
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest";
+
+    let mut source = Source::official();
+    source.mode = 7;
+    let catalog = discover(&source);
+    assert_eq!(source.opens.load(Ordering::SeqCst), 0);
+    let cancel = Cancellation::default();
+
+    let result = catalog.read_snapshot(anchor(&catalog), Timestamp(1700172800), &cancel);
+    assert!(matches!(
+        result,
+        Err(ReaderError::Source(SourceError::Cancelled))
+    ));
+    assert!(cancel.is_cancelled());
+
+    let opened = source.opened_keys.lock().unwrap().clone();
+    assert_eq!(opened.len(), 5, "no later incremental objects are opened");
+    assert_eq!(source.opens.load(Ordering::SeqCst), 5);
+    assert_eq!(opened[4], FIRST_INCREMENTAL_MANIFEST);
+    assert!(opened[..4].contains(&FULL_MANIFEST.to_owned()));
+    for number in 1..=3 {
+        assert!(opened[..4].contains(&format!(
+            "backup/duplicity-full.20231114T221320Z.vol{number}.difftar.gz"
+        )));
+    }
+    let mut sorted_opened = opened;
+    sorted_opened.sort();
+    let mut expected = vec![
+        FULL_MANIFEST.to_owned(),
+        "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz".to_owned(),
+        "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz".to_owned(),
+        "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz".to_owned(),
+        FIRST_INCREMENTAL_MANIFEST.to_owned(),
+    ];
+    expected.sort();
+    assert_eq!(sorted_opened, expected);
 }
 
 #[test]
