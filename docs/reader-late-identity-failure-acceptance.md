@@ -1,6 +1,8 @@
 # Late Reader Source-Identity Failure Acceptance
 
-**Status:** Proposed; independent specification review pending.
+**Status:** Independent implementation review, implementation, and scoped
+local checks, and full local CI passed. Hosted Linux assurance/Duvet Pages
+remain pending.
 
 ## Goal and scope
 
@@ -84,16 +86,33 @@ This adds native integration evidence only; no formal proof is claimed.
   arbitrary failure positions, cryptographic validation, filesystem
   publication, or complete reader-controller refinement.
 
+## Current evidence
+
+- The focused `identity_cancellation_and_exact_body_failures_publish_no_snapshot`
+  test and full `cargo test -p duplicity-core` pass.
+- The targeted `PARSE-SOURCE-001` implementation/test query, `cargo xtask
+  trace-update`, and full `cargo xtask trace` pass.
+- `cargo clippy -p duplicity-core --tests -- -D warnings`, `cargo fmt --all
+  -- --check`, and `git diff --check` pass. Clippy reports pre-existing
+  warnings in vendored `vest_lib`; the core test target is clean.
+- Full local `cargo xtask ci` passed at source SHA-256
+  `0fd2ce171190ed490639326d8ccfb9613a501dc7cd0659048e482324eed53017`; Verus
+  partitions 2,047/3,183/1,332, zero errors.
+- Independent implementation review passed. Hosted Linux assurance/Duvet
+  Pages remain pending.
+
 ## Checklist
 
-- [ ] Independent specification review accepts the late-trigger/error scope.
-- [ ] Strengthen the existing mode-5 official reader test with the exact
+- [x] Independent specification review accepts the late-trigger/error scope.
+- [x] Strengthen the existing mode-5 official reader test with the exact
       eight-key log and clear-token assertion, and narrow its source failure
       trigger to the exact final-manifest key; make no fixture mutation or
       production change.
-- [ ] Map the case to `PARSE-SOURCE-001` and the existing
+- [x] Map the case to `PARSE-SOURCE-001` and the existing
       `reader-orchestration` assurance milestone.
-- [ ] Focused/full core tests, targeted Duvet/full trace, formatting, strict
-      Clippy, and full local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused/full core tests, targeted Duvet/full trace, formatting, and
+      strict Clippy pass.
+- [x] Full local `cargo xtask ci` passed for the implementation tree recorded
+      below.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages pass.

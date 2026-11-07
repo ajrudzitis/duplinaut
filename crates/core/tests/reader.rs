@@ -84,13 +84,13 @@ impl ObjectSource for Source {
         if expected != object || self.mode == 1 {
             return Err(SourceError::Changed);
         }
-        if object.key.contains(".to.20231116T221320Z.") {
-            if self.mode == 5 {
-                return Err(SourceError::Changed);
-            }
-            if self.mode == 6 {
-                cancel.cancel();
-            }
+        if self.mode == 5
+            && object.key == "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest"
+        {
+            return Err(SourceError::Changed);
+        }
+        if self.mode == 6 && object.key.contains(".to.20231116T221320Z.") {
+            cancel.cancel();
         }
         if self.mode == 7
             && object.key == "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest"
@@ -477,27 +477,42 @@ fn original_official_local_objects_reconstruct_all_three_dates_and_restore_plans
 //# The reader MUST detect changes to an object identity between discovery and use whenever the source provides version or conditional-read metadata.
 #[test]
 fn identity_cancellation_and_exact_body_failures_publish_no_snapshot() {
+    const EXPECTED_LATE_CHANGED_OPENS: [&str; 8] = [
+        "backup/duplicity-full.20231114T221320Z.manifest",
+        "backup/duplicity-full.20231114T221320Z.vol1.difftar.gz",
+        "backup/duplicity-full.20231114T221320Z.vol2.difftar.gz",
+        "backup/duplicity-full.20231114T221320Z.vol3.difftar.gz",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.manifest",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol1.difftar.gz",
+        "backup/duplicity-inc.20231114T221320Z.to.20231115T221320Z.vol2.difftar.gz",
+        "backup/duplicity-inc.20231115T221320Z.to.20231116T221320Z.manifest",
+    ];
+    let expected_late_changed_opens = EXPECTED_LATE_CHANGED_OPENS.map(str::to_owned);
     for mode in [5, 6] {
         let mut source = Source::official();
         source.mode = mode;
         let catalog = discover(&source);
-        let result = catalog.read_snapshot(
-            anchor(&catalog),
-            Timestamp(1700172800),
-            &Cancellation::default(),
-        );
+        let cancel = Cancellation::default();
+        let result = catalog.read_snapshot(anchor(&catalog), Timestamp(1700172800), &cancel);
         if mode == 5 {
             assert!(matches!(
                 result,
                 Err(ReaderError::Source(SourceError::Changed))
             ));
+            assert!(!cancel.is_cancelled());
+            assert_eq!(
+                source.opened_keys.lock().unwrap().as_slice(),
+                expected_late_changed_opens.as_slice()
+            );
+            assert_eq!(source.opens.load(Ordering::SeqCst), 8);
         } else {
             assert!(matches!(
                 result,
                 Err(ReaderError::Source(SourceError::Cancelled))
             ));
+            assert!(cancel.is_cancelled());
+            assert!(source.opens.load(Ordering::SeqCst) > 3);
         }
-        assert!(source.opens.load(Ordering::SeqCst) > 3);
     }
     for mode in 1..=4 {
         let mut source = Source::official();
