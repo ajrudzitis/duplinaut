@@ -7,8 +7,8 @@ milestone; independent implementation review, the targeted STATE-003 query,
 and full Duvet trace pass. Focused/full core tests, formatting, and strict
 Clippy pass. Full local `cargo xtask ci` passes with 2,047/3,183/1,329
 Verus obligations and zero errors; its exact source digest is recorded in the
-generated `target/assurance/ci.json`. Hosted Linux/Pages assurance remains
-pending.
+generated `target/assurance/ci.json`. Hosted Linux assurance and Duvet Pages
+pass in [run 42359503938](https://github.com/ajrudzitis/duplinaut/actions/runs/42359503938).
 
 ## Goal and scope
 
@@ -128,4 +128,5 @@ volumes, filesystem restoration, or complete reader/controller refinement.
       establish standard-library map internals.
 - [x] Full local `cargo xtask ci` passes, including fresh verification,
       strict workspace Clippy, workspace tests, and named-gate validation.
-- [ ] Hosted Linux assurance and Duvet Pages publication pass.
+- [x] Hosted Linux assurance and Duvet Pages publication pass in [run
+      42359503938](https://github.com/ajrudzitis/duplinaut/actions/runs/42359503938).

@@ -5,7 +5,8 @@ order assertion is linked to `PARSE-STATE-003` and registered in the
 snapshot-entry-order assurance milestone; the targeted query and full Duvet
 trace pass. Focused/full core tests, formatting, strict Clippy, and full local
 `cargo xtask ci` pass (Verus 2,047/3,183/1,329, zero errors; the generated
-receipt is `target/assurance/ci.json`). Hosted Linux/Pages remain pending.
+receipt is `target/assurance/ci.json`). Hosted Linux assurance and Duvet Pages
+pass in [run 42362198467](https://github.com/ajrudzitis/duplinaut/actions/runs/42362198467).
 
 ## Goal and scope
 
@@ -152,7 +153,8 @@ reader proof.
 - [x] Full pinned local `cargo xtask ci` passes with fresh verification,
       formatting, strict workspace Clippy, workspace tests, and named-gate
       validation.
-- [ ] Hosted Linux assurance and Duvet Pages publication pass.
+- [x] Hosted Linux assurance and Duvet Pages publication pass in [run
+      42362198467](https://github.com/ajrudzitis/duplinaut/actions/runs/42362198467).
 
 ## Current local evidence
 
@@ -164,7 +166,8 @@ reader proof.
 - `cargo fmt --all -- --check`, strict core Clippy, and `git diff --check`
   passed.
 - Independent implementation review and full pinned local CI passed. Hosted
-  Linux assurance/Pages remain pending.
+  Linux assurance and Duvet Pages passed in [run
+  42362198467](https://github.com/ajrudzitis/duplinaut/actions/runs/42362198467).
 - `PARSE-STATE-003` is linked to the raw-component order assertion in this
   test and registered under `snapshot-entry-order`; its evidence is limited to
   the observed order of this fixture snapshot and does not prove

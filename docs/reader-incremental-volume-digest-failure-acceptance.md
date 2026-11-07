@@ -1,7 +1,8 @@
 # Official Plain Reader Incremental-Volume Digest-Failure Acceptance
 
 **Status:** Implementation, local tests, Duvet trace, independent review, and
-full local CI pass. Hosted assurance remains pending.
+full local CI pass. Hosted Linux assurance and Duvet Pages pass in [run
+42357239689](https://github.com/ajrudzitis/duplinaut/actions/runs/42357239689).
 
 ## Goal and scope
 
@@ -93,4 +94,5 @@ restoration, or complete reader/controller refinement.
 - [x] Independent implementation review passes.
 - [x] Full local `cargo xtask ci` passes on the final tracked tree (receipt in
       generated `target/assurance/ci.json`).
-- [ ] Hosted Linux assurance and Duvet Pages publication pass.
+- [x] Hosted Linux assurance and Duvet Pages publication pass in [run
+      42357239689](https://github.com/ajrudzitis/duplinaut/actions/runs/42357239689).

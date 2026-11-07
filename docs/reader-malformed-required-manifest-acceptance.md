@@ -4,7 +4,7 @@
 `cargo xtask ci` passes; its receipt records source SHA-256
 `6fb3322ba4e415b301432ff4f4c454cc0b24e25fb7bebf9430af98acdbe66d83`;
 Verus partitions 2,047/3,183/1,329 have zero errors. Hosted Linux assurance
-and Duvet Pages publication remain pending.
+and Duvet Pages pass in [run 42345526850](https://github.com/ajrudzitis/duplinaut/actions/runs/42345526850).
 
 ## Goal and scope
 
@@ -112,4 +112,5 @@ reader-controller refinement.
 - [x] Full local `cargo xtask ci` passes on the final tracked tree after the
       shared parser annotation; the successful receipt and Verus counts are
       recorded above.
-- [ ] Hosted Linux assurance and Duvet Pages publication pass.
+- [x] Hosted Linux assurance and Duvet Pages publication pass in [run
+      42345526850](https://github.com/ajrudzitis/duplinaut/actions/runs/42345526850).

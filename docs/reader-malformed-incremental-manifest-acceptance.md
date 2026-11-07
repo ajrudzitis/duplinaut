@@ -5,7 +5,7 @@ implementation review, and full local `cargo xtask ci` pass. The CI receipt
 records source SHA-256
 `c6d7ee0920b580e725b435e2def19aa5f6574466ac50b31f511f84be176e5529`; Verus
 partitions 2,047/3,183/1,329 have zero errors. Hosted Linux assurance and Duvet
-Pages publication remain pending.
+Pages pass in [run 42355504816](https://github.com/ajrudzitis/duplinaut/actions/runs/42355504816).
 
 ## Goal and scope
 
@@ -100,4 +100,5 @@ refinement.
       focused/full core tests, formatting, strict Clippy, and diff checks pass.
 - [x] Independent implementation/test review passes.
 - [x] Full local `cargo xtask ci` passes on the final tracked tree.
-- [ ] Hosted Linux assurance and Duvet Pages publication pass.
+- [x] Hosted Linux assurance and Duvet Pages publication pass in [run
+      42355504816](https://github.com/ajrudzitis/duplinaut/actions/runs/42355504816).

@@ -3,7 +3,7 @@
 **Status:** Specification and implementation independently reviewed. Focused
 verification, full core tests, Duvet trace, formatting, and strict Clippy pass.
 Full local `cargo xtask ci` passes. Hosted Linux assurance and Duvet Pages
-publication remain pending.
+pass in [run 42352233069](https://github.com/ajrudzitis/duplinaut/actions/runs/42352233069).
 
 ## Goal and scope
 
@@ -103,4 +103,5 @@ restoration, or complete reader/controller refinement.
 - [x] Duvet `PARSE-ENV-006` query and full trace, focused/full core tests,
       formatting, strict Clippy, and independent implementation review pass.
 - [x] Full local `cargo xtask ci` passes.
-- [ ] Hosted Linux assurance and Duvet Pages publication pass.
+- [x] Hosted Linux assurance and Duvet Pages publication pass in [run
+      42352233069](https://github.com/ajrudzitis/duplinaut/actions/runs/42352233069).

@@ -5,7 +5,8 @@ including the fixture-scoped `PARSE-STATE-003` mapping. Focused/full core
 tests, Duvet queries/full trace, formatting, and strict Clippy pass. The
 final-tree full pinned local CI passes with Verus partitions 2,047/3,183/1,329
 and zero errors; its receipt is generated at `target/assurance/ci.json`.
-Hosted Linux/Pages assurance is pending.
+Hosted Linux assurance and Duvet Pages pass in [run
+42364598270](https://github.com/ajrudzitis/duplinaut/actions/runs/42364598270).
 
 ## Goal and scope
 
@@ -166,7 +167,8 @@ restoration, complete reader/controller refinement, or formal reader proof.
 - [x] Independent implementation/test review passes.
 - [x] Final-tree full pinned local `cargo xtask ci` passes after the added
       `PARSE-STATE-003` mapping and documentation update.
-- [ ] Hosted Linux assurance and Duvet Pages publication pass.
+- [x] Hosted Linux assurance and Duvet Pages publication pass in [run
+      42364598270](https://github.com/ajrudzitis/duplinaut/actions/runs/42364598270).
 
 ## Current local evidence
 
@@ -181,4 +183,5 @@ restoration, complete reader/controller refinement, or formal reader proof.
 - Independent implementation review accepts the added STATE-003 scope.
 - Final-tree full pinned local `cargo xtask ci` passed with Verus partitions
   2,047/3,183/1,329 and zero errors. The generated receipt is
-  `target/assurance/ci.json`. Hosted Linux assurance/Pages remain pending.
+  `target/assurance/ci.json`. Hosted Linux assurance and Duvet Pages passed in
+  [run 42364598270](https://github.com/ajrudzitis/duplinaut/actions/runs/42364598270).
