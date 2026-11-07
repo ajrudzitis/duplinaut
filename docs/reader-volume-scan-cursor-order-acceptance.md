@@ -1,7 +1,8 @@
 # Row-major volume-scan cursor acceptance
 
-Status: specification accepted after independent review. Implementation,
-proof, tests, and hosted gates remain pending.
+Status: implementation and independent review passed. Strict focused proof,
+focused tests, trace, formatting, and strict Clippy passed; full workspace CI
+and hosted gates remain pending.
 
 ## Goal and scope
 
@@ -111,16 +112,25 @@ tested.
 ## Acceptance evidence
 
 - [x] Independent specification review accepts the bounded model and scope.
-- [ ] Strict Verus proves the arbitrary-dimension row-major sequence property,
+- [x] Strict Verus proves the arbitrary-dimension row-major sequence property,
       including empty dimensions and checked-product boundaries.
-- [ ] Focused cursor tests cover the required dimension matrix, exact
+- [x] Focused cursor tests cover the required dimension matrix, exact
       positions/completion, invalid transitions, reservation mismatch, and
       overflow.
-- [ ] Production nested-loop adapter evidence is checked against the source;
+- [x] Production nested-loop adapter evidence is checked against the source;
       the official 4/7/9 reverse-order opens remain accurately described.
-- [ ] Duvet targeted `PARSE-GEN-005` queries, trace update, and full trace pass.
-- [ ] Formatting, strict Clippy, focused and workspace tests, and full
-      `cargo xtask ci` pass.
-- [ ] Independent implementation/proof review accepts the model-to-transition
+- [x] Duvet targeted `PARSE-GEN-005` queries, trace update, and full trace pass.
+- [x] Formatting, strict Clippy, and focused tests pass.
+- [x] Full core/workspace tests and `cargo xtask ci` pass.
+- [x] Independent implementation/proof review accepts the model-to-transition
       linkage and native adapter claims.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
+
+## Local implementation evidence
+
+- Strict focused Verus: `cargo verus focus -p duplicity-core --target-dir target/verification/reader-volume-cursor-order -- --no-cheating --verify-module verified::reader_volume_scan` passed with 42 verified and 0 errors.
+- Cursor matrix: `cargo test -p duplicity-core --lib volume_scan_cursor_` passed 4/4.
+- Production adapter: `cargo test -p duplicity-core --test reader official_reversed_object_order_preserves_manifest_descriptor_projection` passed 1/1; the existing reversed listing still asserts the exact 4/7/9 ordered object-open logs at the three selected dates.
+- Duvet: `.tools/bin/duvet query --check implementation,test --section docs/parsing-requirements.md#parse-gen-005`, `cargo xtask trace-update`, and `cargo xtask trace` passed.
+- Local style checks: `cargo fmt --all -- --check`, `cargo clippy -p duplicity-core --tests -- -D warnings`, and `git diff --check` passed.
+- Full `nix-shell tools/shell.nix --run 'source tools/env.sh && cargo xtask ci'` passes at source SHA-256 `53361b06d8852a4258161676e1571b17cbc231a9e90e652138179f61394c4466` on `aarch64-macos`. Verus partitions report 2,047, 3,183, and 1,362 verified obligations with zero errors; workspace formatting, strict Clippy, tests, and assurance-mapped test validation pass. Receipt: generated `target/assurance/ci.json`.

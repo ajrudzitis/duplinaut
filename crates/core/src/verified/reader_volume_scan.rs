@@ -41,6 +41,497 @@ pub struct VolumeScanCursor {
     pub next_position: usize,
 }
 
+pub open spec fn volume_scan_row_major_position(
+    volume_index: int,
+    object_index: int,
+    object_count: int,
+) -> int {
+    volume_index * object_count + object_index
+}
+
+pub open spec fn volume_scan_row_major_before(
+    left_volume: int,
+    left_object: int,
+    right_volume: int,
+    right_object: int,
+) -> bool {
+    left_volume < right_volume
+        || (left_volume == right_volume && left_object < right_object)
+}
+
+pub open spec fn volume_scan_row_major_has_pair(
+    position: int,
+    volume_count: int,
+    object_count: int,
+) -> bool {
+    exists |volume: int, object: int|
+        0 <= volume
+            && volume < volume_count
+            && 0 <= object
+            && object < object_count
+            && volume_scan_row_major_position(volume, object, object_count) == position
+}
+
+pub open spec fn volume_scan_row_major_domain_model(
+    volume_count: int,
+    object_count: int,
+) -> bool {
+    let total = volume_count * object_count;
+    0 <= volume_count
+        && 0 <= object_count
+        && total <= usize::MAX as int
+        && (forall |volume: int, object: int|
+            0 <= volume
+                && volume < volume_count
+                && 0 <= object
+                && object < object_count
+                ==> 0 <= volume_scan_row_major_position(volume, object, object_count)
+                    && volume_scan_row_major_position(volume, object, object_count) < total)
+        && (forall |position: int|
+            0 <= position && position < total
+                ==> #[trigger] volume_scan_row_major_has_pair(position, volume_count, object_count))
+        && (forall |left_volume: int, left_object: int, right_volume: int, right_object: int|
+            0 <= left_volume
+                && left_volume < volume_count
+                && 0 <= left_object
+                && left_object < object_count
+                && 0 <= right_volume
+                && right_volume < volume_count
+                && 0 <= right_object
+                && right_object < object_count
+                && volume_scan_row_major_position(
+                    left_volume,
+                    left_object,
+                    object_count,
+                ) == volume_scan_row_major_position(
+                    right_volume,
+                    right_object,
+                    object_count,
+                )
+                ==> left_volume == right_volume && left_object == right_object)
+        && (forall |left_volume: int, left_object: int, right_volume: int, right_object: int|
+            0 <= left_volume
+                && left_volume < volume_count
+                && 0 <= left_object
+                && left_object < object_count
+                && 0 <= right_volume
+                && right_volume < volume_count
+                && 0 <= right_object
+                && right_object < object_count
+                && volume_scan_row_major_before(
+                    left_volume,
+                    left_object,
+                    right_volume,
+                    right_object,
+                )
+                ==> volume_scan_row_major_position(
+                    left_volume,
+                    left_object,
+                    object_count,
+                ) < volume_scan_row_major_position(
+                    right_volume,
+                    right_object,
+                    object_count,
+                ))
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub proof fn volume_scan_row_major_pair_bounds(
+    volume_count: int,
+    object_count: int,
+    volume_index: int,
+    object_index: int,
+)
+    requires
+        0 <= volume_count,
+        0 <= object_count,
+        volume_count * object_count <= usize::MAX as int,
+        0 <= volume_index < volume_count,
+        0 <= object_index < object_count,
+    ensures
+        0 <= volume_scan_row_major_position(volume_index, object_index, object_count),
+        volume_scan_row_major_position(volume_index, object_index, object_count)
+            < volume_count * object_count,
+{
+    reveal(volume_scan_row_major_position);
+    assert(0 < object_count);
+    assert(volume_index + 1 <= volume_count);
+    assert(volume_index * object_count + object_index < volume_index * object_count + object_count)
+        by (nonlinear_arith)
+        requires 0 <= volume_index, 0 <= object_index, object_index < object_count,
+            0 < object_count;
+    assert(volume_index * object_count + object_count == (volume_index + 1) * object_count)
+        by (nonlinear_arith) requires 0 <= volume_index, 0 <= object_count;
+    assert((volume_index + 1) * object_count <= volume_count * object_count)
+        by (nonlinear_arith) requires volume_index + 1 <= volume_count, 0 <= object_count;
+    assert(volume_index * object_count + object_index < volume_count * object_count)
+        by (nonlinear_arith)
+        requires volume_index * object_count + object_index
+                < volume_index * object_count + object_count,
+            volume_index * object_count + object_count == (volume_index + 1) * object_count,
+            (volume_index + 1) * object_count <= volume_count * object_count;
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub proof fn volume_scan_row_major_position_has_pair(
+    volume_count: int,
+    object_count: int,
+    position: int,
+)
+    requires
+        0 <= volume_count,
+        0 < object_count,
+        volume_count * object_count <= usize::MAX as int,
+        0 <= position,
+        position < volume_count * object_count,
+    ensures
+        volume_scan_row_major_has_pair(position, volume_count, object_count),
+        exists |volume: int, object: int|
+            0 <= volume
+                && volume < volume_count
+                && 0 <= object
+                && object < object_count
+                && volume_scan_row_major_position(volume, object, object_count) == position,
+{
+    vstd::arithmetic::div_mod::lemma_fundamental_div_mod(position, object_count);
+    reveal(volume_scan_row_major_position);
+    let volume = position / object_count;
+    let object = position % object_count;
+    assert(volume == position / object_count);
+    assert(object == position % object_count);
+    vstd::arithmetic::div_mod::lemma_div_pos_is_pos(position, object_count);
+    vstd::arithmetic::div_mod::lemma_mod_division_less_than_divisor(position, object_count);
+    vstd::arithmetic::div_mod::lemma_div_by_multiple_is_strongly_ordered(
+        position,
+        volume_count * object_count,
+        volume_count,
+        object_count,
+    );
+    assert(object_count * volume + object == position);
+    assert(0 <= object && object < object_count);
+    assert(0 <= volume);
+    assert(volume < volume_count) by (nonlinear_arith)
+        requires volume == position / object_count,
+            position < volume_count * object_count,
+            0 <= volume_count,
+            0 < object_count;
+    assert(volume_scan_row_major_has_pair(position, volume_count, object_count)) by {
+        reveal(volume_scan_row_major_has_pair);
+        assert(exists |candidate_volume: int, candidate_object: int|
+            0 <= candidate_volume
+                && candidate_volume < volume_count
+                && 0 <= candidate_object
+                && candidate_object < object_count
+                && volume_scan_row_major_position(
+                    candidate_volume,
+                    candidate_object,
+                    object_count,
+                ) == position) by {
+            assert(0 <= volume);
+            assert(volume < volume_count);
+            assert(0 <= object);
+            assert(object < object_count);
+            assert(volume_scan_row_major_position(volume, object, object_count) == position)
+                by (nonlinear_arith)
+                requires object_count * volume + object == position;
+        }
+        assert(volume_scan_row_major_position(volume, object, object_count) == position)
+            by (nonlinear_arith)
+            requires object_count * volume + object == position;
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub proof fn volume_scan_row_major_positions_are_injective(
+    object_count: int,
+    left_volume: int,
+    left_object: int,
+    right_volume: int,
+    right_object: int,
+)
+    requires
+        0 <= left_volume,
+        0 <= right_volume,
+        0 <= left_object,
+        0 <= right_object,
+        left_object < object_count,
+        right_object < object_count,
+        volume_scan_row_major_position(left_volume, left_object, object_count)
+            == volume_scan_row_major_position(right_volume, right_object, object_count),
+    ensures
+        left_volume == right_volume && left_object == right_object,
+{
+    reveal(volume_scan_row_major_position);
+    assert(0 < object_count);
+    if left_volume < right_volume {
+        assert(left_volume + 1 <= right_volume);
+        assert((left_volume + 1) * object_count <= right_volume * object_count)
+            by (nonlinear_arith)
+            requires left_volume + 1 <= right_volume, 0 <= object_count;
+        assert(left_volume * object_count + left_object
+            < left_volume * object_count + object_count) by (nonlinear_arith)
+            requires 0 <= left_object, left_object < object_count, 0 < object_count;
+        assert(right_volume * object_count <= right_volume * object_count + right_object)
+            by (nonlinear_arith) requires 0 <= right_object;
+        assert(left_volume * object_count + object_count
+            == (left_volume + 1) * object_count) by (nonlinear_arith)
+            requires 0 <= left_volume, 0 <= object_count;
+        assert(left_volume * object_count + left_object
+            < right_volume * object_count + right_object) by (nonlinear_arith)
+            requires left_volume * object_count + left_object
+                    < left_volume * object_count + object_count,
+                left_volume * object_count + object_count
+                    == (left_volume + 1) * object_count,
+                (left_volume + 1) * object_count <= right_volume * object_count,
+                right_volume * object_count <= right_volume * object_count + right_object;
+        assert(false);
+    } else if right_volume < left_volume {
+        assert(right_volume + 1 <= left_volume);
+        assert((right_volume + 1) * object_count <= left_volume * object_count)
+            by (nonlinear_arith)
+            requires right_volume + 1 <= left_volume, 0 <= object_count;
+        assert(right_volume * object_count + right_object
+            < right_volume * object_count + object_count) by (nonlinear_arith)
+            requires 0 <= right_object, right_object < object_count, 0 < object_count;
+        assert(left_volume * object_count <= left_volume * object_count + left_object)
+            by (nonlinear_arith) requires 0 <= left_object;
+        assert(right_volume * object_count + object_count
+            == (right_volume + 1) * object_count) by (nonlinear_arith)
+            requires 0 <= right_volume, 0 <= object_count;
+        assert(right_volume * object_count + right_object
+            < left_volume * object_count + left_object) by (nonlinear_arith)
+            requires right_volume * object_count + right_object
+                    < right_volume * object_count + object_count,
+                right_volume * object_count + object_count
+                    == (right_volume + 1) * object_count,
+                (right_volume + 1) * object_count <= left_volume * object_count,
+                left_volume * object_count <= left_volume * object_count + left_object;
+        assert(false);
+    } else {
+        assert(left_volume == right_volume);
+        assert(left_object == right_object);
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub proof fn volume_scan_row_major_pairs_are_ordered(
+    object_count: int,
+    left_volume: int,
+    left_object: int,
+    right_volume: int,
+    right_object: int,
+)
+    requires
+        0 <= left_volume,
+        0 <= right_volume,
+        0 <= left_object,
+        0 <= right_object,
+        left_object < object_count,
+        right_object < object_count,
+        volume_scan_row_major_before(left_volume, left_object, right_volume, right_object),
+    ensures
+        volume_scan_row_major_position(left_volume, left_object, object_count)
+            < volume_scan_row_major_position(right_volume, right_object, object_count),
+{
+    reveal(volume_scan_row_major_position);
+    reveal(volume_scan_row_major_before);
+    assert(0 < object_count);
+    if left_volume < right_volume {
+        assert(left_volume + 1 <= right_volume);
+        assert((left_volume + 1) * object_count <= right_volume * object_count)
+            by (nonlinear_arith)
+            requires left_volume + 1 <= right_volume, 0 <= object_count;
+        assert(left_volume * object_count + left_object
+            < left_volume * object_count + object_count) by (nonlinear_arith)
+            requires 0 <= left_object, left_object < object_count, 0 < object_count;
+        assert(right_volume * object_count <= right_volume * object_count + right_object)
+            by (nonlinear_arith) requires 0 <= right_object;
+        assert(left_volume * object_count + object_count
+            == (left_volume + 1) * object_count) by (nonlinear_arith)
+            requires 0 <= left_volume, 0 <= object_count;
+        assert(left_volume * object_count + left_object
+            < right_volume * object_count + right_object) by (nonlinear_arith)
+            requires left_volume * object_count + left_object
+                    < left_volume * object_count + object_count,
+                left_volume * object_count + object_count
+                    == (left_volume + 1) * object_count,
+                (left_volume + 1) * object_count <= right_volume * object_count,
+                right_volume * object_count <= right_volume * object_count + right_object;
+    } else {
+        assert(left_volume == right_volume);
+        assert(left_object < right_object);
+        assert(left_volume * object_count + left_object
+            < left_volume * object_count + right_object) by (nonlinear_arith)
+            requires left_object < right_object;
+        assert(volume_scan_row_major_position(left_volume, left_object, object_count)
+            < volume_scan_row_major_position(right_volume, right_object, object_count))
+            by (nonlinear_arith)
+            requires left_volume == right_volume, left_object < right_object,
+                0 <= left_volume, 0 <= object_count;
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub proof fn volume_scan_row_major_domain_is_exact(
+    volume_count: int,
+    object_count: int,
+)
+    requires
+        0 <= volume_count,
+        0 <= object_count,
+        volume_count * object_count <= usize::MAX as int,
+    ensures volume_scan_row_major_domain_model(volume_count, object_count),
+{
+    reveal(volume_scan_row_major_position);
+    assert forall |volume: int, object: int|
+        0 <= volume
+            && volume < volume_count
+            && 0 <= object
+            && object < object_count
+        implies 0 <= volume_scan_row_major_position(volume, object, object_count)
+            && volume_scan_row_major_position(volume, object, object_count)
+                < volume_count * object_count by {
+        volume_scan_row_major_pair_bounds(volume_count, object_count, volume, object);
+    }
+    assert forall |position: int|
+        0 <= position && position < volume_count * object_count
+        implies #[trigger] volume_scan_row_major_has_pair(position, volume_count, object_count)
+        by {
+        if object_count > 0 {
+            volume_scan_row_major_position_has_pair(volume_count, object_count, position);
+        } else {
+            assert(object_count == 0);
+            assert(volume_count * object_count == 0);
+            assert(position < 0);
+            assert(false);
+        }
+    }
+    reveal(volume_scan_row_major_position);
+    reveal(volume_scan_row_major_before);
+    assert forall |left_volume: int, left_object: int, right_volume: int, right_object: int|
+        0 <= left_volume
+            && left_volume < volume_count
+            && 0 <= left_object
+            && left_object < object_count
+            && 0 <= right_volume
+            && right_volume < volume_count
+            && 0 <= right_object
+            && right_object < object_count
+            && volume_scan_row_major_position(
+                left_volume,
+                left_object,
+                object_count,
+            ) == volume_scan_row_major_position(
+                right_volume,
+                right_object,
+                object_count,
+            )
+        implies left_volume == right_volume && left_object == right_object by {
+        volume_scan_row_major_positions_are_injective(
+            object_count,
+            left_volume,
+            left_object,
+            right_volume,
+            right_object,
+        );
+    }
+    assert forall |left_volume: int, left_object: int, right_volume: int, right_object: int|
+        0 <= left_volume
+            && left_volume < volume_count
+            && 0 <= left_object
+            && left_object < object_count
+            && 0 <= right_volume
+            && right_volume < volume_count
+            && 0 <= right_object
+            && right_object < object_count
+            && volume_scan_row_major_before(
+                left_volume,
+                left_object,
+                right_volume,
+                right_object,
+            )
+        implies volume_scan_row_major_position(
+            left_volume,
+            left_object,
+            object_count as int,
+        ) < volume_scan_row_major_position(
+            right_volume,
+            right_object,
+            object_count as int,
+        ) by {
+        volume_scan_row_major_pairs_are_ordered(
+            object_count,
+            left_volume,
+            left_object,
+            right_volume,
+            right_object,
+        );
+    }
+}
+
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=implementation
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+pub proof fn volume_scan_row_major_step_refines_cursor(
+    volume_count: usize,
+    object_count: usize,
+    volume_index: usize,
+    object_index: usize,
+)
+    requires
+        volume_count as int * object_count as int <= usize::MAX as int,
+        volume_index < volume_count,
+        object_index < object_count,
+    ensures
+        advance_volume_scan_cursor_model(
+            VolumeScanCursor {
+                volume_count,
+                object_count,
+                planned_positions: (volume_count as int * object_count as int) as usize,
+                next_position: volume_scan_row_major_position(
+                    volume_index as int,
+                    object_index as int,
+                    object_count as int,
+                ) as usize,
+            },
+            volume_index,
+            object_index,
+        ) == Some(VolumeScanCursor {
+            volume_count,
+            object_count,
+            planned_positions: (volume_count as int * object_count as int) as usize,
+            next_position: (volume_scan_row_major_position(
+                volume_index as int,
+                object_index as int,
+                object_count as int,
+            ) + 1) as usize,
+        }),
+{
+    volume_scan_row_major_pair_bounds(
+        volume_count as int,
+        object_count as int,
+        volume_index as int,
+        object_index as int,
+    );
+    reveal(advance_volume_scan_cursor_model);
+    assert(volume_index as int * object_count as int + object_index as int
+        == volume_scan_row_major_position(
+            volume_index as int,
+            object_index as int,
+            object_count as int,
+        ));
+}
+
 /// Fieldwise model for one already-parsed catalog name and one required
 /// manifest volume. Name parsing, manifest parsing, source identity, and later
 /// envelope handling are outside this predicate.
@@ -544,6 +1035,71 @@ mod tests {
                 planned_checks: 0,
                 final_checks: 2,
             })
+        );
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-gen-005
+    //= type=test
+    //# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
+    fn volume_scan_cursor_matches_independent_row_major_dimension_matrix() {
+        type RowMajorCase = (usize, usize, &'static [(usize, usize)]);
+        let cases: &[RowMajorCase] = &[
+            (0, 0, &[]),
+            (0, 3, &[]),
+            (2, 0, &[]),
+            (1, 1, &[(0, 0)]),
+            (1, 3, &[(0, 0), (0, 1), (0, 2)]),
+            (3, 1, &[(0, 0), (1, 0), (2, 0)]),
+            (2, 3, &[(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2)]),
+            (3, 2, &[(0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1)]),
+        ];
+
+        for (volume_count, object_count, expected_pairs) in cases {
+            let planned = volume_count.checked_mul(*object_count).unwrap();
+            let reservation = VolumeScanReservation {
+                initial_checks: 0,
+                planned_checks: planned,
+                final_checks: planned,
+            };
+            let mut cursor =
+                start_volume_scan_cursor(reservation, *volume_count, *object_count).unwrap();
+            assert_eq!(cursor.next_position, 0);
+            assert_eq!(
+                volume_scan_cursor_complete(cursor),
+                expected_pairs.is_empty()
+            );
+
+            for (position, &(volume, object)) in expected_pairs.iter().enumerate() {
+                assert_eq!(cursor.next_position, position);
+                cursor = advance_volume_scan_cursor(cursor, volume, object)
+                    .expect("the independent row-major pair is accepted at its exact position");
+                assert_eq!(cursor.next_position, position + 1);
+                assert_eq!(volume_scan_cursor_complete(cursor), position + 1 == planned);
+            }
+            assert!(volume_scan_cursor_complete(cursor));
+
+            if expected_pairs.is_empty() {
+                assert_eq!(advance_volume_scan_cursor(cursor, 0, 0), None);
+                assert_eq!(advance_volume_scan_cursor(cursor, *volume_count, 0), None);
+            }
+        }
+
+        let mismatched_reservation = VolumeScanReservation {
+            initial_checks: 0,
+            planned_checks: 5,
+            final_checks: 5,
+        };
+        assert_eq!(start_volume_scan_cursor(mismatched_reservation, 2, 3), None);
+
+        let overflow_reservation = VolumeScanReservation {
+            initial_checks: 0,
+            planned_checks: usize::MAX,
+            final_checks: usize::MAX,
+        };
+        assert_eq!(
+            start_volume_scan_cursor(overflow_reservation, usize::MAX, 2),
+            None
         );
     }
 

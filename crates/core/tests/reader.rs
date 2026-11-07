@@ -162,6 +162,9 @@ fn decode_oracle_hex(hex: &str) -> Vec<u8> {
 //= docs/parsing-requirements.md#parse-chain-001
 //= type=test
 //# A restorable snapshot MUST be derived from one full set followed by a uniquely selected sequence of incremental sets whose start times equal the preceding end times.
+//= docs/parsing-requirements.md#parse-gen-005
+//= type=test
+//# The reader MUST enforce explicit configurable bounds on decoded bytes, entry counts, path lengths, nesting, metadata storage, reconstructed bytes, and temporary storage.
 //= docs/parsing-requirements.md#parse-chain-002
 //= type=test
 //# The reader MUST report missing sets, missing required volumes, and ambiguous chain branches without silently treating the resulting snapshot as complete.

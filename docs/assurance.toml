@@ -1179,26 +1179,34 @@ tests = [
 
 [[milestone]]
 id = "reader-volume-scan-cursor"
-gate = false
+gate = true
 requirements = ["PARSE-GEN-005"]
 specified = true
 implemented = true
-proved = false
+proved = true
 tested = true
 reviewed = true
 proof_required = true
-# Ordered-position cursor independently accepted; Rust iterator semantics and
-# identity-predicate/controller refinement remain outside the proof.
+# Exact bounded row-major cursor positions are proved; standard iterator/slice
+# internals and whole-reader refinement remain outside the proof.
 implementations = [{ path = "crates/core/src/reader.rs", symbol = "read_snapshot_inner" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "start_volume_scan_cursor" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "advance_volume_scan_cursor" }, { path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "volume_scan_cursor_complete" }]
 proofs = [
   { id = "reader-volume-scan-cursor-start", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "start_volume_scan_cursor", kind = "contract" },
   { id = "reader-volume-scan-cursor-order", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "advance_volume_scan_cursor", kind = "contract" },
-  { id = "reader-volume-scan-cursor-complete", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "volume_scan_cursor_complete", kind = "contract" }
+  { id = "reader-volume-scan-cursor-complete", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "volume_scan_cursor_complete", kind = "contract" },
+  { id = "reader-volume-scan-cursor-row-major-pair-bounds", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "volume_scan_row_major_pair_bounds", kind = "lemma" },
+  { id = "reader-volume-scan-cursor-row-major-witness", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "volume_scan_row_major_position_has_pair", kind = "lemma" },
+  { id = "reader-volume-scan-cursor-row-major-injective", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "volume_scan_row_major_positions_are_injective", kind = "lemma" },
+  { id = "reader-volume-scan-cursor-row-major-ordered", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "volume_scan_row_major_pairs_are_ordered", kind = "lemma" },
+  { id = "reader-volume-scan-cursor-row-major-domain", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "volume_scan_row_major_domain_is_exact", kind = "lemma" },
+  { id = "reader-volume-scan-cursor-row-major-step", requirement = "PARSE-GEN-005", path = "crates/core/src/verified/reader_volume_scan.rs", symbol = "volume_scan_row_major_step_refines_cursor", kind = "lemma" }
 ]
 tests = [
+  { package = "duplicity-core", name = "verified::reader_volume_scan::tests::volume_scan_cursor_matches_independent_row_major_dimension_matrix" },
   { package = "duplicity-core", name = "verified::reader_volume_scan::tests::volume_scan_cursor_accepts_exact_lexicographic_positions" },
   { package = "duplicity-core", name = "verified::reader_volume_scan::tests::volume_scan_cursor_keeps_incomplete_scan_unfinished" },
   { package = "duplicity-core", name = "verified::reader_volume_scan::tests::volume_scan_cursor_rejects_skips_reordering_and_extra_positions" },
+  { package = "duplicity-core", name = "official_reversed_object_order_preserves_manifest_descriptor_projection" },
   { package = "duplicity-core", name = "reader_budget_edges_accept_exact_and_reject_one_less" }
 ]
 
