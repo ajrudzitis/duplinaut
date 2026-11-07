@@ -1,8 +1,14 @@
 # Official Plain Reader Supported Digest with Unknown Sibling Acceptance
 
-**Status:** Specification and implementation independently reviewed. Focused
-and full core tests, Duvet query/full trace, formatting, and strict Clippy pass.
-Full local CI and hosted Linux/Pages assurance remain pending.
+**Status:** The `PARSE-ENV-006` case and implementation are independently
+reviewed. The observed raw-component order assertion is now linked to
+`PARSE-STATE-003` and registered in the snapshot-entry-order assurance
+milestone; independent implementation review, the targeted STATE-003 query,
+and full Duvet trace pass. Focused/full core tests, formatting, and strict
+Clippy pass. Full local `cargo xtask ci` passes with 2,047/3,183/1,329
+Verus obligations and zero errors; its exact source digest is recorded in the
+generated `target/assurance/ci.json`. Hosted Linux/Pages assurance remains
+pending.
 
 ## Goal and scope
 
@@ -50,8 +56,11 @@ claim.
    `tests/fixtures/duplicity-3.0.7/expected.json`: raw component-byte paths,
    entry kinds, `mode() & 0o777`, exact regular-file and directory mtimes in
    seconds/nanoseconds, regular-file sizes and SHA-256 values, and symlink
-   target bytes. Omit symlink mtime per the producer's recorded comparison
-   exclusion.
+   target bytes. `SnapshotState::entries()` MUST enumerate paths in the same
+   order as the oracle's raw component sequences, compared lexicographically
+   as unsigned bytes with component boundaries significant and proper
+   component-sequence prefixes ordered first. Omit symlink mtime per the
+   producer's recorded comparison exclusion.
 3. Require exactly the nine required chain objects to be opened, once each:
    the Full, first-Incremental, and final-Incremental manifests; Full volumes
    1/2/3; first-Incremental volumes 1/2; and final-Incremental volume 1. No
@@ -73,12 +82,18 @@ duplicity.
    re-prove digest enforcement.
 3. MUST reconstruct the final snapshot and avoid opening irrelevant signature
    archives or objects.
+4. MUST expose `SnapshotState::entries()` in bytewise lexicographic order of
+   backup-relative path components, preserving component boundaries and
+   ordering a proper component-sequence prefix before its extension. The test
+   checks the final snapshot's observed order against the raw-component oracle
+   and links this assertion to `PARSE-STATE-003`.
 
 Add a focused integration test in `crates/core/tests/reader.rs`, annotated
-with Duvet `PARSE-ENV-006`. Do not add `ASSURE-TEST-001`: the manifest is
-test-mutated and the test is scoped to digest-policy behavior, not a claim that
-the mutated object is an official producer output. No additional chain,
-S3, or filesystem-publication requirement is needed for this slice.
+with Duvet `PARSE-ENV-006` and `PARSE-STATE-003`. Do not add
+`ASSURE-TEST-001`: the manifest is test-mutated and the test is scoped to
+digest-policy behavior, not a claim that the mutated object is an official
+producer output. No additional chain, S3, or filesystem-publication
+requirement is needed for this slice.
 
 Acceptance requires the focused test, targeted Duvet query and full trace,
 focused/full core tests, formatting, strict Clippy, local `cargo xtask ci`,
@@ -96,14 +111,21 @@ volumes, filesystem restoration, or complete reader/controller refinement.
 ## Checklist
 
 - [x] Independent specification review accepts the inserted declaration,
-      supported-digest precondition, final snapshot comparison, and nine-key open set.
+      supported-digest precondition, final snapshot comparison, and nine-key
+      open set.
+- [x] Independent specification review accepts the added `PARSE-STATE-003`
+      iteration-order requirement and trace scope.
 - [x] Focused test proves the original SHA1 token/hex and all data payloads are
       unchanged, and inserts exactly one valid same-digest SHA2 line.
 - [x] Discovery opens no objects; final public read succeeds and matches the
       plain oracle at `1700172800`.
 - [x] The nine required chain objects open once each; no signatures or
       unrelated objects open.
-- [x] Duvet `PARSE-ENV-006` query/full trace, focused/full core tests,
-      formatting, strict Clippy, and independent implementation review pass.
-- [ ] Full local `cargo xtask ci` passes.
+- [x] Duvet `PARSE-ENV-006` and `PARSE-STATE-003` implementation/test queries,
+      full trace, focused/full core tests, formatting, strict Clippy, and
+      independent implementation review pass. The STATE-003 test evidence is
+      limited to the observed order of this fixture snapshot; it does not
+      establish standard-library map internals.
+- [x] Full local `cargo xtask ci` passes, including fresh verification,
+      strict workspace Clippy, workspace tests, and named-gate validation.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.

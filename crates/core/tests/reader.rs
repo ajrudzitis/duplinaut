@@ -5379,6 +5379,9 @@ fn official_incremental_unsupported_digest_fails_before_volume_open() {
 //= docs/parsing-requirements.md#parse-env-006
 //= type=test
 //# An unknown digest algorithm MUST produce an unsupported-integrity diagnostic when no supported declared digest can validate the volume.
+//= docs/parsing-requirements.md#parse-state-003
+//= type=test
+//# `SnapshotState::entries()` MUST enumerate retained entries in bytewise lexicographic order of their backup-relative path components.
 #[test]
 fn official_incremental_supported_digest_ignores_unknown_sibling() {
     const FIRST_INCREMENTAL_MANIFEST: &str =
@@ -5574,6 +5577,8 @@ fn official_incremental_supported_digest_ignores_unknown_sibling() {
         .map(|(path, _)| path.components().clone())
         .collect::<Vec<_>>();
     let expected_sorted_paths = expected_by_components.keys().cloned().collect::<Vec<_>>();
+    // This checks the observed order for this fixture snapshot against raw
+    // oracle components; it does not prove standard-library map internals.
     assert_eq!(
         actual_paths, expected_sorted_paths,
         "final snapshot paths and iteration order match raw oracle components"

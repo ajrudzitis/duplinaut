@@ -5429,7 +5429,8 @@ proofs = [
   { id = "snapshot-entry-component-order", requirement = "PARSE-STATE-003", path = "crates/core/src/path.rs", symbol = "compare", kind = "contract" }
 ]
 tests = [
-  { package = "duplicity-core", name = "snapshot_entries_use_bytewise_component_lexicographic_order" }
+  { package = "duplicity-core", name = "snapshot_entries_use_bytewise_component_lexicographic_order" },
+  { package = "duplicity-core", name = "official_incremental_supported_digest_ignores_unknown_sibling" }
 ]
 
 [[trusted]]
