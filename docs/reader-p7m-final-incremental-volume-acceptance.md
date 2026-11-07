@@ -1,7 +1,9 @@
 # Official Plain Reader PKCS#7 Final-Incremental Volume Acceptance
 
-**Status:** Specification accepted after independent review. Implementation,
-focused verification, and hosted assurance are pending.
+**Status:** Implementation and independent review passed. Focused/full core
+tests, targeted Duvet queries/full trace, formatting, and strict Clippy passed.
+Local pinned `cargo xtask ci` passed. Hosted Linux assurance and Duvet Pages
+are pending.
 
 ## Goal and scope
 
@@ -142,13 +144,14 @@ reader proof.
 
 - [x] Independent specification review accepts the mutation, outcomes, open
       set, and previous-snapshot oracle.
-- [ ] Discovery reports the renamed object as
+- [x] Discovery reports the renamed object as
       `IncrementalVolume(1700086400,1700172800,1)`/`Pkcs7`/
       `UnsupportedEnvelope`, preserving exact inventory and payload identity.
-- [ ] The previous snapshot matches every documented oracle field; the final
+- [x] The previous snapshot matches every documented oracle field; the final
       target returns exact `MissingVolume { number: 1 }` and opens exactly the
       eight listed objects.
-- [ ] Focused/full core tests, targeted Duvet queries/full trace, formatting,
-      strict Clippy, and local `cargo xtask ci` pass.
-- [ ] Independent implementation/test review passes.
+- [x] Focused/full core tests, targeted Duvet queries/full trace, formatting,
+      and strict Clippy pass.
+- [x] Local pinned `cargo xtask ci` passes.
+- [x] Independent implementation/test review passes.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
