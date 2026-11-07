@@ -1,8 +1,10 @@
 # Official Plain Reader Malformed Required-Manifest Acceptance
 
-**Status:** Implementation and independent review pass. A fresh full local CI
-run is pending after the shared `Manifest::parse` traceability annotation;
-hosted Linux assurance and Duvet Pages publication remain pending.
+**Status:** Implementation and independent review pass. Full local
+`cargo xtask ci` passes on receipt source SHA-256
+`6fb3322ba4e415b301432ff4f4c454cc0b24e25fb7bebf9430af98acdbe66d83`;
+Verus partitions 2,047/3,183/1,329 have zero errors. Hosted Linux assurance
+and Duvet Pages publication remain pending.
 
 ## Goal and scope
 
@@ -107,6 +109,7 @@ reader-controller refinement.
       `PARSE-GEN-001` implementation/test query and full `cargo xtask trace`
       pass; formatting, strict core Clippy, and diff checks pass.
 - [x] Independent implementation/test review passes.
-- [ ] Full local `cargo xtask ci` passes on the final tracked tree after the
-      shared parser annotation.
+- [x] Full local `cargo xtask ci` passes on the final tracked tree after the
+      shared parser annotation; the successful receipt and Verus counts are
+      recorded above.
 - [ ] Hosted Linux assurance and Duvet Pages publication pass.
