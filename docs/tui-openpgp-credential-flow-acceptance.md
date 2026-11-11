@@ -74,13 +74,23 @@ provider, or the restore controller.
    environment value. Typed characters MUST NOT appear literally or as a
    length-revealing mask in the terminal screen, scrollback transcript, normal
    logs, worker replies, catalog, snapshot, authentication evidence, or restore
-   receipt. Cancellation at the prompt MUST cancel the read and leave no
+   receipt. The prompt MUST NOT display a character mask, length, or other
+   input-dependent indication. It MUST bound passphrase input to 4096 UTF-8
+   bytes and compute each candidate character's `len_utf8` before appending;
+   reject a multibyte character that would cross the limit without growing the
+   input. Cancellation at the prompt MUST cancel the read and leave no
    snapshot or destination.
 2. Public-key and signed profile key exports MUST be loaded from explicitly
    selected files; export bytes MUST NOT be accepted in argv/environment or
-   rendered. File contents and passphrases MUST stay outside browser history,
-   status labels, and diagnostic formatting. This acceptance makes no secure
-   erasure guarantee for process memory or trusted crypto-library temporaries.
+   rendered. The visible key-file path MUST be byte-escaped for the terminal,
+   limited to 4096 input bytes, and rendered within a fixed bounded field.
+   Before allocation/read, the selected export MUST be verified as a regular
+   file with metadata length at most 16 MiB; the read MUST remain bounded to
+   that limit and reject if bytes read exceed it, including growth beyond the
+   cap during reading. File contents and passphrases
+   MUST stay outside browser history, status labels, and diagnostic
+   formatting. This acceptance makes no secure erasure guarantee for process
+   memory or trusted crypto-library temporaries.
 3. For each profile above, the production worker MUST build one immutable
    borrowed `CryptoReadContext` for the read and call
    `Catalog::read_snapshot_with_crypto`. It MUST preserve the exact profile
@@ -107,8 +117,14 @@ provider, or the restore controller.
    this acceptance does not repeat the filesystem metadata oracle already
    covered by restore acceptance.
 6. Credential and cancellation changes MUST invalidate any in-flight read
-   token. A stale reply MUST NOT install a snapshot under a different
-   credential/policy set or arm restore confirmation.
+   token, retire its operation ID, and cancel the old token before accepting a
+   new credential set. A stale reply MUST NOT install a snapshot under a
+   different credential/policy set or arm restore confirmation. After the
+   credential-submit event, prompt input MUST be quarantined/drained before
+   returning to normal browser input; queued characters, especially `restore`,
+   Enter, or `r`, MUST NOT become acknowledgment or command input. A fresh
+   successful snapshot may arm a restore preview only after the user issues a
+   separate browser command and the ordinary preview/acknowledgment sequence.
 7. No OpenPGP credential, exported key bytes, message/key passphrase, or
    plaintext payload bytes may be written to the backup source or S3. The
    credential prompt MUST restore terminal mode on success, error, and
@@ -127,7 +143,18 @@ are used.
 
 For each profile, synchronize input on observed UI state, enter the required
 passphrase only after the hidden prompt appears, and require the final snapshot
-to match `expected.json` for that mode/date. Inspect the child command line and
+to match `expected.json` for that mode/date. Prompt tests MUST fill each bound
+to its limit and verify that one extra UTF-8 byte/character is rejected before
+allocation, including a multibyte character that would cross the boundary.
+The path-field validator test MUST accept the 4096-byte input boundary and
+reject a 4097-byte candidate before append without opening that synthetic
+path; separate file-load tests MUST use shorter valid paths and reject a
+selected directory or other non-regular file. For secret input, the PTY test
+MUST queue a restore acknowledgment, Enter, and `r` immediately behind the
+submit keystroke, then prove that no preview or Execute is created until fresh
+post-snapshot user input. Path tests MUST cover an escaped/bounded display and
+export files at the size limit and one byte over it. Inspect the child command
+line and
 environment on Linux to verify they contain neither passphrase nor key bytes;
 assert captured terminal output, screen model, stderr, history/status, and
 worker diagnostics do not contain the passphrase or key-export contents.
@@ -167,6 +194,8 @@ provider and are not part of this OpenPGP prompt.
 - [x] Clarify RESTORE-UI-013 for read-only restore/source handling and add RESTORE-UI-015 for the not-yet-implemented archive-unlock flow.
 - [x] Independently review and adopt this specification.
 - [ ] Implement the no-echo prompt and typed worker/context bridge.
+- [ ] Bound input/file reads and quarantine queued prompt keystrokes before
+      normal browser input resumes; prove stale credential replies are retired.
 - [ ] Add real-executable Linux PTY tests for all three named profiles and the
       wrong-passphrase/no-publication case.
 - [ ] Complete targeted Duvet queries/full trace, full tests, formatting,

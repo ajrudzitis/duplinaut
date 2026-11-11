@@ -1168,6 +1168,23 @@ Provenance: PARSE-SOURCE-001, POLICY. The worker restores already validated in-m
 
 When the frontend supports OpenPGP archives, it MUST collect archive-unlock credentials only through an explicit no-echo interaction before snapshot construction and keep that interaction separate from destination selection, restore preview, and confirmation. The frontend MUST NOT accept OpenPGP passphrases or exported key bytes through argv or environment values, display them, retain them in browser history, or copy them into catalog objects, snapshots, authentication evidence, receipts, diagnostics, or logs. Exported key material MUST be read from explicitly selected files; SDK/storage credentials remain with the configured provider and outside this archive-unlock interaction.
 
+The passphrase prompt MUST NOT show a mask, length, or other input-dependent
+indication. It MUST accept at most 4096 UTF-8 bytes and check a candidate
+character's encoded byte length before allocating/appending it, rejecting an
+over-limit character without growing the input. A visible selected-file path
+MUST accept at most 4096 UTF-8 bytes, be byte-escaped for terminal rendering,
+and render within a fixed bounded field. Before reading an exported key file,
+the frontend MUST verify that it is a regular file whose metadata length is at
+most 16 MiB, then read with a 16 MiB-plus-one-byte cap and reject overflow if
+the read exceeds the cap, including when the file grows during the read.
+
+Changing credentials MUST cancel the current read token and retire its
+operation ID before a new credential set is accepted. Replies carrying the
+retired ID MUST NOT install a snapshot or arm restore confirmation. After a
+credential modal submits, queued modal input MUST be drained or quarantined
+before normal browser input resumes; queued characters, especially `restore`,
+Enter, or `r`, MUST NOT become restore acknowledgment or a browser command.
+
 Provenance: PARSE-ENV-009, PARSE-ENV-021, POLICY. This frontend clause governs acquisition and disclosure only; core requirements separately govern the supported key/passphrase formats, authenticated decryption, signer policy, and completion before snapshot return. It makes no secure-memory-erasure claim and adds no credential-provider or OpenPGP algorithm support.
 
 ### RESTORE-UI-014
