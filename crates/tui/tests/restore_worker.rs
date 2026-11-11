@@ -80,7 +80,7 @@ fn worker() -> Worker {
 //# The frontend MUST bound owned restoration request, preview and receipt metadata before allocating it, retaining original payload ownership without payload copies.
 //= docs/parsing-requirements.md#restore-ui-013
 //= type=test
-//# The frontend MUST keep backup source access read-only and avoid collecting or exposing credentials, backup payload bytes or secret material through the restoration interaction, diagnostics or automatic logs.
+//# The frontend MUST keep backup source access read-only and avoid exposing SDK/storage credentials, backup payload bytes or secret material through the restoration interaction, diagnostics, or automatic logs.
 //= docs/parsing-requirements.md#restore-ui-014
 //= type=test
 //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.

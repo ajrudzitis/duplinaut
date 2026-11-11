@@ -278,7 +278,7 @@ pub fn prepare(
 //# The frontend MUST derive a restoration preview from the exact completed immutable snapshot and selected original byte-valued roots, including precisely the entries and source directory ancestors accepted by its `RestorePlan`.
 //= docs/parsing-requirements.md#restore-ui-013
 //= type=implementation
-//# The frontend MUST keep backup source access read-only and avoid collecting or exposing credentials, backup payload bytes or secret material through the restoration interaction, diagnostics or automatic logs.
+//# The frontend MUST keep backup source access read-only and avoid exposing SDK/storage credentials, backup payload bytes or secret material through the restoration interaction, diagnostics, or automatic logs.
 pub fn execute(
     frozen: Frozen,
     cancel: &Cancellation,

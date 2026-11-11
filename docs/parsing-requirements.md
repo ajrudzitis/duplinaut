@@ -1160,9 +1160,15 @@ Provenance: POLICY, DOC-RUST-THREAD. Close all frontend-owned request senders or
 
 ### RESTORE-UI-013
 
-The frontend MUST keep backup source access read-only and avoid collecting or exposing credentials, backup payload bytes or secret material through the restoration interaction, diagnostics or automatic logs.
+The frontend MUST keep backup source access read-only and avoid exposing SDK/storage credentials, backup payload bytes or secret material through the restoration interaction, diagnostics, or automatic logs.
 
-Provenance: PARSE-SOURCE-001, POLICY. The worker restores already validated in-memory entries and needs no further source request or bucket write. Initial destination flags contain paths, not passwords/keys; use the existing SDK credential provider outside this restoration flow. Do not dump environment/configuration/argv/SDK credential errors or file content to construct a receipt. User-requested path/identity diagnostics are preserved through escaping. No automatic receipt file, clipboard action, upload, bucket mutation or external-message delivery is part of this profile.
+Provenance: PARSE-SOURCE-001, POLICY. The worker restores already validated in-memory entries and needs no further source request or bucket write. Destination flags contain paths, not passwords/keys; use the existing SDK credential provider outside this restoration flow. Do not dump environment/configuration/argv/SDK credential errors or file content to construct a receipt. User-requested path/identity diagnostics are preserved through escaping. No automatic receipt file, clipboard action, upload, bucket mutation or external-message delivery is part of this profile.
+
+### RESTORE-UI-015
+
+When the frontend supports OpenPGP archives, it MUST collect archive-unlock credentials only through an explicit no-echo interaction before snapshot construction and keep that interaction separate from destination selection, restore preview, and confirmation. The frontend MUST NOT accept OpenPGP passphrases or exported key bytes through argv or environment values, display them, retain them in browser history, or copy them into catalog objects, snapshots, authentication evidence, receipts, diagnostics, or logs. Exported key material MUST be read from explicitly selected files; SDK/storage credentials remain with the configured provider and outside this archive-unlock interaction.
+
+Provenance: PARSE-ENV-009, PARSE-ENV-021, POLICY. This frontend clause governs acquisition and disclosure only; core requirements separately govern the supported key/passphrase formats, authenticated decryption, signer policy, and completion before snapshot return. It makes no secure-memory-erasure claim and adds no credential-provider or OpenPGP algorithm support.
 
 ### RESTORE-UI-014
 
