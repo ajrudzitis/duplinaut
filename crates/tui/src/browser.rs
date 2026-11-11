@@ -1,6 +1,7 @@
 //! Terminal interaction over one lifecycle-owned storage/preview/restore worker.
 use crate::{
     cli::Destination,
+    credentials::{CredentialPrompt, PromptResult, ReadCredentials},
     display,
     restore_flow::{Acknowledgment, Preview},
     worker::{Command, History, Reply, Worker},
@@ -8,7 +9,7 @@ use crate::{
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use duplicity_core::{
     chain::SetKind,
-    reader::ValidatedSnapshot,
+    reader::{OpenPgpError, ReaderError, ValidatedSnapshot},
     source::{Cancellation, ObjectSource},
 };
 use ratatui::{
@@ -28,6 +29,59 @@ fn pressed_key(event: Event) -> Option<KeyCode> {
     match event {
         Event::Key(key) if key.kind == KeyEventKind::Press => Some(key.code),
         _ => None,
+    }
+}
+
+fn needs_unlock(error: &ReaderError) -> bool {
+    matches!(
+        error,
+        ReaderError::Crypto(OpenPgpError::MissingPassword | OpenPgpError::MissingSecretKey)
+    )
+}
+
+fn safe_read_error(error: &ReaderError) -> &'static str {
+    match error {
+        ReaderError::Crypto(
+            OpenPgpError::WrongCredentials | OpenPgpError::AuthenticationFailed,
+        ) => "OpenPGP authentication failed; no snapshot was installed.",
+        ReaderError::Crypto(OpenPgpError::MissingPassword | OpenPgpError::MissingSecretKey) => {
+            "Archive unlock credentials are required before a snapshot can be read."
+        }
+        _ => "Snapshot validation failed; no snapshot was installed.",
+    }
+}
+
+fn drain_queued_prompt_events(
+    mut pending: impl FnMut() -> io::Result<bool>,
+    mut discard: impl FnMut() -> io::Result<()>,
+) -> io::Result<()> {
+    const EVENT_DRAIN_LIMIT: usize = 4096;
+    for _ in 0..EVENT_DRAIN_LIMIT {
+        if !pending()? {
+            return Ok(());
+        }
+        discard()?;
+    }
+    if pending()? {
+        return Err(io::Error::other(
+            "terminal input remained queued after credential prompt",
+        ));
+    }
+    Ok(())
+}
+
+//= docs/parsing-requirements.md#restore-ui-015
+//= type=implementation
+//# A visible selected-file path MUST accept at most 4096 UTF-8 bytes, be byte-escaped for terminal rendering, and render within a fixed bounded field.
+fn escaped_prompt_path(input: &str, limit: usize) -> String {
+    let escaped = display::bytes(input.as_bytes());
+    if escaped.len() <= limit {
+        escaped
+    } else {
+        let mut bounded = escaped;
+        bounded.truncate(limit.saturating_sub(3));
+        bounded.push_str("...");
+        bounded
     }
 }
 fn take_confirmation(ack: &mut Acknowledgment, code: KeyCode) -> bool {
@@ -327,6 +381,9 @@ mod key_event_tests {
 //= docs/parsing-requirements.md#restore-ui-014
 //= type=implementation
 //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+//= docs/parsing-requirements.md#restore-ui-015
+//= type=implementation
+//# When the frontend supports OpenPGP archives, it MUST collect archive-unlock credentials only through an explicit no-echo interaction before snapshot construction and keep that interaction separate from destination selection, restore preview, and confirmation.
 pub fn run_configured(
     source: Arc<dyn ObjectSource>,
     prefix: String,
@@ -340,6 +397,10 @@ pub fn run_configured(
     let mut selected = 0usize;
     let mut anchor = None;
     let mut total = None;
+    let mut credential_prompt: Option<CredentialPrompt> = None;
+    let mut pending_unlock_scan: Option<(usize, duplicity_core::names::Timestamp)> = None;
+    let mut read_credentials: Option<Arc<ReadCredentials>> = None;
+    let mut selected_scan: Option<(usize, duplicity_core::names::Timestamp)> = None;
     let mut active = Some(0u64);
     let mut serial = 0u64;
     let mut scan_confirm = false;
@@ -388,6 +449,26 @@ pub fn run_configured(
                                     status=format!("Validated snapshot: {} entries, {} payload bytes. p read-only; r executable preview.",value.state().len(),value.state().payload_bytes());
                                     snapshot = Some(value);
                                 }
+                                Reply::ReadFailure { error, .. } if needs_unlock(&error) => {
+                                    snapshot = None;
+                                    marked.clear();
+                                    preview = None;
+                                    ack.clear();
+                                    read_credentials = None;
+                                    pending_unlock_scan = selected_scan;
+                                    credential_prompt = Some(CredentialPrompt::new());
+                                    scan_confirm = false;
+                                    status =
+                                        "Archive unlock required before snapshot construction."
+                                            .into();
+                                }
+                                Reply::ReadFailure { error, .. } => {
+                                    snapshot = None;
+                                    marked.clear();
+                                    preview = None;
+                                    ack.clear();
+                                    status = safe_read_error(&error).into();
+                                }
                                 Reply::Preview { .. } => {
                                     unreachable!("matching preview mapped by dispatch_reply")
                                 }
@@ -425,9 +506,118 @@ pub fn run_configured(
                     _ => {}
                 }
                 let count = snapshot.as_ref().map_or(history.len(), |s| s.state().len());
-                terminal.draw(|frame|{let areas=Layout::vertical([Constraint::Length(3),Constraint::Min(2),Constraint::Length(6)]).split(frame.area());frame.render_widget(Paragraph::new(format!("DUPLICITY / BACKUP READER   full anchor: {anchor:?}")).style(Style::default().fg(Color::Cyan)).block(Block::bordered()),areas[0]);let height=usize::from(areas[1].height.saturating_sub(2)).max(1);
-   if let Some(text)=preview.as_ref().map(|p|p.text.as_str()).or(document.as_deref()){let width=usize::from(areas[1].width.saturating_sub(2)).max(1);let wrapped=wrapped_rows(text,width);scroll_max=wrapped.clone().count().saturating_sub(1);offset=offset.min(scroll_max);let lines:Vec<&str>=wrapped.skip(offset).take(height).collect();frame.render_widget(Paragraph::new(lines.join("\n")).block(Block::bordered().title("Restore preview / outcome / Up-Down scroll")),areas[1]);}else{let first=selected.saturating_sub(height/2).min(count.saturating_sub(height));let items:Vec<ListItem>=if let Some(value)=&snapshot{value.state().entries().enumerate().skip(first).take(height).map(|(i,(path,entry))|ListItem::new(format!("{} {:?} {:03o} {:>10} {}",if marked.contains(&i){"*"}else{" "},entry.entry_type(),entry.mode()&0o777,entry.content().map_or(0,<[u8]>::len),display::path(path)))).collect()}else{history.iter().skip(first).take(height).map(|row|ListItem::new(row.label.as_str())).collect()};let mut cursor=ListState::default().with_selected((count!=0).then_some(selected.saturating_sub(first)));frame.render_stateful_widget(List::new(items).block(Block::bordered().title(if snapshot.is_some(){"Snapshot paths"}else{"History / metadata only"})).highlight_style(Style::default().bg(Color::DarkGray).fg(Color::White)),areas[1],&mut cursor);}
-   let footer=if preview.is_some(){format!("{status}\nAcknowledgment [{}] {}\nType restore then Enter | Up/Down scroll | Esc abandons",display::bytes(ack.text().as_bytes()),if ack.armed{"ready"}else{"unarmed"})}else{format!("{status}\nUp/Down | a anchor | Enter scan | Space mark | p read-only | r restore preview | Esc back/cancel | q quit")};frame.render_widget(Paragraph::new(footer).wrap(Wrap{trim:false}).block(Block::bordered()),areas[2]);})?;
+                terminal.draw(|frame| {
+                    let areas = Layout::vertical([
+                        Constraint::Length(3),
+                        Constraint::Min(2),
+                        Constraint::Length(6),
+                    ])
+                    .split(frame.area());
+                    frame.render_widget(
+                        Paragraph::new(format!(
+                            "DUPLICITY / BACKUP READER   full anchor: {anchor:?}"
+                        ))
+                        .style(Style::default().fg(Color::Cyan))
+                        .block(Block::bordered()),
+                        areas[0],
+                    );
+                    let height = usize::from(areas[1].height.saturating_sub(2)).max(1);
+                    if let Some(prompt) = credential_prompt.as_ref() {
+                        let mut text = prompt.prompt_text().to_string();
+                        if let Some(input) = prompt.visible_input() {
+                            text.push('\n');
+                            text.push_str(&escaped_prompt_path(input, 256));
+                        } else if prompt.accepts_secret_input() {
+                            text.push_str("\n[passphrase input hidden]");
+                        }
+                        if let Some(notice) = prompt.notice() {
+                            text.push('\n');
+                            text.push_str(notice);
+                        }
+                        frame.render_widget(
+                            Paragraph::new(text)
+                                .wrap(Wrap { trim: false })
+                                .block(Block::bordered().title("Archive unlock")),
+                            areas[1],
+                        );
+                    } else if let Some(text) =
+                        preview.as_ref().map(|p| p.text.as_str()).or(document.as_deref())
+                    {
+                        let width = usize::from(areas[1].width.saturating_sub(2)).max(1);
+                        let wrapped = wrapped_rows(text, width);
+                        scroll_max = wrapped.clone().count().saturating_sub(1);
+                        offset = offset.min(scroll_max);
+                        let lines: Vec<&str> = wrapped.skip(offset).take(height).collect();
+                        frame.render_widget(
+                            Paragraph::new(lines.join("\n")).block(
+                                Block::bordered().title("Restore preview / outcome / Up-Down scroll"),
+                            ),
+                            areas[1],
+                        );
+                    } else {
+                        let first = selected.saturating_sub(height / 2).min(count.saturating_sub(height));
+                        let items: Vec<ListItem> = if let Some(value) = &snapshot {
+                            value
+                                .state()
+                                .entries()
+                                .enumerate()
+                                .skip(first)
+                                .take(height)
+                                .map(|(i, (path, entry))| {
+                                    ListItem::new(format!(
+                                        "{} {:?} {:03o} {:>10} {}",
+                                        if marked.contains(&i) { "*" } else { " " },
+                                        entry.entry_type(),
+                                        entry.mode() & 0o777,
+                                        entry.content().map_or(0, <[u8]>::len),
+                                        display::path(path)
+                                    ))
+                                })
+                                .collect()
+                        } else {
+                            history
+                                .iter()
+                                .skip(first)
+                                .take(height)
+                                .map(|row| ListItem::new(row.label.as_str()))
+                                .collect()
+                        };
+                        let mut cursor = ListState::default()
+                            .with_selected((count != 0).then_some(selected.saturating_sub(first)));
+                        frame.render_stateful_widget(
+                            List::new(items)
+                                .block(Block::bordered().title(if snapshot.is_some() {
+                                    "Snapshot paths"
+                                } else {
+                                    "History / metadata only"
+                                }))
+                                .highlight_style(
+                                    Style::default().bg(Color::DarkGray).fg(Color::White),
+                                ),
+                            areas[1],
+                            &mut cursor,
+                        );
+                    }
+                    let footer = if credential_prompt.is_some() {
+                        "Enter continues/submits; Esc cancels archive unlock. Passphrases are not displayed.".to_string()
+                    } else if preview.is_some() {
+                        format!(
+                            "{status}\nAcknowledgment [{}] {}\nType restore then Enter | Up/Down scroll | Esc abandons",
+                            display::bytes(ack.text().as_bytes()),
+                            if ack.armed { "ready" } else { "unarmed" }
+                        )
+                    } else {
+                        format!(
+                            "{status}\nUp/Down | a anchor | Enter scan | Space mark | p read-only | r restore preview | u unlock/change credentials | Esc back/cancel | q quit"
+                        )
+                    };
+                    frame.render_widget(
+                        Paragraph::new(footer)
+                            .wrap(Wrap { trim: false })
+                            .block(Block::bordered()),
+                        areas[2],
+                    );
+                })?;
                 // The concrete preview and empty field have rendered. Bounded drain never
                 // arms while terminal input remains buffered, including across iterations.
                 if preview.is_some() && !ack.armed {
@@ -451,6 +641,61 @@ pub fn run_configured(
                     continue;
                 };
                 if active_key_transition(code, active, cancel, &mut abandoning, &mut status) {
+                    continue;
+                }
+                if let Some(prompt_result) =
+                    credential_prompt.as_mut().map(|prompt| prompt.handle(code))
+                {
+                    match prompt_result {
+                        PromptResult::Pending => {}
+                        PromptResult::Cancelled => {
+                            credential_prompt = None;
+                            pending_unlock_scan = None;
+                            read_credentials = None;
+                            snapshot = None;
+                            marked.clear();
+                            ack.clear();
+                            status = "Archive unlock cancelled; no snapshot was created.".into();
+                            drain_queued_prompt_events(
+                                || event::poll(Duration::ZERO),
+                                || {
+                                    let _ = event::read()?;
+                                    Ok(())
+                                },
+                            )?;
+                        }
+                        PromptResult::Complete(selected_credentials) => {
+                            credential_prompt = None;
+                            drain_queued_prompt_events(
+                                || event::poll(Duration::ZERO),
+                                || {
+                                    let _ = event::read()?;
+                                    Ok(())
+                                },
+                            )?;
+                            let Some((full, target)) = pending_unlock_scan.take() else {
+                                status = "Archive unlock selection lost its pending read.".into();
+                                continue;
+                            };
+                            read_credentials = selected_credentials.map(Arc::new);
+                            serial = serial
+                                .checked_add(1)
+                                .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
+                            *cancel = Cancellation::default();
+                            worker.send(Command::Scan {
+                                id: serial,
+                                anchor: full,
+                                target,
+                                credentials: read_credentials.as_ref().map(Arc::clone),
+                                cancel: cancel.clone(),
+                            })?;
+                            selected_scan = Some((full, target));
+                            active = Some(serial);
+                            snapshot = None;
+                            marked.clear();
+                            status = "Reading and validating the selected snapshot; credentials stay hidden.".into();
+                        }
+                    }
                     continue;
                 }
                 if preview.is_some() {
@@ -597,6 +842,38 @@ pub fn run_configured(
                         )?;
                         continue;
                     }
+                    KeyCode::Char('u') => {
+                        if let Some(full) = anchor {
+                            let target = selected_scan
+                                .filter(|(scan_anchor, _)| *scan_anchor == full)
+                                .map(|(_, target)| target)
+                                .or_else(|| history.get(selected).map(|row| row.end));
+                            if let Some(target) = target {
+                                cancel.cancel();
+                                *cancel = Cancellation::default();
+                                serial = serial
+                                    .checked_add(1)
+                                    .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
+                                active = None;
+                                snapshot = None;
+                                marked.clear();
+                                preview = None;
+                                document = None;
+                                ack.clear();
+                                read_credentials = None;
+                                pending_unlock_scan = Some((full, target));
+                                selected_scan = Some((full, target));
+                                credential_prompt = Some(CredentialPrompt::new());
+                                status = "Credentials changed; the prior read ID is retired. Choose archive-unlock inputs.".into();
+                            } else {
+                                status =
+                                    "Choose a target before changing unlock credentials.".into();
+                            }
+                        } else {
+                            status = "Choose a full anchor and target before changing unlock credentials.".into();
+                        }
+                        continue;
+                    }
                     KeyCode::Char('a') if snapshot.is_none() => {
                         scan_confirm = false;
                         if let Some(row) = history.get(selected) {
@@ -623,8 +900,10 @@ pub fn run_configured(
                                         id: serial,
                                         anchor: full,
                                         target: row.end,
+                                        credentials: read_credentials.as_ref().map(Arc::clone),
                                         cancel: cancel.clone(),
                                     })?;
+                                    selected_scan = Some((full, row.end));
                                     active = Some(serial);
                                     scan_confirm = false;
                                     status="Reading and validating every required volume... Esc/q cancels and waits.".into();
@@ -678,6 +957,45 @@ fn wrapped_rows(text: &str, width: usize) -> impl Iterator<Item = &str> + Clone 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::VecDeque;
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-015
+    //= type=test
+    //# After a credential modal submits, queued modal input MUST be drained or quarantined before normal browser input resumes; queued characters, especially `restore`, Enter, or `r`, MUST NOT become restore acknowledgment or a browser command.
+    fn submitted_prompt_drains_queued_modal_keys_before_browser_dispatch() {
+        let queued = std::cell::RefCell::new(VecDeque::from([
+            KeyCode::Char('r'),
+            KeyCode::Char('e'),
+            KeyCode::Char('s'),
+            KeyCode::Char('t'),
+            KeyCode::Enter,
+            KeyCode::Char('r'),
+        ]));
+        let mut discarded = Vec::new();
+        drain_queued_prompt_events(
+            || Ok(!queued.borrow().is_empty()),
+            || {
+                discarded.push(queued.borrow_mut().pop_front().unwrap());
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(discarded.len(), 6);
+        assert!(queued.borrow().is_empty());
+        assert_eq!(
+            discarded,
+            [
+                KeyCode::Char('r'),
+                KeyCode::Char('e'),
+                KeyCode::Char('s'),
+                KeyCode::Char('t'),
+                KeyCode::Enter,
+                KeyCode::Char('r'),
+            ]
+        );
+    }
+
     //= docs/parsing-requirements.md#restore-ui-010
     //= type=test
     //# The frontend MUST render destination, selected paths, staging/candidate names and diagnostics using reversible terminal-safe byte escaping, preserving complete backend identity and warning fields in the accessible final result.

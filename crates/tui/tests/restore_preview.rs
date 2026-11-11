@@ -84,6 +84,7 @@ fn snapshot(
             id,
             anchor,
             target: Timestamp(target),
+            credentials: None,
             cancel: Cancellation::default(),
         })
         .unwrap();

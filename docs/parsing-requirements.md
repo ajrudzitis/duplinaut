@@ -1184,6 +1184,9 @@ retired ID MUST NOT install a snapshot or arm restore confirmation. After a
 credential modal submits, queued modal input MUST be drained or quarantined
 before normal browser input resumes; queued characters, especially `restore`,
 Enter, or `r`, MUST NOT become restore acknowledgment or a browser command.
+The worker MUST build a borrowed CryptoReadContext from the selected profile,
+preserve typed ReaderError values across its bounded reply channel, and install
+a snapshot only after that context succeeds.
 
 Provenance: PARSE-ENV-009, PARSE-ENV-021, POLICY. This frontend clause governs acquisition and disclosure only; core requirements separately govern the supported key/passphrase formats, authenticated decryption, signer policy, and completion before snapshot return. It makes no secure-memory-erasure claim and adds no credential-provider or OpenPGP algorithm support.
 

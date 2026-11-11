@@ -1,13 +1,14 @@
 //! One owned thread and capacity-one queues; shutdown closes/drains before join.
 use crate::{
     cli::Destination,
+    credentials::ReadCredentials,
     display,
     restore_flow::{self, Frozen, Preview},
 };
 use duplicity_core::{
     chain::SetKind,
     names::{NameConfig, Timestamp},
-    reader::{Catalog, ReaderLimits, ValidatedSnapshot},
+    reader::{Catalog, ReaderError, ReaderLimits, ValidatedSnapshot},
     source::{Cancellation, ObjectSource},
 };
 use std::{
@@ -26,6 +27,7 @@ pub enum Command {
         id: u64,
         anchor: usize,
         target: Timestamp,
+        credentials: Option<Arc<ReadCredentials>>,
         cancel: Cancellation,
     },
     Prepare {
@@ -54,6 +56,10 @@ pub enum Reply {
         id: u64,
         value: Arc<ValidatedSnapshot>,
     },
+    ReadFailure {
+        id: u64,
+        error: ReaderError,
+    },
     Preview {
         id: u64,
         result: Result<Preview, restore_flow::Error>,
@@ -72,12 +78,40 @@ impl Reply {
     pub fn id(&self) -> u64 {
         match self {
             Self::Ready(..) => 0,
-            Self::Snapshot { id, .. } | Self::Preview { id, .. } | Self::Error { id, .. } => *id,
+            Self::Snapshot { id, .. }
+            | Self::ReadFailure { id, .. }
+            | Self::Preview { id, .. }
+            | Self::Error { id, .. } => *id,
             #[cfg(target_os = "linux")]
             Self::Outcome { id, .. } => *id,
         }
     }
 }
+
+//= docs/parsing-requirements.md#parse-env-009
+//= type=implementation
+//# The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
+//= docs/parsing-requirements.md#parse-env-021
+//= type=implementation
+//# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+//= docs/parsing-requirements.md#restore-ui-015
+//= type=implementation
+//# The worker MUST build a borrowed CryptoReadContext from the selected profile, preserve typed ReaderError values across its bounded reply channel, and install a snapshot only after that context succeeds.
+fn perform_scan(
+    catalog: &Catalog<'_>,
+    anchor: usize,
+    target: Timestamp,
+    cancel: &Cancellation,
+    credentials: Option<&ReadCredentials>,
+) -> Result<ValidatedSnapshot, ReaderError> {
+    match credentials {
+        Some(credentials) => credentials.with_context(|context| {
+            catalog.read_snapshot_with_crypto(anchor, target, cancel, context)
+        }),
+        None => catalog.read_snapshot(anchor, target, cancel),
+    }
+}
+
 //= docs/parsing-requirements.md#restore-ui-006
 //= type=implementation
 //# The frontend MUST retain one frozen operation's exact snapshot, roots, destination and bounded plan summary across preview and confirmation, and keep at most one active scan, preview or restoration with bounded request/reply queues.
@@ -188,17 +222,24 @@ impl Worker {
                             id,
                             anchor,
                             target,
+                            credentials,
                             cancel,
-                        } => match catalog.read_snapshot(anchor, target, &cancel) {
-                            Ok(value) => Reply::Snapshot {
-                                id,
-                                value: Arc::new(value),
-                            },
-                            Err(_) => Reply::Error {
-                                id,
-                                text: "Snapshot validation failed or was cancelled.",
-                            },
-                        },
+                        } => {
+                            let result = perform_scan(
+                                &catalog,
+                                anchor,
+                                target,
+                                &cancel,
+                                credentials.as_deref(),
+                            );
+                            match result {
+                                Ok(value) => Reply::Snapshot {
+                                    id,
+                                    value: Arc::new(value),
+                                },
+                                Err(error) => Reply::ReadFailure { id, error },
+                            }
+                        }
                         Command::Prepare {
                             id,
                             snapshot,
@@ -446,6 +487,10 @@ pub fn finish(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use duplicity_core::{
+        local::LocalSource,
+        reader::{OpenPgpError, OpenPgpPassword},
+    };
     #[test]
     //= docs/parsing-requirements.md#restore-ui-006
     //= type=test
@@ -486,6 +531,116 @@ mod tests {
             .unwrap();
         assert_eq!(seen, [0, 1]);
     }
+
+    #[test]
+    //= docs/parsing-requirements.md#parse-env-009
+    //= type=test
+    //# The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
+    //= docs/parsing-requirements.md#parse-env-014
+    //= type=test
+    //# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
+    //= docs/parsing-requirements.md#parse-env-021
+    //= type=test
+    //# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+    //= docs/parsing-requirements.md#restore-ui-015
+    //= type=test
+    //# The worker MUST build a borrowed CryptoReadContext from the selected profile, preserve typed ReaderError values across its bounded reply channel, and install a snapshot only after that context succeeds.
+    fn crypto_scan_preserves_typed_failure_and_uses_borrowed_symmetric_context() {
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/duplicity-3.0.7/symmetric");
+        let source = LocalSource::new(fixture).unwrap();
+        let mut worker =
+            Worker::start(Arc::new(source), String::new(), Cancellation::default()).unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        let anchor = loop {
+            match worker.poll() {
+                Ok(Reply::Ready(rows, _)) => {
+                    break rows
+                        .into_iter()
+                        .find(|row| row.kind == SetKind::Full)
+                        .expect("full fixture row")
+                        .index;
+                }
+                Ok(_) => panic!("unexpected startup reply"),
+                Err(mpsc::TryRecvError::Empty) => {
+                    assert!(std::time::Instant::now() < deadline);
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Err(error) => panic!("worker disconnected during discovery: {error:?}"),
+            }
+        };
+        worker
+            .send(Command::Scan {
+                id: 1,
+                anchor,
+                target: Timestamp(1700172800),
+                credentials: Some(Arc::new(ReadCredentials::Symmetric {
+                    message_passphrase: OpenPgpPassword::from("incorrect-public-test-passphrase"),
+                })),
+                cancel: Cancellation::default(),
+            })
+            .unwrap();
+        let wrong_reply = loop {
+            match worker.poll() {
+                Ok(reply) => break reply,
+                Err(mpsc::TryRecvError::Empty) => {
+                    assert!(std::time::Instant::now() < deadline);
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Err(error) => panic!("worker disconnected during wrong credential scan: {error:?}"),
+            }
+        };
+        match wrong_reply {
+            Reply::ReadFailure {
+                id: 1,
+                error:
+                    ReaderError::Crypto(
+                        OpenPgpError::WrongCredentials | OpenPgpError::AuthenticationFailed,
+                    ),
+            } => {}
+            Reply::ReadFailure { .. } => panic!("wrong credential returned another typed error"),
+            Reply::Snapshot { .. } => panic!("wrong credential produced a snapshot"),
+            _ => panic!("wrong credential returned a non-scan reply"),
+        }
+        worker
+            .send(Command::Scan {
+                id: 2,
+                anchor,
+                target: Timestamp(1700172800),
+                credentials: Some(Arc::new(ReadCredentials::Symmetric {
+                    message_passphrase: OpenPgpPassword::from(
+                        "duplicity-reader-public-test-fixture",
+                    ),
+                })),
+                cancel: Cancellation::default(),
+            })
+            .unwrap();
+        let success_reply = loop {
+            match worker.poll() {
+                Ok(reply) => break reply,
+                Err(mpsc::TryRecvError::Empty) => {
+                    assert!(std::time::Instant::now() < deadline);
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Err(error) => panic!("worker disconnected during valid credential scan: {error:?}"),
+            }
+        };
+        match success_reply {
+            Reply::Snapshot { id: 2, value } => {
+                assert_eq!(value.target(), Timestamp(1700172800));
+                assert_eq!(value.authentication_evidence().objects().len(), 6);
+                assert!(value
+                    .authentication_evidence()
+                    .objects()
+                    .iter()
+                    .all(|record| record.kind
+                        == duplicity_core::reader::AuthenticationKind::OpenPgpIntegrity));
+            }
+            Reply::ReadFailure { .. } => panic!("valid credentials failed to read snapshot"),
+            _ => panic!("valid credentials returned a non-scan reply"),
+        }
+        worker.shutdown(&Cancellation::default(), |_| {}).unwrap();
+    }
     #[test]
     //= docs/parsing-requirements.md#restore-ui-006
     //= type=test
@@ -524,6 +679,7 @@ mod tests {
                 id: 3,
                 anchor: 0,
                 target: Timestamp(0),
+                credentials: None,
                 cancel: Cancellation::default()
             })
             .is_err());

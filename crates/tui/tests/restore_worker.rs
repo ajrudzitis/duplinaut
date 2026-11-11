@@ -65,6 +65,7 @@ fn worker() -> Worker {
     )
     .unwrap()
 }
+
 #[test]
 //= docs/parsing-requirements.md#restore-ui-002
 //= type=test
@@ -108,6 +109,7 @@ fn official_three_dates_pass_through_frozen_frontend_worker_and_source_oracles()
                 id,
                 anchor,
                 target: Timestamp(1700000000 + day * 86400),
+                credentials: None,
                 cancel: Cancellation::default(),
             })
             .unwrap();
@@ -269,6 +271,7 @@ fn preview_cancellation_releases_request_and_scan_serializes_work() {
             id: 1,
             anchor,
             target: Timestamp(1700000000),
+            credentials: None,
             cancel: Cancellation::default(),
         })
         .unwrap();
@@ -277,6 +280,7 @@ fn preview_cancellation_releases_request_and_scan_serializes_work() {
             id: 2,
             anchor,
             target: Timestamp(1700000000),
+            credentials: None,
             cancel: Cancellation::default()
         })
         .is_err());
@@ -329,6 +333,7 @@ fn controlled_terminal_error_during_execute_drains_joins_and_retains_typed_resul
             id: 1,
             anchor,
             target: Timestamp(1700000000),
+            credentials: None,
             cancel: Cancellation::default(),
         })
         .unwrap();
@@ -449,6 +454,7 @@ fn production_lifecycle_teardown_and_sink_faults_during_execute_keep_typed_outco
             id: 1,
             anchor,
             target: Timestamp(1700000000),
+            credentials: None,
             cancel: Cancellation::default(),
         })
         .unwrap();
