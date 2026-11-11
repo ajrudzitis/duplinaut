@@ -1,8 +1,10 @@
 # TUI OpenPGP credential-flow acceptance
 
-Status: accepted specification; implementation and acceptance test are
-pending. No credential UI, frontend implementation, or acceptance test is
-claimed by this document.
+Status: accepted specification; the credential prompt, bounded input/file
+handling, typed worker bridge, and Linux PTY acceptance cases are implemented.
+Local `cargo xtask ci` and portable checks pass. The Linux-gated executable
+PTY cases have not run on this macOS host; hosted Linux assurance remains
+pending.
 
 ## Goal and bounded profile
 
@@ -193,12 +195,15 @@ provider and are not part of this OpenPGP prompt.
 
 - [x] Clarify RESTORE-UI-013 for read-only restore/source handling and add RESTORE-UI-015 for the not-yet-implemented archive-unlock flow.
 - [x] Independently review and adopt this specification.
-- [ ] Implement the no-echo prompt and typed worker/context bridge.
-- [ ] Bound input/file reads and quarantine queued prompt keystrokes before
-      normal browser input resumes; prove stale credential replies are retired.
-- [ ] Add real-executable Linux PTY tests for all three named profiles and the
-      wrong-passphrase/no-publication case.
-- [ ] Complete targeted Duvet queries/full trace, full tests, formatting,
+- [x] Implement the no-echo prompt, bounded input/file reads, typed worker/
+      context bridge, credential-change token retirement, stale-reply
+      rejection, and queued-prompt-input quarantine.
+- [x] Add real-executable Linux PTY cases for all three named profiles,
+      wrong-passphrase/no-publication, queued-key quarantine, and prompt
+      cancellation/terminal restoration.
+- [ ] Execute and pass the Linux-gated PTY cases, including signed-profile
+      publication, on hosted Linux.
+- [x] Complete targeted Duvet queries/full trace, full tests, formatting,
       strict Clippy and local assurance CI.
-- [ ] Pass independent implementation/security review.
+- [x] Pass independent implementation/security review.
 - [ ] Pass hosted Linux assurance and Duvet Pages publication.

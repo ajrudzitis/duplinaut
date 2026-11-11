@@ -28,6 +28,7 @@ use std::{
 const ROWS: u16 = 22;
 const COLS: u16 = 240;
 const OUTPUT_LIMIT: usize = 8 * 1024 * 1024;
+const STDERR_LIMIT: usize = 64 * 1024;
 const PHASE_TIMEOUT: Duration = Duration::from_secs(45);
 const RESTORE_TIMEOUT: Duration = Duration::from_secs(120);
 const HISTORY_MARKER: &[u8] = b"duplicity-full.20231114T221320Z.manifest";
@@ -1481,4 +1482,615 @@ fn production_linux_tui_preserves_raw_destination_and_selected_path_identity() {
 
 fn screen_has(parser: &vt100::Parser, text: &str) -> bool {
     parser.screen().contents().contains(text)
+}
+
+fn credential_process_args_and_environment(wrapper_pid: u32) -> (Vec<u8>, Vec<u8>) {
+    let executable = fs::canonicalize(env!("CARGO_BIN_EXE_duplicity-tui"))
+        .expect("canonicalize production executable");
+    let mut pending = vec![wrapper_pid];
+    while let Some(pid) = pending.pop() {
+        let root = PathBuf::from(format!("/proc/{pid}"));
+        let args = fs::read(root.join("cmdline")).expect("read child command line");
+        let actual_executable = fs::read_link(root.join("exe"))
+            .ok()
+            .and_then(|path| fs::canonicalize(path).ok());
+        let argv_zero = args.split(|byte| *byte == 0).next().unwrap_or_default();
+        if actual_executable.as_ref() == Some(&executable)
+            || argv_zero == executable.as_os_str().as_bytes()
+        {
+            let env = fs::read(root.join("environ")).expect("read production child environment");
+            return (args, env);
+        }
+        if let Ok(children) = fs::read(root.join(format!("task/{pid}/children"))) {
+            pending.extend(
+                children
+                    .split(|byte| byte.is_ascii_whitespace())
+                    .filter(|child| !child.is_empty())
+                    .filter_map(|child| std::str::from_utf8(child).ok()?.parse::<u32>().ok()),
+            );
+        }
+    }
+    panic!("could not locate production executable below setsid PID {wrapper_pid}");
+}
+
+fn assert_absent_bytes(container: &[u8], needle: &[u8], what: &str) {
+    assert!(
+        !needle.is_empty()
+            && !container
+                .windows(needle.len())
+                .any(|window| window == needle),
+        "credential bytes appeared in {what}"
+    );
+}
+
+fn drain_bounded_stderr(mut reader: impl Read) -> (Vec<u8>, bool) {
+    let mut captured = Vec::new();
+    let mut overflow = false;
+    let mut chunk = [0u8; 8192];
+    loop {
+        let count = reader.read(&mut chunk).expect("drain child stderr");
+        if count == 0 {
+            break;
+        }
+        let available = STDERR_LIMIT.saturating_sub(captured.len());
+        let retained = count.min(available);
+        captured.extend_from_slice(&chunk[..retained]);
+        overflow |= retained != count;
+    }
+    (captured, overflow)
+}
+
+struct CredentialSession {
+    child: ChildGuard,
+    master: File,
+    slave: File,
+    original_termios: nix::sys::termios::Termios,
+    output: Vec<u8>,
+    parser: vt100::Parser,
+    stderr_reader: std::thread::JoinHandle<(Vec<u8>, bool)>,
+    scratch: TestTree,
+    fixture: PathBuf,
+    parent: PathBuf,
+    destination: PathBuf,
+    source_before: Vec<(PathBuf, Option<[u8; 32]>)>,
+}
+
+impl CredentialSession {
+    fn start(fixture: &Path, destination_name: &str) -> Self {
+        let fixture = fs::canonicalize(fixture).expect("canonicalize encrypted fixture");
+        let source_before = fingerprint(&fixture);
+        let mut scratch = TestTree::new();
+        scratch.preserve();
+        let parent = scratch.path.join("parent");
+        fs::create_dir(&parent).expect("create empty destination parent");
+        let destination = parent.join(destination_name);
+        assert!(!destination.exists());
+
+        let winsize = Winsize {
+            ws_row: ROWS,
+            ws_col: COLS,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        let pty = openpty(Some(&winsize), None).expect("open credential-flow PTY");
+        fcntl_setfd(&pty.master, FdFlags::CLOEXEC).expect("close PTY master on exec");
+        let slave = File::from(pty.slave);
+        fcntl_setfd(&slave, FdFlags::CLOEXEC).expect("close parent PTY slave on exec");
+        let original_termios = tcgetattr(&slave).expect("read original credential PTY termios");
+        let master = File::from(pty.master);
+        let mut command = Command::new("setsid");
+        command
+            .arg("--wait")
+            .arg(env!("CARGO_BIN_EXE_duplicity-tui"))
+            .arg("local")
+            .arg(&fixture)
+            .arg("--restore-parent")
+            .arg(&parent)
+            .arg("--restore-name")
+            .arg(destination_name)
+            .current_dir(&scratch.path)
+            .env_clear()
+            .env("TERM", "xterm-256color")
+            .stdin(Stdio::from(slave.try_clone().unwrap()))
+            .stdout(Stdio::from(slave.try_clone().unwrap()))
+            .stderr(Stdio::piped());
+        let mut child = ChildGuard(command.spawn().expect("launch production TUI under setsid"));
+        let stderr = child.0.stderr.take().expect("capture child stderr");
+        let stderr_reader = std::thread::spawn(move || drain_bounded_stderr(stderr));
+        Self {
+            child,
+            master,
+            slave,
+            original_termios,
+            output: Vec::new(),
+            parser: vt100::Parser::new(ROWS, COLS, 0),
+            stderr_reader,
+            scratch,
+            fixture,
+            parent,
+            destination,
+            source_before,
+        }
+    }
+
+    fn wait(&mut self, phase: &str, expected: impl Fn(&str) -> bool) {
+        wait_screen(
+            &self.master,
+            &mut self.child,
+            &mut self.output,
+            &mut self.parser,
+            phase,
+            PHASE_TIMEOUT,
+            expected,
+        );
+    }
+
+    fn send(&self, bytes: &[u8]) {
+        let written = write(&self.master, bytes).expect("write credential-flow PTY input");
+        assert_eq!(written, bytes.len(), "PTY accepted the full input burst");
+    }
+
+    fn prepare_final_scan(&mut self) {
+        self.wait("encrypted history discovery", |screen| {
+            screen.contains(std::str::from_utf8(HISTORY_MARKER).unwrap())
+                && screen.contains("Metadata only. a selects full anchor")
+        });
+        self.send(b"a");
+        self.wait("encrypted full-anchor selection", |screen| {
+            screen.contains("Full anchor selected; choose target then Enter.")
+        });
+        self.send(b"\x1b[B\x1b[B\r");
+        self.wait("encrypted final target confirmation", |screen| {
+            screen.contains("Full volume scan required.") && screen.contains("Enter confirms.")
+        });
+        self.send(b"\r");
+        self.wait("missing-credential prompt", |screen| {
+            screen.contains("Choose unlock profile: s symmetric")
+        });
+    }
+
+    fn assert_no_echo(&self) {
+        use nix::sys::termios::LocalFlags;
+        let current = tcgetattr(&self.slave).expect("read no-echo credential prompt state");
+        assert!(!current.local_flags.contains(LocalFlags::ECHO));
+        assert_ne!(current, self.original_termios);
+    }
+
+    fn assert_process_secrets_absent(&self, values: &[&[u8]]) {
+        let (args, env) = credential_process_args_and_environment(self.child.0.id());
+        for value in values {
+            assert_absent_bytes(&args, value, "child command line");
+            assert_absent_bytes(&env, value, "child environment");
+        }
+    }
+
+    fn quit_and_verify(mut self, secrets: &[&[u8]], published: bool) {
+        self.send(b"q");
+        let status = wait_exit(&self.master, &mut self.child, &mut self.output)
+            .expect("credential-flow TUI exit timeout");
+        assert!(status.success(), "production TUI exited with {status}");
+        assert_eq!(tcgetattr(&self.slave).unwrap(), self.original_termios);
+        let (stderr, stderr_overflow) = self.stderr_reader.join().expect("stderr reader join");
+        assert!(!stderr_overflow, "stderr exceeded capture bound");
+        let final_screen = self.parser.screen().contents();
+        for secret in secrets {
+            assert_absent_bytes(&self.output, secret, "terminal transcript");
+            assert_absent_bytes(final_screen.as_bytes(), secret, "current terminal screen");
+            assert_absent_bytes(&stderr, secret, "child stderr");
+        }
+        assert_eq!(fingerprint(&self.fixture), self.source_before);
+        if published {
+            assert!(self.destination.is_dir());
+            let names: Vec<_> = fs::read_dir(&self.parent)
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name())
+                .collect();
+            assert_eq!(
+                names,
+                vec![self.destination.file_name().unwrap().to_os_string()]
+            );
+        } else {
+            assert!(!self.destination.exists());
+            assert_eq!(fs::read_dir(&self.parent).unwrap().count(), 0);
+        }
+        self.scratch.cleanup_after_assertions();
+    }
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-009
+//= type=test
+//# The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
+//= docs/parsing-requirements.md#parse-env-014
+//= type=test
+//# The adapter MUST return unsuccessful restoration for any failed integrity, key-binding, configured signer, or complete-read check without publishing staged plaintext.
+//= docs/parsing-requirements.md#parse-env-021
+//= type=test
+//# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+//= docs/parsing-requirements.md#restore-ui-013
+//= type=test
+//# The frontend MUST keep backup source access read-only and avoid exposing SDK/storage credentials, backup payload bytes or secret material through the restoration interaction, diagnostics, or automatic logs.
+//= docs/parsing-requirements.md#restore-ui-014
+//= type=test
+//# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+//= docs/parsing-requirements.md#restore-ui-015
+//= type=test
+//# The worker MUST build a borrowed CryptoReadContext from the selected profile, preserve typed ReaderError values across its bounded reply channel, and install a snapshot only after that context succeeds.
+fn production_linux_tui_rejects_wrong_symmetric_passphrase_without_snapshot_or_restore() {
+    use nix::sys::termios::LocalFlags;
+    use std::{io::Read, thread};
+
+    const PASS: &[u8] = b"wrong-public-fixture-passphrase";
+    let fixture = fs::canonicalize(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/duplicity-3.0.7/symmetric"),
+    )
+    .expect("official symmetric fixture");
+    let before = fingerprint(&fixture);
+    let mut test_tree = TestTree::new();
+    test_tree.preserve();
+    let parent = test_tree.path.join("parent");
+    fs::create_dir(&parent).expect("create empty destination parent");
+    let destination = parent.join("wrong-password-tree");
+    assert!(!destination.exists());
+
+    let winsize = Winsize {
+        ws_row: ROWS,
+        ws_col: COLS,
+        ws_xpixel: 0,
+        ws_ypixel: 0,
+    };
+    let pty = openpty(Some(&winsize), None).expect("open credential-flow PTY");
+    fcntl_setfd(&pty.master, FdFlags::CLOEXEC).expect("close PTY master on exec");
+    let slave = File::from(pty.slave);
+    fcntl_setfd(&slave, FdFlags::CLOEXEC).expect("close parent PTY slave on exec");
+    let original_termios = tcgetattr(&slave).expect("read original PTY termios");
+    let master = File::from(pty.master);
+    let mut command = Command::new("setsid");
+    command
+        .arg("--wait")
+        .arg(env!("CARGO_BIN_EXE_duplicity-tui"))
+        .arg("local")
+        .arg(&fixture)
+        .arg("--restore-parent")
+        .arg(&parent)
+        .arg("--restore-name")
+        .arg("wrong-password-tree")
+        .current_dir(&test_tree.path)
+        .env_clear()
+        .env("TERM", "xterm-256color")
+        .stdin(Stdio::from(slave.try_clone().unwrap()))
+        .stdout(Stdio::from(slave.try_clone().unwrap()))
+        .stderr(Stdio::piped());
+    let mut child = ChildGuard(command.spawn().expect("launch production TUI under setsid"));
+    let stderr = child.0.stderr.take().expect("capture child stderr");
+    let stderr_reader = thread::spawn(move || drain_bounded_stderr(stderr));
+    let mut output = Vec::new();
+    let mut parser = vt100::Parser::new(ROWS, COLS, 0);
+
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "symmetric history discovery",
+        PHASE_TIMEOUT,
+        |screen| {
+            screen.contains(std::str::from_utf8(HISTORY_MARKER).unwrap())
+                && screen.contains("Metadata only. a selects full anchor")
+        },
+    );
+    write(&master, b"a").expect("select full anchor");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "symmetric anchor selection",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Full anchor selected; choose target then Enter."),
+    );
+    write(&master, b"\x1b[B\x1b[B\r").expect("select final target and request scan");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "symmetric scan confirmation",
+        PHASE_TIMEOUT,
+        |screen| {
+            screen.contains("Full volume scan required.") && screen.contains("Enter confirms.")
+        },
+    );
+    write(&master, b"\r").expect("confirm symmetric snapshot read");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "no-echo symmetric credential profile prompt",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Choose unlock profile: s symmetric"),
+    );
+    write(&master, b"s").expect("select symmetric profile");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "symmetric passphrase prompt",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("Message passphrase (input hidden; no mask or length is shown):"),
+    );
+    let terminal_state = tcgetattr(&slave).expect("read no-echo prompt termios");
+    assert!(!terminal_state.local_flags.contains(LocalFlags::ECHO));
+    assert_ne!(terminal_state, original_termios);
+    let (args, env) = credential_process_args_and_environment(child.0.id());
+    assert_absent_bytes(&args, PASS, "child command line");
+    assert_absent_bytes(&env, PASS, "child environment");
+
+    // The queued restore acknowledgment, Enter, and preview command must all
+    // be consumed by the modal submit quarantine, not browser dispatch.
+    let mut burst = PASS.to_vec();
+    burst.extend_from_slice(b"\rrestore\rr");
+    write(&master, &burst).expect("submit wrong passphrase with queued browser keys");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "typed symmetric authentication failure",
+        PHASE_TIMEOUT,
+        |screen| screen.contains("OpenPGP authentication failed; no snapshot was installed."),
+    );
+    let (args_after_submit, env_after_submit) =
+        credential_process_args_and_environment(child.0.id());
+    assert_absent_bytes(&args_after_submit, PASS, "active-read child command line");
+    assert_absent_bytes(&env_after_submit, PASS, "active-read child environment");
+    let screen = parser.screen().contents();
+    assert!(!screen.contains("Validated snapshot:"));
+    assert!(!screen.contains("Snapshot target:"));
+    assert!(!screen.contains("Published completed tree."));
+    assert!(!destination.exists());
+    assert_eq!(
+        fs::read_dir(&parent).unwrap().count(),
+        0,
+        "wrong credentials produced no destination or staging entry"
+    );
+    write(&master, b"r").expect("try a fresh preview command after failed authentication");
+    wait_screen(
+        &master,
+        &mut child,
+        &mut output,
+        &mut parser,
+        "rejected preview without snapshot",
+        PHASE_TIMEOUT,
+        |screen| {
+            screen.contains("Restore requires a validated snapshot")
+                && !screen.contains("Snapshot target:")
+        },
+    );
+    assert!(!destination.exists());
+    write(&master, b"q").expect("quit after wrong credentials");
+    let status = wait_exit(&master, &mut child, &mut output).expect("wrong-pass UI exit timeout");
+    assert!(status.success());
+    assert_eq!(tcgetattr(&slave).unwrap(), original_termios);
+    let (stderr, stderr_overflow) = stderr_reader.join().expect("stderr reader join");
+    assert!(!stderr_overflow, "stderr exceeded capture bound");
+    for captured in [&output[..], screen.as_bytes(), &stderr] {
+        assert_absent_bytes(captured, PASS, "captured output/status/error");
+    }
+    assert_eq!(
+        fingerprint(&fixture),
+        before,
+        "fixture source remains read-only"
+    );
+    assert_eq!(fs::read_dir(&parent).unwrap().count(), 0);
+    test_tree.cleanup_after_assertions();
+}
+
+#[test]
+//= docs/parsing-requirements.md#parse-env-009
+//= type=test
+//# The adapter MUST support caller-supplied passphrases and exported supported secret keys without invoking external key agents or crypto applications.
+//= docs/parsing-requirements.md#parse-env-021
+//= type=test
+//# The reader integration MUST borrow caller-supplied credential and authorization inputs without cloning secret exports or passphrases into catalog objects, object names, snapshots, evidence receipts, diagnostics or logs.
+//= docs/parsing-requirements.md#restore-ui-003
+//= type=test
+//# The frontend MUST present a concrete restoration preview identifying the exact snapshot target, configured parent and new leaf, marked/all selection, included ancestors, resulting entry count, total regular payload bytes, no-replacement policy and supported metadata policy before offering publication confirmation.
+//= docs/parsing-requirements.md#restore-ui-004
+//= type=test
+//# The frontend MUST start at most one restoration operation only when its displayed successful `r` preview receives the exact ASCII acknowledgment `restore` followed by Enter, and MUST clear that acknowledgment and disarm confirmation when its snapshot, roots or destination changes or the user leaves that preview.
+//= docs/parsing-requirements.md#restore-ui-005
+//= type=test
+//# The frontend MUST execute restoration through the adopted native `restore` API with its reviewed limits and profile policy, without implementing its own path extraction, destination replacement, staging cleanup or filesystem eligibility fallback.
+//= docs/parsing-requirements.md#restore-ui-008
+//= type=test
+//# The frontend MUST preserve the backend's published, unpublished and publication-indeterminate outcome distinction, including successful-publication precedence over racing cancellation and all reported cleanup warnings or uncertainty.
+//= docs/parsing-requirements.md#restore-ui-013
+//= type=test
+//# The frontend MUST keep backup source access read-only and avoid exposing SDK/storage credentials, backup payload bytes or secret material through the restoration interaction, diagnostics, or automatic logs.
+//= docs/parsing-requirements.md#restore-ui-014
+//= type=test
+//# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+//= docs/parsing-requirements.md#restore-ui-015
+//= type=test
+//# The worker MUST build a borrowed CryptoReadContext from the selected profile, preserve typed ReaderError values across its bounded reply channel, and install a snapshot only after that context succeeds.
+fn production_linux_tui_reads_all_supported_credential_profiles_and_publishes_signed_restore() {
+    use nix::sys::termios::LocalFlags;
+    use std::fs;
+
+    const MESSAGE_PASSWORD: &[u8] = b"duplicity-reader-public-test-fixture";
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7");
+    let keys = root.join("test-keys");
+    let secret_export = fs::read(keys.join("secret.asc")).expect("read public test secret export");
+    let signer_export = fs::read(keys.join("public.asc")).expect("read public test signer export");
+    let credentials: serde_json::Value = serde_json::from_slice(
+        &fs::read(keys.join("credentials.json")).expect("read public test credentials"),
+    )
+    .expect("parse public fixture credentials");
+    let key_password = credentials["passphrase"]
+        .as_str()
+        .expect("fixture key password")
+        .as_bytes();
+    let fingerprint = credentials["fingerprint"]
+        .as_str()
+        .expect("fixture signer fingerprint");
+    let oracle: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/duplicity-3.0.7/expected.json"
+    ))
+    .expect("parse official snapshot oracle");
+
+    for (profile, mode) in [(b's', "symmetric"), (b'p', "public-key"), (b'g', "signed")] {
+        let fixture = root.join(mode);
+        let mut session = CredentialSession::start(&fixture, "credential-restore");
+        session.prepare_final_scan();
+        session.send(&[profile]);
+        let mut disclosed_values: Vec<&[u8]> = vec![MESSAGE_PASSWORD, key_password];
+
+        if profile == b's' {
+            session.wait("symmetric message passphrase prompt", |screen| {
+                screen.contains("Message passphrase (input hidden; no mask or length is shown):")
+            });
+            session.assert_no_echo();
+            session.assert_process_secrets_absent(&[MESSAGE_PASSWORD]);
+            let mut burst = MESSAGE_PASSWORD.to_vec();
+            burst.extend_from_slice(b"\rrestore\rr");
+            session.send(&burst);
+            session.assert_process_secrets_absent(&[MESSAGE_PASSWORD]);
+        } else {
+            let secret_path = keys.join("secret.asc");
+            let secret_path_text = secret_path.to_str().expect("ASCII fixture path");
+            session.wait("secret-key export path prompt", |screen| {
+                screen.contains("Secret-key export file path (visible; file contents stay hidden):")
+            });
+            session.send(&[secret_path_text.as_bytes(), b"\r"].concat());
+            session.wait("secret-key passphrase prompt", |screen| {
+                screen.contains("Key passphrase (input hidden; no mask or length is shown):")
+            });
+            session.assert_no_echo();
+            session.assert_process_secrets_absent(&[key_password, &secret_export]);
+            disclosed_values.push(&secret_export);
+
+            if profile == b'p' {
+                let mut burst = key_password.to_vec();
+                burst.extend_from_slice(b"\rrestore\rr");
+                session.send(&burst);
+                session.assert_process_secrets_absent(&[key_password, &secret_export]);
+            } else {
+                session.send(&[key_password, b"\r"].concat());
+                session.assert_process_secrets_absent(&[key_password, &secret_export]);
+                let signer_path = keys.join("public.asc");
+                let signer_path_text = signer_path.to_str().expect("ASCII fixture path");
+                session.wait("signer export path prompt", |screen| {
+                    screen.contains(
+                        "Signer public-key export file path (visible; file contents stay hidden):",
+                    )
+                });
+                session.send(&[signer_path_text.as_bytes(), b"\r"].concat());
+                session.wait("permitted signer fingerprint prompt", |screen| {
+                    screen.contains("Permitted primary fingerprint (40 hexadecimal characters):")
+                });
+                session.assert_process_secrets_absent(&[
+                    key_password,
+                    &secret_export,
+                    &signer_export,
+                ]);
+                disclosed_values.push(&signer_export);
+                let mut burst = fingerprint.as_bytes().to_vec();
+                burst.extend_from_slice(b"\rrestore\rr");
+                session.send(&burst);
+                session.assert_process_secrets_absent(&[
+                    key_password,
+                    &secret_export,
+                    &signer_export,
+                ]);
+            }
+        }
+
+        let snapshot = oracle["snapshots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|snapshot| snapshot["mode"] == mode && snapshot["index"] == 2)
+            .expect("official final profile snapshot");
+        let entries = snapshot["entries"].as_array().unwrap();
+        let payload: u64 = entries
+            .iter()
+            .filter(|entry| entry["kind"] == "file")
+            .map(|entry| entry["size"].as_u64().unwrap())
+            .sum();
+        let expected = format!(
+            "Validated snapshot: {} entries, {payload} payload bytes.",
+            entries.len()
+        );
+        session.wait("complete credentialed final snapshot", |screen| {
+            screen.contains(&expected)
+        });
+        let screen = session.parser.screen().contents();
+        assert!(!screen.contains("Snapshot target:"));
+        assert!(!screen.contains("Acknowledgment ["));
+        assert!(!screen.contains("Published completed tree."));
+        for value in &disclosed_values {
+            assert_absent_bytes(&session.output, value, "credentialed terminal transcript");
+            assert_absent_bytes(screen.as_bytes(), value, "credentialed current screen");
+        }
+        session.assert_process_secrets_absent(&disclosed_values);
+
+        // Only fresh browser input after a validated snapshot may create the
+        // executable preview; the queued submit burst above must not do so.
+        session.send(b"r");
+        session.wait("credentialed executable preview", |screen| {
+            screen.contains("Snapshot target: 1700172800")
+                && screen.contains("Acknowledgment [] ready")
+        });
+
+        if profile == b'g' {
+            session.send(b"restore");
+            session.wait("signed profile exact acknowledgment", |screen| {
+                screen.contains("Acknowledgment [restore] ready")
+            });
+            session.send(b"\r");
+            session.wait("signed profile Published result", |screen| {
+                screen.contains("Published completed tree.")
+            });
+            assert!(session.destination.is_dir());
+            session.quit_and_verify(&disclosed_values, true);
+        } else {
+            assert!(!session.destination.exists());
+            session.send(b"q");
+            session.wait(
+                "credentialed preview abandoned without execution",
+                |screen| screen.contains("Restore preview abandoned; nothing staged."),
+            );
+            session.quit_and_verify(&disclosed_values, false);
+        }
+    }
+}
+
+#[test]
+//= docs/parsing-requirements.md#restore-ui-015
+//= type=test
+//# When the frontend supports OpenPGP archives, it MUST collect archive-unlock credentials only through an explicit no-echo interaction before snapshot construction and keep that interaction separate from destination selection, restore preview, and confirmation.
+fn production_linux_tui_prompt_cancel_restores_terminal_without_snapshot() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/duplicity-3.0.7/symmetric");
+    let mut session = CredentialSession::start(&fixture, "cancelled-restore");
+    session.prepare_final_scan();
+    session.send(b"s");
+    session.wait("cancel test no-echo passphrase prompt", |screen| {
+        screen.contains("Message passphrase (input hidden; no mask or length is shown):")
+    });
+    session.assert_no_echo();
+    session.send(b"\x1b");
+    session.wait("credential prompt cancellation", |screen| {
+        screen.contains("Archive unlock cancelled; no snapshot was created.")
+    });
+    let screen = session.parser.screen().contents();
+    assert!(!screen.contains("Validated snapshot:"));
+    assert!(!screen.contains("Snapshot target:"));
+    assert!(!session.destination.exists());
+    assert_eq!(fs::read_dir(&session.parent).unwrap().count(), 0);
+    session.quit_and_verify(&[], false);
 }

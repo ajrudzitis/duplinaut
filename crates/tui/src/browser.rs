@@ -10,7 +10,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use duplicity_core::{
     chain::SetKind,
     reader::{OpenPgpError, ReaderError, ValidatedSnapshot},
-    source::{Cancellation, ObjectSource},
+    source::{Cancellation, ObjectSource, SourceError},
 };
 use ratatui::{
     layout::{Constraint, Layout},
@@ -47,10 +47,16 @@ fn safe_read_error(error: &ReaderError) -> &'static str {
         ReaderError::Crypto(OpenPgpError::MissingPassword | OpenPgpError::MissingSecretKey) => {
             "Archive unlock credentials are required before a snapshot can be read."
         }
+        ReaderError::Source(SourceError::Cancelled) => {
+            "Snapshot validation failed or was cancelled."
+        }
         _ => "Snapshot validation failed; no snapshot was installed.",
     }
 }
 
+//= docs/parsing-requirements.md#restore-ui-015
+//= type=implementation
+//# After a credential modal submits, queued modal input MUST be drained or quarantined before normal browser input resumes; queued characters, especially `restore`, Enter, or `r`, MUST NOT become restore acknowledgment or a browser command.
 fn drain_queued_prompt_events(
     mut pending: impl FnMut() -> io::Result<bool>,
     mut discard: impl FnMut() -> io::Result<()>,
@@ -67,6 +73,23 @@ fn drain_queued_prompt_events(
             "terminal input remained queued after credential prompt",
         ));
     }
+    Ok(())
+}
+
+//= docs/parsing-requirements.md#restore-ui-015
+//= type=implementation
+//# Changing credentials MUST cancel the current read token and retire its operation ID before a new credential set is accepted.
+fn retire_read_operation(
+    cancel: &mut Cancellation,
+    serial: &mut u64,
+    active: &mut Option<u64>,
+) -> io::Result<()> {
+    cancel.cancel();
+    *serial = serial
+        .checked_add(1)
+        .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
+    *active = None;
+    *cancel = Cancellation::default();
     Ok(())
 }
 
@@ -201,6 +224,9 @@ struct ReplyDispatchState<'a> {
     abandoning: &'a mut bool,
     status: &'a mut String,
 }
+//= docs/parsing-requirements.md#restore-ui-015
+//= type=implementation
+//# Replies carrying the retired ID MUST NOT install a snapshot or arm restore confirmation.
 fn dispatch_reply(reply: Reply, state: ReplyDispatchState<'_>) -> Option<Reply> {
     if *state.active != Some(reply.id()) {
         return None;
@@ -842,6 +868,9 @@ pub fn run_configured(
                         )?;
                         continue;
                     }
+                    //= docs/parsing-requirements.md#restore-ui-015
+                    //= type=implementation
+                    //# Changing credentials MUST cancel the current read token and retire its operation ID before a new credential set is accepted.
                     KeyCode::Char('u') => {
                         if let Some(full) = anchor {
                             let target = selected_scan
@@ -849,12 +878,7 @@ pub fn run_configured(
                                 .map(|(_, target)| target)
                                 .or_else(|| history.get(selected).map(|row| row.end));
                             if let Some(target) = target {
-                                cancel.cancel();
-                                *cancel = Cancellation::default();
-                                serial = serial
-                                    .checked_add(1)
-                                    .ok_or_else(|| io::Error::other("operation ID exhausted"))?;
-                                active = None;
+                                retire_read_operation(cancel, &mut serial, &mut active)?;
                                 snapshot = None;
                                 marked.clear();
                                 preview = None;
@@ -994,6 +1018,118 @@ mod tests {
                 KeyCode::Char('r'),
             ]
         );
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-015
+    //= type=test
+    //# A visible selected-file path MUST accept at most 4096 UTF-8 bytes, be byte-escaped for terminal rendering, and render within a fixed bounded field.
+    fn selected_key_path_is_byte_escaped_and_render_bounded() {
+        assert_eq!(
+            escaped_prompt_path("key-\u{00ff}.asc", 256),
+            "key-\\xc3\\xbf.asc"
+        );
+        let large = "a".repeat(512);
+        let visible = escaped_prompt_path(&large, 64);
+        assert_eq!(visible.len(), 64);
+        assert!(visible.ends_with("..."));
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-015
+    //= type=test
+    //# Changing credentials MUST cancel the current read token and retire its operation ID before a new credential set is accepted.
+    fn credential_change_cancels_old_token_retires_id_and_installs_fresh_token() {
+        let mut cancel = Cancellation::default();
+        let old_token = cancel.clone();
+        let mut active = Some(31);
+        let mut serial = 31;
+        retire_read_operation(&mut cancel, &mut serial, &mut active).unwrap();
+        assert!(old_token.is_cancelled());
+        assert!(!cancel.is_cancelled());
+        assert_eq!(serial, 32);
+        assert_eq!(active, None);
+    }
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-015
+    //= type=test
+    //# Replies carrying the retired ID MUST NOT install a snapshot or arm restore confirmation.
+    fn retired_snapshot_reply_cannot_replace_new_credential_operation() {
+        use duplicity_core::{
+            chain::SetKind,
+            local::LocalSource,
+            names::{NameConfig, Timestamp},
+            reader::{Catalog, ReaderLimits},
+        };
+        use std::path::PathBuf;
+
+        let source = LocalSource::new(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/duplicity-3.0.7/plain"),
+        )
+        .unwrap();
+        let cancel = Cancellation::default();
+        let catalog = Catalog::discover(
+            &source,
+            "duplicity-",
+            NameConfig::default(),
+            ReaderLimits::default(),
+            &cancel,
+        )
+        .unwrap();
+        let anchor = catalog
+            .manifests()
+            .find(|(_, _, set)| {
+                set.kind() == SetKind::Full
+                    && set.start() == Timestamp(1700000000)
+                    && set.end() == Timestamp(1700000000)
+            })
+            .unwrap()
+            .0;
+        let stale_snapshot = Arc::new(
+            catalog
+                .read_snapshot(anchor, Timestamp(1700172800), &cancel)
+                .unwrap(),
+        );
+
+        let retired_id = 31;
+        let new_id = 32;
+        let mut active = Some(new_id);
+        let mut scan_confirm = false;
+        let mut selected = 0;
+        let mut preview = None;
+        let mut offset = 0;
+        let mut ack = Acknowledgment::default();
+        let mut abandoning = false;
+        let mut status = "Reading with replacement credentials".to_string();
+        let mut installed_snapshot = None;
+        let stale_reply = Reply::Snapshot {
+            id: retired_id,
+            value: stale_snapshot,
+        };
+        if let Some(Reply::Snapshot { value, .. }) = dispatch_reply(
+            stale_reply,
+            ReplyDispatchState {
+                active: &mut active,
+                scan_confirm: &mut scan_confirm,
+                selected: &mut selected,
+                preview: &mut preview,
+                offset: &mut offset,
+                ack: &mut ack,
+                abandoning: &mut abandoning,
+                status: &mut status,
+            },
+        ) {
+            installed_snapshot = Some(value);
+        }
+        assert_eq!(active, Some(new_id));
+        assert!(installed_snapshot.is_none());
+        assert!(preview.is_none());
+        assert!(ack.text().is_empty());
+        assert!(!ack.armed);
+        assert!(!scan_confirm);
+        assert_eq!(status, "Reading with replacement credentials");
     }
 
     //= docs/parsing-requirements.md#restore-ui-010

@@ -588,7 +588,35 @@ SPECIFICATION: [Duplicity reader parsing requirements](docs/parsing-requirements
     TEXT[!MUST,implementation,test]: On a controlled terminal I/O failure or shutdown during active restoration, the frontend MUST request cancellation, close or signal its worker request path, attempt terminal-state restoration, drain and join the worker without bounded-channel deadlock, retain its typed result, and attempt escaped final-result reporting through an available non-raw output sink before controlled exit.
 
   SECTION: [RESTORE-UI-013](#restore-ui-013)
-    TEXT[!MUST,implementation,test]: The frontend MUST keep backup source access read-only and avoid collecting or exposing credentials, backup payload bytes or secret material through the restoration interaction, diagnostics or automatic logs.
+    TEXT[!MUST,implementation,test]: The frontend MUST keep backup source access read-only and avoid exposing SDK/storage credentials, backup payload bytes or secret material through the restoration interaction, diagnostics, or automatic logs.
+
+  SECTION: [RESTORE-UI-015](#restore-ui-015)
+    TEXT[!MUST,implementation,test]: When the frontend supports OpenPGP archives, it MUST collect archive-unlock credentials only through an explicit no-echo interaction before snapshot construction and keep that interaction separate from destination selection, restore preview, and confirmation.
+    TEXT[!MUST,implementation,test]: The frontend MUST NOT accept OpenPGP passphrases or exported key bytes through argv or environment values, display them, retain them in browser history, or copy them into catalog objects, snapshots, authentication evidence, receipts, diagnostics, or logs.
+    TEXT[!MUST,implementation,test]: Exported key material MUST be read from explicitly selected files; SDK/storage credentials remain with the configured provider and outside this archive-unlock interaction.
+    TEXT[!MUST,implementation,test]: The passphrase prompt MUST NOT show a mask, length, or other input-dependent
+    TEXT[!MUST,implementation,test]: indication.
+    TEXT[!MUST,implementation,test]: It MUST accept at most 4096 UTF-8 bytes and check a candidate
+    TEXT[!MUST,implementation,test]: character's encoded byte length before allocating/appending it, rejecting an
+    TEXT[!MUST,implementation,test]: over-limit character without growing the input.
+    TEXT[!MUST,implementation,test]: A visible selected-file path
+    TEXT[!MUST,implementation,test]: MUST accept at most 4096 UTF-8 bytes, be byte-escaped for terminal rendering,
+    TEXT[!MUST,implementation,test]: and render within a fixed bounded field.
+    TEXT[!MUST,implementation,test]: Before reading an exported key file,
+    TEXT[!MUST,implementation,test]: the frontend MUST verify that it is a regular file whose metadata length is at
+    TEXT[!MUST,implementation,test]: most 16 MiB, then read with a 16 MiB-plus-one-byte cap and reject overflow if
+    TEXT[!MUST,implementation,test]: the read exceeds the cap, including when the file grows during the read.
+    TEXT[!MUST,implementation,test]: Changing credentials MUST cancel the current read token and retire its
+    TEXT[!MUST,implementation,test]: operation ID before a new credential set is accepted.
+    TEXT[!MUST,implementation,test]: Replies carrying the
+    TEXT[!MUST,implementation,test]: retired ID MUST NOT install a snapshot or arm restore confirmation.
+    TEXT[!MUST,implementation,test]: After a
+    TEXT[!MUST,implementation,test]: credential modal submits, queued modal input MUST be drained or quarantined
+    TEXT[!MUST,implementation,test]: before normal browser input resumes; queued characters, especially `restore`,
+    TEXT[!MUST,implementation,test]: Enter, or `r`, MUST NOT become restore acknowledgment or a browser command.
+    TEXT[!MUST,implementation,test]: The worker MUST build a borrowed CryptoReadContext from the selected profile,
+    TEXT[!MUST,implementation,test]: preserve typed ReaderError values across its bounded reply channel, and install
+    TEXT[!MUST,implementation,test]: a snapshot only after that context succeeds.
 
   SECTION: [RESTORE-UI-014](#restore-ui-014)
     TEXT[!MUST,implementation,test]: Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
