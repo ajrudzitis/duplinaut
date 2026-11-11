@@ -1613,6 +1613,7 @@ tests = [
   { package = "duplicity-core", name = "public_rsa2048_pkesk_full_snapshot_matches_official_oracle" },
   { package = "duplicity-core", name = "public_expired_primary_signature_remains_authorized_offline" },
   { package = "duplicity-core", name = "public_aes128_symmetric_full_snapshot_matches_official_oracle" },
+  { package = "duplicity-core", name = "public_aes192_symmetric_full_snapshot_matches_official_oracle" },
   { package = "duplicity-core", name = "public_signed_manifest_signer_rejection_precedes_volume_open" },
   { package = "duplicity-core", name = "public_ed25519_signing_subkey_full_snapshot_records_primary_and_component" }
 ]
@@ -1724,6 +1725,27 @@ implementations = [
 proofs = []
 tests = [
   { package = "duplicity-core", name = "public_aes128_symmetric_full_snapshot_matches_official_oracle" }
+]
+
+[[milestone]]
+id = "openpgp-aes192-symmetric-compatibility"
+gate = true
+requirements = ["PARSE-ENV-008", "PARSE-ENV-009", "PARSE-ENV-021", "PARSE-ENV-023", "PARSE-STATE-003"]
+specified = true
+implemented = true
+proved = false
+tested = true
+reviewed = true
+proof_required = false
+proof_rationale = "This narrow native milestone enforces Duvet/test attendance for one official AES-192 symmetric Full fixture and observed snapshot order only. It makes no Verus claim about OpenPGP cryptographic primitives or complete reader control flow."
+implementations = [
+  { path = "crates/core/src/openpgp.rs", symbol = "decode" },
+  { path = "crates/core/src/reader.rs", symbol = "read_snapshot_with_crypto" },
+  { path = "crates/core/src/path.rs", symbol = "cmp" }
+]
+proofs = []
+tests = [
+  { package = "duplicity-core", name = "public_aes192_symmetric_full_snapshot_matches_official_oracle" }
 ]
 
 [[milestone]]

@@ -1,7 +1,11 @@
 # PARSE-ENV-008 AES-192 symmetric payload acceptance
 
-Status: proposed; pending independent specification review. No fixture, test,
-assurance-gate, or implementation work is included in this specification yet.
+Status: implementation independently reviewed and accepted. Full core/workspace
+tests, targeted Duvet queries/full trace, formatting, strict Clippy, and full
+local `cargo xtask ci` pass at exact-source receipt SHA-256
+`affd61e1c3f7588425c7df53d1636cf193709cc0d703dc3a75d6fdb73722cbf3`
+(Verus 2,047/3,183/1,371, zero errors). The native-attendance gate is enabled.
+Hosted Linux/Pages checks remain pending.
 
 ## Goal and scope
 
@@ -109,24 +113,31 @@ remain trusted upstream boundaries.
 
 ## Verification and acceptance checklist
 
-- [ ] Independent specification review approves scope and the AES-192 fixture
+- [x] Independent specification review approves scope and the AES-192 fixture
       recipe.
-- [ ] Producer provenance pins versions, commands, exact object hashes and
+- [x] Producer provenance pins versions, commands, exact object hashes and
       identities; independent GnuPG inspection confirms exactly one SKESKv4
       and zero PKESK packets, SEIPDv1/MDC, and AES-192 algorithm ID 8 for both
       objects.
-- [ ] The public-reader test verifies the empty/nonempty credential profile,
+- [x] The public-reader test verifies the empty/nonempty credential profile,
       metadata-only discovery, exact ordered two-key open log, complete
       snapshot oracle, and exactly two integrity-only evidence records.
-- [ ] Duvet links cover PARSE-ENV-008, PARSE-ENV-009, PARSE-ENV-021,
+- [x] Duvet links cover PARSE-ENV-008, PARSE-ENV-009, PARSE-ENV-021,
       PARSE-ENV-023, and the scoped PARSE-STATE-003 order assertion; targeted
       queries and full trace pass.
-- [ ] The focused test is registered in the existing reader edge-test ledger
-      and the narrow native-only `proof_required = false` gate. Independent
-      implementation review approves enabling the gate.
-- [ ] Focused/full core tests, formatting, strict Clippy, and full
-      `cargo xtask ci` pass with an exact-source receipt.
+- [x] The focused test is registered in the existing reader edge-test ledger
+      and the narrow native-only `proof_required = false` gate, enabled after
+      independent implementation review.
+- [x] The focused/full core tests, formatting, strict Clippy, generator
+      compilation, and full `cargo xtask ci` pass with the exact-source receipt
+      recorded above.
 - [ ] Hosted Linux assurance and Duvet Pages pass.
+
+The pinned Duplicity 3.0.7/GnuPG 2.4.9 fixture and official restore oracle
+confirm exactly one SKESKv4, zero PKESK, SEIPDv1/MDC, and AES-192 algorithm ID 8
+for both objects. The public reader returns the oracle-matched snapshot with
+exact opens and two integrity-only records. The narrow gate enforces Duvet/test
+attendance only and makes no Verus crypto or whole-reader proof claim.
 
 Acceptance establishes only the single AES-192 symmetric Full-volume profile
 described here. It does not close the complete AES or OpenPGP compatibility

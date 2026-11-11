@@ -100,6 +100,34 @@ versions, packet/decryption inspection for each object, object hashes and the
 source-identity policy. The synthetic source uses UTF-8-safe path components
 so the producer recipe can run on both macOS and Linux.
 
+### PARSE-ENV-008 AES-192 symmetric fixture
+
+`generate_aes192_symmetric.py` creates a deterministic UTF-8-safe source tree,
+then runs official Duplicity 3.0.7 with the explicit
+`--gpg-options=--cipher-algo=AES192` option for one Full backup and official
+restore. Before packaging, it inspects both the manifest and volume 1 with
+GnuPG: each must contain exactly one SKESKv4 packet and no PKESK, and must use
+SEIPDv1 with MDC method 2. Decryption status must independently report
+`DECRYPTION_INFO 2 8 0`, `DECRYPTION_OKAY`, and `GOODMDC`. The test uses only
+the public synthetic message password and checks the independent restored-
+source oracle. Runtime tests invoke no producer or crypto tool.
+
+Reproduce into a new output directory with the pinned tools:
+
+```sh
+nix-shell tools/shell.nix --run \
+  'python3 tests/producer/generate_aes192_symmetric.py \
+    --duplicity /path/to/official/duplicity-3.0.7/bin/duplicity \
+    --gpg /path/to/pinned/gnupg/bin/gpg \
+    --expected-version 3.0.7 \
+    --output /tmp/duplicity-reader-aes192-symmetric'
+```
+
+The output directory must not exist. Provenance records exact argv, tool
+versions, packet/decryption inspection for each object, object hashes and the
+source-identity policy. The synthetic source uses UTF-8-safe path components
+so the producer recipe can run on both macOS and Linux.
+
 ### PARSE-ENV-008 Ed25519 signing-subkey fixture
 
 `generate_signing_subkey.py` creates a v4 Ed25519 certification-only primary,

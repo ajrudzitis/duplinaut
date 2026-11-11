@@ -1,0 +1,210 @@
+{
+  "producer": "duplicity 3.0.7 December 31, 2025",
+  "gpg": "gpg (GnuPG) 2.4.9",
+  "source_recipe": "tests/producer/generate_aes192_symmetric.py",
+  "source_recipe_sha256": "ce38efdc0973d48e59c2eb73935673650dca086b447f3d90dd215b04c7cede75",
+  "oracle_helper": "tests/producer/generate.py",
+  "oracle_helper_sha256": "675b72926639c13abb6eb0c3a4a4733975cae49ce0d7e37990b32729ba606d5b",
+  "reference_command": [
+    "python3",
+    "tests/producer/generate_aes192_symmetric.py",
+    "--duplicity",
+    "${DUPLICITY_3_0_7}",
+    "--gpg",
+    "${PINNED_GPG}",
+    "--expected-version",
+    "3.0.7",
+    "--output",
+    "tests/fixtures/duplicity-3.0.7/aes192-symmetric"
+  ],
+  "commands": [
+    [
+      "/nix/store/jbfy8i1wsc8nyx8wvydvr3n177x03ky8-duplicity-3.0.7/bin/duplicity",
+      "--version"
+    ],
+    [
+      "/nix/store/lnxq9bb8j1rc18msgsx6mh4x1rwfdjm9-gnupg-2.4.9/bin/gpg",
+      "--version"
+    ],
+    [
+      "/nix/store/jbfy8i1wsc8nyx8wvydvr3n177x03ky8-duplicity-3.0.7/bin/duplicity",
+      "full",
+      "--archive-dir",
+      "${WORK}/producer-cache",
+      "--name",
+      "reader-fixture-aes192",
+      "--volsize",
+      "1",
+      "--gpg-binary",
+      "/nix/store/lnxq9bb8j1rc18msgsx6mh4x1rwfdjm9-gnupg-2.4.9/bin/gpg",
+      "--gpg-options=--pinentry-mode=loopback",
+      "--gpg-options=--cipher-algo=AES192",
+      "--current-time",
+      "1700000000",
+      "${WORK}/aes192-source",
+      "file://${WORK}/producer-objects"
+    ],
+    [
+      "/nix/store/jbfy8i1wsc8nyx8wvydvr3n177x03ky8-duplicity-3.0.7/bin/duplicity",
+      "restore",
+      "--archive-dir",
+      "${WORK}/producer-cache",
+      "--gpg-binary",
+      "/nix/store/lnxq9bb8j1rc18msgsx6mh4x1rwfdjm9-gnupg-2.4.9/bin/gpg",
+      "--gpg-options=--pinentry-mode=loopback",
+      "--gpg-options=--cipher-algo=AES192",
+      "--time",
+      "1700000000",
+      "file://${WORK}/producer-objects",
+      "${WORK}/aes192-restore"
+    ],
+    [
+      "/nix/store/lnxq9bb8j1rc18msgsx6mh4x1rwfdjm9-gnupg-2.4.9/bin/gpg",
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "${FIXTURE_PASSPHRASE}",
+      "--list-packets",
+      "${WORK}/producer-objects/duplicity-full.20231114T221320Z.manifest.gpg"
+    ],
+    [
+      "/nix/store/lnxq9bb8j1rc18msgsx6mh4x1rwfdjm9-gnupg-2.4.9/bin/gpg",
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "${FIXTURE_PASSPHRASE}",
+      "--status-fd=2",
+      "--output",
+      "${WORK}/duplicity-full.20231114T221320Z.manifest.gpg.decoded",
+      "--decrypt",
+      "${WORK}/producer-objects/duplicity-full.20231114T221320Z.manifest.gpg"
+    ],
+    [
+      "/nix/store/lnxq9bb8j1rc18msgsx6mh4x1rwfdjm9-gnupg-2.4.9/bin/gpg",
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "${FIXTURE_PASSPHRASE}",
+      "--list-packets",
+      "${WORK}/producer-objects/duplicity-full.20231114T221320Z.vol1.difftar.gpg"
+    ],
+    [
+      "/nix/store/lnxq9bb8j1rc18msgsx6mh4x1rwfdjm9-gnupg-2.4.9/bin/gpg",
+      "--batch",
+      "--pinentry-mode",
+      "loopback",
+      "--passphrase",
+      "${FIXTURE_PASSPHRASE}",
+      "--status-fd=2",
+      "--output",
+      "${WORK}/duplicity-full.20231114T221320Z.vol1.difftar.gpg.decoded",
+      "--decrypt",
+      "${WORK}/producer-objects/duplicity-full.20231114T221320Z.vol1.difftar.gpg"
+    ]
+  ],
+  "source_interval": {
+    "start": 1700000000,
+    "end": 1700000000
+  },
+  "cipher_selection": {
+    "duplicity_gpg_option": "--gpg-options=--cipher-algo=AES192",
+    "gnupg_name": "AES192",
+    "openpgp_symmetric_algorithm_id": 8
+  },
+  "symmetric_fixture": {
+    "credentials_path": "test-keys/credentials.json",
+    "credential_source": "public synthetic fixture passphrase only",
+    "objects": {
+      "manifest": {
+        "packet_counts": {
+          "pkesk": 0,
+          "skesk": 1
+        },
+        "skesk": {
+          "version": 4,
+          "cipher_algorithm_id": 8,
+          "aead_algorithm_id": 0,
+          "s2k_type": 3,
+          "s2k_hash_algorithm_id": 10
+        },
+        "seipd": {
+          "version": 1,
+          "packet": "SEIPDv1",
+          "mdc_method": 2,
+          "authenticated_mdc_status": "GOODMDC"
+        },
+        "payload_cipher": {
+          "name": "AES-192",
+          "algorithm_id": 8,
+          "decryption_info_status": "[GNUPG:] DECRYPTION_INFO 2 8 0"
+        },
+        "decryption_ok_status": "DECRYPTION_OKAY",
+        "packet_listing": "# off=0 ctb=8c tag=3 hlen=2 plen=13\n:symkey enc packet: version 4, cipher 8, aead 0, s2k 3, hash 10\n\tsalt 88CCADF9A1CA4738, count 65011712 (255)\n# off=15 ctb=d2 tag=18 hlen=3 plen=258 new-ctb\n:encrypted data packet:\n\tlength: 258\n\tmdc_method: 2\n# off=37 ctb=a3 tag=8 hlen=1 plen=0 indeterminate\n:compressed packet: algo=1\n# off=39 ctb=cb tag=11 hlen=3 plen=293 new-ctb\n:literal data packet:\n\tmode b (62), created 1794420536, name=\"\",\n\traw data: 287 bytes\ngpg: AES192.CFB encrypted data\ngpg: encrypted with 1 passphrase\n",
+        "packet_listing_stderr": "gpg: AES192.CFB encrypted data\ngpg: encrypted with 1 passphrase\n",
+        "decryption_status": "gpg: AES192.CFB encrypted data\n[GNUPG:] NEED_PASSPHRASE_SYM 8 3 10\ngpg: encrypted with 1 passphrase\n[GNUPG:] BEGIN_DECRYPTION\n[GNUPG:] DECRYPTION_INFO 2 8 0\n[GNUPG:] PLAINTEXT 62 1794420536 \n[GNUPG:] PLAINTEXT_LENGTH 287\n[GNUPG:] DECRYPTION_OKAY\n[GNUPG:] GOODMDC\n[GNUPG:] END_DECRYPTION\n",
+        "decrypted_bytes": 287
+      },
+      "volume": {
+        "packet_counts": {
+          "pkesk": 0,
+          "skesk": 1
+        },
+        "skesk": {
+          "version": 4,
+          "cipher_algorithm_id": 8,
+          "aead_algorithm_id": 0,
+          "s2k_type": 3,
+          "s2k_hash_algorithm_id": 10
+        },
+        "seipd": {
+          "version": 1,
+          "packet": "SEIPDv1",
+          "mdc_method": 2,
+          "authenticated_mdc_status": "GOODMDC"
+        },
+        "payload_cipher": {
+          "name": "AES-192",
+          "algorithm_id": 8,
+          "decryption_info_status": "[GNUPG:] DECRYPTION_INFO 2 8 0"
+        },
+        "decryption_ok_status": "DECRYPTION_OKAY",
+        "packet_listing": "# off=0 ctb=8c tag=3 hlen=2 plen=13\n:symkey enc packet: version 4, cipher 8, aead 0, s2k 3, hash 10\n\tsalt 69E20A7E38F823C2, count 65011712 (255)\n# off=15 ctb=d2 tag=18 hlen=3 plen=411 new-ctb\n:encrypted data packet:\n\tlength: 411\n\tmdc_method: 2\n# off=37 ctb=a3 tag=8 hlen=1 plen=0 indeterminate\n:compressed packet: algo=1\n# off=39 ctb=cb tag=11 hlen=2 plen=0 partial new-ctb\n:literal data packet:\n\tmode b (62), created 1794420536, name=\"\",\n\traw data: unknown length\ngpg: AES192.CFB encrypted data\ngpg: encrypted with 1 passphrase\n",
+        "packet_listing_stderr": "gpg: AES192.CFB encrypted data\ngpg: encrypted with 1 passphrase\n",
+        "decryption_status": "gpg: AES192.CFB encrypted data\n[GNUPG:] NEED_PASSPHRASE_SYM 8 3 10\ngpg: encrypted with 1 passphrase\n[GNUPG:] BEGIN_DECRYPTION\n[GNUPG:] DECRYPTION_INFO 2 8 0\n[GNUPG:] PLAINTEXT 62 1794420536 \n[GNUPG:] DECRYPTION_OKAY\n[GNUPG:] GOODMDC\n[GNUPG:] END_DECRYPTION\n",
+        "decrypted_bytes": 10240
+      }
+    }
+  },
+  "source_identity_policy": {
+    "version_id": "symmetric-aes192-fixture-v1",
+    "etag": "lowercase SHA-256 hex of each exact stored object body",
+    "size": "exact stored object byte length",
+    "scope": "OrderedFixtureSource test adapter only; not a provider ETag claim"
+  },
+  "objects": [
+    {
+      "key": "backup/duplicity-full.20231114T221320Z.manifest.gpg",
+      "path": "objects/duplicity-full.20231114T221320Z.manifest.gpg",
+      "bytes": 276,
+      "sha256": "2b8b761adffb1f427f81f7e06baa5af8383541fe5a254dec6d169fa46aeaa038",
+      "version_id": "symmetric-aes192-fixture-v1"
+    },
+    {
+      "key": "backup/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "path": "objects/duplicity-full.20231114T221320Z.vol1.difftar.gpg",
+      "bytes": 429,
+      "sha256": "c42fb891acb7c44c45c7c00e9006949c31e8513448db50928760bb6be97b90b1",
+      "version_id": "symmetric-aes192-fixture-v1"
+    }
+  ],
+  "snapshot_oracle": {
+    "path": "expected.json",
+    "entries": 6,
+    "official_comparison_exclusions": [
+      "symlink_mtime_ns"
+    ]
+  }
+}
