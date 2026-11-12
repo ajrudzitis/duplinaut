@@ -4470,7 +4470,7 @@ fn discovery_diagnostics_crypto_and_limits_remain_distinct_from_validation() {
         .0;
     assert!(matches!(
         catalog.read_snapshot(encrypted, Timestamp(1731622400), &Cancellation::default()),
-        Err(ReaderError::Envelope(_))
+        Err(ReaderError::UnlockRequired)
     ));
     for limits in [
         ReaderLimits {

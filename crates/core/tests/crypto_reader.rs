@@ -2346,6 +2346,32 @@ fn corrupted_ciphertext_fails_declared_digest_before_missing_credentials() {
 }
 
 #[test]
+//= docs/parsing-requirements.md#restore-ui-015
+//= type=test
+//# When the frontend supports OpenPGP archives, it MUST collect archive-unlock credentials only through an explicit no-echo interaction before snapshot construction and keep that interaction separate from destination selection, restore preview, and confirmation.
+fn encrypted_snapshot_without_unlock_context_requests_credentials() {
+    let source = FixtureSource::new("symmetric", None);
+    let catalog = Catalog::discover(
+        &source,
+        "backup/",
+        NameConfig::default(),
+        ReaderLimits::default(),
+        &Cancellation::default(),
+    )
+    .unwrap();
+    let anchor = catalog
+        .manifests()
+        .find(|(_, _, descriptor)| descriptor.kind() == duplicity_core::chain::SetKind::Full)
+        .unwrap()
+        .0;
+
+    assert!(matches!(
+        catalog.read_snapshot(anchor, Timestamp(1700000000), &Cancellation::default()),
+        Err(ReaderError::UnlockRequired)
+    ));
+}
+
+#[test]
 //= docs/parsing-requirements.md#parse-env-018
 //= type=test
 //# OpenPGP manifest integration MUST complete supported message integrity, framing, decoding and configured signer checks before parsing the manifest or using its volume records.

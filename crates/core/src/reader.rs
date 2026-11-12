@@ -225,8 +225,17 @@ pub enum ReaderError {
     Configuration(NameError),
     Chain(ChainError),
     Envelope(EnvelopeError),
+    /// An OpenPGP object was selected for a read, but no archive-unlock
+    /// context was supplied. The required profile may need a passphrase, a
+    /// secret-key export, or both; the caller must decide interactively.
+    //= docs/parsing-requirements.md#restore-ui-015
+    //= type=implementation
+    //# When the frontend supports OpenPGP archives, it MUST collect archive-unlock credentials only through an explicit no-echo interaction before snapshot construction and keep that interaction separate from destination selection, restore preview, and confirmation.
+    UnlockRequired,
     Manifest(ManifestError),
-    MissingVolume { number: u64 },
+    MissingVolume {
+        number: u64,
+    },
     Assembly(AssemblyError),
     State(StateError),
     Crypto(CryptoError),
@@ -742,7 +751,7 @@ impl<'a> Catalog<'a> {
             let object = self.objects.get(object_index).ok_or(ReaderError::Limit)?;
             let name = object.name.unwrap();
             if name.envelope == Envelope::OpenPgp && context.is_none() {
-                return Err(ReaderError::Envelope(EnvelopeError::UnsupportedEnvelope));
+                return Err(ReaderError::UnlockRequired);
             }
             if signer_required && !matches!(name.envelope, Envelope::OpenPgp) {
                 return Err(ReaderError::Crypto(CryptoError::Unsigned));
@@ -760,8 +769,7 @@ impl<'a> Catalog<'a> {
             };
             let stored = self.read_stored(&object.object, cancel, stored_limit)?;
             let decoded = if name.envelope == Envelope::OpenPgp {
-                let context =
-                    context.ok_or(ReaderError::Envelope(EnvelopeError::UnsupportedEnvelope))?;
+                let context = context.ok_or(ReaderError::UnlockRequired)?;
                 let mut limits = context.crypto_limits;
                 limits.stored_bytes = stored_limit;
                 limits.decoded_bytes = limits
@@ -883,7 +891,7 @@ impl<'a> Catalog<'a> {
                 }
                 let stored_limit = if envelope == Envelope::OpenPgp {
                     context
-                        .ok_or(ReaderError::Envelope(EnvelopeError::UnsupportedEnvelope))?
+                        .ok_or(ReaderError::UnlockRequired)?
                         .crypto_limits
                         .stored_bytes
                         .min(self.limits.stored_buffer_bytes)
@@ -899,8 +907,7 @@ impl<'a> Catalog<'a> {
                 };
                 let stored = self.read_stored(&object.object, cancel, stored_limit)?;
                 if envelope == Envelope::OpenPgp {
-                    let context =
-                        context.ok_or(ReaderError::Envelope(EnvelopeError::UnsupportedEnvelope))?;
+                    let context = context.ok_or(ReaderError::UnlockRequired)?;
                     let mut limits = context.crypto_limits;
                     limits.stored_bytes = stored_limit;
                     limits.decoded_bytes = limits

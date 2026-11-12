@@ -35,12 +35,16 @@ fn pressed_key(event: Event) -> Option<KeyCode> {
 fn needs_unlock(error: &ReaderError) -> bool {
     matches!(
         error,
-        ReaderError::Crypto(OpenPgpError::MissingPassword | OpenPgpError::MissingSecretKey)
+        ReaderError::UnlockRequired
+            | ReaderError::Crypto(OpenPgpError::MissingPassword | OpenPgpError::MissingSecretKey)
     )
 }
 
 fn safe_read_error(error: &ReaderError) -> &'static str {
     match error {
+        ReaderError::UnlockRequired => {
+            "Archive unlock credentials are required before a snapshot can be read."
+        }
         ReaderError::Crypto(
             OpenPgpError::WrongCredentials | OpenPgpError::AuthenticationFailed,
         ) => "OpenPGP authentication failed; no snapshot was installed.",
@@ -982,6 +986,18 @@ fn wrapped_rows(text: &str, width: usize) -> impl Iterator<Item = &str> + Clone 
 mod tests {
     use super::*;
     use std::collections::VecDeque;
+
+    #[test]
+    //= docs/parsing-requirements.md#restore-ui-015
+    //= type=test
+    //# When the frontend supports OpenPGP archives, it MUST collect archive-unlock credentials only through an explicit no-echo interaction before snapshot construction and keep that interaction separate from destination selection, restore preview, and confirmation.
+    fn missing_unlock_context_opens_the_archive_credential_flow() {
+        assert!(needs_unlock(&ReaderError::UnlockRequired));
+        assert_eq!(
+            safe_read_error(&ReaderError::UnlockRequired),
+            "Archive unlock credentials are required before a snapshot can be read."
+        );
+    }
 
     #[test]
     //= docs/parsing-requirements.md#restore-ui-015
