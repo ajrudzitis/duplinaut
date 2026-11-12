@@ -182,6 +182,12 @@ fn observe_tree(
     }
 }
 
+fn fingerprint(root: &Path) -> BTreeMap<Vec<Vec<u8>>, Entry> {
+    let mut observed = BTreeMap::new();
+    observe_tree(root, &mut Vec::new(), &mut observed);
+    observed
+}
+
 fn decode_hex(hex: &str) -> Vec<u8> {
     let (pairs, remainder) = hex.as_bytes().as_chunks::<2>();
     assert!(remainder.is_empty(), "oracle hex has complete byte pairs");
@@ -1552,7 +1558,7 @@ struct CredentialSession {
     fixture: PathBuf,
     parent: PathBuf,
     destination: PathBuf,
-    source_before: Vec<(PathBuf, Option<[u8; 32]>)>,
+    source_before: BTreeMap<Vec<Vec<u8>>, Entry>,
 }
 
 impl CredentialSession {
@@ -1718,7 +1724,7 @@ impl CredentialSession {
 //# The worker MUST build a borrowed CryptoReadContext from the selected profile, preserve typed ReaderError values across its bounded reply channel, and install a snapshot only after that context succeeds.
 fn production_linux_tui_rejects_wrong_symmetric_passphrase_without_snapshot_or_restore() {
     use nix::sys::termios::LocalFlags;
-    use std::{io::Read, thread};
+    use std::thread;
 
     const PASS: &[u8] = b"wrong-public-fixture-passphrase";
     let fixture = fs::canonicalize(
@@ -1918,7 +1924,6 @@ fn production_linux_tui_rejects_wrong_symmetric_passphrase_without_snapshot_or_r
 //= type=test
 //# The worker MUST build a borrowed CryptoReadContext from the selected profile, preserve typed ReaderError values across its bounded reply channel, and install a snapshot only after that context succeeds.
 fn production_linux_tui_reads_all_supported_credential_profiles_and_publishes_signed_restore() {
-    use nix::sys::termios::LocalFlags;
     use std::fs;
 
     const MESSAGE_PASSWORD: &[u8] = b"duplicity-reader-public-test-fixture";
