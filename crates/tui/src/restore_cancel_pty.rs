@@ -636,7 +636,18 @@ fn wait_output_screen(
     }
 }
 
-fn check_active_restore_output_failure() {
+/// How the controlled stdout failure is induced once the Execute gate is held.
+enum OutputFailureTrigger {
+    /// The q key cancels the exact held Execute token through the input PTY;
+    /// a subsequent changed redraw then fails through closed stdout.
+    Q,
+    /// No keypress: closing the output master alone makes the next periodic
+    /// redraw fail, and that output failure drives cancellation and controlled
+    /// shutdown by itself.
+    CloseOnly,
+}
+
+fn check_active_restore_output_failure(trigger: OutputFailureTrigger) {
     let source_path = fixture();
     let before_source = fingerprint(&source_path);
     let working = Scratch::new("restore-output-failure-work");
@@ -781,9 +792,17 @@ fn check_active_restore_output_failure() {
 
     // Remove the output reader while keeping the input PTY live. The q key
     // cancels the exact held Execute token; a subsequent changed redraw then
-    // fails through stdout and drives controlled terminal shutdown.
+    // fails through stdout and drives controlled terminal shutdown. The
+    // close-only variant sends no key: the next periodic redraw fails through
+    // the closed stdout and the terminal lifecycle requests cancellation and
+    // controlled shutdown by itself.
     drop(output_master);
-    write(&input_master, b"q").expect("send q through live input PTY");
+    match trigger {
+        OutputFailureTrigger::Q => {
+            write(&input_master, b"q").expect("send q through live input PTY");
+        }
+        OutputFailureTrigger::CloseOnly => {}
+    }
     let deadline = Instant::now() + PHASE_TIMEOUT;
     while marker(&control.0, "cancel-observed").unwrap().is_none() {
         assert!(
@@ -793,7 +812,7 @@ fn check_active_restore_output_failure() {
         );
         assert!(
             Instant::now() < deadline,
-            "Execute gate did not observe q cancellation{}",
+            "Execute gate did not observe cancellation{}",
             stderr.diagnostic()
         );
         std::thread::sleep(Duration::from_millis(5));
@@ -932,5 +951,26 @@ fn escape_cancels_active_restore_through_test_gate_before_backend_filesystem_wor
 //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
 #[test]
 fn q_cancels_active_restore_then_stdout_failure_shuts_down_through_split_ptys() {
-    check_active_restore_output_failure();
+    check_active_restore_output_failure(OutputFailureTrigger::Q);
+}
+
+// Closing stdout alone, with no keypress, makes the next periodic redraw fail;
+// that output failure requests cancellation of the exact held Execute token and
+// drives controlled shutdown. This does not assert cancellation latency or
+// syscall interruption, and it does not use a key event to initiate the fault.
+//= docs/parsing-requirements.md#restore-ui-012
+//= type=test
+//# On a controlled terminal I/O failure or shutdown during active restoration, the frontend MUST request cancellation, close or signal its worker request path, attempt terminal-state restoration, drain and join the worker without bounded-channel deadlock, retain its typed result, and attempt escaped final-result reporting through an available non-raw output sink before controlled exit.
+//= docs/parsing-requirements.md#restore-ui-007
+//= type=test
+//# The frontend MUST run plan preparation and filesystem restoration outside the terminal event/render loop, with an operation-specific cancellation token and explicit running/cancellation-requested states.
+//= docs/parsing-requirements.md#restore-ui-008
+//= type=test
+//# The frontend MUST preserve the backend's published, unpublished and publication-indeterminate outcome distinction, including successful-publication precedence over racing cancellation and all reported cleanup warnings or uncertainty.
+//= docs/parsing-requirements.md#restore-ui-014
+//= type=test
+//# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+#[test]
+fn close_only_stdout_failure_during_active_restore_shuts_down_through_split_ptys() {
+    check_active_restore_output_failure(OutputFailureTrigger::CloseOnly);
 }

@@ -33,7 +33,7 @@
 | Snapshot reconstruction | Three official backup dates match byte paths, contents and metadata; immutable prior-set delta bases; transactional failures | Controller/resource proofs and chain integration |
 | Multipart assembly | Official snapshot/delta source oracles; bounded ordered parts; provisional output and sticky failure tests | Formal refinement and footer-bearing/encrypted queued replay |
 | Repository browser and restore | Metadata-only catalog and identity-bound plain/gzip reconstruction; byte-preserving selection and reviewed native Linux publication; official three-date oracles | Frontend publication integration and controller proofs |
-| Terminal interface | Local/S3 history and explicit full-scan browsing; byte-safe selection; reviewed worker-owned restore publication; automated official-chain PTY scan/read-only previews and manual PTY restore evidence | Credential flow, controller proofs, comprehensive event-loop fault coverage |
+| Terminal interface | Local/S3 history and explicit full-scan browsing; byte-safe selection; reviewed worker-owned restore publication; automated official-chain PTY scan/read-only previews; bounded no-echo OpenPGP archive-unlock flow; manual PTY restore evidence | Credential-flow hosted acceptance, controller proofs, remaining event-loop fault coverage (input-PTY failure, both output sinks unavailable, live S3) |
 
 The [parsing requirements](docs/parsing-requirements.md) were written in RFC 2119/8174 language and independently reviewed **before implementation**. Public documentation leads format research; immutable official-source references and producer evidence resolve ambiguities.
 
@@ -81,8 +81,8 @@ The detailed **281-item milestone and evidence history** remains available in [d
 ### Near-term product and release scope
 
 1. **Finish the browsing and restoration experience.**
-   **Status:** Catalog browsing, selection, preview, worker-owned restore publication, and multiple PTY acceptance cases exist. The complete user-facing credential flow and comprehensive interactive fault coverage remain open.
-   **Finish condition:** Complete the documented user flows and their required acceptance tests, including credential handling and the remaining event-loop failure cases. See [capabilities](docs/capabilities.md), the [TUI crate record](crates/tui/README.md), and [restore interaction](docs/restore-interaction.md).
+   **Status:** Catalog browsing, selection, preview, worker-owned restore publication, and multiple PTY acceptance cases exist. The bounded no-echo OpenPGP credential flow is implemented and locally tested; its Linux-gated PTY cases and hosted assurance remain pending. Interactive fault coverage now includes close-only stdout failure during active restore; input-PTY failure, both stdout and stderr unavailable, close-only read-only-scan failure, and live S3 remain open.
+   **Finish condition:** Complete the documented user flows and their required acceptance tests, including hosted credential-flow execution and the remaining event-loop failure cases. See [capabilities](docs/capabilities.md), the [TUI crate record](crates/tui/README.md), and [restore interaction](docs/restore-interaction.md).
 
 2. **Publish a bounded compatibility contract.**
    **Status:** Official fixtures and reader tests cover several Duplicity releases and 3.0.7 plain, encrypted, signed, historical-name, and adversarial cases. The broader producer matrix is not complete.
