@@ -1,9 +1,10 @@
 # TUI close-only read-only-scan output-failure acceptance plan
 
-Status: implementation and macOS portable test in place; hosted Linux assurance
-and independent review remain pending. This complements the accepted
-q-triggered read-only-scan output-failure case by proving that a closed stdout,
-with no keypress, drives cancellation and controlled shutdown on its own.
+Status: implementation, macOS portable test, and hosted Linux assurance are
+complete; Duvet Pages publication and independent review remain pending. This
+complements the accepted q-triggered read-only-scan output-failure case by
+proving that a closed stdout, with no keypress, drives cancellation and
+controlled shutdown on its own.
 
 ## Goal and scope
 
@@ -71,5 +72,6 @@ latency is claimed.
 - [x] Write the parent test asserting exact-token cancellation, retained event
       fault, teardown fault fields, terminal restoration, and source/working
       directory invariants; the macOS portable test passes.
-- [ ] Hosted Linux assurance (`cargo xtask ci`) and Duvet Pages pass.
+- [x] Hosted Linux assurance (`cargo xtask ci`) passes in [run 43564648218](https://github.com/ajrudzitis/duplinaut/actions/runs/43564648218);
+      Duvet Pages publication runs only on push to `main` and remains pending.
 - [ ] Independent implementation review accepts the scoped evidence.

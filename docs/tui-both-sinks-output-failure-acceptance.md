@@ -1,7 +1,7 @@
 # TUI both-output-sinks output-failure acceptance plan
 
-Status: implementation in place; the Linux-gated PTY case, hosted Linux
-assurance, and independent review remain pending. This complements the accepted
+Status: implementation and hosted Linux assurance are complete; Duvet Pages
+publication and independent review remain pending. This complements the accepted
 active-restore output-failure case by making the fallback output sink fail too,
 proving the typed result is still retained.
 
@@ -95,6 +95,7 @@ rather than a clean input-error path.
 - [x] Write the parent test and helper asserting exact token, retained typed
       outcome, failed fallback output, teardown faults, worker join, and
       filesystem/source invariants.
-- [ ] Focused/full Linux tests, strict TUI Clippy, hosted Linux assurance and
-      Duvet Pages pass.
+- [x] Focused/full Linux tests, strict TUI Clippy and hosted Linux assurance
+      (`cargo xtask ci`) pass in [run 43564648218](https://github.com/ajrudzitis/duplinaut/actions/runs/43564648218);
+      Duvet Pages publication runs only on push to `main` and remains pending.
 - [ ] Independent implementation review accepts the scoped evidence.
