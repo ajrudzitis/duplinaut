@@ -1,7 +1,7 @@
 # duplicity-tui
 
 Read-only terminal history and snapshot browser for local directories and S3.
-Native Linux restoration is implemented as a software checkpoint with independent frontend acceptance pending. OpenPGP remains unsupported.
+Native Linux restoration is implemented as a software checkpoint with independent frontend acceptance pending. OpenPGP archive unlocking is implemented for the three recorded 3.0.7 profiles through an explicit no-echo credential prompt; hosted Linux acceptance remains pending.
 
 ```sh
 cargo run -p duplicity-tui -- local /path/to/backup
@@ -25,9 +25,23 @@ executable r preview and publication run on the lifecycle worker.
 The reader runs on a worker thread and keeps the original catalog identities
 across scans. Cancellation is cooperative; bounded synchronous parsing and
 kernel operations have no fixed cancellation latency. S3 connection setup uses
-the SDK credential chain before entering the terminal; no credentials are
-requested or displayed by the UI. Optional `--profile`, `--endpoint`, and
-`--path-style` select SDK configuration. S3 bucket writes are not exposed.
+the SDK credential chain before entering the terminal; no SDK/storage
+credentials are requested or displayed by the UI. Optional `--profile`,
+`--endpoint`, and `--path-style` select SDK configuration. S3 bucket writes are
+not exposed.
+
+For OpenPGP archives the browser collects archive-unlock credentials through an
+explicit no-echo prompt before snapshot construction, separate from destination
+selection, preview and confirmation. A symmetric profile takes only a message
+passphrase; public-key and signed profiles take an explicitly selected exported
+secret-key file and its passphrase; the signed profile also takes the signer
+public-key export, its permitted primary fingerprint, and requires a valid
+signature. Passphrases are never echoed, masked or shown as a length, and are
+bounded to 4096 UTF-8 bytes; key-export paths are byte-escaped, bounded to 4096
+bytes, and the files are verified regular with a 16 MiB-plus-one-byte read cap.
+Passphrases and key bytes never enter argv, the environment, the catalog,
+snapshot evidence, receipts, diagnostics or logs. See the
+[credential-flow acceptance plan](../../docs/tui-openpgp-credential-flow-acceptance.md).
 
 History is limited to 100,000 manifests and a conservative 32 MiB display charge;
 snapshot rendering formats only visible rows. Core limits independently apply.
@@ -110,6 +124,9 @@ anchor choice.
 - [x] Accept active preview abandonment: Esc/`q` cancels the exact Prepare token; a matching late successful Preview is discarded without arming confirmation or sending Execute. Synthetic frontend state only; this does not prove real-terminal input delivery or backend cancellation. Local portable TUI tests, Duvet trace, formatting, strict Clippy, and review passed; hosted Linux assurance (`cargo xtask ci`), Duvet artifact upload, and Pages publication passed in [run 41871608268](https://github.com/ajrudzitis/duplinaut/actions/runs/41871608268). See [`docs/tui-preview-abandonment-acceptance.md`](../../docs/tui-preview-abandonment-acceptance.md).
 - [x] Accept failed executable-preview replies: matching IDs clear active state; stale IDs do not; the failed preview stays unarmed and idle-path Enter cannot Execute. Synthetic frontend state only; no backend/PTY evidence is claimed. Local portable TUI tests, Duvet trace, formatting, strict Clippy, and review passed; hosted Linux assurance (`cargo xtask ci`), Duvet artifact upload, and Pages publication passed in [run 41871608268](https://github.com/ajrudzitis/duplinaut/actions/runs/41871608268). See [`docs/tui-preview-error-acceptance.md`](../../docs/tui-preview-error-acceptance.md).
 - [x] Accept active-restore output failure in a Linux split-PTY case: close stdout, then send `q` to cancel the exact Execute token; the changed-status redraw fails and ends the UI. Retain the real backend's typed `Unpublished(Cancelled)` result and stderr fallback. No syscall-interruption or successful screen/cursor-restoration claim. Independent review, Linux `cargo xtask ci`, and Duvet Pages passed in [run 41886697516](https://github.com/ajrudzitis/duplinaut/actions/runs/41886697516). See [`docs/tui-active-restore-output-failure-acceptance.md`](../../docs/tui-active-restore-output-failure-acceptance.md).
+- [ ] Accept close-only active-restore output failure through a Linux split-PTY case: close stdout and send no key; the next periodic redraw fails and itself cancels the exact Execute token, drives controlled teardown, and retains the typed result and stderr fallback. Hosted Linux assurance (`cargo xtask ci`) passed in [run 43385750183](https://github.com/ajrudzitis/duplinaut/actions/runs/43385750183); Duvet Pages publication (on push to `main`) and independent review remain pending. See [`docs/tui-close-only-output-failure-acceptance.md`](../../docs/tui-close-only-output-failure-acceptance.md).
+- [ ] Accept close-only read-only-scan output failure: close stdout with no keypress during a held scan; the next periodic redraw fails and itself cancels the exact scan token, drives controlled teardown, and restores the input terminal. The macOS portable test and hosted Linux assurance (`cargo xtask ci`) pass in [run 43564648218](https://github.com/ajrudzitis/duplinaut/actions/runs/43564648218); Duvet Pages publication (on push to `main`) and independent review remain pending. See [`docs/tui-close-only-scan-output-failure-acceptance.md`](../../docs/tui-close-only-scan-output-failure-acceptance.md).
+- [ ] Accept active-restore output failure with both stdout and stderr unavailable: close stdout and give the child `/dev/full` stderr; `q` cancels the exact Execute token, the redraw fails, and the fallback report also fails while the typed `Unpublished(Cancelled)` result is retained. Hosted Linux assurance (`cargo xtask ci`) passes in [run 43564648218](https://github.com/ajrudzitis/duplinaut/actions/runs/43564648218); Duvet Pages publication (on push to `main`) and independent review remain pending. See [`docs/tui-both-sinks-output-failure-acceptance.md`](../../docs/tui-both-sinks-output-failure-acceptance.md).
 - [x] Accept successful restore through the production Linux executable/browser PTY: exact `restore` acknowledgment, one Execute, visible Published result, and complete official plain final-snapshot tree/oracle comparison (symlink mtime excluded). Local TUI checks, Duvet trace, and independent implementation review passed; Linux `cargo xtask ci`, artifact upload, and Duvet Pages deployment passed in [run 41886697516](https://github.com/ajrudzitis/duplinaut/actions/runs/41886697516). See [`docs/tui-restore-success-pty-acceptance.md`](../../docs/tui-restore-success-pty-acceptance.md).
 - [x] Accept one RESTORE-UI-010 raw destination identity case through a production Linux PTY: raw control/backslash/non-UTF-8 leaf bytes remain exact in filesystem identity and render as reversible escapes in preview and Published receipt. Local TUI checks, Duvet trace, and independent review passed; Linux `cargo xtask ci`, artifact upload, and Duvet Pages deployment passed in [run 41892380922](https://github.com/ajrudzitis/duplinaut/actions/runs/41892380922). See [`docs/tui-raw-identity-pty-acceptance.md`](../../docs/tui-raw-identity-pty-acceptance.md).
 - [x] Accept executable-preview resizing through a Linux production PTY: 40x240 -> 18x96 -> 40x240 fresh frames, scroll-accessible preview details, retained armed acknowledgment, no Execute, and Esc cleanup. The Linux-gated test executed as part of full assurance and Duvet Pages publication in [run 41905441225](https://github.com/ajrudzitis/duplinaut/actions/runs/41905441225). This proves the listed local plain-fixture preview flow only; it does not execute restoration or establish publication/controller behavior. See [`docs/tui-executable-preview-resize-acceptance.md`](../../docs/tui-executable-preview-resize-acceptance.md).
@@ -122,7 +139,7 @@ anchor choice.
 - [x] Verify on macOS that ordinary local and S3 CLI configurations parse without a restore destination while native restore flags remain rejected; independent review and full CI passed. This is CLI parsing coverage only.
 - [x] Connect explicitly acknowledged selection to native Linux publication; use the existing SDK credential provider.
 - [ ] Test remaining display escaping, error and interaction paths.
-- [ ] Automate remaining terminal interaction, cancellation, resize and S3 frontend tests. The q-triggered output-failure case is complete; broader cancellation and resize behavior and live S3 acceptance remain open.
+- [ ] Automate remaining terminal interaction, cancellation, resize and S3 frontend tests. The q-triggered and close-only active-restore and read-only-scan output-failure cases, plus the both-sinks case, are in place. Input-PTY hangup is a crossterm/OS trusted-boundary limitation (the browser hangs rather than erroring, so no clean acceptance case exists); live S3 frontend acceptance remains open.
 
 See [requirements](../../docs/parsing-requirements.md) and the [machine ledger](../../docs/assurance.toml).
 

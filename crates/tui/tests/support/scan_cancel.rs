@@ -432,7 +432,16 @@ fn check_scan_cancellation(key: &[u8]) {
     assert!(fs::read_dir(&working.0).unwrap().next().is_none());
 }
 
-fn check_redraw_output_failure() {
+/// How the controlled stdout failure is induced once the held scan gate is
+/// entered. The q key cancels the held scan through the input PTY; the
+/// close-only variant sends no key, so the next periodic redraw fails through
+/// the closed stdout and the terminal lifecycle cancels the scan by itself.
+enum OutputFailureTrigger {
+    Q,
+    CloseOnly,
+}
+
+fn check_redraw_output_failure(trigger: OutputFailureTrigger) {
     let fixture = fs::canonicalize(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/duplicity-3.0.7/plain"),
     )
@@ -581,8 +590,15 @@ fn check_redraw_output_failure() {
     // Preserve the output slave descriptor for the child, but remove the only
     // reader. One q key cancels the held scan and changes the status text, so
     // the subsequent production redraw must write changed cells to broken stdout.
+    // The close-only variant sends no key: the next periodic redraw fails
+    // through the closed stdout and cancels the scan by itself.
     drop(output_master);
-    write(&input_master, b"q").expect("request cancellation through live input PTY");
+    match trigger {
+        OutputFailureTrigger::Q => {
+            write(&input_master, b"q").expect("request cancellation through live input PTY");
+        }
+        OutputFailureTrigger::CloseOnly => {}
+    }
     let deadline = Instant::now() + PHASE_TIMEOUT;
     while !marker_matches(&control.0, "cancel-observed", OBSERVED).unwrap() {
         assert!(
@@ -658,5 +674,19 @@ fn escape_cancels_gated_scan_and_waits_for_worker_before_exit() {
 //= type=test
 //# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
 fn redraw_output_failure_cancels_scan_and_restores_input_terminal() {
-    check_redraw_output_failure();
+    check_redraw_output_failure(OutputFailureTrigger::Q);
+}
+
+// Closing stdout alone, with no keypress, makes the next periodic redraw fail;
+// that output failure cancels the exact held scan token and drives controlled
+// shutdown by itself. This does not use a key event to initiate the fault.
+//= docs/parsing-requirements.md#restore-ui-012
+//= type=test
+//# On a controlled terminal I/O failure or shutdown during active restoration, the frontend MUST request cancellation, close or signal its worker request path, attempt terminal-state restoration, drain and join the worker without bounded-channel deadlock, retain its typed result, and attempt escaped final-result reporting through an available non-raw output sink before controlled exit.
+//= docs/parsing-requirements.md#restore-ui-014
+//= type=test
+//# Frontend restoration acceptance MUST separately record state-machine/CLI tests, native worker/result integration, real terminal interaction evidence, backend native evidence and outstanding formal controller obligations.
+#[test]
+fn close_only_redraw_output_failure_cancels_scan_and_restores_input_terminal() {
+    check_redraw_output_failure(OutputFailureTrigger::CloseOnly);
 }
