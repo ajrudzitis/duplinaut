@@ -1,10 +1,10 @@
 # TUI close-only output-failure acceptance plan
 
-Status: specification and implementation in place; the Linux-gated PTY case and
-hosted Linux assurance remain pending. This case complements the accepted
-q-triggered active-restore output-failure evidence by proving that a closed
-stdout, with no keypress, drives cancellation and controlled shutdown on its
-own.
+Status: the Linux-gated PTY case passed hosted Linux assurance; Duvet Pages
+publication and independent review remain pending. This case complements the
+accepted q-triggered active-restore output-failure evidence by proving that a
+closed stdout, with no keypress, drives cancellation and controlled shutdown on
+its own.
 
 ## Goal and scope
 
@@ -114,6 +114,7 @@ during an active filesystem syscall.
 - [x] Write the parent test asserting exact token, typed outcome retention,
       controlled teardown, fallback reporting, worker join, and
       filesystem/source invariants.
-- [ ] Focused/full Linux tests, strict TUI Clippy, hosted Linux assurance and
-      Duvet Pages pass.
+- [x] Focused/full Linux tests, formatting, strict Clippy and hosted Linux
+      assurance (`cargo xtask ci`) pass in [run 43385750183](https://github.com/ajrudzitis/duplinaut/actions/runs/43385750183);
+      Duvet Pages publication runs only on push to `main` and remains pending.
 - [ ] Independent implementation review accepts the scoped evidence.
