@@ -81,8 +81,8 @@ The detailed **281-item milestone and evidence history** remains available in [d
 ### Near-term product and release scope
 
 1. **Finish the browsing and restoration experience.**
-   **Status:** Catalog browsing, selection, preview, worker-owned restore publication, and multiple PTY acceptance cases exist. The bounded no-echo OpenPGP credential flow is implemented and its Linux-gated PTY cases pass hosted Linux CI. Interactive fault coverage now covers q-triggered and close-only stdout failure (active restore and read-only scan) and both stdout+stderr unavailable; only input-PTY failure and live S3 remain open.
-   **Finish condition:** Complete the documented user flows and their required acceptance tests, including hosted credential-flow acceptance and the remaining event-loop failure cases (input-PTY failure). See [capabilities](docs/capabilities.md), the [TUI crate record](crates/tui/README.md), and [restore interaction](docs/restore-interaction.md).
+   **Status:** Catalog browsing, selection, preview, worker-owned restore publication, and multiple PTY acceptance cases exist. The bounded no-echo OpenPGP credential flow is implemented and its Linux-gated PTY cases pass hosted Linux CI. Interactive fault coverage now covers q-triggered and close-only stdout failure (active restore and read-only scan) and both stdout+stderr unavailable. Input-PTY hangup is a documented crossterm/OS trusted-boundary limitation (the browser hangs, not errors); live S3 remains separate.
+   **Finish condition:** Complete the documented user flows and their required acceptance tests, including hosted credential-flow acceptance and the remaining event-loop failure cases, with input-PTY hangup recorded as a trusted-boundary limitation. See [capabilities](docs/capabilities.md), the [TUI crate record](crates/tui/README.md), and [restore interaction](docs/restore-interaction.md).
 
 2. **Publish a bounded compatibility contract.**
    **Status:** Official fixtures and reader tests cover several Duplicity releases and 3.0.7 plain, encrypted, signed, historical-name, and adversarial cases. The broader producer matrix is not complete.

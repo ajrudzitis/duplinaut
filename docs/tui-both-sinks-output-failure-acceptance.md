@@ -80,6 +80,14 @@ output, fatal signals, crashes, fixed cancellation latency, syscall
 interruption, publication races, S3, or encrypted credentials. The backend
 receives the already-cancelled token before filesystem restore work begins.
 
+Input-PTY failure is excluded because it is a trusted-boundary limitation, not a
+testable controlled-shutdown case: closing the input PTY master hangs up the
+child's stdin, and pinned crossterm 0.29's tty poll reports only `POLLHUP`
+(never `POLLIN`) after the hangup, so its `event::poll` busy-spins and
+`event::read` never returns; the browser hangs instead of returning an input
+error. A real terminal close is handled by the operating system via `SIGHUP`
+rather than a clean input-error path.
+
 ## Checklist
 
 - [x] Specify and implement the both-sinks case using `/dev/full` stderr, the

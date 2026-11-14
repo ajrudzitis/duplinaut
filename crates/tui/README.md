@@ -139,7 +139,7 @@ anchor choice.
 - [x] Verify on macOS that ordinary local and S3 CLI configurations parse without a restore destination while native restore flags remain rejected; independent review and full CI passed. This is CLI parsing coverage only.
 - [x] Connect explicitly acknowledged selection to native Linux publication; use the existing SDK credential provider.
 - [ ] Test remaining display escaping, error and interaction paths.
-- [ ] Automate remaining terminal interaction, cancellation, resize and S3 frontend tests. The q-triggered and close-only active-restore and read-only-scan output-failure cases, plus the both-sinks case, are in place; input-PTY failure and live S3 acceptance remain open.
+- [ ] Automate remaining terminal interaction, cancellation, resize and S3 frontend tests. The q-triggered and close-only active-restore and read-only-scan output-failure cases, plus the both-sinks case, are in place. Input-PTY hangup is a crossterm/OS trusted-boundary limitation (the browser hangs rather than erroring, so no clean acceptance case exists); live S3 frontend acceptance remains open.
 
 See [requirements](../../docs/parsing-requirements.md) and the [machine ledger](../../docs/assurance.toml).
 
